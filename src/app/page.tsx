@@ -25,6 +25,7 @@ import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, Us
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { SocioVipLogo } from "@/components/icons";
 
@@ -59,6 +60,12 @@ const mockExistingUser: UserData = {
   phone: "+51987654321",
   dob: "1990-05-15",
   dni: "12345678",
+};
+
+const statusTranslations: { [key in QrCodeStatus]: string } = {
+  generated: "Generado",
+  utilized: "Utilizado",
+  expired: "Vencido",
 };
 
 export default function HomePage() {
@@ -164,7 +171,7 @@ export default function HomePage() {
       name: values.name,
       surname: values.surname,
       phone: values.phone,
-      dob: format(values.dob, "yyyy-MM-dd"),
+      dob: format(values.dob, "yyyy-MM-dd"), // Keep ISO format for storage
       dni: enteredDni,
     };
 
@@ -353,7 +360,7 @@ export default function HomePage() {
                                   )}
                                 >
                                   {field.value ? (
-                                    format(field.value, "PPP")
+                                    format(field.value, "d MMMM yyyy", { locale: es })
                                   ) : (
                                     <span>Selecciona una fecha</span>
                                   )}
@@ -366,10 +373,11 @@ export default function HomePage() {
                                 mode="single"
                                 selected={field.value}
                                 onSelect={field.onChange}
+                                locale={es}
                                 captionLayout="dropdown-buttons"
                                 fromYear={1900}
                                 toYear={new Date().getFullYear()}
-                                disabled={(date) => date > new Date()}
+                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                                 initialFocus
                               />
                             </PopoverContent>
@@ -413,10 +421,10 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold text-primary flex items-center"><Ticket className="mr-2 h-5 w-5"/> Detalles de la Promoción</h3>
                 <p><strong className="font-medium">Título:</strong> {qrData.promotion.title}</p>
                 <p><strong className="font-medium">Descripción:</strong> {qrData.promotion.description}</p>
-                <p className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Válido hasta:</strong> {format(new Date(qrData.promotion.validUntil), "PPP")}</p>
+                <p className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Válido hasta:</strong> {format(new Date(qrData.promotion.validUntil), "d MMMM yyyy", { locale: es })}</p>
                 <p className="flex items-center">
                   {renderStatusIcon(qrData.status)}
-                  <strong className="font-medium ml-2">Estado:</strong> <span className="capitalize ml-1">{qrData.status}</span>
+                  <strong className="font-medium ml-2">Estado:</strong> <span className="ml-1">{statusTranslations[qrData.status]}</span>
                 </p>
               </div>
 
@@ -446,5 +454,6 @@ export default function HomePage() {
     </div>
   );
 }
-
     
+
+      
