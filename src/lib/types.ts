@@ -9,7 +9,7 @@ export interface PromotionDetails { // For public display
   aiHint: string; // Hint for placeholder image
 }
 
-export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'expired'; // Renamed to avoid conflict
+export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'expired'; 
 
 // Represents a client who generates QR codes via promotional codes (public page flow)
 export interface QrClient {
@@ -17,7 +17,7 @@ export interface QrClient {
   name: string;
   surname: string;
   phone: string;
-  dob: string; // Date of Birth, YYYY-MM-DD
+  dob: string; // Date of Birth, YYYY-MM-DD T HH:mm:ss
   dni: string; // Document ID
   registrationDate: string; // ISO date string of first QR generation
 }
@@ -37,7 +37,7 @@ export interface SocioVipMember {
   name: string;
   surname: string;
   phone: string;
-  dob: string; // YYYY-MM-DD
+  dob: string; // YYYY-MM-DD T HH:mm:ss
   dni: string;
   email: string; // For account login
   address?: string;
@@ -107,8 +107,8 @@ export interface BusinessManagedEntity { // Promotions, Events, Surveys created 
   type: BusinessEntityType;
   name: string;
   description: string;
-  startDate: string; // ISO Date
-  endDate: string; // ISO Date
+  startDate: string; // ISO Date string e.g. "2024-08-01T12:00:00"
+  endDate: string; // ISO Date string e.g. "2024-12-31T12:00:00"
   usageLimit?: number; // Max number of times it can be used/redeemed (for promotions)
   maxAttendance?: number; // Max attendance for events
   isActive: boolean;

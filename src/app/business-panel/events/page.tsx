@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ListChecks } from "lucide-react";
 import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { BusinessEventForm } from "@/components/business/forms/BusinessEventForm";
 import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog";
+import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
+
 
 // Mock data for business events - In a real app, this would be fetched for the logged-in business
 let mockBusinessEvents: BusinessManagedEntity[] = [
@@ -69,11 +71,16 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
 
 export default function BusinessEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateEditEventModal, setShowCreateEditEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(null);
   const [events, setEvents] = useState<BusinessManagedEntity[]>(mockBusinessEvents);
+  
   const [showManageCodesModal, setShowManageCodesModal] = useState(false);
-  const [selectedEntityForCodes, setSelectedEntityForCodes] = useState<BusinessManagedEntity | null>(null);
+  const [selectedEntityForViewingCodes, setSelectedEntityForViewingCodes] = useState<BusinessManagedEntity | null>(null);
+  
+  const [showCreateCodesModal, setShowCreateCodesModal] = useState(false);
+  const [selectedEntityForCreatingCodes, setSelectedEntityForCreatingCodes] = useState<BusinessManagedEntity | null>(null);
+  
   const { toast } = useToast();
 
   const filteredEvents = events.filter(event =>
@@ -97,7 +104,7 @@ export default function BusinessEventsPage() {
       generatedCodes: [],
     };
     setEvents(prev => [newEvent, ...prev]);
-    setShowCreateModal(false);
+    setShowCreateEditEventModal(false);
     toast({ title: "Evento Creado", description: `El evento "${newEvent.name}" ha sido creado.` });
   };
 
@@ -116,6 +123,7 @@ export default function BusinessEventsPage() {
     };
     setEvents(prev => prev.map(p => p.id === editingEvent.id ? updatedEvent : p));
     setEditingEvent(null);
+    setShowCreateEditEventModal(false);
     toast({ title: "Evento Actualizado", description: `El evento "${updatedEvent.name}" ha sido actualizado.` });
   };
   
@@ -124,12 +132,27 @@ export default function BusinessEventsPage() {
     toast({ title: "Evento Eliminado", description: `El evento ha sido eliminado.`, variant: "destructive" });
   };
 
-  const handleOpenManageCodes = (event: BusinessManagedEntity) => {
-    setSelectedEntityForCodes(event);
+  const openCreateCodesDialog = (event: BusinessManagedEntity) => {
+    setSelectedEntityForCreatingCodes(event);
+    setShowCreateCodesModal(true);
+  };
+
+  const openViewCodesDialog = (event: BusinessManagedEntity) => {
+    setSelectedEntityForViewingCodes(event);
     setShowManageCodesModal(true);
   };
   
-  const handleCodesUpdated = (entityId: string, updatedCodes: GeneratedCode[]) => {
+  const handleNewCodesCreated = (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
+    setEvents(prevEvents => prevEvents.map(event => {
+      if (event.id === entityId) {
+        const updatedCodes = [...(event.generatedCodes || []), ...newCodes];
+        return { ...event, generatedCodes: updatedCodes };
+      }
+      return event;
+    }));
+  };
+
+  const handleCodesUpdatedFromManageDialog = (entityId: string, updatedCodes: GeneratedCode[]) => {
     setEvents(prevEvents => prevEvents.map(event => 
       event.id === entityId ? { ...event, generatedCodes: updatedCodes } : event
     ));
@@ -146,7 +169,7 @@ export default function BusinessEventsPage() {
         <h1 className="text-3xl font-bold text-primary flex items-center">
           <Calendar className="h-8 w-8 mr-2" /> Gestión de Eventos
         </h1>
-        <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90">
+        <Button onClick={() => {setEditingEvent(null); setShowCreateEditEventModal(true);}} className="bg-primary hover:bg-primary/90">
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Evento
         </Button>
       </div>
@@ -193,10 +216,13 @@ export default function BusinessEventsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
-                       <Button variant="outline" size="sm" onClick={() => handleOpenManageCodes(event)}>
-                        <QrCode className="h-4 w-4 mr-1" /> Códigos ({event.generatedCodes?.length || 0})
+                       <Button variant="outline" size="sm" onClick={() => openCreateCodesDialog(event)}>
+                        <QrCode className="h-4 w-4 mr-1" /> Crear Códigos
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setEditingEvent(event)}>
+                       <Button variant="outline" size="sm" onClick={() => openViewCodesDialog(event)}>
+                        <ListChecks className="h-4 w-4 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => {setEditingEvent(event); setShowCreateEditEventModal(true);}}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Editar</span>
                       </Button>
@@ -239,41 +265,48 @@ export default function BusinessEventsPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+      <Dialog open={showCreateEditEventModal} onOpenChange={setShowCreateEditEventModal}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Crear Nuevo Evento</DialogTitle>
-            <DialogDescription>Completa los detalles para tu nuevo evento.</DialogDescription>
+            <DialogTitle>{editingEvent ? "Editar Evento" : "Crear Nuevo Evento"}</DialogTitle>
+            <DialogDescription>
+                 {editingEvent ? `Actualiza los detalles de "${editingEvent.name}".` : "Completa los detalles para tu nuevo evento."}
+            </DialogDescription>
           </DialogHeader>
           <BusinessEventForm
-            onSubmit={handleCreateEvent} 
-            onCancel={() => setShowCreateModal(false)} 
+            event={editingEvent || undefined}
+            onSubmit={editingEvent ? handleEditEvent : handleCreateEvent} 
+            onCancel={() => setShowCreateEditEventModal(false)} 
           />
         </DialogContent>
       </Dialog>
 
-      {editingEvent && (
-         <Dialog open={!!editingEvent} onOpenChange={() => setEditingEvent(null)}>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Evento: {editingEvent.name}</DialogTitle>
-               <DialogDescription>Actualiza los detalles del evento.</DialogDescription>
-            </DialogHeader>
-            <BusinessEventForm
-              event={editingEvent} 
-              onSubmit={handleEditEvent} 
-              onCancel={() => setEditingEvent(null)}
-            />
-          </DialogContent>
-        </Dialog>
+      {selectedEntityForCreatingCodes && (
+        <CreateCodesDialog
+          open={showCreateCodesModal}
+          onOpenChange={setShowCreateCodesModal}
+          entityName={selectedEntityForCreatingCodes.name}
+          entityId={selectedEntityForCreatingCodes.id}
+          existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
+          onCodesCreated={handleNewCodesCreated}
+        />
       )}
 
-      {selectedEntityForCodes && (
+      {selectedEntityForViewingCodes && (
         <ManageCodesDialog
           open={showManageCodesModal}
-          onOpenChange={setShowManageCodesModal}
-          entity={selectedEntityForCodes}
-          onCodesUpdated={handleCodesUpdated}
+          onOpenChange={(isOpen) => {
+            setShowManageCodesModal(isOpen);
+            if (!isOpen) setSelectedEntityForViewingCodes(null);
+          }}
+          entity={selectedEntityForViewingCodes}
+          onCodesUpdated={handleCodesUpdatedFromManageDialog}
+          onRequestCreateNewCodes={() => {
+            setShowManageCodesModal(false);
+             if(selectedEntityForViewingCodes) {
+                setTimeout(() => openCreateCodesDialog(selectedEntityForViewingCodes), 0);
+            }
+          }}
         />
       )}
     </div>
