@@ -121,7 +121,8 @@ export interface BusinessManagedEntity { // Promotions, Events, Surveys created 
   imageUrl?: string; // Optional image for the entity
   aiHint?: string;
   generatedCodes?: GeneratedCode[]; // Codes generated for this entity
-  // assignedPromoterIds?: string[]; // Future: To link specific promoters
+  ticketTypes?: TicketType[];
+  eventBoxes?: EventBox[];
 }
 
 export interface PromoterProfile { // Global profile for a promoter
@@ -143,8 +144,8 @@ export interface BusinessPromoterLink { // How a Business links to a Promoter
 // New types for Event Management
 export interface TicketType {
   id: string;
-  businessId: string; // Assuming types are per business
-  eventId?: string; // Optional: if a ticket type is specific to one event
+  businessId: string; 
+  eventId: string; 
   name: string;
   cost: number;
   description?: string;
@@ -153,16 +154,16 @@ export interface TicketType {
 
 export interface EventBox {
   id: string;
-  businessId: string; // Assuming boxes are per business
-  eventId?: string; // Optional: if a box configuration is specific to one event
+  businessId: string; 
+  eventId: string; 
   name: string;
   cost: number;
   description?: string;
   status: 'available' | 'unavailable';
   capacity?: number; // How many people fit
-  sellerName?: string; // New field
-  ownerName?: string;  // New field
-  ownerDni?: string;   // New field
+  sellerName?: string; 
+  ownerName?: string;  
+  ownerDni?: string;   
 }
 
 
@@ -262,5 +263,3 @@ export interface EventBoxFormData {
   ownerName?: string;
   ownerDni?: string;
 }
-
-    
