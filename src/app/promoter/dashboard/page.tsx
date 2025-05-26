@@ -2,7 +2,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart2, CheckCircle, QrCode, DollarSign } from "lucide-react";
+import { BarChart2, CheckCircle, QrCode, DollarSign, Gift } from "lucide-react";
 import { StatCard } from "@/components/admin/StatCard"; // Re-using StatCard
 
 // Mock Data for Promoter Dashboard
@@ -66,3 +66,4 @@ export default function PromoterDashboardPage() {
     </div>
   );
 }
+
