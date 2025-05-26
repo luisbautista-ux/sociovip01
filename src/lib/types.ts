@@ -1,5 +1,4 @@
 
-
 export interface PromotionDetails { // For public display
   id: string;
   title: string;
@@ -105,6 +104,7 @@ export interface GeneratedCode {
     name: string;
     phone?: string; // Optional, if captured during a simplified redemption
   };
+  isVipCandidate?: boolean; // Marked by Host during redemption
 }
 
 export interface BusinessManagedEntity { // Promotions, Events, Surveys created by a Business
@@ -203,4 +203,17 @@ export interface BusinessPromoterFormData { // For inviting/linking a promoter
   promoterEmail: string;
   promoterPhone?: string;
   commissionRate?: string;
+}
+
+// For Promoter Commissions Page
+export interface PromoterCommissionEntry {
+    id: string;
+    businessName: string;
+    entityName: string; // Promotion or Event name
+    entityType: 'promotion' | 'event';
+    codesRedeemedByPromoter: number;
+    commissionRate: string; // e.g. "S/ 2.50 por código" or "5% de venta"
+    commissionEarned: number;
+    paymentStatus: 'Pendiente' | 'Pagado';
+    period: string; // e.g. "Agosto 2024"
 }

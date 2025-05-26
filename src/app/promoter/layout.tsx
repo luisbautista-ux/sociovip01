@@ -1,20 +1,19 @@
 
-"use client"; // Add this directive
+"use client"; 
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { BarChart2, Gift, ListChecks, LogOut, QrCode, Settings, UserCircle } from "lucide-react";
-import { SocioVipLogo } from "@/components/icons"; // Reusing the logo
+import { BarChart2, Gift, ListChecks, LogOut, QrCode, Settings, UserCircle, DollarSign } from "lucide-react";
+import { SocioVipLogo } from "@/components/icons"; 
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation"; 
 
-// This layout will wrap all promoter pages
 
 const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
-  { href: "/promoter/entities", label: "Mis Entidades", icon: Gift },
-  // { href: "/promoter/codes", label: "Generar Códigos", icon: QrCode }, // Maybe part of entities
+  { href: "/promoter/entities", label: "Promociones y Eventos", icon: Gift },
+  { href: "/promoter/commissions", label: "Mis Comisiones", icon: DollarSign },
   // { href: "/promoter/settings", label: "Configuración", icon: Settings },
 ];
 
@@ -54,11 +53,6 @@ function PromoterSidebar() {
   );
 }
 
-// Removed metadata export as it's not allowed in Client Components
-// export const metadata: Metadata = {
-//   title: "Panel Promotor - SocioVIP",
-//   description: "Gestiona tus entidades asignadas y códigos.",
-// };
 
 export default function PromoterLayout({
   children,
@@ -76,9 +70,6 @@ export default function PromoterLayout({
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
           <div className="md:hidden">
-             {/* Mobile Menu Trigger (Sheet) can go here. 
-                 For now, a placeholder. For a real Sheet, this might also need to be a client component.
-             */}
              <Button size="icon" variant="outline">
                 <ListChecks className="h-5 w-5" />
                 <span className="sr-only">Toggle Menu</span>
@@ -93,7 +84,7 @@ export default function PromoterLayout({
               {promoterUserName}
             </span>
             <Button variant="outline" size="icon" asChild>
-              <Link href="/"> {/* Replace with actual logout later */}
+              <Link href="/"> 
                 <LogOut className="h-4 w-4" />
                 <span className="sr-only">Cerrar Sesión</span>
               </Link>
