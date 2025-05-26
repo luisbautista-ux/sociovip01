@@ -1,11 +1,13 @@
 
+"use client"; // Add this directive
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BarChart2, Gift, ListChecks, LogOut, QrCode, Settings, UserCircle } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons"; // Reusing the logo
 import { cn } from "@/lib/utils";
-import { usePathname } from "next/navigation"; // Will need "use client" in Nav component
+import { usePathname } from "next/navigation"; 
 
 // This layout will wrap all promoter pages
 
@@ -18,7 +20,7 @@ const navItems = [
 
 
 function PromoterSidebar() {
-  const pathname = usePathname(); // Hook requires "use client"
+  const pathname = usePathname(); 
   const promoterName = "Promotor Ejemplo"; // Mocked
 
   return (
@@ -52,11 +54,11 @@ function PromoterSidebar() {
   );
 }
 
-
-export const metadata: Metadata = {
-  title: "Panel Promotor - SocioVIP",
-  description: "Gestiona tus entidades asignadas y códigos.",
-};
+// Removed metadata export as it's not allowed in Client Components
+// export const metadata: Metadata = {
+//   title: "Panel Promotor - SocioVIP",
+//   description: "Gestiona tus entidades asignadas y códigos.",
+// };
 
 export default function PromoterLayout({
   children,
@@ -68,28 +70,15 @@ export default function PromoterLayout({
 
   return (
     <div className="flex min-h-screen bg-muted/40">
-       {/* 
-        This structure assumes PromoterSidebar is a Client Component if it uses usePathname directly.
-        For server layouts, navigation state needs careful handling or separate client components.
-        For now, let's make the sidebar a client component.
-      */}
-      <div className="hidden md:flex"> {/* Sidebar hidden on small screens, could be a Sheet */}
-         {/* To make PromoterSidebar a client component if it uses usePathname:
-             1. Create PromoterSidebar.tsx
-             2. Add "use client"; at the top of PromoterSidebar.tsx
-             3. Move the PromoterSidebar function definition to that file.
-             4. Import and use <PromoterSidebar /> here.
-             For now, this will cause an error if PromoterSidebar directly uses usePathname
-             without being marked as a client component itself.
-             Let's assume PromoterSidebar will be refactored or this page becomes client-side.
-             For simplicity of this step, I'm leaving it as is, but noting the implication.
-          */}
-          {/* <PromoterSidebar /> Placeholder if sidebar becomes separate client component */}
+      <div className="hidden md:flex">
+          <PromoterSidebar /> 
       </div>
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
           <div className="md:hidden">
-             {/* Mobile Menu Trigger (Sheet) can go here */}
+             {/* Mobile Menu Trigger (Sheet) can go here. 
+                 For now, a placeholder. For a real Sheet, this might also need to be a client component.
+             */}
              <Button size="icon" variant="outline">
                 <ListChecks className="h-5 w-5" />
                 <span className="sr-only">Toggle Menu</span>
