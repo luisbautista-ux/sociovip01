@@ -1,4 +1,5 @@
 
+
 export interface PromotionDetails { // For public display
   id: string;
   title: string;
@@ -95,10 +96,15 @@ export interface GeneratedCode {
   value: string; // The actual 9-digit code string
   entityId: string; // ID of BusinessManagedEntity (Promotion, Event, etc.)
   status: QrCodeStatusGenerated; // 'available', 'redeemed', 'expired'
-  generatedByName: string; // Mock: "Business Admin" or specific staff name
+  generatedByName: string; // Mock: "Business Admin" or specific staff name or promoter name
   generatedDate: string; // ISO Date string
   redemptionDate?: string; // ISO Date string, if redeemed
   observation?: string; // Optional observation for the code
+  redeemedByInfo?: { // Info of the client who redeemed this specific code
+    dni: string;
+    name: string;
+    phone?: string; // Optional, if captured during a simplified redemption
+  };
 }
 
 export interface BusinessManagedEntity { // Promotions, Events, Surveys created by a Business
@@ -115,6 +121,7 @@ export interface BusinessManagedEntity { // Promotions, Events, Surveys created 
   imageUrl?: string; // Optional image for the entity
   aiHint?: string;
   generatedCodes?: GeneratedCode[]; // Codes generated for this entity
+  // assignedPromoterIds?: string[]; // Future: To link specific promoters
 }
 
 export interface PromoterProfile { // Global profile for a promoter
