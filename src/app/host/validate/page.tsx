@@ -19,7 +19,6 @@ import { Html5Qrcode, type Html5QrcodeScannerState } from "html5-qrcode";
 
 // Mock data - In a real app, this would be fetched for the host's associated business
 // For simplicity, we'll re-use and filter the mock data from business panel.
-// This is NOT ideal as changes in one place won't reflect here without backend.
 const allMockPromotions: BusinessManagedEntity[] = [
   { 
     id: "bp1", 
@@ -62,8 +61,8 @@ const allMockPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Promo Cumpleañero Mes (INACTIVA)", 
     description: "Si cumples años este mes, tu postre es gratis.", 
-    startDate: "2024-01-01T12:00:00", // Kept in past
-    endDate: "2024-12-31T12:00:00", // Kept in past
+    startDate: "2024-01-01T12:00:00", 
+    endDate: "2024-12-31T12:00:00", 
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "birthday cake",
@@ -107,7 +106,7 @@ const statusTranslations: Record<GeneratedCode['status'], string> = {
 const QR_READER_ELEMENT_ID = "qr-reader";
 
 export default function HostValidateQrPage() {
-  const [scannedCode, setScannedCode] = useState("");
+  const [scannedCodeValue, setScannedCodeValue] = useState(""); // Renamed from scannedCode to avoid confusion with actual foundCode object
   const [foundEntity, setFoundEntity] = useState<BusinessManagedEntity | null>(null);
   const [foundCode, setFoundCode] = useState<GeneratedCode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -119,7 +118,7 @@ export default function HostValidateQrPage() {
   const businessName = "Pandora Lounge Bar"; 
 
   const [isScannerActive, setIsScannerActive] = useState(false);
-  const scannerInstanceRef = useRef<Html5Qrcode | null>(null);
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null); // Changed scannerInstanceRef to html5QrCodeRef
 
   useEffect(() => {
     const now = new Date();
@@ -145,61 +144,81 @@ export default function HostValidateQrPage() {
         return;
     }
     
+    // Ensure only one instance is active
+    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+        await html5QrCodeRef.current.stop().catch(console.error);
+    }
+    
     const newScannerInstance = new Html5Qrcode(QR_READER_ELEMENT_ID);
-    scannerInstanceRef.current = newScannerInstance;
+    html5QrCodeRef.current = newScannerInstance;
 
     const qrCodeSuccessCallback = (decodedText: string, decodedResult: any) => {
-      setScannedCode(decodedText);
-      handleSearchCode(decodedText); // Auto-search after scan
-      stopScanner();
+      setScannedCodeValue(decodedText.toUpperCase());
+      handleSearchCode(decodedText.toUpperCase()); // Auto-search after scan
+      stopScanner(); // Stop scanner after successful scan
       toast({ title: "QR Escaneado", description: `Código: ${decodedText}` });
     };
 
     const qrCodeErrorCallback = (errorMessage: string) => {
-      // console.warn(`QR Code no detectado, error: ${errorMessage}`);
+      // console.warn(`QR Code no detectado, error: ${errorMessage}`); // Can be noisy
     };
     
     try {
-      const cameras = await Html5Qrcode.getCameras();
-      if (cameras && cameras.length) {
-        const cameraId = cameras[0].id; // Use the first camera
-        await newScannerInstance.start(
-          cameraId,
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          qrCodeSuccessCallback,
-          qrCodeErrorCallback
-        );
-        setIsScannerActive(true);
-      } else {
-        toast({ title: "Sin Cámara", description: "No se encontraron cámaras disponibles.", variant: "destructive" });
-      }
+      // Prefer 'environment' (rear camera)
+      await newScannerInstance.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        qrCodeSuccessCallback,
+        qrCodeErrorCallback
+      );
+      setIsScannerActive(true);
     } catch (err) {
-      console.error("Error al iniciar scanner:", err);
-      toast({ title: "Error de Scanner", description: "No se pudo iniciar el scanner de QR.", variant: "destructive" });
-      if (scannerInstanceRef.current && scannerInstanceRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
-        await scannerInstanceRef.current.stop().catch(console.error);
+      console.error("Error al iniciar scanner (environment):", err);
+      // Fallback to any camera if environment facing mode fails
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length) {
+            await newScannerInstance.start(
+                cameras[0].id,
+                { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+                qrCodeSuccessCallback,
+                qrCodeErrorCallback
+            );
+            setIsScannerActive(true);
+        } else {
+             toast({ title: "Sin Cámara", description: "No se encontraron cámaras disponibles.", variant: "destructive" });
+             setIsScannerActive(false);
+        }
+      } catch (fallbackErr) {
+        console.error("Error al iniciar scanner (fallback):", fallbackErr);
+        toast({ title: "Error de Scanner", description: "No se pudo iniciar el scanner de QR.", variant: "destructive" });
+        setIsScannerActive(false); // Ensure scanner state is correctly set
       }
-      setIsScannerActive(false);
     }
   };
 
   const stopScanner = async () => {
-    if (scannerInstanceRef.current && scannerInstanceRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
       try {
-        await scannerInstanceRef.current.stop();
+        await html5QrCodeRef.current.stop();
       } catch (err) {
         console.error("Error al detener scanner:", err);
-        // It might have already been stopped or cleared.
       }
     }
-    scannerInstanceRef.current = null;
+    // html5QrCodeRef.current = null; // Don't nullify, just ensure it's stopped
     setIsScannerActive(false);
+    const qrReaderElement = document.getElementById(QR_READER_ELEMENT_ID);
+    if (qrReaderElement) {
+      qrReaderElement.innerHTML = ""; // Clear the video feed
+    }
   };
 
   useEffect(() => {
     // Cleanup scanner on component unmount
     return () => {
-      stopScanner();
+      if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+        html5QrCodeRef.current.stop().catch(console.error);
+      }
     };
   }, []);
 
@@ -208,23 +227,22 @@ export default function HostValidateQrPage() {
     if (isScannerActive) {
       stopScanner();
     } else {
-      // Clear previous search results when starting scanner
       setSearchPerformed(false);
       setFoundEntity(null);
       setFoundCode(null);
-      setScannedCode("");
+      setScannedCodeValue("");
       startScanner();
     }
   };
 
-  const handleSearchCode = (codeToSearch?: string) => {
-    const currentCode = codeToSearch || scannedCode;
-    if (currentCode.length !== 9 && currentCode.length !== 0) { // Allow empty for initial state
-      if (currentCode.length === 0 && !codeToSearch) return; // Do nothing if input is cleared manually and not from scan
+  const handleSearchCode = (codeToSearchParam?: string) => {
+    const currentCodeValue = (codeToSearchParam || scannedCodeValue).toUpperCase();
+    if (currentCodeValue.length !== 9 && currentCodeValue.length !== 0) {
+      if (currentCodeValue.length === 0 && !codeToSearchParam) return; 
       toast({ title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive" });
       return;
     }
-    if (currentCode.length === 0) { // If input cleared, reset search results
+    if (currentCodeValue.length === 0) {
       setSearchPerformed(false);
       setFoundEntity(null);
       setFoundCode(null);
@@ -236,28 +254,31 @@ export default function HostValidateQrPage() {
     setFoundCode(null);
     setIsVipCandidate(false); 
 
+    // Simulating API call
     setTimeout(() => {
       let entityMatch: BusinessManagedEntity | null = null;
       let codeMatch: GeneratedCode | null = null;
 
+      // First search in active entities for today
       for (const entity of activeBusinessEntities) { 
-        const code = entity.generatedCodes?.find(c => c.value.toUpperCase() === currentCode.toUpperCase());
+        const code = entity.generatedCodes?.find(c => c.value.toUpperCase() === currentCodeValue);
         if (code) {
           entityMatch = entity;
           codeMatch = code;
-          setIsVipCandidate(code.isVipCandidate || false);
+          setIsVipCandidate(code.isVipCandidate || false); // Load VIP candidate status
           break;
         }
       }
       
+      // If not found in active, search all entities of the business (e.g., for expired or inactive ones)
       if (!codeMatch) {
         const allEntitiesForBusiness = [...allMockPromotions, ...allMockEvents].filter(e => e.businessId === hostBusinessId);
          for (const entity of allEntitiesForBusiness) {
-            const code = entity.generatedCodes?.find(c => c.value.toUpperCase() === currentCode.toUpperCase());
+            const code = entity.generatedCodes?.find(c => c.value.toUpperCase() === currentCodeValue);
             if (code) {
                 entityMatch = entity; 
                 codeMatch = code;
-                setIsVipCandidate(code.isVipCandidate || false);
+                setIsVipCandidate(code.isVipCandidate || false); // Load VIP candidate status
                 break;
             }
         }
@@ -267,7 +288,7 @@ export default function HostValidateQrPage() {
       setFoundCode(codeMatch);
       setIsLoading(false);
       setSearchPerformed(true);
-    }, 1000);
+    }, 500); // Reduced timeout
   };
 
   const handleValidateAndRedeem = () => {
@@ -277,10 +298,12 @@ export default function HostValidateQrPage() {
         ...foundCode, 
         status: 'redeemed' as GeneratedCode['status'], 
         redemptionDate: new Date().toISOString(),
-        isVipCandidate: isVipCandidate 
+        isVipCandidate: isVipCandidate // Save the current state of the VIP candidate toggle
     };
     setFoundCode(updatedCode); 
 
+    // This is where you'd typically call an API to update the backend.
+    // For mock data, we update the global mock arrays. This is NOT ideal for real apps.
     const updateMockList = (list: BusinessManagedEntity[]) => 
         list.map(entity => {
             if (entity.id === foundEntity.id) {
@@ -292,10 +315,12 @@ export default function HostValidateQrPage() {
             return entity;
         });
     
+    // Directly modify the imported arrays if they are mutable (not ideal, but works for mocks)
     allMockPromotions.splice(0, allMockPromotions.length, ...updateMockList(allMockPromotions));
     allMockEvents.splice(0, allMockEvents.length, ...updateMockList(allMockEvents));
     
-     const now = new Date();
+    // Re-filter active entities to reflect potential changes if an event reached max attendance
+    const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const filteredActive = [...allMockPromotions, ...allMockEvents].filter(entity => {
       const entityStartDateObj = new Date(entity.startDate);
@@ -316,6 +341,7 @@ export default function HostValidateQrPage() {
   
   const handleVipCandidateToggle = (checked: boolean) => {
     setIsVipCandidate(checked);
+    // Only show toast if a code is found and available, to avoid nuisance toasts
     if (foundCode && foundCode.status === 'available') { 
         toast({
             title: "Perfil de Cliente",
@@ -341,6 +367,7 @@ export default function HostValidateQrPage() {
 
     if (foundCode.status !== 'available') return false; 
 
+    // Check event attendance limit
     if (foundEntity.type === 'event' && foundEntity.maxAttendance && foundEntity.maxAttendance > 0) {
       const redeemedCount = foundEntity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
       if (redeemedCount >= foundEntity.maxAttendance) return false; 
@@ -373,30 +400,30 @@ export default function HostValidateQrPage() {
             <CardDescription>Apunta la cámara al código QR del cliente.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div id={QR_READER_ELEMENT_ID} className="w-full max-w-md mx-auto aspect-square border rounded-md overflow-hidden">
-              {/* html5-qrcode will render video here */}
+            <div id={QR_READER_ELEMENT_ID} className="w-full max-w-md mx-auto aspect-square border rounded-md overflow-hidden bg-muted">
+              {/* html5-qrcode will render video here if camera access is granted */}
             </div>
-             <p className="text-center text-sm text-muted-foreground mt-2">El video de la cámara aparecerá aquí.</p>
+             <p className="text-center text-sm text-muted-foreground mt-2">El video de la cámara aparecerá aquí si se conceden los permisos.</p>
           </CardContent>
         </Card>
       )}
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Ingresar Código Manualmente</CardTitle>
-          <CardDescription>Si el escaneo falla, escribe el código de 9 dígitos del cliente.</CardDescription>
+          <CardTitle>Verificar Código Manualmente</CardTitle>
+          <CardDescription>Si el escaneo falla o necesitas verificar un código, ingrésalo aquí para ver su estado.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col sm:flex-row gap-2">
           <Input
             type="text"
-            value={scannedCode}
-            onChange={(e) => setScannedCode(e.target.value.toUpperCase())}
+            value={scannedCodeValue}
+            onChange={(e) => setScannedCodeValue(e.target.value.toUpperCase())}
             placeholder="ABC123XYZ"
             maxLength={9}
             className="text-lg flex-grow tracking-wider"
             disabled={isLoading || isScannerActive}
           />
-          <Button onClick={() => handleSearchCode()} disabled={isLoading || isScannerActive || scannedCode.length !== 9} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+          <Button onClick={() => handleSearchCode()} disabled={isLoading || isScannerActive || scannedCodeValue.length !== 9} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
             <Search className="mr-2 h-4 w-4" /> {isLoading ? "Buscando..." : "Buscar Código"}
           </Button>
         </CardContent>
@@ -405,14 +432,14 @@ export default function HostValidateQrPage() {
       {searchPerformed && (
         <Card className="shadow-xl animate-in fade-in-50">
           <CardHeader>
-            <CardTitle>Resultado de la Búsqueda</CardTitle>
+            <CardTitle>Resultado de la Verificación</CardTitle>
           </CardHeader>
           <CardContent>
             {!foundCode && !foundEntity && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Código No Encontrado</AlertTitle>
-                <AlertDescription>El código "{scannedCode}" no se encontró en ninguna promoción o evento activo de este negocio, o no es un código válido.</AlertDescription>
+                <AlertDescription>El código "{scannedCodeValue}" no se encontró o no es válido para este negocio.</AlertDescription>
               </Alert>
             )}
             {foundCode && foundEntity && (
@@ -516,5 +543,4 @@ export default function HostValidateQrPage() {
     </div>
   );
 }
-
     
