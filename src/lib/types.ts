@@ -107,6 +107,15 @@ export interface GeneratedCode {
   isVipCandidate?: boolean; // Marked by Host during redemption
 }
 
+// For assigning promoters to specific events/promotions with specific commission
+export interface EventPromoterAssignment {
+  promoterProfileId: string; // From global PromoterProfile list
+  promoterName: string; // For display convenience
+  promoterEmail?: string; // For display convenience
+  commissionRate?: string; // Event/Promotion specific commission
+  notes?: string; // Event/Promotion specific notes for this promoter
+}
+
 export interface BusinessManagedEntity { // Promotions, Events, Surveys created by a Business
   id: string;
   businessId: string;
@@ -123,6 +132,7 @@ export interface BusinessManagedEntity { // Promotions, Events, Surveys created 
   generatedCodes?: GeneratedCode[]; // Codes generated for this entity
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
+  assignedPromoters?: EventPromoterAssignment[]; // Promoters assigned to this specific event/promotion
 }
 
 export interface PromoterProfile { // Global profile for a promoter
@@ -132,16 +142,17 @@ export interface PromoterProfile { // Global profile for a promoter
   phone?: string;
 }
 
-export interface BusinessPromoterLink { // How a Business links to a Promoter
+export interface BusinessPromoterLink { // How a Business links to a Promoter (Global Link)
   id: string;
   businessId: string;
   promoterProfileId: string;
-  commissionRate?: string; // e.g., "10%" or "S/5 por QR"
+  commissionRate?: string; // e.g., "10%" or "S/5 por QR" - General commission with this business
   isActive: boolean;
   joinDate: string;
+  // promoterProfile?: PromoterProfile; // If we decide to embed for easier display
 }
 
-// New types for Event Management
+
 export interface TicketType {
   id: string;
   businessId: string; 
@@ -224,11 +235,11 @@ export interface BusinessEventFormData {
   aiHint?: string;
 }
 
-export interface BusinessPromoterFormData { // For inviting/linking a promoter
+export interface BusinessPromoterFormData { // For inviting/linking a promoter to the business globally
   promoterName: string;
   promoterEmail: string;
   promoterPhone?: string;
-  commissionRate?: string;
+  commissionRate?: string; // General commission with the business
 }
 
 // For Promoter Commissions Page
@@ -262,4 +273,11 @@ export interface EventBoxFormData {
   sellerName?: string;
   ownerName?: string;
   ownerDni?: string;
+}
+
+// Form data for assigning a promoter to an event
+export interface EventPromoterAssignmentFormData {
+    promoterProfileId: string;
+    commissionRate?: string;
+    notes?: string;
 }
