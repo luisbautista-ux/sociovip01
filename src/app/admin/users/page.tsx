@@ -4,22 +4,34 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Users, PlusCircle, Download, Search } from "lucide-react";
-import type { PlatformUser } from "@/lib/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Users, PlusCircle, Download, Search, Edit, Trash2 } from "lucide-react";
+import type { PlatformUser, PlatformUserFormData, Business } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-// TODO: Import Dialog components for create/edit forms
+import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
+import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-// Mock Data
-const mockPlatformUsers: PlatformUser[] = [
+
+// Mock Data - make it mutable for updates
+let mockPlatformUsers: PlatformUser[] = [
   { id: "su1", name: "Admin Principal", email: "superadmin@sociovip.app", role: "superadmin", lastLogin: "2024-07-20T10:00:00Z" },
   { id: "pu1", name: "Juan Perez (Pandora)", email: "juan.perez@pandora.com", role: "business_admin", businessId: "biz1", lastLogin: "2024-07-19T15:30:00Z" },
   { id: "pu2", name: "Maria Lopez (Pandora)", email: "maria.lopez@pandora.com", role: "staff", businessId: "biz1", lastLogin: "2024-07-20T09:00:00Z" },
   { id: "pu3", name: "Carlos Sanchez (Rincón)", email: "carlos.sanchez@rinconbohemio.pe", role: "business_admin", businessId: "biz2", lastLogin: "2024-07-18T11:00:00Z" },
 ];
+
+// Mock businesses for the form selector - in a real app, this would be fetched
+const mockBusinessesForForm: Business[] = [
+  { id: "biz1", name: "Pandora Lounge Bar", contactEmail: "contacto@pandora.com", joinDate: "2023-01-15T00:00:00Z", activePromotions: 3 },
+  { id: "biz2", name: "El Rincón Bohemio", contactEmail: "info@rinconbohemio.pe", joinDate: "2023-03-22T00:00:00Z", activePromotions: 5 },
+  { id: "biz3", name: "La Noche Estrellada Cafe", contactEmail: "reservas@lanoche.com", joinDate: "2023-05-10T00:00:00Z", activePromotions: 2 },
+];
+
 
 const roleTranslations: Record<PlatformUser['role'], string> = {
   superadmin: "Super Admin",
@@ -29,10 +41,15 @@ const roleTranslations: Record<PlatformUser['role'], string> = {
 
 export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  // const [showCreateModal, setShowCreateModal] = useState(false);
-  // const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
+  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>(mockPlatformUsers);
+  const { toast } = useToast();
 
-  const filteredUsers = mockPlatformUsers.filter(user =>
+  // In a real app, fetch businesses if needed, or pass them down if already available globally
+  const [availableBusinesses, setAvailableBusinesses] = useState<Business[]>(mockBusinessesForForm);
+
+  const filteredUsers = platformUsers.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -59,6 +76,34 @@ export default function AdminUsersPage() {
     document.body.removeChild(link);
   };
 
+  const handleCreateUser = (data: PlatformUserFormData) => {
+    const newUser: PlatformUser = {
+      id: `user${Date.now()}`,
+      ...data,
+      lastLogin: new Date().toISOString(),
+    };
+    setPlatformUsers(prev => [newUser, ...prev]);
+    setShowCreateModal(false);
+    toast({ title: "Usuario Creado", description: `El usuario "${newUser.name}" ha sido creado.` });
+  };
+
+  const handleEditUser = (data: PlatformUserFormData) => {
+    if (!editingUser) return;
+    setPlatformUsers(prev => prev.map(u => u.id === editingUser.id ? { ...editingUser, ...data } : u));
+    setEditingUser(null);
+    toast({ title: "Usuario Actualizado", description: `El usuario "${data.name}" ha sido actualizado.` });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setPlatformUsers(prev => prev.filter(u => u.id !== userId));
+    toast({ title: "Usuario Eliminado", description: `El usuario ha sido eliminado.`, variant: "destructive" });
+  };
+
+  const getBusinessName = (businessId?: string) => {
+    if (!businessId) return "N/A (Super Admin)";
+    return availableBusinesses.find(b => b.id === businessId)?.name || "Negocio Desconocido";
+  };
+
 
   return (
     <div className="space-y-6">
@@ -70,7 +115,7 @@ export default function AdminUsersPage() {
            <Button onClick={handleExport} variant="outline">
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button /* onClick={() => setShowCreateModal(true)} */ className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90">
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Usuario
           </Button>
         </div>
@@ -100,31 +145,61 @@ export default function AdminUsersPage() {
                 <TableHead>Rol</TableHead>
                 <TableHead className="hidden lg:table-cell">Negocio Asociado</TableHead>
                 <TableHead>Último Acceso</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell>{user.name}</TableCell>
+                    <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                     <TableCell>
-                      <Badge variant={user.role === 'superadmin' ? 'default' : 'secondary'}>
+                      <Badge variant={user.role === 'superadmin' ? 'default' : (user.role === 'business_admin' ? 'secondary' : 'outline')}>
                         {roleTranslations[user.role]}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">{user.businessId || "N/A (Super Admin)"}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{getBusinessName(user.businessId)}</TableCell>
                     <TableCell>{format(new Date(user.lastLogin), "P p", { locale: es })}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" /* onClick={() => setEditingUser(user)} */>Editar</Button>
-                      {/* Add delete button with confirmation */}
+                    <TableCell className="text-right space-x-1">
+                      <Button variant="ghost" size="icon" onClick={() => setEditingUser(user)}>
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Editar</span>
+                      </Button>
+                      {user.role !== 'superadmin' && ( // Prevent deleting superadmin
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Eliminar</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario 
+                                <span className="font-semibold"> {user.name}</span>.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="bg-destructive hover:bg-destructive/90"
+                              >
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">No se encontraron usuarios.</TableCell>
+                  <TableCell colSpan={6} className="text-center h-24">No se encontraron usuarios.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -132,10 +207,36 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
       
-      {/* TODO: Add Dialog for Create/Edit User Form */}
-      <p className="text-sm text-muted-foreground text-center p-4">
-        Funcionalidad de creación y edición de usuarios será implementada próximamente.
-      </p>
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
+            <DialogDescription>Completa los detalles para registrar un nuevo usuario de plataforma.</DialogDescription>
+          </DialogHeader>
+          <PlatformUserForm 
+            businesses={availableBusinesses}
+            onSubmit={handleCreateUser}
+            onCancel={() => setShowCreateModal(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {editingUser && (
+        <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Usuario: {editingUser.name}</DialogTitle>
+              <DialogDescription>Actualiza los detalles del usuario.</DialogDescription>
+            </DialogHeader>
+            <PlatformUserForm 
+              user={editingUser}
+              businesses={availableBusinesses}
+              onSubmit={handleEditUser}
+              onCancel={() => setEditingUser(null)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -15,14 +15,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import type { UserData, PromotionDetails, QrCodeData, QrCodeStatus } from "@/lib/types";
 import Image from "next/image";
-import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download } from "lucide-react";
+import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download, Gift, Home, Briefcase, Tags } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -47,6 +48,9 @@ const newUserSchema = z.object({
   surname: z.string().min(2, "Apellido es requerido."),
   phone: z.string().min(7, "Celular es requerido.").regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
   dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
+  address: z.string().optional(),
+  profession: z.string().optional(),
+  preferences: z.string().optional(), // Storing as comma-separated string for simplicity in form
 });
 
 type NewUserFormData = z.infer<typeof newUserSchema>;
@@ -89,6 +93,9 @@ const mockExistingUser: UserData = {
   phone: "+51987654321",
   dob: "1990-05-15",
   dni: "12345678",
+  address: "Av. Siempreviva 742",
+  profession: "Consultora",
+  preferences: ["Música en vivo", "Cocktails Clásicos"],
 };
 
 const statusTranslations: { [key in QrCodeStatus]: string } = {
@@ -125,39 +132,37 @@ export default function HomePage() {
       surname: "",
       phone: "",
       dob: undefined,
+      address: "",
+      profession: "",
+      preferences: "",
     }
   });
 
   useEffect(() => {
     if (currentStepInModal === 'newUserForm' && enteredDniOriginal) {
-      newUserForm.setValue('dni', enteredDniOriginal);
-      // Clear other fields if DNI changes or it's the first load for this DNI
       const currentDniInForm = newUserForm.getValues('dni');
-      if (currentDniInForm !== enteredDniOriginal) {
-        newUserForm.reset({ dni: enteredDniOriginal, name: "", surname: "", phone: "", dob: undefined });
-      } else if (!newUserForm.getValues('name')) { // If name is empty, likely first load for this DNI
-        newUserForm.reset({ dni: enteredDniOriginal, name: "", surname: "", phone: "", dob: undefined });
+      if (currentDniInForm !== enteredDniOriginal || !newUserForm.getValues('name')) {
+        newUserForm.reset({ 
+          dni: enteredDniOriginal, 
+          name: "", 
+          surname: "", 
+          phone: "", 
+          dob: undefined,
+          address: "",
+          profession: "",
+          preferences: "",
+        });
       }
     }
   }, [currentStepInModal, enteredDniOriginal, newUserForm]);
 
   const handleValidateAndShowDniModal = (promoCodeValue: string, promotion: PromotionDetails) => {
     const code = promoCodeValue.toUpperCase();
-    // Mock validation logic - replace with actual API call if needed
-    if (code === "INVALIDC1") {
-      toast({ title: "Error", description: "Código no válido.", variant: "destructive" });
-      return;
-    }
-    if (code === "EXPIREDCD") {
-      toast({ title: "Error", description: "Código vencido.", variant: "destructive" });
-      return;
-    }
-
     if (code === promotion.promoCode) {
       setActivePromotion(promotion);
       setValidatedPromoCode(code);
       setCurrentStepInModal("enterDni");
-      dniForm.reset(); // Reset DNI form when opening
+      dniForm.reset(); 
       setShowDniModal(true);
       toast({ title: "Código Válido", description: `Para "${promotion.title}". Ingresa tu DNI.` });
     } else {
@@ -184,10 +189,14 @@ export default function HomePage() {
       setQrData(newQrData);
       setShowDniModal(false);
       setPageViewState("qrDisplay");
-      toast({ title: `Bienvenido ${mockExistingUser.name}!`, description: "Tu QR ha sido generado." });
+      toast({ title: `Bienvenido de vuelta ${mockExistingUser.name}!`, description: "Tu QR ha sido generado." });
     } else {
       setCurrentStepInModal("newUserForm");
-      newUserForm.reset({ dni: values.dni, name: "", surname: "", phone: "", dob: undefined });
+      newUserForm.reset({ 
+        dni: values.dni, 
+        name: "", surname: "", phone: "", dob: undefined,
+        address: "", profession: "", preferences: ""
+      });
       toast({ title: "Nuevo Usuario", description: "Por favor, completa tus datos para generar tu QR." });
     }
   };
@@ -212,11 +221,10 @@ export default function HomePage() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
 
-    // Check if DNI changed to an existing user's DNI and is different from the original DNI that brought user to this form
     if (values.dni === mockExistingUser.dni && values.dni !== enteredDniOriginal) {
       setFormDataForDniWarning(values);
       setShowDniExistsWarningDialog(true);
-      return; // Stop submission, wait for dialog confirmation
+      return; 
     }
     
     const newUser: UserData = {
@@ -226,6 +234,9 @@ export default function HomePage() {
       phone: values.phone,
       dob: format(values.dob, "yyyy-MM-dd"),
       dni: values.dni,
+      address: values.address,
+      profession: values.profession,
+      preferences: values.preferences?.split(',').map(p => p.trim()).filter(p => p),
     };
     processNewUserRegistration(newUser);
   };
@@ -233,26 +244,22 @@ export default function HomePage() {
   const handleDniExistsConfirmation = (confirmed: boolean) => {
     setShowDniExistsWarningDialog(false);
     if (confirmed && formDataForDniWarning) {
-      // User confirmed it's their DNI, prefill form with existing user's data
-      // and allow them to submit (potentially after editing)
       newUserForm.reset({
         dni: mockExistingUser.dni,
         name: mockExistingUser.name,
         surname: mockExistingUser.surname,
         phone: mockExistingUser.phone,
         dob: new Date(mockExistingUser.dob), 
+        address: mockExistingUser.address,
+        profession: mockExistingUser.profession,
+        preferences: mockExistingUser.preferences?.join(', '),
       });
-      // User will need to click "Confirmar y Generar QR" again
-      // Or we can submit programmatically if no edits are desired.
-      // For now, let them review and submit.
       toast({ title: "Datos Precargados", description: "Hemos rellenado el formulario con tus datos existentes. Revisa y confirma." });
     } else if (!confirmed && formDataForDniWarning) {
-      // User denied, or wants to change DNI, reset to what they had typed
        newUserForm.reset(formDataForDniWarning);
     }
     setFormDataForDniWarning(null);
   };
-
 
   const resetProcess = () => {
     setPageViewState("promotionsList");
@@ -350,7 +357,7 @@ export default function HomePage() {
 
     return (
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 mt-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 mt-4">
           <FormField
             control={form.control}
             name="promoCode"
@@ -402,7 +409,7 @@ export default function HomePage() {
                   Válido hasta: {format(new Date(promo.validUntil), "d MMMM yyyy", { locale: es })}
                 </p>
               </CardContent>
-              <CardFooter className="flex-col"> {/* Ensure footer content is stacked */}
+              <CardFooter className="flex-col items-stretch">
                 <PromotionCodeForm promotion={promo} />
               </CardFooter>
             </Card>
@@ -448,6 +455,10 @@ export default function HomePage() {
               <h3 className="text-lg font-semibold text-primary flex items-center"><User className="mr-2 h-5 w-5"/> Tus Datos</h3>
               <p><strong className="font-medium">Nombre Completo:</strong> {qrData.user.name} {qrData.user.surname}</p>
               <p><strong className="font-medium">DNI/CE:</strong> {qrData.user.dni}</p>
+              <p className="flex items-center"><Gift className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Cumpleaños:</strong> {format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}</p>
+              {qrData.user.address && <p className="flex items-center"><Home className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Dirección:</strong> {qrData.user.address}</p>}
+              {qrData.user.profession && <p className="flex items-center"><Briefcase className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Profesión:</strong> {qrData.user.profession}</p>}
+              {qrData.user.preferences && qrData.user.preferences.length > 0 && <p className="flex items-center"><Tags className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Preferencias:</strong> {qrData.user.preferences.join(', ')}</p>}
             </div>
 
             <div className="text-sm text-muted-foreground p-3 bg-secondary rounded-md flex items-start">
@@ -577,8 +588,8 @@ export default function HomePage() {
                             locale={es}
                             captionLayout="dropdown-buttons"
                             fromYear={1900}
-                            toYear={new Date().getFullYear()}
-                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                            toYear={new Date().getFullYear() - 10} // At least 10 years old
+                            disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1900-01-01")}
                             initialFocus
                           />
                         </PopoverContent>
@@ -587,11 +598,44 @@ export default function HomePage() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={newUserForm.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dirección (Opcional)</FormLabel>
+                      <FormControl><Input placeholder="Ej: Av. Larco 123, Miraflores" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={newUserForm.control}
+                  name="profession"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Profesión (Opcional)</FormLabel>
+                      <FormControl><Input placeholder="Ej: Ingeniero, Doctora" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={newUserForm.control}
+                  name="preferences"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Preferencias (Opcional)</FormLabel>
+                      <FormControl><Textarea placeholder="Ej: Música rock, Comida italiana, Viajes (separadas por comas)" {...field} /></FormControl>
+                      <FormDescription>Separa tus preferencias por comas.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               <DialogFooter className="pt-4">
                 <Button variant="outline" type="button" onClick={() => {
                   const currentDniValue = newUserForm.getValues("dni");
                   setCurrentStepInModal('enterDni');
-                  // Optionally prefill DNI form with current value from newUserForm
                   dniForm.setValue("dni", currentDniValue || enteredDniOriginal || "");
                 }}>Volver</Button>
                 <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isLoading}>
@@ -621,12 +665,9 @@ export default function HomePage() {
         </AlertDialogContent>
       </AlertDialog>
 
-
       <footer className="mt-8 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
 }
-
-    

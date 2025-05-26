@@ -6,6 +6,9 @@ export interface UserData {
   phone: string;
   dob: string; // Date of Birth
   dni: string; // Document ID
+  address?: string;
+  profession?: string;
+  preferences?: string[];
 }
 
 export interface PromotionDetails {
@@ -41,6 +44,7 @@ export interface RegisteredClient extends UserData {
   registrationDate: string; // Date of first QR generation
   lastPromotionId?: string;
   lastPromotionTitle?: string;
+  loyaltyPoints: number;
 }
 
 export interface PromotionAnalyticsData {
@@ -65,4 +69,17 @@ export interface PlatformUser { // Admin user for a business, or superadmin
   role: 'superadmin' | 'business_admin' | 'staff';
   businessId?: string; // if not superadmin
   lastLogin: string;
+}
+
+// Form data types
+export interface BusinessFormData {
+  name: string;
+  contactEmail: string;
+}
+
+export interface PlatformUserFormData {
+  name: string;
+  email: string;
+  role: 'superadmin' | 'business_admin' | 'staff';
+  businessId?: string;
 }

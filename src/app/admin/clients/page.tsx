@@ -6,18 +6,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { RegisteredClient } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ListChecks, Download, Search } from "lucide-react";
+import { ListChecks, Download, Search, Gift, Home, Briefcase, Tags, Award } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 // Mock Data
 const mockRegisteredClients: RegisteredClient[] = [
-  { id: "user123", name: "Ana", surname: "García", phone: "+51987654321", dob: "1990-05-15", dni: "12345678", registrationDate: "2024-07-01T10:00:00Z", lastPromotionTitle: "Martes de 2x1 en Cocktails" },
-  { id: "user456", name: "Carlos", surname: "Pérez", phone: "+51912345678", dob: "1985-11-20", dni: "87654321", registrationDate: "2024-07-02T11:30:00Z", lastPromotionTitle: "Sábado VIP: Entrada Gratuita" },
-  { id: "user789", name: "Luisa", surname: "Martinez", phone: "+51998877665", dob: "1995-02-10", dni: "11223344", registrationDate: "2024-07-03T14:15:00Z", lastPromotionTitle: "Noche de Salsa: Mojito Gratis" },
-  { id: "user101", name: "Jorge", surname: "Rodriguez", phone: "+51965432109", dob: "1988-08-25", dni: "44332211", registrationDate: "2024-07-04T09:00:00Z", lastPromotionTitle: "Martes de 2x1 en Cocktails" },
-  { id: "user112", name: "Sofia", surname: "Lopez", phone: "+51955555555", dob: "2000-12-01", dni: "55667788", registrationDate: "2024-07-05T16:45:00Z", lastPromotionTitle: "Sábado VIP: Entrada Gratuita" },
+  { id: "user123", name: "Ana", surname: "García", phone: "+51987654321", dob: "1990-05-15", dni: "12345678", registrationDate: "2024-07-01T10:00:00Z", lastPromotionTitle: "Martes de 2x1 en Cocktails", loyaltyPoints: 120, address: "Av. Principal 123", profession: "Diseñadora", preferences: ["Música Pop", "Vino Tinto"] },
+  { id: "user456", name: "Carlos", surname: "Pérez", phone: "+51912345678", dob: "1985-11-20", dni: "87654321", registrationDate: "2024-07-02T11:30:00Z", lastPromotionTitle: "Sábado VIP: Entrada Gratuita", loyaltyPoints: 75, address: "Calle Secundaria 456", profession: "Ingeniero", preferences: ["Cerveza Artesanal", "Deportes"] },
+  { id: "user789", name: "Luisa", surname: "Martinez", phone: "+51998877665", dob: "1995-02-10", dni: "11223344", registrationDate: "2024-07-03T14:15:00Z", lastPromotionTitle: "Noche de Salsa: Mojito Gratis", loyaltyPoints: 200, preferences: ["Baile", "Cocktails Tropicales"] },
+  { id: "user101", name: "Jorge", surname: "Rodriguez", phone: "+51965432109", dob: "1988-08-25", dni: "44332211", registrationDate: "2024-07-04T09:00:00Z", lastPromotionTitle: "Martes de 2x1 en Cocktails", loyaltyPoints: 50 },
+  { id: "user112", name: "Sofia", surname: "Lopez", phone: "+51955555555", dob: "2000-12-01", dni: "55667788", registrationDate: "2024-07-05T16:45:00Z", lastPromotionTitle: "Sábado VIP: Entrada Gratuita", loyaltyPoints: 90, address: "Jr. Los Girasoles 789", profession: "Estudiante" },
 ];
 
 export default function AdminClientsPage() {
@@ -26,12 +26,12 @@ export default function AdminClientsPage() {
   const filteredClients = mockRegisteredClients.filter(client =>
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.dni.includes(searchTerm)
+    client.dni.includes(searchTerm) ||
+    (client.profession && client.profession.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleExport = () => {
-    // Basic CSV export logic
-    const headers = ["ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro", "Última Promo"];
+    const headers = ["ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro", "Última Promo", "Puntos Fidelidad", "Dirección", "Profesión", "Preferencias"];
     const rows = filteredClients.map(client => [
       client.id,
       client.name,
@@ -40,7 +40,11 @@ export default function AdminClientsPage() {
       client.phone,
       format(new Date(client.dob), "dd/MM/yyyy", { locale: es }),
       format(new Date(client.registrationDate), "dd/MM/yyyy HH:mm", { locale: es }),
-      client.lastPromotionTitle || "N/A"
+      client.lastPromotionTitle || "N/A",
+      client.loyaltyPoints,
+      client.address || "N/A",
+      client.profession || "N/A",
+      client.preferences?.join(', ') || "N/A"
     ]);
 
     let csvContent = "data:text/csv;charset=utf-8,"
@@ -75,7 +79,7 @@ export default function AdminClientsPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar por nombre, apellido o DNI..."
+              placeholder="Buscar por nombre, apellido, DNI, profesión..."
               className="pl-8 w-full sm:w-[300px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -86,11 +90,14 @@ export default function AdminClientsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombres</TableHead>
-                <TableHead>Apellidos</TableHead>
-                <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
+                <TableHead>Nombres y Apellidos</TableHead>
+                <TableHead className="hidden xl:table-cell">DNI/CE</TableHead>
                 <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
-                <TableHead>Fecha Registro</TableHead>
+                <TableHead><Gift className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Fecha Nac.</TableHead>
+                <TableHead className="hidden md:table-cell"><Award className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Puntos</TableHead>
+                <TableHead className="hidden xl:table-cell"><Home className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Dirección</TableHead>
+                <TableHead className="hidden lg:table-cell"><Briefcase className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Profesión</TableHead>
+                <TableHead className="hidden xl:table-cell"><Tags className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Preferencias</TableHead>
                 <TableHead>Última Promo</TableHead>
               </TableRow>
             </TableHeader>
@@ -98,17 +105,20 @@ export default function AdminClientsPage() {
               {filteredClients.length > 0 ? (
                 filteredClients.map((client) => (
                   <TableRow key={client.id}>
-                    <TableCell>{client.name}</TableCell>
-                    <TableCell>{client.surname}</TableCell>
-                    <TableCell className="hidden md:table-cell">{client.dni}</TableCell>
+                    <TableCell>{client.name} {client.surname}</TableCell>
+                    <TableCell className="hidden xl:table-cell">{client.dni}</TableCell>
                     <TableCell className="hidden lg:table-cell">{client.phone}</TableCell>
-                    <TableCell>{format(new Date(client.registrationDate), "P p", { locale: es })}</TableCell>
+                    <TableCell>{format(new Date(client.dob), "P", { locale: es })}</TableCell>
+                    <TableCell className="hidden md:table-cell text-center">{client.loyaltyPoints}</TableCell>
+                    <TableCell className="hidden xl:table-cell">{client.address || "N/A"}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{client.profession || "N/A"}</TableCell>
+                    <TableCell className="hidden xl:table-cell truncate max-w-xs">{client.preferences?.join(', ') || "N/A"}</TableCell>
                     <TableCell>{client.lastPromotionTitle || "N/A"}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">No se encontraron clientes.</TableCell>
+                  <TableCell colSpan={9} className="text-center">No se encontraron clientes.</TableCell>
                 </TableRow>
               )}
             </TableBody>
