@@ -99,7 +99,6 @@ export default function HomePage() {
 
   const handleCodeSubmit = async (values: z.infer<typeof codeSchema>) => {
     setIsLoading(true);
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
 
@@ -113,7 +112,6 @@ export default function HomePage() {
       setCurrentStep("enterDni");
       toast({ title: "Código Válido", description: "Por favor, ingresa tu número de DNI o carnet de extranjería." });
     } else {
-       // Generic valid codes for testing
       if (code.startsWith("VALID")) {
         setValidatedCode(code);
         setCurrentStep("enterDni");
@@ -131,7 +129,6 @@ export default function HomePage() {
     
     setEnteredDni(values.dni);
 
-    // Simulate DNI check
     if (values.dni === mockExistingUser.dni && validatedCode && mockPromotions[validatedCode]) {
       const promotion = mockPromotions[validatedCode];
       setQrData({
@@ -148,7 +145,6 @@ export default function HomePage() {
       newUserForm.setValue("dniConfirm", values.dni);
       toast({ title: "Nuevo Usuario", description: "Por favor, completa tus datos para generar tu QR." });
     } else {
-      // Fallback if validatedCode or promotion is somehow lost (should not happen in normal flow)
       toast({ title: "Error", description: "Ha ocurrido un error. Por favor, intenta de nuevo.", variant: "destructive" });
       setCurrentStep("enterCode");
     }
@@ -171,7 +167,7 @@ export default function HomePage() {
       name: values.name,
       surname: values.surname,
       phone: values.phone,
-      dob: format(values.dob, "yyyy-MM-dd"), // Keep ISO format for storage
+      dob: format(values.dob, "yyyy-MM-dd"),
       dni: enteredDni,
     };
 
@@ -207,19 +203,67 @@ export default function HomePage() {
     }
   };
 
-  const handleSaveQr = () => {
-    if (qrData?.qrImageUrl) {
+  const handleSaveQrWithDetails = () => {
+    if (!qrData || !qrData.qrImageUrl) {
+      toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    const qrSize = 250;
+    const padding = 20;
+    const lineHeight = 20;
+    const textLines = 4; // Title, User, DNI, Valid Until
+    
+    canvas.width = qrSize + 2 * padding;
+    canvas.height = qrSize + (textLines + 2) * lineHeight + 2 * padding; // Extra line height for spacing
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      toast({ title: "Error", description: "No se pudo generar la imagen.", variant: "destructive" });
+      return;
+    }
+
+    // Draw background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const qrImg = new window.Image();
+    qrImg.crossOrigin = "anonymous"; 
+    qrImg.onload = () => {
+      // Draw QR
+      ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
+
+      // Draw Text
+      ctx.fillStyle = 'black';
+      ctx.font = '14px Arial';
+      ctx.textAlign = 'center';
+      
+      let currentY = padding + qrSize + lineHeight * 1.5; // Start Y for text
+
+      ctx.fillText(`Promo: ${qrData.promotion.title}`, canvas.width / 2, currentY);
+      currentY += lineHeight;
+      ctx.fillText(`Usuario: ${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
+      currentY += lineHeight;
+      ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+      currentY += lineHeight;
+      ctx.fillText(`Válido hasta: ${format(new Date(qrData.promotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+
+      // Create download link
       const link = document.createElement('a');
-      link.href = qrData.qrImageUrl;
-      // Extract filename if possible, otherwise default
-      const filenameFromUrl = qrData.qrImageUrl.substring(qrData.qrImageUrl.lastIndexOf('/') + 1).split('?')[0];
-      link.download = filenameFromUrl && filenameFromUrl.includes('.') ? filenameFromUrl : `SocioVIP_QR_${qrData.code}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.download = `SocioVIP_QR_Detalles_${qrData.code}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast({ title: "QR Guardado", description: "La imagen de tu QR se ha descargado." });
-    }
+      toast({ title: "QR con Detalles Guardado", description: "La imagen con los detalles se ha descargado." });
+    };
+    qrImg.onerror = () => {
+      toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
+    };
+    qrImg.src = qrData.qrImageUrl;
   };
+
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
@@ -430,6 +474,11 @@ export default function HomePage() {
                   data-ai-hint="qr code"
                 />
               </div>
+              <div className="flex justify-center mt-4">
+                <Button variant="outline" className="w-auto" onClick={handleSaveQrWithDetails} disabled={!qrData?.qrImageUrl}>
+                  <Download className="mr-2 h-5 w-5"/> Guardar QR con Detalles
+                </Button>
+              </div>
               
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold text-primary flex items-center"><Ticket className="mr-2 h-5 w-5"/> Detalles de la Promoción</h3>
@@ -458,9 +507,6 @@ export default function HomePage() {
               <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" onClick={resetFlow}>
                 Generar Otro Código
               </Button>
-              <Button variant="outline" className="w-full" onClick={handleSaveQr} disabled={!qrData?.qrImageUrl}>
-                <Download className="mr-2 h-5 w-5"/> Guardar QR
-              </Button>
             </CardFooter>
           </>
         )}
@@ -474,3 +520,6 @@ export default function HomePage() {
     
 
       
+
+
+    
