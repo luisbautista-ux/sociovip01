@@ -5,18 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Search, Ticket, BadgeCheck, BadgeX, QrCode, Eye, ListChecks } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Ticket, BadgeCheck, BadgeX, QrCode, Eye, ListChecks, Copy } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { BusinessPromotionForm } from "@/components/business/forms/BusinessPromotionForm";
 import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Mock data for business promotions - In a real app, this would be fetched for the logged-in business
 let mockBusinessPromotions: BusinessManagedEntity[] = [
@@ -26,8 +28,8 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Jueves de Alitas BBQ", 
     description: "Todas las alitas BBQ a S/1 cada una.", 
-    startDate: "2025-01-01T12:00:00", // Updated to 2025
-    endDate: "2025-12-31T12:00:00", // Updated to 2025
+    startDate: "2025-01-01T12:00:00",
+    endDate: "2025-12-31T12:00:00",
     usageLimit: 0, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -35,7 +37,7 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     generatedCodes: [
         { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:00:00Z", observation: "Código de lanzamiento" },
         { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:05:00Z", redemptionDate: "2025-01-21T12:00:00Z" },
-        { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:06:00Z" },
+        { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:06:00Z", observation: "Para clientes frecuentes" },
     ]
   },
   { 
@@ -44,8 +46,8 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Happy Hour Extendido", 
     description: "Tragos seleccionados 2x1 de 5 PM a 9 PM.", 
-    startDate: "2025-01-15T12:00:00", // Updated to 2025
-    endDate: "2025-10-31T12:00:00", // Updated to 2025
+    startDate: "2025-01-15T12:00:00",
+    endDate: "2025-10-31T12:00:00",
     usageLimit: 500, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -58,8 +60,8 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Promo Cumpleañero Mes", 
     description: "Si cumples años este mes, tu postre es gratis.", 
-    startDate: "2024-01-01T12:00:00", // Kept in past
-    endDate: "2024-12-31T12:00:00", // Kept in past
+    startDate: "2025-01-01T12:00:00", 
+    endDate: "2025-12-31T12:00:00", 
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "birthday cake",
@@ -67,11 +69,32 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
   },
 ];
 
+const isEntityCurrentlyActivatable = (entity: BusinessManagedEntity): boolean => {
+  if (!entity.isActive) { // If it's globally set to inactive, it's not activatable for codes
+    // return false; // This line was too restrictive; isActive refers to general status, not date validity for code generation
+  }
+  
+  const now = new Date();
+  const entityStartDateObj = new Date(entity.startDate);
+  const entityEndDateObj = new Date(entity.endDate);
+
+  if (isNaN(entityStartDateObj.getTime()) || isNaN(entityEndDateObj.getTime())) {
+    return false; 
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
+  const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
+  
+  return today >= effectiveStartDate && today <= effectiveEndDate && entity.isActive;
+};
+
 
 export default function BusinessPromotionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateEditPromotionModal, setShowCreateEditPromotionModal] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<BusinessManagedEntity | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [promotions, setPromotions] = useState<BusinessManagedEntity[]>(mockBusinessPromotions);
   
   const [showManageCodesModal, setShowManageCodesModal] = useState(false);
@@ -83,47 +106,65 @@ export default function BusinessPromotionsPage() {
   const { toast } = useToast();
 
   const filteredPromotions = promotions.filter(promo =>
-    promo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (promo.description && promo.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+    (promo.name && typeof promo.name === 'string' ? promo.name.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+    (promo.description && typeof promo.description === 'string' ? promo.description.toLowerCase().includes(searchTerm.toLowerCase()) : false)
+  ).sort((a, b) => {
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      return a.name.localeCompare(b.name);
+  });
 
-  const handleCreatePromotion = (data: BusinessPromotionFormData) => {
-    const newPromotion: BusinessManagedEntity = {
-      id: `bp${Date.now()}`,
-      businessId: "biz1", 
-      type: "promotion",
-      name: data.name,
-      description: data.description,
-      startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
-      endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
-      usageLimit: data.usageLimit || 0, 
-      isActive: data.isActive,
-      imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
-      aiHint: data.aiHint,
-      generatedCodes: [],
-    };
-    setPromotions(prev => [newPromotion, ...prev]);
-    setShowCreateEditPromotionModal(false);
-    toast({ title: "Promoción Creada", description: `La promoción "${newPromotion.name}" ha sido creada.` });
+  const handleOpenCreateEditModal = (promotion: BusinessManagedEntity | null, duplicate = false) => {
+    setIsDuplicating(duplicate);
+    if (duplicate && promotion) {
+      setEditingPromotion({
+        ...promotion,
+        id: `bp${Date.now()}`, // New ID for duplicated item
+        name: `${promotion.name} (Copia)`,
+        generatedCodes: [], // Codes are not duplicated
+      });
+    } else {
+      setEditingPromotion(promotion);
+    }
+    setShowCreateEditPromotionModal(true);
   };
 
-  const handleEditPromotion = (data: BusinessPromotionFormData) => {
-    if (!editingPromotion) return;
-    const updatedPromotion: BusinessManagedEntity = {
-      ...editingPromotion,
-      name: data.name,
-      description: data.description,
-      startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
-      endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
-      usageLimit: data.usageLimit || 0,
-      isActive: data.isActive,
-      imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingPromotion.imageUrl || `https://placehold.co/300x200.png`),
-      aiHint: data.aiHint,
-    };
-    setPromotions(prev => prev.map(p => p.id === editingPromotion.id ? updatedPromotion : p));
-    setEditingPromotion(null);
+  const handleFormSubmit = (data: BusinessPromotionFormData) => {
+    if (editingPromotion && !isDuplicating) { // Editing existing
+      const updatedPromotion: BusinessManagedEntity = {
+        ...editingPromotion,
+        name: data.name,
+        description: data.description,
+        startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
+        endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
+        usageLimit: data.usageLimit || 0,
+        isActive: data.isActive,
+        imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingPromotion.imageUrl || `https://placehold.co/300x200.png`),
+        aiHint: data.aiHint,
+      };
+      setPromotions(prev => prev.map(p => p.id === editingPromotion.id ? updatedPromotion : p));
+      toast({ title: "Promoción Actualizada", description: `La promoción "${updatedPromotion.name}" ha sido actualizada.` });
+    } else { // Creating new or duplicated
+      const newPromotion: BusinessManagedEntity = {
+        id: editingPromotion?.id || `bp${Date.now()}`, // Use ID from duplicated if available, else new
+        businessId: "biz1", // TODO: Replace with actual business ID from context/auth
+        type: "promotion",
+        name: data.name,
+        description: data.description,
+        startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
+        endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
+        usageLimit: data.usageLimit || 0,
+        isActive: data.isActive,
+        imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
+        aiHint: data.aiHint,
+        generatedCodes: [], // New promotions start with no codes
+      };
+      setPromotions(prev => [newPromotion, ...prev.filter(p => p.id !== newPromotion.id)]); // Add new, remove old if duplicating
+      toast({ title: isDuplicating ? "Promoción Duplicada" : "Promoción Creada", description: `La promoción "${newPromotion.name}" ha sido ${isDuplicating ? 'duplicada' : 'creada'}.` });
+    }
     setShowCreateEditPromotionModal(false);
-    toast({ title: "Promoción Actualizada", description: `La promoción "${updatedPromotion.name}" ha sido actualizada.` });
+    setEditingPromotion(null);
+    setIsDuplicating(false);
   };
   
   const handleDeletePromotion = (promotionId: string) => {
@@ -132,6 +173,14 @@ export default function BusinessPromotionsPage() {
   };
 
   const openCreateCodesDialog = (promotion: BusinessManagedEntity) => {
+    if (!isEntityCurrentlyActivatable(promotion)) {
+      toast({ 
+        title: "No se pueden crear códigos", 
+        description: "Esta promoción no está activa o está fuera de su periodo de vigencia.", 
+        variant: "destructive"
+      });
+      return;
+    }
     setSelectedEntityForCreatingCodes(promotion);
     setShowCreateCodesModal(true);
   };
@@ -157,7 +206,6 @@ export default function BusinessPromotionsPage() {
     ));
   };
 
-
   const getRedemptionCount = (promotion: BusinessManagedEntity) => {
     const redeemedCount = promotion.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
     const totalGenerated = promotion.generatedCodes?.length || 0;
@@ -167,6 +215,35 @@ export default function BusinessPromotionsPage() {
     return `${redeemedCount} / ${totalGenerated === 0 ? '∞' : totalGenerated } (Generados)`;
   };
 
+  const handleTogglePromotionStatus = (promotionId: string) => {
+    let promotionNameForToast = "";
+    let newStatusForToast = false;
+
+    const updateStatusInPromotion = (promoToUpdate: BusinessManagedEntity | null) => {
+      if (!promoToUpdate || promoToUpdate.id !== promotionId) return promoToUpdate;
+      promotionNameForToast = promoToUpdate.name;
+      newStatusForToast = !promoToUpdate.isActive;
+      return { ...promoToUpdate, isActive: !promoToUpdate.isActive };
+    };
+    
+    setPromotions(prevPromotions =>
+      prevPromotions.map(promo =>
+        promo.id === promotionId ? updateStatusInPromotion(promo) as BusinessManagedEntity : promo
+      )
+    );
+    
+    // Call toast after state updates are likely processed
+    // This ensures the toast reflects the new state if the update was successful
+    setTimeout(() => {
+        if (promotionNameForToast) {
+          toast({
+            title: "Estado Actualizado",
+            description: `La promoción "${promotionNameForToast}" ahora está ${newStatusForToast ? "Activa" : "Inactiva"}.`
+          });
+        }
+    }, 0);
+  };
+
 
   return (
     <div className="space-y-6">
@@ -174,7 +251,7 @@ export default function BusinessPromotionsPage() {
         <h1 className="text-3xl font-bold text-primary flex items-center">
           <Ticket className="h-8 w-8 mr-2" /> Gestión de Promociones
         </h1>
-        <Button onClick={() => { setEditingPromotion(null); setShowCreateEditPromotionModal(true);}} className="bg-primary hover:bg-primary/90">
+        <Button onClick={() => handleOpenCreateEditModal(null)} className="bg-primary hover:bg-primary/90">
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Promoción
         </Button>
       </div>
@@ -201,7 +278,8 @@ export default function BusinessPromotionsPage() {
                 <TableHead>Nombre</TableHead>
                 <TableHead className="hidden md:table-cell">Vigencia</TableHead>
                 <TableHead className="hidden lg:table-cell text-center">Canjes</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead>Códigos</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -214,26 +292,43 @@ export default function BusinessPromotionsPage() {
                       {format(new Date(promo.startDate), "P", { locale: es })} - {format(new Date(promo.endDate), "P", { locale: es })}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-center">{getRedemptionCount(promo)}</TableCell>
-                    <TableCell>
-                      <Badge variant={promo.isActive ? "default" : "outline"} className={promo.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
-                        {promo.isActive ? <BadgeCheck className="mr-1 h-3 w-3"/> : <BadgeX className="mr-1 h-3 w-3"/>}
-                        {promo.isActive ? "Activa" : "Inactiva"}
-                      </Badge>
+                    <TableCell className="text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                            <Switch
+                                checked={promo.isActive}
+                                onCheckedChange={() => handleTogglePromotionStatus(promo.id)}
+                                aria-label={`Estado de la promoción ${promo.name}`}
+                                id={`status-switch-${promo.id}`}
+                            />
+                            <Label htmlFor={`status-switch-${promo.id}`} className="sr-only">
+                                {promo.isActive ? "Activa" : "Inactiva"}
+                            </Label>
+                            <Badge variant={promo.isActive ? "default" : "outline"} className={promo.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
+                                {promo.isActive ? <BadgeCheck className="mr-1 h-3 w-3"/> : <BadgeX className="mr-1 h-3 w-3"/>}
+                                {promo.isActive ? "Activa" : "Inactiva"}
+                            </Badge>
+                        </div>
+                    </TableCell>
+                    <TableCell className="space-x-1">
+                      <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(promo)} disabled={!isEntityCurrentlyActivatable(promo)}>
+                        <QrCode className="h-3 w-3 mr-1" /> Crear
+                      </Button>
+                      <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(promo)}>
+                        <ListChecks className="h-3 w-3 mr-1" /> Ver ({promo.generatedCodes?.length || 0})
+                      </Button>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button variant="outline" size="sm" onClick={() => openCreateCodesDialog(promo)}>
-                        <QrCode className="h-4 w-4 mr-1" /> Crear Códigos
+                      <Button variant="ghost" size="icon" title="Duplicar Promoción" onClick={() => handleOpenCreateEditModal(promo, true)}>
+                        <Copy className="h-4 w-4" />
+                        <span className="sr-only">Duplicar</span>
                       </Button>
-                       <Button variant="outline" size="sm" onClick={() => openViewCodesDialog(promo)}>
-                        <ListChecks className="h-4 w-4 mr-1" /> Ver Códigos ({promo.generatedCodes?.length || 0})
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => { setEditingPromotion(promo); setShowCreateEditPromotionModal(true);}}>
+                      <Button variant="ghost" size="icon" title="Editar Promoción" onClick={() => handleOpenCreateEditModal(promo)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Editar</span>
                       </Button>
                        <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                          <Button variant="ghost" size="icon" title="Eliminar Promoción" className="text-destructive hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Eliminar</span>
                           </Button>
@@ -243,7 +338,7 @@ export default function BusinessPromotionsPage() {
                             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                             <AlertDialogDescription>
                               Esta acción no se puede deshacer. Esto eliminará permanentemente la promoción:
-                               <span className="font-semibold"> {promo.name}</span>.
+                               <span className="font-semibold"> {promo.name}</span> y todos sus códigos asociados.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -262,7 +357,7 @@ export default function BusinessPromotionsPage() {
                 ))
               ) : (
                  <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">No se encontraron promociones.</TableCell>
+                  <TableCell colSpan={6} className="text-center h-24">No se encontraron promociones.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -270,18 +365,28 @@ export default function BusinessPromotionsPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={showCreateEditPromotionModal} onOpenChange={setShowCreateEditPromotionModal}>
+      <Dialog open={showCreateEditPromotionModal} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+              setEditingPromotion(null);
+              setIsDuplicating(false);
+          }
+          setShowCreateEditPromotionModal(isOpen);
+      }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción"}</DialogTitle>
+            <DialogTitle>{isDuplicating ? `Duplicar Promoción: ${editingPromotion?.name?.replace(' (Copia)','')}` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</DialogTitle>
             <DialogDescription>
-              {editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción."}
+              {isDuplicating ? "Creando una copia. Ajusta los detalles necesarios." : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
             </DialogDescription>
           </DialogHeader>
           <BusinessPromotionForm
-            promotion={editingPromotion || undefined}
-            onSubmit={editingPromotion ? handleEditPromotion : handleCreatePromotion} 
-            onCancel={() => setShowCreateEditPromotionModal(false)} 
+            promotion={editingPromotion || undefined} // Pass undefined if new, or the object if editing/duplicating
+            onSubmit={handleFormSubmit} 
+            onCancel={() => {
+                setShowCreateEditPromotionModal(false);
+                setEditingPromotion(null);
+                setIsDuplicating(false);
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -307,9 +412,21 @@ export default function BusinessPromotionsPage() {
           entity={selectedEntityForViewingCodes}
           onCodesUpdated={handleCodesUpdatedFromManageDialog}
           onRequestCreateNewCodes={() => {
-            setShowManageCodesModal(false);
-            if(selectedEntityForViewingCodes) { 
-                 setTimeout(() => openCreateCodesDialog(selectedEntityForViewingCodes), 0); 
+            const currentEntity = selectedEntityForViewingCodes; 
+            setShowManageCodesModal(false); 
+            if(currentEntity) { 
+                setTimeout(() => {
+                    if (isEntityCurrentlyActivatable(currentEntity)) {
+                        setSelectedEntityForCreatingCodes(currentEntity);
+                        setShowCreateCodesModal(true);
+                    } else {
+                        toast({
+                            title: "No se pueden crear códigos",
+                            description: "Esta promoción no está activa o está fuera de su periodo de vigencia.",
+                            variant: "destructive"
+                        });
+                    }
+                }, 0);
             }
           }}
         />
