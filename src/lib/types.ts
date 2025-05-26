@@ -140,6 +140,28 @@ export interface BusinessPromoterLink { // How a Business links to a Promoter
   joinDate: string;
 }
 
+// New types for Event Management
+export interface TicketType {
+  id: string;
+  businessId: string; // Assuming types are per business
+  eventId?: string; // Optional: if a ticket type is specific to one event
+  name: string;
+  cost: number;
+  description?: string;
+  quantity?: number; // Max available for this type
+}
+
+export interface EventBox {
+  id: string;
+  businessId: string; // Assuming boxes are per business
+  eventId?: string; // Optional: if a box configuration is specific to one event
+  name: string;
+  cost: number;
+  description?: string;
+  status: 'available' | 'unavailable';
+  capacity?: number; // How many people fit
+}
+
 
 // Form data types
 export interface BusinessFormData {
@@ -216,4 +238,21 @@ export interface PromoterCommissionEntry {
     commissionEarned: number;
     paymentStatus: 'Pendiente' | 'Pagado';
     period: string; // e.g. "Agosto 2024"
+}
+
+// Form data for TicketType
+export interface TicketTypeFormData {
+  name: string;
+  cost: number;
+  description?: string;
+  quantity?: number;
+}
+
+// Form data for EventBox
+export interface EventBoxFormData {
+  name: string;
+  cost: number;
+  description?: string;
+  status: 'available' | 'unavailable';
+  capacity?: number;
 }
