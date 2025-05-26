@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Contact, Crown, Download, Search, UserCircle, Users } from "lucide-react";
+import { Contact, Crown, Download, Search } from "lucide-react";
 import type { QrClient, SocioVipMember, BusinessClientView, BusinessClientType } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -22,9 +22,9 @@ const mockBusinessQrClients: QrClient[] = [
   { id: "qrclient-biz1-2", name: "Sofia", surname: "Vargas", phone: "+51909876543", dob: "1988-07-22T12:00:00", dni: "44455566", registrationDate: "2025-02-20T11:30:00Z" },
 ];
 
-const mockBusinessSocioVipMembers: SocioVipMember[] = [ // Assuming these VIPs have interacted with biz1
+const mockBusinessSocioVipMembers: SocioVipMember[] = [ 
   { id: "vip1", name: "Elena", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12T12:00:00", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T12:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
-  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2025-06-01T12:00:00Z", preferences: ["Yoga", "Lectura"] }, // Adjusted joinDate to midday UTC
+  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2025-06-01T12:00:00Z", preferences: ["Yoga", "Lectura"] },
 ];
 
 const membershipStatusTranslations: Record<SocioVipMember['membershipStatus'], string> = {
@@ -32,6 +32,17 @@ const membershipStatusTranslations: Record<SocioVipMember['membershipStatus'], s
   inactive: "Inactiva",
   pending_payment: "Pendiente Pago",
   cancelled: "Cancelada",
+};
+
+// Helper component to format date/time on client side
+const ClientSideFormattedDateTime = ({ dateString }: { dateString: string }) => {
+  const [formattedDate, setFormattedDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormattedDate(format(new Date(dateString), "P p", { locale: es }));
+  }, [dateString]);
+
+  return <>{formattedDate || "..."}</>; // Show '...' or null/empty string while loading
 };
 
 
@@ -48,7 +59,7 @@ export default function BusinessClientsPage() {
       surname: qc.surname,
       dni: qc.dni,
       phone: qc.phone,
-      email: undefined, // QrClients don't have email in this model
+      email: undefined, 
       relevantDate: qc.registrationDate,
       isVip: false,
     }));
@@ -96,7 +107,7 @@ export default function BusinessClientsPage() {
       client.dni,
       client.phone || "N/A",
       client.email || "N/A",
-      format(new Date(client.relevantDate), "P p", { locale: es }),
+      format(new Date(client.relevantDate), "P p", { locale: es }), // CSV can use consistent formatting
       client.isVip ? client.loyaltyPoints?.toString() || "0" : "N/A",
       client.isVip ? (client.membershipStatus ? membershipStatusTranslations[client.membershipStatus] : "N/A") : "N/A",
     ]);
@@ -163,7 +174,6 @@ export default function BusinessClientsPage() {
                 <TableHead className="hidden xl:table-cell">Email</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Fecha Reg./Ingreso</TableHead>
-                {/* Add more VIP specific columns if needed, or manage via a detail view */}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -180,7 +190,9 @@ export default function BusinessClientsPage() {
                         {client.clientType === 'qr' ? "Cliente QR" : "Socio VIP"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{format(new Date(client.relevantDate), "P p", { locale: es })}</TableCell>
+                    <TableCell>
+                      <ClientSideFormattedDateTime dateString={client.relevantDate} />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
@@ -197,5 +209,3 @@ export default function BusinessClientsPage() {
     </div>
   );
 }
-
-    
