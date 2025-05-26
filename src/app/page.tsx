@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,8 +17,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import type { UserData, PromotionDetails, QrCodeData, QrCodeStatus } from "@/lib/types";
 import Image from "next/image";
 import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download } from "lucide-react";
@@ -37,16 +38,19 @@ const codeSchema = z.object({
 });
 
 const dniSchema = z.object({
-  dni: z.string().min(8, "DNI/CE debe tener al menos 8 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 
 const newUserSchema = z.object({
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
   name: z.string().min(2, "Nombre es requerido."),
   surname: z.string().min(2, "Apellido es requerido."),
   phone: z.string().min(7, "Celular es requerido.").regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
   dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
-  dniConfirm: z.string(),
 });
+
+type NewUserFormData = z.infer<typeof newUserSchema>;
+
 
 const MOCK_PROMOTIONS: PromotionDetails[] = [
   { 
@@ -99,28 +103,47 @@ export default function HomePage() {
   const [currentStepInModal, setCurrentStepInModal] = useState<ModalStep>("enterDni");
   const [activePromotion, setActivePromotion] = useState<PromotionDetails | null>(null);
   const [validatedPromoCode, setValidatedPromoCode] = useState<string | null>(null);
-  const [enteredDni, setEnteredDni] = useState<string | null>(null);
+  const [enteredDniOriginal, setEnteredDniOriginal] = useState<string | null>(null); // DNI original que llevó a newUserForm
   const [qrData, setQrData] = useState<QrCodeData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  
+  const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
+  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewUserFormData | null>(null);
+
 
   const dniForm = useForm<z.infer<typeof dniSchema>>({
     resolver: zodResolver(dniSchema),
     defaultValues: { dni: "" },
   });
 
-  const newUserForm = useForm<z.infer<typeof newUserSchema>>({
+  const newUserForm = useForm<NewUserFormData>({
     resolver: zodResolver(newUserSchema),
+    defaultValues: {
+      dni: "",
+      name: "",
+      surname: "",
+      phone: "",
+      dob: undefined,
+    }
   });
 
   useEffect(() => {
-    if (currentStepInModal === 'newUserForm' && enteredDni) {
-      newUserForm.setValue('dniConfirm', enteredDni);
+    if (currentStepInModal === 'newUserForm' && enteredDniOriginal) {
+      newUserForm.setValue('dni', enteredDniOriginal);
+      // Clear other fields if DNI changes or it's the first load for this DNI
+      const currentDniInForm = newUserForm.getValues('dni');
+      if (currentDniInForm !== enteredDniOriginal) {
+        newUserForm.reset({ dni: enteredDniOriginal, name: "", surname: "", phone: "", dob: undefined });
+      } else if (!newUserForm.getValues('name')) { // If name is empty, likely first load for this DNI
+        newUserForm.reset({ dni: enteredDniOriginal, name: "", surname: "", phone: "", dob: undefined });
+      }
     }
-  }, [currentStepInModal, enteredDni, newUserForm]);
+  }, [currentStepInModal, enteredDniOriginal, newUserForm]);
 
   const handleValidateAndShowDniModal = (promoCodeValue: string, promotion: PromotionDetails) => {
     const code = promoCodeValue.toUpperCase();
+    // Mock validation logic - replace with actual API call if needed
     if (code === "INVALIDC1") {
       toast({ title: "Error", description: "Código no válido.", variant: "destructive" });
       return;
@@ -134,6 +157,7 @@ export default function HomePage() {
       setActivePromotion(promotion);
       setValidatedPromoCode(code);
       setCurrentStepInModal("enterDni");
+      dniForm.reset(); // Reset DNI form when opening
       setShowDniModal(true);
       toast({ title: "Código Válido", description: `Para "${promotion.title}". Ingresa tu DNI.` });
     } else {
@@ -147,7 +171,7 @@ export default function HomePage() {
     await new Promise(resolve => setTimeout(resolve, 1000)); 
     setIsLoading(false);
     
-    setEnteredDni(values.dni);
+    setEnteredDniOriginal(values.dni);
 
     if (values.dni === mockExistingUser.dni) {
       const newQrData: QrCodeData = {
@@ -163,28 +187,15 @@ export default function HomePage() {
       toast({ title: `Bienvenido ${mockExistingUser.name}!`, description: "Tu QR ha sido generado." });
     } else {
       setCurrentStepInModal("newUserForm");
-      newUserForm.setValue("dniConfirm", values.dni); // Pre-fill DNI for new user form
+      newUserForm.reset({ dni: values.dni, name: "", surname: "", phone: "", dob: undefined });
       toast({ title: "Nuevo Usuario", description: "Por favor, completa tus datos para generar tu QR." });
     }
   };
 
-  const handleNewUserSubmitInModal = async (values: z.infer<typeof newUserSchema>) => {
-    if (!activePromotion || !validatedPromoCode || !enteredDni) return;
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
-
-    const newUser: UserData = {
-      id: `user-${Date.now()}`,
-      name: values.name,
-      surname: values.surname,
-      phone: values.phone,
-      dob: format(values.dob, "yyyy-MM-dd"),
-      dni: enteredDni,
-    };
-
+  const processNewUserRegistration = (userData: UserData) => {
+    if (!activePromotion || !validatedPromoCode) return;
     const newQrData: QrCodeData = {
-      user: newUser,
+      user: userData,
       promotion: activePromotion,
       qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
       code: validatedPromoCode,
@@ -193,20 +204,65 @@ export default function HomePage() {
     setQrData(newQrData);
     setShowDniModal(false);
     setPageViewState("qrDisplay");
-    toast({ title: `Bienvenido ${newUser.name}!`, description: "Tu QR ha sido generado con éxito." });
+    toast({ title: `Bienvenido ${userData.name}!`, description: "Tu QR ha sido generado con éxito." });
+  }
+
+  const handleNewUserSubmitInModal = async (values: NewUserFormData) => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsLoading(false);
+
+    // Check if DNI changed to an existing user's DNI and is different from the original DNI that brought user to this form
+    if (values.dni === mockExistingUser.dni && values.dni !== enteredDniOriginal) {
+      setFormDataForDniWarning(values);
+      setShowDniExistsWarningDialog(true);
+      return; // Stop submission, wait for dialog confirmation
+    }
+    
+    const newUser: UserData = {
+      id: `user-${Date.now()}`,
+      name: values.name,
+      surname: values.surname,
+      phone: values.phone,
+      dob: format(values.dob, "yyyy-MM-dd"),
+      dni: values.dni,
+    };
+    processNewUserRegistration(newUser);
   };
+  
+  const handleDniExistsConfirmation = (confirmed: boolean) => {
+    setShowDniExistsWarningDialog(false);
+    if (confirmed && formDataForDniWarning) {
+      // User confirmed it's their DNI, prefill form with existing user's data
+      // and allow them to submit (potentially after editing)
+      newUserForm.reset({
+        dni: mockExistingUser.dni,
+        name: mockExistingUser.name,
+        surname: mockExistingUser.surname,
+        phone: mockExistingUser.phone,
+        dob: new Date(mockExistingUser.dob), 
+      });
+      // User will need to click "Confirmar y Generar QR" again
+      // Or we can submit programmatically if no edits are desired.
+      // For now, let them review and submit.
+      toast({ title: "Datos Precargados", description: "Hemos rellenado el formulario con tus datos existentes. Revisa y confirma." });
+    } else if (!confirmed && formDataForDniWarning) {
+      // User denied, or wants to change DNI, reset to what they had typed
+       newUserForm.reset(formDataForDniWarning);
+    }
+    setFormDataForDniWarning(null);
+  };
+
 
   const resetProcess = () => {
     setPageViewState("promotionsList");
     setShowDniModal(false);
     setActivePromotion(null);
     setValidatedPromoCode(null);
-    setEnteredDni(null);
+    setEnteredDniOriginal(null);
     setQrData(null);
     dniForm.reset();
     newUserForm.reset();
-    // Resetting individual promo code forms would require tracking them,
-    // for simplicity, they will retain their values or user can manually clear.
   };
   
   const handleCloseDniModal = () => {
@@ -215,7 +271,7 @@ export default function HomePage() {
     newUserForm.reset();
     setActivePromotion(null);
     setValidatedPromoCode(null);
-    setEnteredDni(null);
+    setEnteredDniOriginal(null);
   }
 
   const renderStatusIcon = (status: QrCodeStatus) => {
@@ -282,7 +338,6 @@ export default function HomePage() {
     qrImg.src = qrData.qrImageUrl;
   };
 
-  // Component for individual promotion code form
   const PromotionCodeForm = ({ promotion }: { promotion: PromotionDetails }) => {
     const form = useForm<z.infer<typeof codeSchema>>({
       resolver: zodResolver(codeSchema),
@@ -295,12 +350,12 @@ export default function HomePage() {
 
     return (
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-end space-x-2 mt-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 mt-4">
           <FormField
             control={form.control}
             name="promoCode"
             render={({ field }) => (
-              <FormItem className="flex-grow">
+              <FormItem>
                 <FormLabel className="sr-only">Código de Promoción</FormLabel>
                 <FormControl>
                   <Input placeholder="Ingresar código" {...field} className="text-sm tracking-wider" maxLength={9} />
@@ -309,7 +364,7 @@ export default function HomePage() {
               </FormItem>
             )}
           />
-          <Button type="submit" size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground whitespace-nowrap">
+          <Button type="submit" size="sm" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground whitespace-nowrap">
             Validar y Obtener QR <ScanLine className="ml-1 h-4 w-4"/>
           </Button>
         </form>
@@ -347,7 +402,7 @@ export default function HomePage() {
                   Válido hasta: {format(new Date(promo.validUntil), "d MMMM yyyy", { locale: es })}
                 </p>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex-col"> {/* Ensure footer content is stacked */}
                 <PromotionCodeForm promotion={promo} />
               </CardFooter>
             </Card>
@@ -450,14 +505,14 @@ export default function HomePage() {
           {currentStepInModal === 'newUserForm' && (
             <Form {...newUserForm}>
               <form onSubmit={newUserForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-2">
-                <FormField
+                 <FormField
                   control={newUserForm.control}
-                  name="dniConfirm"
+                  name="dni"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>DNI / Carnet de Extranjería (Confirmar)</FormLabel>
+                      <FormLabel>DNI / Carnet de Extranjería</FormLabel>
                       <FormControl>
-                        <Input {...field} readOnly className="bg-muted"/>
+                        <Input placeholder="Tu número de documento" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -533,7 +588,12 @@ export default function HomePage() {
                   )}
                 />
               <DialogFooter className="pt-4">
-                <Button variant="outline" type="button" onClick={() => setCurrentStepInModal('enterDni')}>Volver</Button>
+                <Button variant="outline" type="button" onClick={() => {
+                  const currentDniValue = newUserForm.getValues("dni");
+                  setCurrentStepInModal('enterDni');
+                  // Optionally prefill DNI form with current value from newUserForm
+                  dniForm.setValue("dni", currentDniValue || enteredDniOriginal || "");
+                }}>Volver</Button>
                 <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isLoading}>
                   {isLoading ? "Guardando..." : "Confirmar y Generar QR"} <Sparkles className="ml-2 h-4 w-4" />
                 </Button>
@@ -544,9 +604,29 @@ export default function HomePage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>DNI Ya Registrado</AlertDialogTitle>
+            <AlertDialogDescription>
+              El DNI que has ingresado ya está registrado. ¿Estás seguro que es tu número?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => handleDniExistsConfirmation(false)}>No, deseo corregir</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDniExistsConfirmation(true)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              Sí, es mi número
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       <footer className="mt-8 text-center text-sm text-muted-foreground">
         <p>&copy; {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
 }
+
+    
