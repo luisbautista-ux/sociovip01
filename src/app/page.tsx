@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -365,9 +366,10 @@ export default function HomePage() {
                                 mode="single"
                                 selected={field.value}
                                 onSelect={field.onChange}
-                                disabled={(date) =>
-                                  date > new Date() || date < new Date("1900-01-01")
-                                }
+                                captionLayout="dropdown-buttons"
+                                fromYear={1900}
+                                toYear={new Date().getFullYear()}
+                                disabled={(date) => date > new Date()}
                                 initialFocus
                               />
                             </PopoverContent>
@@ -444,3 +446,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
