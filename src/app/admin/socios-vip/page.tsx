@@ -5,13 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Star, PlusCircle, Download, Search, Edit, Trash2, Mail, Phone, Award, ShieldCheck, CalendarDays } from "lucide-react";
+import { Star, PlusCircle, Download, Search, Edit, Trash2, Mail, Phone, Award, ShieldCheck, CalendarDays, Cake, Filter } from "lucide-react";
 import type { SocioVipMember, SocioVipMemberFormData } from "@/lib/types";
-import { format } from "date-fns";
+import { format, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { SocioVipMemberForm } from "@/components/admin/forms/SocioVipMemberForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -21,6 +23,7 @@ let mockSocioVipMembers: SocioVipMember[] = [
   { id: "vip1", name: "Elena", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12T12:00:00", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T00:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
   { id: "vip2", name: "Roberto", surname: "Chavez", email: "roberto.vip@example.com", phone: "+51911222333", dob: "1975-09-05T12:00:00", dni: "09876543", loyaltyPoints: 850, membershipStatus: "inactive", joinDate: "2022-11-10T00:00:00Z", address: "Calle Luna 123, Arequipa", profession: "Empresario", preferences: ["Vinos", "Golf"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ROBERTOQR"  },
   { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2024-06-01T00:00:00Z", preferences: ["Yoga", "Lectura"] },
+  { id: "vip4", name: "Luis", surname: "Gomez", email: "luis.vip@example.com", phone: "+51922333444", dob: "1990-03-25T12:00:00", dni: "45678901", loyaltyPoints: 500, membershipStatus: "active", joinDate: "2024-03-15T00:00:00Z", address: "Jr. Los Pinos 789, Lima", profession: "Doctor", preferences: ["Deportes", "Tecnología"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=LUISQR"  },
 ];
 
 const membershipStatusTranslations: Record<SocioVipMember['membershipStatus'], string> = {
@@ -31,26 +34,42 @@ const membershipStatusTranslations: Record<SocioVipMember['membershipStatus'], s
 };
 
 const membershipStatusColors: Record<SocioVipMember['membershipStatus'], "default" | "secondary" | "destructive" | "outline"> = {
-    active: "default", // Typically primary or a success-like color
+    active: "default",
     inactive: "secondary",
-    pending_payment: "outline", // Or a warning color if available
+    pending_payment: "outline",
     cancelled: "destructive",
 };
 
+const mesesDelAno = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
 
 export default function AdminSocioVipPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [birthdayMonthFilter, setBirthdayMonthFilter] = useState<string>("all");
+  const [joinMonthFilter, setJoinMonthFilter] = useState<string>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingMember, setEditingMember] = useState<SocioVipMember | null>(null);
   const [members, setMembers] = useState<SocioVipMember[]>(mockSocioVipMembers);
   const { toast } = useToast();
 
-  const filteredMembers = members.filter(member =>
-    member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.dni.includes(searchTerm)
-  );
+  const filteredMembers = members.filter(member => {
+    const searchMatch = (
+      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.dni.includes(searchTerm)
+    );
+
+    const birthdayMatch = birthdayMonthFilter === "all" ||
+      (member.dob && getMonth(new Date(member.dob)) === parseInt(birthdayMonthFilter));
+
+    const joinMatch = joinMonthFilter === "all" ||
+      (member.joinDate && getMonth(new Date(member.joinDate)) === parseInt(joinMonthFilter));
+
+    return searchMatch && birthdayMatch && joinMatch;
+  });
 
   const handleExport = () => {
     const headers = ["ID", "Nombre", "Apellido", "Email", "Teléfono", "DNI", "Fec. Nac.", "Puntos", "Estado Membresía", "Fecha Ingreso", "Dirección", "Profesión", "Preferencias"];
@@ -139,15 +158,47 @@ export default function AdminSocioVipPage() {
         <CardHeader>
           <CardTitle>Lista de Socios VIP</CardTitle>
           <CardDescription>Miembros exclusivos de la plataforma SocioVIP.</CardDescription>
-           <div className="relative mt-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por nombre, email, DNI..."
-              className="pl-8 w-full sm:w-[300px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 items-end">
+            <div className="relative">
+              <Label htmlFor="search-members">Buscar Socio</Label>
+              <Search className="absolute left-2.5 top-[calc(1.75rem+0.625rem)] h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search-members"
+                type="search"
+                placeholder="Buscar por nombre, email, DNI..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="birthday-month-filter">Filtrar por Mes de Cumpleaños</Label>
+              <Select value={birthdayMonthFilter} onValueChange={setBirthdayMonthFilter}>
+                <SelectTrigger id="birthday-month-filter">
+                  <SelectValue placeholder="Todos los meses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los meses</SelectItem>
+                  {mesesDelAno.map((mes, index) => (
+                    <SelectItem key={index} value={index.toString()}>{mes}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="join-month-filter">Filtrar por Mes de Registro</Label>
+              <Select value={joinMonthFilter} onValueChange={setJoinMonthFilter}>
+                <SelectTrigger id="join-month-filter">
+                  <SelectValue placeholder="Todos los meses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los meses</SelectItem>
+                  {mesesDelAno.map((mes, index) => (
+                    <SelectItem key={index} value={index.toString()}>{mes}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -158,6 +209,7 @@ export default function AdminSocioVipPage() {
                 <TableHead className="hidden lg:table-cell"><Mail className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Email</TableHead>
                 <TableHead className="hidden md:table-cell"><Phone className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Teléfono</TableHead>
                 <TableHead className="hidden xl:table-cell">DNI</TableHead>
+                <TableHead><Cake className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Fecha Nac.</TableHead>
                 <TableHead className="text-center"><Award className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Puntos</TableHead>
                 <TableHead><ShieldCheck className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Estado Membresía</TableHead>
                 <TableHead className="hidden lg:table-cell"><CalendarDays className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Fecha Ingreso</TableHead>
@@ -172,6 +224,7 @@ export default function AdminSocioVipPage() {
                     <TableCell className="hidden lg:table-cell">{member.email}</TableCell>
                     <TableCell className="hidden md:table-cell">{member.phone}</TableCell>
                     <TableCell className="hidden xl:table-cell">{member.dni}</TableCell>
+                    <TableCell>{format(new Date(member.dob), "P", { locale: es })}</TableCell>
                     <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
                     <TableCell>
                       <Badge variant={membershipStatusColors[member.membershipStatus]}>
@@ -215,7 +268,7 @@ export default function AdminSocioVipPage() {
                 ))
               ) : (
                  <TableRow>
-                  <TableCell colSpan={8} className="text-center h-24">No se encontraron socios VIP.</TableCell>
+                  <TableCell colSpan={9} className="text-center h-24">No se encontraron socios VIP con los filtros aplicados.</TableCell>
                 </TableRow>
               )}
             </TableBody>
