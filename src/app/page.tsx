@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import type { UserData, PromotionDetails, QrCodeData, QrCodeStatus } from "@/lib/types";
 import Image from "next/image";
-import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles } from "lucide-react";
+import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -204,6 +204,20 @@ export default function HomePage() {
         return <BadgeCheck className="h-5 w-5 text-blue-500" />;
       case "expired":
         return <XCircle className="h-5 w-5 text-red-500" />;
+    }
+  };
+
+  const handleSaveQr = () => {
+    if (qrData?.qrImageUrl) {
+      const link = document.createElement('a');
+      link.href = qrData.qrImageUrl;
+      // Extract filename if possible, otherwise default
+      const filenameFromUrl = qrData.qrImageUrl.substring(qrData.qrImageUrl.lastIndexOf('/') + 1).split('?')[0];
+      link.download = filenameFromUrl && filenameFromUrl.includes('.') ? filenameFromUrl : `SocioVIP_QR_${qrData.code}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast({ title: "QR Guardado", description: "La imagen de tu QR se ha descargado." });
     }
   };
 
@@ -440,9 +454,12 @@ export default function HomePage() {
               </div>
 
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex-col space-y-3">
               <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" onClick={resetFlow}>
                 Generar Otro Código
+              </Button>
+              <Button variant="outline" className="w-full" onClick={handleSaveQr} disabled={!qrData?.qrImageUrl}>
+                <Download className="mr-2 h-5 w-5"/> Guardar QR
               </Button>
             </CardFooter>
           </>
