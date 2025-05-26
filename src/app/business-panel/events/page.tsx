@@ -6,8 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ListChecks, Ticket as TicketIcon, Box, Copy, UserPlus, BarChartHorizontal } from "lucide-react";
-import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, TicketTypeFormData, EventBoxFormData, PromoterProfile, EventPromoterAssignment, EventPromoterAssignmentFormData } from "@/lib/types";
+import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ListChecks, Ticket as TicketIcon, Box, Copy, UserPlus, BarChartHorizontalSquare } from "lucide-react"; // Changed BarChartHorizontal to BarChartHorizontalSquare
+import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, TicketTypeFormData, EventBoxFormData, PromoterProfile, EventPromoterAssignment } from "@/lib/types"; // Removed EventPromoterAssignmentFormData
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,8 @@ import { TicketTypeForm } from "@/components/business/forms/TicketTypeForm";
 import { EventBoxForm } from "@/components/business/forms/EventBoxForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+
 
 // Mock data for business events
 let mockBusinessEvents: BusinessManagedEntity[] = [
@@ -96,12 +98,12 @@ const mockBusinessPromoters: PromoterProfile[] = [
   { id: "pp3", name: "Pedro Pascal", email: "pedro.pascal@promo.com"},
 ];
 
+type BusinessEntityType = BusinessManagedEntity['type'];
 
 export default function BusinessEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [events, setEvents] = useState<BusinessManagedEntity[]>(mockBusinessEvents);
   
-  // State for main Create/Edit Event Modal (now a "Manage Event Modal")
   const [showManageEventModal, setShowManageEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(null);
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -114,15 +116,12 @@ export default function BusinessEventsPage() {
   
   const { toast } = useToast();
 
-  // States for managing tickets for a specific event (within the Manage Event Modal)
   const [editingTicketInEventModal, setEditingTicketInEventModal] = useState<TicketType | null>(null);
   const [showTicketFormInEventModal, setShowTicketFormInEventModal] = useState(false);
 
-  // States for managing boxes for a specific event (within the Manage Event Modal)
   const [editingBoxInEventModal, setEditingBoxInEventModal] = useState<EventBox | null>(null);
   const [showBoxFormInEventModal, setShowBoxFormInEventModal] = useState(false);
   
-  // States for assigning promoters to an event (within the Manage Event Modal)
   const [selectedPromoterForAssignment, setSelectedPromoterForAssignment] = useState<string>("");
   const [promoterEventCommission, setPromoterEventCommission] = useState("");
   const [promoterEventNotes, setPromoterEventNotes] = useState("");
@@ -131,30 +130,32 @@ export default function BusinessEventsPage() {
   const filteredEvents = events.filter(event =>
     event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  ).sort((a, b) => { // Sort by active status first, then by name
+    if (a.isActive && !b.isActive) return -1;
+    if (!a.isActive && b.isActive) return 1;
+    return a.name.localeCompare(b.name);
+  });
 
   const handleOpenManageEventModal = (event: BusinessManagedEntity | null, duplicate = false) => {
     setIsDuplicating(duplicate);
     if (duplicate && event) {
         setEditingEvent({
             ...event,
-            id: `evt${Date.now()}`, // New ID for duplicate
+            id: `evt${Date.now()}`,
             name: `${event.name} (Copia)`,
-            generatedCodes: [], // Duplicates don't carry over codes
+            generatedCodes: [], 
             ticketTypes: event.ticketTypes ? JSON.parse(JSON.stringify(event.ticketTypes.map(tt => ({...tt, id: `tt${Date.now()}-${Math.random().toString(36).substring(7)}`})))) : [],
             eventBoxes: event.eventBoxes ? JSON.parse(JSON.stringify(event.eventBoxes.map(eb => ({...eb, id: `box${Date.now()}-${Math.random().toString(36).substring(7)}`})))) : [],
-            assignedPromoters: event.assignedPromoters ? JSON.parse(JSON.stringify(event.assignedPromoters)) : [] // Deep copy promoters assignments
+            assignedPromoters: event.assignedPromoters ? JSON.parse(JSON.stringify(event.assignedPromoters)) : [] 
         });
     } else {
-        setEditingEvent(event); // For editing or creating new
+        setEditingEvent(event ? {...event} : null); // Edit existing or prepare for new if null
     }
     setShowManageEventModal(true);
   };
 
   const handleMainEventFormSubmit = (data: BusinessEventFormData) => {
-    if (editingEvent && !isDuplicating && !showManageEventModal) { // This means it's from the main create button
-       handleCreateOrEditEvent(data, false); // Create new from main button
-    } else if (editingEvent) { // This is from within the "Manage Event" modal's "Detalles" tab
+    if (editingEvent && !isDuplicating && showManageEventModal) { 
         const updatedEventDetails: Partial<BusinessManagedEntity> = {
             name: data.name,
             description: data.description,
@@ -165,55 +166,30 @@ export default function BusinessEventsPage() {
             imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingEvent.imageUrl || `https://placehold.co/300x200.png`),
             aiHint: data.aiHint,
         };
-        // Update only details, keep tickets, boxes, codes, promoters
         setEditingEvent(prev => prev ? ({ ...prev, ...updatedEventDetails }) : null);
         toast({ title: "Detalles del Evento Actualizados", description: `Los detalles de "${data.name}" han sido actualizados.` });
+    } else if (!editingEvent && showManageEventModal && !isDuplicating) { // Creating a new event from the "Crear Evento" button (via Manage Modal)
+        const newEvent: BusinessManagedEntity = {
+            id: `evt${Date.now()}`,
+            businessId: "biz1", 
+            type: "event" as BusinessEntityType,
+            name: data.name,
+            description: data.description,
+            startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
+            endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
+            maxAttendance: data.maxAttendance || 0, 
+            isActive: data.isActive,
+            imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
+            aiHint: data.aiHint,
+            generatedCodes: [],
+            ticketTypes: [],
+            eventBoxes: [],
+            assignedPromoters: [],
+          };
+          setEvents(prev => [newEvent, ...prev]);
+          setEditingEvent(newEvent); // Keep modal open with the new event loaded for further management
+          toast({ title: "Evento Creado", description: `El evento "${newEvent.name}" ha sido creado. Puedes gestionar entradas, boxes y promotores.` });
     }
-  };
-  
-  const handleCreateOrEditEvent = (data: BusinessEventFormData, fromDuplicate = isDuplicating) => {
-     if (editingEvent && !fromDuplicate && showManageEventModal) { // Editing existing event from Manage Modal
-      const updatedEvent: BusinessManagedEntity = {
-        ...editingEvent, // This already contains tickets, boxes, promoters from modal state
-        name: data.name,
-        description: data.description,
-        startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
-        endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
-        maxAttendance: data.maxAttendance || 0,
-        isActive: data.isActive,
-        imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingEvent.imageUrl || `https://placehold.co/300x200.png`),
-        aiHint: data.aiHint,
-      };
-      setEvents(prev => prev.map(p => p.id === editingEvent.id ? updatedEvent : p));
-      toast({ title: "Evento Actualizado", description: `El evento "${updatedEvent.name}" ha sido actualizado.` });
-    } else { // Creating new event (or finishing duplication)
-      const newEventBase = fromDuplicate && editingEvent ? editingEvent : {
-        id: `evt${Date.now()}`,
-        businessId: "biz1", 
-        type: "event" as BusinessEntityType,
-        generatedCodes: [],
-        ticketTypes: [],
-        eventBoxes: [],
-        assignedPromoters: [],
-      };
-
-      const newEvent: BusinessManagedEntity = {
-        ...newEventBase,
-        name: data.name,
-        description: data.description,
-        startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
-        endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
-        maxAttendance: data.maxAttendance || 0, 
-        isActive: data.isActive,
-        imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
-        aiHint: data.aiHint,
-      };
-      setEvents(prev => [newEvent, ...prev]);
-      toast({ title: fromDuplicate ? "Evento Duplicado" : "Evento Creado", description: `El evento "${newEvent.name}" ha sido ${fromDuplicate ? 'duplicado' : 'creado'}.` });
-    }
-    setShowManageEventModal(false);
-    setEditingEvent(null);
-    setIsDuplicating(false);
   };
   
   const handleDeleteEvent = (eventId: string) => {
@@ -221,40 +197,16 @@ export default function BusinessEventsPage() {
     toast({ title: "Evento Eliminado", description: `El evento ha sido eliminado.`, variant: "destructive" });
   };
 
-  // This is called when the "Guardar y Cerrar" button in the Manage Event Modal is clicked
   const handleSaveManagedEventAndClose = () => {
     if (!editingEvent) return;
-    // If it was a new event being configured through the manage modal (unlikely flow now)
-    if (!events.find(e => e.id === editingEvent.id) && !isDuplicating) {
-         // This case is less likely now that "Create Event" uses a simpler form first
-         // For safety, treat as creation if ID not in main list
-        const newEventData: BusinessEventFormData = {
-            name: editingEvent.name,
-            description: editingEvent.description,
-            startDate: new Date(editingEvent.startDate),
-            endDate: new Date(editingEvent.endDate),
-            maxAttendance: editingEvent.maxAttendance,
-            isActive: editingEvent.isActive,
-            imageUrl: editingEvent.imageUrl,
-            aiHint: editingEvent.aiHint,
-        };
-        handleCreateOrEditEvent(newEventData);
-    } else if (isDuplicating && editingEvent) {
-        // Finalize duplication - `editingEvent` has the pre-filled new ID and copied data
-        const newEventData: BusinessEventFormData = {
-            name: editingEvent.name,
-            description: editingEvent.description,
-            startDate: new Date(editingEvent.startDate),
-            endDate: new Date(editingEvent.endDate),
-            maxAttendance: editingEvent.maxAttendance,
-            isActive: editingEvent.isActive,
-            imageUrl: editingEvent.imageUrl,
-            aiHint: editingEvent.aiHint,
-        };
-        // `editingEvent` itself is the new event data for duplication, but we pass form data
-        handleCreateOrEditEvent(newEventData, true);
-    }
-     else { // It's an existing event whose details (or tickets/boxes/promoters) were modified
+
+    if (isDuplicating) { // Finalizing a duplication
+      setEvents(prev => [editingEvent, ...prev.filter(e => e.id !== editingEvent.id)]); // Add new, ensure old is not re-added if ID was temp
+      toast({ title: "Evento Duplicado", description: `El evento "${editingEvent.name}" ha sido duplicado.` });
+    } else if (!events.some(e => e.id === editingEvent.id)) { // It was a new event created directly through manage modal
+        setEvents(prev => [editingEvent, ...prev]);
+        // Toast was already shown on creation from handleMainEventFormSubmit
+    } else { // It's an existing event whose details/sub-entities were modified
       setEvents(prev => prev.map(e => e.id === editingEvent.id ? editingEvent : e));
       toast({ title: "Evento Guardado", description: `Los cambios en "${editingEvent.name}" han sido guardados.` });
     }
@@ -283,9 +235,8 @@ export default function BusinessEventsPage() {
 
     if (editingEvent && editingEvent.id === entityId) {
         setEditingEvent(prev => updateLogic(prev));
-    } else {
-        setEvents(prevEvents => prevEvents.map(event => event.id === entityId ? updateLogic(event) as BusinessManagedEntity : event));
     }
+    setEvents(prevEvents => prevEvents.map(event => event.id === entityId ? updateLogic(event) as BusinessManagedEntity : event));
   };
 
   const handleCodesUpdatedFromManageDialog = (entityId: string, updatedCodes: GeneratedCode[]) => {
@@ -296,15 +247,32 @@ export default function BusinessEventsPage() {
     
     if (editingEvent && editingEvent.id === entityId) {
         setEditingEvent(prev => updateLogic(prev));
-    } else {
-        setEvents(prevEvents => prevEvents.map(event => event.id === entityId ? updateLogic(event) as BusinessManagedEntity : event));
     }
+    setEvents(prevEvents => prevEvents.map(event => event.id === entityId ? updateLogic(event) as BusinessManagedEntity : event));
   };
 
   const getAttendanceCount = (event: BusinessManagedEntity) => {
     const redeemedCount = event.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
     return `${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
   };
+
+  const handleToggleEventStatus = (eventId: string) => {
+    const updateStatusInEvent = (event: BusinessManagedEntity | null) => {
+        if (!event || event.id !== eventId) return event;
+        const newStatus = !event.isActive;
+        toast({
+            title: "Estado Actualizado",
+            description: `El evento "${event.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
+        });
+        return { ...event, isActive: newStatus };
+    };
+
+    if (editingEvent && editingEvent.id === eventId) {
+        setEditingEvent(prev => updateStatusInEvent(prev));
+    }
+    setEvents(prevEvents => prevEvents.map(event => event.id === eventId ? updateStatusInEvent(event) as BusinessManagedEntity : event));
+  };
+
 
   // CRUD for Ticket Types within an Event (inside Manage Event Modal)
   const handleCreateOrEditTicketTypeForEvent = (data: TicketTypeFormData) => {
@@ -454,7 +422,8 @@ export default function BusinessEventsPage() {
                 <TableHead>Nombre</TableHead>
                 <TableHead className="hidden md:table-cell">Vigencia</TableHead>
                 <TableHead className="hidden lg:table-cell text-center">Asistencia / Aforo</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
+                <TableHead>Códigos</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -467,26 +436,39 @@ export default function BusinessEventsPage() {
                       {format(new Date(event.startDate), "P", { locale: es })} - {format(new Date(event.endDate), "P", { locale: es })}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-center">{getAttendanceCount(event)}</TableCell>
-                    <TableCell>
-                      <Badge variant={event.isActive ? "default" : "outline"} className={event.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
-                        {event.isActive ? <BadgeCheck className="mr-1 h-3 w-3"/> : <BadgeX className="mr-1 h-3 w-3"/>}
-                        {event.isActive ? "Activo" : "Inactivo"}
-                      </Badge>
+                    <TableCell className="text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                            <Switch
+                                checked={event.isActive}
+                                onCheckedChange={() => handleToggleEventStatus(event.id)}
+                                aria-label={`Estado del evento ${event.name}`}
+                                id={`status-switch-${event.id}`}
+                            />
+                            <Label htmlFor={`status-switch-${event.id}`} className="sr-only">
+                                {event.isActive ? "Activo" : "Inactivo"}
+                            </Label>
+                            <Badge variant={event.isActive ? "default" : "outline"} className={event.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
+                                {event.isActive ? <BadgeCheck className="mr-1 h-3 w-3"/> : <BadgeX className="mr-1 h-3 w-3"/>}
+                                {event.isActive ? "Activo" : "Inactivo"}
+                            </Badge>
+                        </div>
                     </TableCell>
-                    <TableCell className="text-right space-x-1">
+                    <TableCell className="space-x-1">
                       <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(event)}>
-                        <QrCode className="h-3 w-3 mr-1" /> Crear Códigos
+                        <QrCode className="h-3 w-3 mr-1" /> Crear
                       </Button>
                       <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(event)}>
-                        <ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})
+                        <ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})
                       </Button>
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
                        <Button variant="ghost" size="icon" title="Duplicar Evento" onClick={() => handleOpenManageEventModal(event, true)}>
                         <Copy className="h-4 w-4" />
                         <span className="sr-only">Duplicar</span>
                       </Button>
-                      <Button variant="ghost" size="icon" title="Editar/Gestionar Evento" onClick={() => handleOpenManageEventModal(event)}>
+                      <Button variant="ghost" size="icon" title="Gestionar Evento" onClick={() => handleOpenManageEventModal(event)}>
                         <Edit className="h-4 w-4" />
-                        <span className="sr-only">Editar/Gestionar</span>
+                        <span className="sr-only">Gestionar</span>
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -519,7 +501,7 @@ export default function BusinessEventsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">No se encontraron eventos.</TableCell>
+                  <TableCell colSpan={6} className="text-center h-24">No se encontraron eventos.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -536,11 +518,14 @@ export default function BusinessEventsPage() {
         }
         setShowManageEventModal(isOpen);
       }}>
-        <DialogContent className="sm:max-w-4xl h-[90vh]">
+        <DialogContent className="sm:max-w-4xl h-[90vh]"> {/* Increased max-width and height */}
           <DialogHeader>
-            <DialogTitle>{isDuplicating ? "Duplicar Evento" : (editingEvent?.id && events.some(e=>e.id === editingEvent.id) ? `Gestionar Evento: ${editingEvent.name}` : "Crear Nuevo Evento")}</DialogTitle>
+            <DialogTitle className="text-2xl">
+                {isDuplicating ? `Duplicar Evento: ${editingEvent?.name?.replace(' (Copia)','')}` : 
+                (editingEvent?.id && events.some(e=>e.id === editingEvent.id) ? `Gestionar Evento: ${editingEvent.name}` : "Crear Nuevo Evento")}
+            </DialogTitle>
             <DialogDescription>
-                 {isDuplicating ? `Creando una copia de "${editingEvent?.name?.replace(' (Copia)','')}". Ajusta los detalles necesarios.` : "Administra todos los aspectos de tu evento."}
+                 {isDuplicating ? `Creando una copia. Ajusta los detalles necesarios.` : "Administra todos los aspectos de tu evento desde las pestañas."}
             </DialogDescription>
           </DialogHeader>
 
@@ -555,15 +540,15 @@ export default function BusinessEventsPage() {
 
             <TabsContent value="details" className="flex-grow overflow-y-auto p-1">
               <BusinessEventForm
-                event={editingEvent}
+                event={editingEvent} // Pass the whole event object
                 onSubmit={handleMainEventFormSubmit} 
-                onCancel={() => { /* Cancel inside form not needed here, modal handles it */ }} 
+                onCancel={() => { /* Cancel handled by modal close */ }} 
               />
             </TabsContent>
 
             <TabsContent value="tickets" className="flex-grow overflow-y-auto p-1 space-y-4">
                 <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">Tipos de Entrada del Evento</h3>
+                    <h3 className="text-lg font-semibold">Entradas del Evento</h3>
                     <Button onClick={() => { setEditingTicketInEventModal(null); setShowTicketFormInEventModal(true); }} className="bg-primary hover:bg-primary/90">
                         <PlusCircle className="mr-2 h-4 w-4" /> Crear Nueva Entrada
                     </Button>
@@ -575,14 +560,16 @@ export default function BusinessEventsPage() {
                             {editingEvent.ticketTypes?.map((tt) => (
                                 <TableRow key={tt.id}>
                                     <TableCell>{tt.name}</TableCell><TableCell>{tt.cost.toFixed(2)}</TableCell><TableCell>{tt.description || "N/A"}</TableCell><TableCell>{tt.quantity === undefined || tt.quantity === null ? 'Ilimitada' : tt.quantity}</TableCell>
-                                    <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => { setEditingTicketInEventModal(tt); setShowTicketFormInEventModal(true); }}><Edit className="h-4 w-4" /></Button>
-                                    <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Eliminar "{tt.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteTicketTypeFromEvent(tt.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                                    </AlertDialog></TableCell>
+                                    <TableCell className="text-right">
+                                      <Button variant="ghost" size="icon" onClick={() => { setEditingTicketInEventModal(tt); setShowTicketFormInEventModal(true); }}><Edit className="h-4 w-4" /></Button>
+                                      <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Eliminar "{tt.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteTicketTypeFromEvent(tt.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                                      </AlertDialog>
+                                    </TableCell>
                                 </TableRow>))}
                         </TableBody>
                     </Table>
-                ) : <p className="text-muted-foreground text-center">No hay entradas definidas.</p>}
+                ) : <p className="text-muted-foreground text-center py-4">No hay entradas definidas para este evento.</p>}
             </TabsContent>
 
             <TabsContent value="boxes" className="flex-grow overflow-y-auto p-1 space-y-4">
@@ -599,14 +586,16 @@ export default function BusinessEventsPage() {
                             {editingEvent.eventBoxes?.map((box) => (
                                 <TableRow key={box.id}>
                                     <TableCell>{box.name}</TableCell><TableCell>{box.cost.toFixed(2)}</TableCell><TableCell><Badge variant={box.status === 'available' ? 'default' : 'secondary'}>{box.status === 'available' ? "Disponible" : "No Disp."}</Badge></TableCell><TableCell>{box.capacity || "N/A"}</TableCell><TableCell>{box.sellerName || "N/A"}</TableCell><TableCell>{box.ownerName || "N/A"} {box.ownerDni && `(${box.ownerDni})`}</TableCell>
-                                    <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => { setEditingBoxInEventModal(box); setShowBoxFormInEventModal(true);}}><Edit className="h-4 w-4" /></Button>
-                                    <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar box?</AlertDialogTitle><AlertDialogDescription>Eliminar "{box.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBoxFromEvent(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                                    </AlertDialog></TableCell>
+                                    <TableCell className="text-right">
+                                      <Button variant="ghost" size="icon" onClick={() => { setEditingBoxInEventModal(box); setShowBoxFormInEventModal(true);}}><Edit className="h-4 w-4" /></Button>
+                                      <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar box?</AlertDialogTitle><AlertDialogDescription>Eliminar "{box.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBoxFromEvent(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                                      </AlertDialog>
+                                    </TableCell>
                                 </TableRow>))}
                         </TableBody>
                     </Table>
-                ) : <p className="text-muted-foreground text-center">No hay boxes definidos.</p>}
+                ) : <p className="text-muted-foreground text-center py-4">No hay boxes definidos para este evento.</p>}
             </TabsContent>
 
             <TabsContent value="promoters" className="flex-grow overflow-y-auto p-1 space-y-4">
@@ -627,13 +616,13 @@ export default function BusinessEventsPage() {
                     </div>
                      <div className="space-y-1">
                         <Label htmlFor="promoter-notes">Notas (Opcional)</Label>
-                        <Input id="promoter-notes" placeholder="Notas específicas para el promotor en este evento" value={promoterEventNotes} onChange={(e) => setPromoterEventNotes(e.target.value)} />
+                        <Input id="promoter-notes" placeholder="Notas específicas para el promotor" value={promoterEventNotes} onChange={(e) => setPromoterEventNotes(e.target.value)} />
                     </div>
                     <Button onClick={handleAssignPromoterToEvent} className="md:col-span-3 bg-primary hover:bg-primary/90">
-                        <UserPlus className="mr-2 h-4 w-4" /> Asignar Promotor
+                        <UserPlus className="mr-2 h-4 w-4" /> Asignar Promotor al Evento
                     </Button>
                 </div>
-                <h4 className="text-md font-semibold pt-2">Promotores Asignados</h4>
+                <h4 className="text-md font-semibold pt-2">Promotores Asignados a este Evento</h4>
                 {(editingEvent.assignedPromoters?.length || 0) > 0 ? (
                     <Table>
                         <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Email</TableHead><TableHead>Comisión (Evento)</TableHead><TableHead>Notas</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader>
@@ -651,7 +640,7 @@ export default function BusinessEventsPage() {
                             ))}
                         </TableBody>
                     </Table>
-                ): <p className="text-muted-foreground text-center">No hay promotores asignados a este evento.</p>}
+                ): <p className="text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>}
             </TabsContent>
 
             <TabsContent value="stats" className="flex-grow overflow-y-auto p-1 space-y-4">
@@ -660,16 +649,18 @@ export default function BusinessEventsPage() {
                     <p><strong>Códigos Generados (Total):</strong> {editingEvent.generatedCodes?.length || 0}</p>
                     <p><strong>Códigos Canjeados:</strong> {editingEvent.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
                     <p><strong>Tasa de Canje:</strong> {editingEvent.generatedCodes?.length ? ((editingEvent.generatedCodes.filter(c => c.status === 'redeemed').length / editingEvent.generatedCodes.length) * 100).toFixed(2) : '0.00'}%</p>
-                    <p><strong>Top Promotores (Mock):</strong> Ana (15 canjes), Pedro (10 canjes)</p>
-                    <p><strong>Entradas Vendidas (Mock):</strong> General (50), VIP (10)</p>
+                    <p><strong>Entradas Vendidas (Mock):</strong> General (50), VIP (10) - <i>Se calcularía a partir de códigos canjeados asociados a tipos de entrada.</i></p>
+                    <p><strong>Boxes Ocupados (Mock):</strong> Box A1 - <i>Se determinaría por el estado 'ownerName' del box.</i></p>
+                    <p><strong>Top Promotores (Códigos Canjeados de este Evento - Mock):</strong> Ana (15 canjes), Pedro (10 canjes) - <i>Se calcularía analizando `generatedByName` en códigos canjeados y cruzando con `assignedPromoters`.</i></p>
+                    <p className="text-sm text-muted-foreground pt-2">Estas son estadísticas de ejemplo. La implementación real requeriría lógica de agregación de datos.</p>
                 </CardContent></Card>
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="pt-4 border-t">
+          <DialogFooter className="pt-4 border-t mt-auto"> {/* Ensure footer is at the bottom */}
             <Button variant="outline" onClick={() => {setShowManageEventModal(false); setEditingEvent(null); setIsDuplicating(false);}}>Cancelar</Button>
             <Button onClick={handleSaveManagedEventAndClose} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                {isDuplicating ? "Crear Evento Duplicado" : "Guardar Cambios y Cerrar"}
+                {isDuplicating ? "Crear Evento Duplicado" : (editingEvent?.id && events.some(e=>e.id === editingEvent.id) ? "Guardar Cambios y Cerrar" : "Crear Evento y Continuar Gestionando")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -716,7 +707,7 @@ export default function BusinessEventsPage() {
       )}
 
 
-      {/* Create Codes Modal (for selected event) */}
+      {/* Create Codes Modal (for selected event from main list) */}
       {selectedEntityForCreatingCodes && (
         <CreateCodesDialog
           open={showCreateCodesModal}
@@ -728,7 +719,7 @@ export default function BusinessEventsPage() {
         />
       )}
 
-      {/* Manage Codes Modal (for selected event) */}
+      {/* Manage Codes Modal (for selected event from main list) */}
       {selectedEntityForViewingCodes && (
         <ManageCodesDialog
           open={showManageCodesModal}
@@ -739,14 +730,15 @@ export default function BusinessEventsPage() {
           entity={selectedEntityForViewingCodes}
           onCodesUpdated={handleCodesUpdatedFromManageDialog}
           onRequestCreateNewCodes={() => {
-            // If managing codes from within Manage Event Modal
-            if (editingEvent && editingEvent.id === selectedEntityForViewingCodes.id) {
-                setSelectedEntityForCreatingCodes(editingEvent); // Or selectedEntityForViewingCodes
-            } else { // If managing codes from main event list (fallback)
-                setSelectedEntityForCreatingCodes(selectedEntityForViewingCodes);
+            const currentEntity = selectedEntityForViewingCodes; // Capture current entity
+            setShowManageCodesModal(false); 
+            if(currentEntity) { 
+                // Use timeout to ensure state update from onOpenChange(false) completes
+                setTimeout(() => {
+                    setSelectedEntityForCreatingCodes(currentEntity);
+                    setShowCreateCodesModal(true);
+                }, 0);
             }
-            setShowManageCodesModal(false); // Close this one
-            setShowCreateCodesModal(true); // Open create codes one
           }}
         />
       )}
@@ -754,3 +746,4 @@ export default function BusinessEventsPage() {
   );
 }
 
+    
