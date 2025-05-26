@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard"; // Re-using StatCard for now
-import { Ticket, CalendarEvent, Users, BarChart3, ScanLine } from "lucide-react";
+import { Ticket, Calendar, Users, BarChart3, ScanLine } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 // Mock data specific to a business would be fetched here
 // For example, active promotions for *this* business, recent redemptions, etc.
@@ -22,7 +22,7 @@ export default function BusinessDashboardPage() {
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Promociones Activas" value={mockBusinessStats.activePromotions} icon={Ticket} />
-        <StatCard title="Eventos Próximos" value={mockBusinessStats.upcomingEvents} icon={CalendarEvent} />
+        <StatCard title="Eventos Próximos" value={mockBusinessStats.upcomingEvents} icon={Calendar} />
         <StatCard title="Canjes Hoy" value={mockBusinessStats.totalRedemptionsToday} icon={ScanLine} />
         <StatCard title="Nuevos Clientes (Semana)" value={mockBusinessStats.newCustomersThisWeek} icon={Users} />
       </div>

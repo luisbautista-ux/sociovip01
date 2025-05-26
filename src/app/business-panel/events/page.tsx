@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarEvent, PlusCircle } from "lucide-react";
+import { Calendar, PlusCircle } from "lucide-react";
 
 export default function BusinessEventsPage() {
   // Placeholder for events data and logic
@@ -11,7 +11,7 @@ export default function BusinessEventsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-primary flex items-center">
-          <CalendarEvent className="h-8 w-8 mr-2" /> Gestión de Eventos
+          <Calendar className="h-8 w-8 mr-2" /> Gestión de Eventos
         </h1>
         <Button className="bg-primary hover:bg-primary/90">
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Evento
