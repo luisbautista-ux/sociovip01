@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { es } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge"; // Added import
 
 // Mock Data for Promoter Commissions
 const mockCommissions: PromoterCommissionEntry[] = [
@@ -44,9 +45,18 @@ export default function PromoterCommissionsPage() {
   const filteredCommissions = commissions.filter(comm => {
     // Basic filtering example, needs more robust logic for dates and selections
     let matches = true;
-    if (selectedBusiness && !comm.businessName.toLowerCase().includes(selectedBusiness.toLowerCase())) matches = false;
-    if (selectedEntity && !comm.entityName.toLowerCase().includes(selectedEntity.toLowerCase())) matches = false;
-    // Date range filtering would be more complex here
+    if (selectedBusiness && selectedBusiness !== 'all' && !comm.businessName.toLowerCase().includes(selectedBusiness.toLowerCase())) {
+        matches = false;
+    }
+    if (selectedEntity && selectedEntity !== 'all' && !comm.entityName.toLowerCase().includes(selectedEntity.toLowerCase())) {
+        matches = false;
+    }
+    if (dateRange?.from && new Date(comm.period.split(" ")[1], es.localize?.month(es.locale.match.months?.findIndex(m => m.test(comm.period.split(" ")[0])) || 0, {}), 1) < dateRange.from) {
+        matches = false;
+    }
+    if (dateRange?.to && new Date(comm.period.split(" ")[1], es.localize?.month(es.locale.match.months?.findIndex(m => m.test(comm.period.split(" ")[0])) || 0, {}), 1) > dateRange.to) {
+        matches = false;
+    }
     return matches;
   });
   
@@ -68,6 +78,8 @@ export default function PromoterCommissionsPage() {
     document.body.removeChild(link);
   };
 
+  const totalCommissions = filteredCommissions.reduce((sum, comm) => sum + comm.commissionEarned, 0);
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary flex items-center">
@@ -78,13 +90,13 @@ export default function PromoterCommissionsPage() {
         <CardHeader>
           <CardTitle>Filtros de Comisiones</CardTitle>
           <CardDescription>Filtra tus comisiones por fecha, negocio o promoción/evento.</CardDescription>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-4 items-end">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   id="date"
                   variant={"outline"}
-                  className={cn("justify-start text-left font-normal", !dateRange && "text-muted-foreground")}
+                  className={cn("justify-start text-left font-normal w-full", !dateRange && "text-muted-foreground")}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (
@@ -112,8 +124,8 @@ export default function PromoterCommissionsPage() {
                 />
               </PopoverContent>
             </Popover>
-            <Select onValueChange={setSelectedBusiness} value={selectedBusiness}>
-                <SelectTrigger>
+            <Select onValueChange={(value) => setSelectedBusiness(value === 'all' ? undefined : value)} value={selectedBusiness || 'all'}>
+                <SelectTrigger className="w-full">
                     <SelectValue placeholder="Todos los Negocios" />
                 </SelectTrigger>
                 <SelectContent>
@@ -123,8 +135,8 @@ export default function PromoterCommissionsPage() {
                     ))}
                 </SelectContent>
             </Select>
-            <Select onValueChange={setSelectedEntity} value={selectedEntity} disabled={!selectedBusiness || selectedBusiness === 'all'}>
-                 <SelectTrigger>
+            <Select onValueChange={(value) => setSelectedEntity(value === 'all' ? undefined : value)} value={selectedEntity || 'all'} > {/* Removed disabled for simplicity with mock data */}
+                 <SelectTrigger className="w-full">
                     <SelectValue placeholder="Todas las Promociones/Eventos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -135,7 +147,7 @@ export default function PromoterCommissionsPage() {
                     ))}
                 </SelectContent>
             </Select>
-            <Button variant="outline" onClick={handleExport}>
+            <Button variant="outline" onClick={handleExport} className="w-full sm:w-auto">
                 <Download className="mr-2 h-4 w-4" /> Exportar CSV
             </Button>
           </div>
@@ -177,10 +189,12 @@ export default function PromoterCommissionsPage() {
             <p className="text-muted-foreground text-center py-10">No se encontraron comisiones con los filtros aplicados.</p>
           )}
         </CardContent>
-         <CardFooter className="justify-end">
-            <p className="text-lg font-bold">Total Comisiones (Filtradas): S/ {filteredCommissions.reduce((sum, comm) => sum + comm.commissionEarned, 0).toFixed(2)}</p>
+         <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t">
+            <p className="text-sm text-muted-foreground mb-2 sm:mb-0">Mostrando {filteredCommissions.length} de {commissions.length} registros.</p>
+            <p className="text-lg font-bold">Total Comisiones (Filtradas): S/ {totalCommissions.toFixed(2)}</p>
         </CardFooter>
       </Card>
     </div>
   );
 }
+
