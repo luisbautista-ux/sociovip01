@@ -60,8 +60,8 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Taller de Coctelería Premium", 
     description: "Aprende a preparar cocktails como un profesional.", 
-    startDate: "2024-10-05T12:00:00", // Kept in past
-    endDate: "2024-10-05T12:00:00", // Kept in past
+    startDate: "2024-10-05T12:00:00", 
+    endDate: "2024-10-05T12:00:00", 
     maxAttendance: 30, 
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -71,13 +71,14 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
 ];
 
 let mockTicketTypes: TicketType[] = [
-    { id: "tt1", businessId: "biz1", name: "Entrada General", cost: 50, description: "Acceso general al evento.", quantity: 100 },
-    { id: "tt2", businessId: "biz1", name: "Entrada VIP", cost: 150, description: "Acceso VIP + 1 bebida.", quantity: 30 },
+    { id: "tt1", businessId: "biz1", eventId: "evt1", name: "Entrada General - Karaoke", cost: 50, description: "Acceso general al evento de Karaoke.", quantity: 80 },
+    { id: "tt2", businessId: "biz1", eventId: "evt1", name: "Entrada VIP - Karaoke", cost: 150, description: "Acceso VIP + 1 bebida para Karaoke.", quantity: 20 },
+    { id: "tt3", businessId: "biz1", eventId: "evt2", name: "Entrada General - Fiesta 80s", cost: 70, description: "Acceso general a la Fiesta 80s.", quantity: 200 },
 ];
 
 let mockEventBoxes: EventBox[] = [
-    { id: "box1", businessId: "biz1", name: "Box A1 (Escenario)", cost: 800, description: "Para 8 personas, cerca al escenario.", status: 'available', capacity: 8 },
-    { id: "box2", businessId: "biz1", name: "Box B2 (Lateral)", cost: 600, description: "Para 6 personas, vista lateral.", status: 'unavailable', capacity: 6 },
+    { id: "box1", businessId: "biz1", eventId: "evt1", name: "Box A1 (Escenario Karaoke)", cost: 800, description: "Para 8 personas, cerca al escenario.", status: 'available', capacity: 8, sellerName: "Ana Staff", ownerName: "Cliente VIP Juan", ownerDni:"12345670" },
+    { id: "box2", businessId: "biz1", eventId: "evt2", name: "Box B2 (Lateral Fiesta 80s)", cost: 600, description: "Para 6 personas, vista lateral.", status: 'unavailable', capacity: 6, sellerName: "Luis Staff" },
 ];
 
 
@@ -183,6 +184,8 @@ export default function BusinessEventsPage() {
 
   const getAttendanceCount = (event: BusinessManagedEntity) => {
     const redeemedCount = event.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
+    // For now, maxAttendance comes directly from the event.
+    // Later, it could be sum of quantities from associated ticket types/boxes.
     return `${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
   };
 
@@ -190,12 +193,13 @@ export default function BusinessEventsPage() {
   const handleCreateTicketType = (data: TicketTypeFormData) => {
     const newTicketType: TicketType = {
       id: `tt${Date.now()}`,
-      businessId: "biz1",
+      businessId: "biz1", // Assuming fixed business ID for mock
+      // eventId: selectedEventId, // If managing tickets per event
       ...data,
     };
     setTicketTypes(prev => [newTicketType, ...prev]);
     setShowTicketTypeModal(false);
-    toast({ title: "Tipo de Entrada Creado", description: `"${newTicketType.name}" ha sido creado.` });
+    toast({ title: "Entrada Creada", description: `La entrada "${newTicketType.name}" ha sido creada.` });
   };
 
   const handleEditTicketType = (data: TicketTypeFormData) => {
@@ -203,24 +207,25 @@ export default function BusinessEventsPage() {
     setTicketTypes(prev => prev.map(tt => tt.id === editingTicketType.id ? { ...editingTicketType, ...data } : tt));
     setEditingTicketType(null);
     setShowTicketTypeModal(false);
-    toast({ title: "Tipo de Entrada Actualizado", description: `"${data.name}" ha sido actualizado.` });
+    toast({ title: "Entrada Actualizada", description: `La entrada "${data.name}" ha sido actualizada.` });
   };
 
   const handleDeleteTicketType = (ticketTypeId: string) => {
     setTicketTypes(prev => prev.filter(tt => tt.id !== ticketTypeId));
-    toast({ title: "Tipo de Entrada Eliminado", variant: "destructive" });
+    toast({ title: "Entrada Eliminada", variant: "destructive" });
   };
 
   // EventBox CRUD
   const handleCreateEventBox = (data: EventBoxFormData) => {
     const newBox: EventBox = {
       id: `box${Date.now()}`,
-      businessId: "biz1",
+      businessId: "biz1", // Assuming fixed business ID for mock
+      // eventId: selectedEventId, // If managing boxes per event
       ...data,
     };
     setEventBoxes(prev => [newBox, ...prev]);
     setShowEventBoxModal(false);
-    toast({ title: "Box Creado", description: `"${newBox.name}" ha sido creado.` });
+    toast({ title: "Box Creado", description: `El box "${newBox.name}" ha sido creado.` });
   };
 
   const handleEditEventBox = (data: EventBoxFormData) => {
@@ -228,7 +233,7 @@ export default function BusinessEventsPage() {
     setEventBoxes(prev => prev.map(b => b.id === editingEventBox.id ? { ...editingEventBox, ...data } : b));
     setEditingEventBox(null);
     setShowEventBoxModal(false);
-    toast({ title: "Box Actualizado", description: `"${data.name}" ha sido actualizado.` });
+    toast({ title: "Box Actualizado", description: `El box "${data.name}" ha sido actualizado.` });
   };
 
   const handleDeleteEventBox = (boxId: string) => {
@@ -248,7 +253,7 @@ export default function BusinessEventsPage() {
       <Tabs defaultValue="events" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="events">Mis Eventos</TabsTrigger>
-          <TabsTrigger value="ticketTypes">Tipos de Entrada</TabsTrigger>
+          <TabsTrigger value="ticketTypes">Entradas</TabsTrigger>
           <TabsTrigger value="boxes">Boxes</TabsTrigger>
         </TabsList>
 
@@ -261,7 +266,7 @@ export default function BusinessEventsPage() {
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>Lista de Eventos</CardTitle>
-              <CardDescription>Administra los eventos organizados por tu negocio.</CardDescription>
+              <CardDescription>Administra los eventos organizados por tu negocio. Próximamente podrás gestionar entradas y boxes por cada evento.</CardDescription>
               <div className="relative mt-4">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -300,7 +305,10 @@ export default function BusinessEventsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-1">
-                          <Button variant="outline" size="sm" onClick={() => openCreateCodesDialog(event)}>
+                           {/* Placeholder buttons for managing tickets/boxes per event */}
+                          {/* <Button variant="outline" size="xs" className="text-xs" onClick={() => alert(`Gestionar Entradas para ${event.name}`)}>Entradas</Button> */}
+                          {/* <Button variant="outline" size="xs" className="text-xs" onClick={() => alert(`Gestionar Boxes para ${event.name}`)}>Boxes</Button> */}
+                          <Button variant="default" size="sm" onClick={() => openCreateCodesDialog(event)}>
                             <QrCode className="h-4 w-4 mr-1" /> Crear Códigos
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => openViewCodesDialog(event)}>
@@ -353,13 +361,13 @@ export default function BusinessEventsPage() {
         <TabsContent value="ticketTypes" className="mt-6">
           <div className="flex justify-end mb-4">
             <Button onClick={() => {setEditingTicketType(null); setShowTicketTypeModal(true);}} className="bg-primary hover:bg-primary/90">
-                <PlusCircle className="mr-2 h-4 w-4" /> Crear Tipo de Entrada
+                <PlusCircle className="mr-2 h-4 w-4" /> Crear Entrada
             </Button>
           </div>
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Tipos de Entrada</CardTitle>
-              <CardDescription>Define diferentes tipos de entradas para tus eventos.</CardDescription>
+              <CardTitle>Entradas</CardTitle>
+              <CardDescription>Define diferentes tipos de entradas para tus eventos. (Gestión global por ahora)</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -379,7 +387,7 @@ export default function BusinessEventsPage() {
                         <TableCell className="font-medium">{tt.name}</TableCell>
                         <TableCell className="text-right">{tt.cost.toFixed(2)}</TableCell>
                         <TableCell>{tt.description || "N/A"}</TableCell>
-                        <TableCell className="text-center">{tt.quantity === undefined ? 'Ilimitada' : tt.quantity}</TableCell>
+                        <TableCell className="text-center">{tt.quantity === undefined || tt.quantity === null ? 'Ilimitada' : tt.quantity}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => {setEditingTicketType(tt); setShowTicketTypeModal(true);}}>
                             <Edit className="h-4 w-4" />
@@ -427,15 +435,17 @@ export default function BusinessEventsPage() {
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>Boxes del Evento</CardTitle>
-              <CardDescription>Define y gestiona los boxes disponibles.</CardDescription>
+              <CardDescription>Define y gestiona los boxes disponibles. (Gestión global por ahora)</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
+                    <TableHead>Nombre Box</TableHead>
                     <TableHead className="text-right">Costo (S/)</TableHead>
                     <TableHead>Descripción</TableHead>
+                    <TableHead className="hidden md:table-cell">Vendedor</TableHead>
+                    <TableHead className="hidden lg:table-cell">Dueño (Cliente)</TableHead>
                     <TableHead className="text-center">Capacidad</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -448,6 +458,10 @@ export default function BusinessEventsPage() {
                         <TableCell className="font-medium">{box.name}</TableCell>
                         <TableCell className="text-right">{box.cost.toFixed(2)}</TableCell>
                         <TableCell>{box.description || "N/A"}</TableCell>
+                        <TableCell className="hidden md:table-cell">{box.sellerName || "N/A"}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {box.ownerName ? `${box.ownerName}${box.ownerDni ? ` (${box.ownerDni})` : ''}` : "N/A"}
+                        </TableCell>
                         <TableCell className="text-center">{box.capacity || "N/A"}</TableCell>
                         <TableCell>
                           <Badge variant={box.status === 'available' ? 'default' : 'secondary'}
@@ -482,7 +496,7 @@ export default function BusinessEventsPage() {
                     ))
                   ) : (
                      <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center">No hay boxes definidos.</TableCell>
+                      <TableCell colSpan={8} className="h-24 text-center">No hay boxes definidos.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -544,7 +558,7 @@ export default function BusinessEventsPage() {
       <Dialog open={showTicketTypeModal} onOpenChange={setShowTicketTypeModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingTicketType ? "Editar Tipo de Entrada" : "Crear Nuevo Tipo de Entrada"}</DialogTitle>
+            <DialogTitle>{editingTicketType ? "Editar Entrada" : "Crear Nueva Entrada"}</DialogTitle>
           </DialogHeader>
           <TicketTypeForm
             ticketType={editingTicketType || undefined}
@@ -571,3 +585,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
+    

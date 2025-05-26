@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -25,6 +26,11 @@ const eventBoxFormSchema = z.object({
   description: z.string().optional(),
   status: z.enum(['available', 'unavailable'], { required_error: "Debes seleccionar un estado."}),
   capacity: z.coerce.number().int().min(1, "La capacidad debe ser al menos 1.").optional(),
+  sellerName: z.string().optional(),
+  ownerName: z.string().optional(),
+  ownerDni: z.string().optional().refine(val => !val || (val.length >= 7 && val.length <= 15), {
+    message: "DNI/CE del dueño debe tener entre 7 y 15 caracteres si se ingresa.",
+  }),
 });
 
 type EventBoxFormValues = z.infer<typeof eventBoxFormSchema>;
@@ -44,6 +50,9 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
       description: eventBox?.description || "",
       status: eventBox?.status || 'available',
       capacity: eventBox?.capacity || undefined,
+      sellerName: eventBox?.sellerName || "",
+      ownerName: eventBox?.ownerName || "",
+      ownerDni: eventBox?.ownerDni || "",
     },
   });
 
@@ -53,7 +62,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
         <FormField
           control={form.control}
           name="name"
@@ -82,7 +91,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Detalles del box..." {...field} rows={3} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del box..." {...field} rows={2} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -92,8 +101,42 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           name="capacity"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Capacidad (Personas - Opcional)</FormLabel>
+              <FormLabel>Capacidad (Personas)</FormLabel>
               <FormControl><Input type="number" placeholder="8" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)}/></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="sellerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Vendedor Asignado (Opcional)</FormLabel>
+              <FormControl><Input placeholder="Nombre del vendedor" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="ownerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nombre Dueño del Box (Opcional)</FormLabel>
+              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} /></FormControl>
+              <FormDescription className="text-xs">Si el box es reservado por un cliente específico.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="ownerDni"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>DNI/CE Dueño del Box (Opcional)</FormLabel>
+              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -131,3 +174,5 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
     </Form>
   );
 }
+
+    

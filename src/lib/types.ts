@@ -160,6 +160,9 @@ export interface EventBox {
   description?: string;
   status: 'available' | 'unavailable';
   capacity?: number; // How many people fit
+  sellerName?: string; // New field
+  ownerName?: string;  // New field
+  ownerDni?: string;   // New field
 }
 
 
@@ -255,4 +258,9 @@ export interface EventBoxFormData {
   description?: string;
   status: 'available' | 'unavailable';
   capacity?: number;
+  sellerName?: string;
+  ownerName?: string;
+  ownerDni?: string;
 }
+
+    
