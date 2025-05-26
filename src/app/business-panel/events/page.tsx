@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ClipboardList } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode } from "lucide-react";
 import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -32,7 +32,7 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "karaoke night",
     generatedCodes: [
-        { id: "codeEvt1-1", entityId: "evt1", value: "KARAOKE01", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:00:00Z" },
+        { id: "codeEvt1-1", entityId: "evt1", value: "KARAOKE01", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:00:00Z", observation: "Invitado especial" },
         { id: "codeEvt1-2", entityId: "evt1", value: "KARAOKE02", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:05:00Z", redemptionDate: "2024-08-15T20:00:00Z" },
     ]
   },
@@ -78,7 +78,7 @@ export default function BusinessEventsPage() {
 
   const filteredEvents = events.filter(event =>
     event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (event.description && event.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleCreateEvent = (data: BusinessEventFormData) => {
@@ -137,7 +137,7 @@ export default function BusinessEventsPage() {
 
   const getAttendanceCount = (event: BusinessManagedEntity) => {
     const redeemedCount = event.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
-    return `${redeemedCount} / ${event.maxAttendance === 0 ? '∞' : event.maxAttendance || 'N/A'}`;
+    return `${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
   };
 
   return (
@@ -194,7 +194,7 @@ export default function BusinessEventsPage() {
                     </TableCell>
                     <TableCell className="text-right space-x-1">
                        <Button variant="outline" size="sm" onClick={() => handleOpenManageCodes(event)}>
-                        <QrCode className="h-4 w-4 mr-1" /> Códigos
+                        <QrCode className="h-4 w-4 mr-1" /> Códigos ({event.generatedCodes?.length || 0})
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditingEvent(event)}>
                         <Edit className="h-4 w-4" />

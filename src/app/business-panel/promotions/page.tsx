@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Search, Ticket, BadgeCheck, BadgeX, QrCode, ClipboardList } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Ticket, BadgeCheck, BadgeX, QrCode } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { BusinessPromotionForm } from "@/components/business/forms/BusinessPromotionForm";
-import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog"; // Added import
+import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog";
 
 // Mock data for business promotions - In a real app, this would be fetched for the logged-in business
 let mockBusinessPromotions: BusinessManagedEntity[] = [
@@ -32,7 +32,7 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "chicken wings",
     generatedCodes: [
-        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:00:00Z" },
+        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:00:00Z", observation: "Código de lanzamiento" },
         { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:05:00Z", redemptionDate: "2024-07-21T12:00:00Z" },
         { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:06:00Z" },
     ]
@@ -78,7 +78,7 @@ export default function BusinessPromotionsPage() {
 
   const filteredPromotions = promotions.filter(promo =>
     promo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    promo.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (promo.description && promo.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleCreatePromotion = (data: BusinessPromotionFormData) => {
@@ -137,7 +137,11 @@ export default function BusinessPromotionsPage() {
 
   const getRedemptionCount = (promotion: BusinessManagedEntity) => {
     const redeemedCount = promotion.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
-    return `${redeemedCount} / ${promotion.usageLimit === 0 ? '∞' : promotion.usageLimit || 'N/A'}`;
+    const totalGenerated = promotion.generatedCodes?.length || 0;
+    if (promotion.usageLimit && promotion.usageLimit > 0) {
+      return `${redeemedCount} / ${promotion.usageLimit}`;
+    }
+    return `${redeemedCount} / ${totalGenerated === 0 ? '∞' : totalGenerated } (Generados)`;
   };
 
 
@@ -173,7 +177,7 @@ export default function BusinessPromotionsPage() {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead className="hidden md:table-cell">Vigencia</TableHead>
-                <TableHead className="hidden lg:table-cell text-center">Canjeados / Límite</TableHead>
+                <TableHead className="hidden lg:table-cell text-center">Canjes</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -195,7 +199,7 @@ export default function BusinessPromotionsPage() {
                     </TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="outline" size="sm" onClick={() => handleOpenManageCodes(promo)}>
-                        <QrCode className="h-4 w-4 mr-1" /> Códigos
+                        <QrCode className="h-4 w-4 mr-1" /> Códigos ({promo.generatedCodes?.length || 0})
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditingPromotion(promo)}>
                         <Edit className="h-4 w-4" />

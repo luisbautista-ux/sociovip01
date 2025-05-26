@@ -98,6 +98,7 @@ export interface GeneratedCode {
   generatedByName: string; // Mock: "Business Admin" or specific staff name
   generatedDate: string; // ISO Date string
   redemptionDate?: string; // ISO Date string, if redeemed
+  observation?: string; // Optional observation for the code
 }
 
 export interface BusinessManagedEntity { // Promotions, Events, Surveys created by a Business
