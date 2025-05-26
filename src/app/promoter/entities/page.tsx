@@ -32,8 +32,8 @@ let mockAssignedEntities: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Jueves de Alitas BBQ (Asignada a Carlos)", 
     description: "Todas las alitas BBQ a S/1 cada una.", 
-    startDate: "2024-08-01T12:00:00", 
-    endDate: "2024-12-31T12:00:00", 
+    startDate: "2024-01-01T12:00:00", // Adjusted for testing
+    endDate: "2024-12-31T12:00:00",   // Adjusted for testing
     usageLimit: 0, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -93,8 +93,13 @@ export default function PromoterEntitiesPage() {
   );
   
   const openCreateCodesDialog = (entity: BusinessManagedEntity) => {
-    if (!entity.isActive || new Date(entity.endDate) < new Date() || new Date(entity.startDate) > new Date()) {
-      toast({ title: "No se pueden crear códigos", description: "La entidad no está activa o está fuera de su periodo de vigencia.", variant: "destructive"});
+    const now = new Date();
+    if (!entity.isActive || new Date(entity.endDate) < now || new Date(entity.startDate) > now) {
+      toast({ 
+        title: "No se pueden crear códigos", 
+        description: "Esta promoción o evento no está activo o está fuera de su periodo de vigencia.", 
+        variant: "destructive"
+      });
       return;
     }
     setSelectedEntityForCreatingCodes(entity);
@@ -155,7 +160,7 @@ export default function PromoterEntitiesPage() {
       </h1>
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Entidades Activas para Ti</CardTitle>
+          <CardTitle>Promociones y Eventos Activos para Ti</CardTitle>
           <CardDescription>Aquí puedes generar códigos para las promociones y eventos que te han sido asignados y están activos.</CardDescription>
           <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

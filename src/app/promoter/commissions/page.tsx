@@ -14,7 +14,7 @@ import { es } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge"; // Added import
+import { Badge } from "@/components/ui/badge";
 
 // Mock Data for Promoter Commissions
 const mockCommissions: PromoterCommissionEntry[] = [
@@ -51,10 +51,22 @@ export default function PromoterCommissionsPage() {
     if (selectedEntity && selectedEntity !== 'all' && !comm.entityName.toLowerCase().includes(selectedEntity.toLowerCase())) {
         matches = false;
     }
-    if (dateRange?.from && new Date(comm.period.split(" ")[1], es.localize?.month(es.locale.match.months?.findIndex(m => m.test(comm.period.split(" ")[0])) || 0, {}), 1) < dateRange.from) {
+    // Ensure es.localize and es.locale.match.months are defined before using them
+    const fromMonthIndex = dateRange?.from ? dateRange.from.getMonth() : -1;
+    const toMonthIndex = dateRange?.to ? dateRange.to.getMonth() : -1;
+    const commPeriodMonthName = comm.period.split(" ")[0];
+    const commPeriodYear = parseInt(comm.period.split(" ")[1]);
+
+    let commMonthIndex = -1;
+    if (es.locale && es.locale.match && es.locale.match.months) {
+        const monthRegexes = es.locale.match.months;
+        commMonthIndex = monthRegexes.findIndex(regex => regex.test(commPeriodMonthName));
+    }
+    
+    if (dateRange?.from && (commPeriodYear < dateRange.from.getFullYear() || (commPeriodYear === dateRange.from.getFullYear() && commMonthIndex < fromMonthIndex))) {
         matches = false;
     }
-    if (dateRange?.to && new Date(comm.period.split(" ")[1], es.localize?.month(es.locale.match.months?.findIndex(m => m.test(comm.period.split(" ")[0])) || 0, {}), 1) > dateRange.to) {
+    if (dateRange?.to && (commPeriodYear > dateRange.to.getFullYear() || (commPeriodYear === dateRange.to.getFullYear() && commMonthIndex > toMonthIndex))) {
         matches = false;
     }
     return matches;
@@ -191,10 +203,9 @@ export default function PromoterCommissionsPage() {
         </CardContent>
          <CardFooter className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t">
             <p className="text-sm text-muted-foreground mb-2 sm:mb-0">Mostrando {filteredCommissions.length} de {commissions.length} registros.</p>
-            <p className="text-lg font-bold">Total Comisiones (Filtradas): S/ {totalCommissions.toFixed(2)}</p>
+            <p className="text-lg font-bold">Total Comisiones: S/ {totalCommissions.toFixed(2)}</p>
         </CardFooter>
       </Card>
     </div>
   );
 }
-
