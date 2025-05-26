@@ -182,4 +182,3 @@ export function CreateBatchBoxesDialog({ open, onOpenChange, onSubmit }: CreateB
     </Dialog>
   );
 }
-```
