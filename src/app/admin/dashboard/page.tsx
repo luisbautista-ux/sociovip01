@@ -1,8 +1,8 @@
 
-"use client"; // For potential future client-side interactions, though stats are static for now
+"use client"; 
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Building, Users, ScanLine, ListChecks, BarChart3, Ticket } from "lucide-react";
+import { Building, Users, ScanLine, ListChecks, BarChart3, Ticket, Star } from "lucide-react"; // Added Star
 import type { AdminDashboardStats, PromotionAnalyticsData } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
@@ -13,8 +13,9 @@ const mockStats: AdminDashboardStats = {
   totalBusinesses: 15,
   totalPlatformUsers: 45,
   totalPromotionsActive: 120,
-  totalQrCodesGenerated: 5670,
-  totalEndUsersRegistered: 2300,
+  totalQrCodesGenerated: 5670, // Total QRs from promotions
+  totalQrClients: 2300,    // Total QrClient records
+  totalSocioVipMembers: 150, // Total SocioVipMember records
 };
 
 const mockMonthlyPromotionData: PromotionAnalyticsData[] = [
@@ -32,12 +33,13 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary">Dashboard de Administración</h1>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {/* Adjusted grid for 6 items */}
         <StatCard title="Negocios Registrados" value={mockStats.totalBusinesses} icon={Building} />
         <StatCard title="Usuarios de Plataforma" value={mockStats.totalPlatformUsers} icon={Users} />
+        <StatCard title="Socios VIP Activos" value={mockStats.totalSocioVipMembers} icon={Star} /> 
         <StatCard title="Promociones Activas" value={mockStats.totalPromotionsActive} icon={Ticket} />
-        <StatCard title="Códigos QR Generados" value={mockStats.totalQrCodesGenerated} icon={ScanLine} />
-        <StatCard title="Clientes QR Registrados" value={mockStats.totalEndUsersRegistered} icon={ListChecks} />
+        <StatCard title="QR Promocionales Generados" value={mockStats.totalQrCodesGenerated} icon={ScanLine} />
+        <StatCard title="Clientes QR Registrados" value={mockStats.totalQrClients} icon={ListChecks} />
       </div>
 
       <Card className="shadow-lg col-span-1 lg:col-span-2">

@@ -15,15 +15,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import type { UserData, PromotionDetails, QrCodeData, QrCodeStatus } from "@/lib/types";
+import type { QrClient, PromotionDetails, QrCodeData, QrCodeStatus, NewQrClientFormData } from "@/lib/types";
 import Image from "next/image";
-import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download, Gift, Home, Briefcase, Tags } from "lucide-react";
+import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download, Gift } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -32,9 +31,9 @@ import { cn } from "@/lib/utils";
 import { SocioVipLogo } from "@/components/icons";
 
 type PageViewState = "promotionsList" | "qrDisplay";
-type ModalStep = "enterDni" | "newUserForm";
+type ModalStep = "enterDni" | "newQrClientForm";
 
-const codeSchema = z.object({
+const promoCodeEntrySchema = z.object({
   promoCode: z.string().length(9, "El código debe tener 9 caracteres.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
 });
 
@@ -42,18 +41,13 @@ const dniSchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 
-const newUserSchema = z.object({
+const newQrClientSchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
   name: z.string().min(2, "Nombre es requerido."),
   surname: z.string().min(2, "Apellido es requerido."),
   phone: z.string().min(7, "Celular es requerido.").regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
   dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
-  address: z.string().optional(),
-  profession: z.string().optional(),
-  preferences: z.string().optional(), // Storing as comma-separated string for simplicity in form
 });
-
-type NewUserFormData = z.infer<typeof newUserSchema>;
 
 
 const MOCK_PROMOTIONS: PromotionDetails[] = [
@@ -86,16 +80,15 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
   },
 ];
 
-const mockExistingUser: UserData = {
-  id: "user123",
+// This mock user is for the public QR generation flow. It's a QrClient.
+const mockExistingQrClient: QrClient = {
+  id: "qrclient123",
   name: "Ana",
   surname: "García",
   phone: "+51987654321",
-  dob: "1990-05-15",
+  dob: "1990-05-15", // YYYY-MM-DD
   dni: "12345678",
-  address: "Av. Siempreviva 742",
-  profession: "Consultora",
-  preferences: ["Música en vivo", "Cocktails Clásicos"],
+  registrationDate: "2024-01-10T10:00:00Z"
 };
 
 const statusTranslations: { [key in QrCodeStatus]: string } = {
@@ -110,13 +103,13 @@ export default function HomePage() {
   const [currentStepInModal, setCurrentStepInModal] = useState<ModalStep>("enterDni");
   const [activePromotion, setActivePromotion] = useState<PromotionDetails | null>(null);
   const [validatedPromoCode, setValidatedPromoCode] = useState<string | null>(null);
-  const [enteredDniOriginal, setEnteredDniOriginal] = useState<string | null>(null); // DNI original que llevó a newUserForm
+  const [enteredDniOriginal, setEnteredDniOriginal] = useState<string | null>(null); 
   const [qrData, setQrData] = useState<QrCodeData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
-  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewUserFormData | null>(null);
+  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
 
 
   const dniForm = useForm<z.infer<typeof dniSchema>>({
@@ -124,37 +117,31 @@ export default function HomePage() {
     defaultValues: { dni: "" },
   });
 
-  const newUserForm = useForm<NewUserFormData>({
-    resolver: zodResolver(newUserSchema),
+  const newQrClientForm = useForm<NewQrClientFormData>({
+    resolver: zodResolver(newQrClientSchema),
     defaultValues: {
       dni: "",
       name: "",
       surname: "",
       phone: "",
       dob: undefined,
-      address: "",
-      profession: "",
-      preferences: "",
     }
   });
 
   useEffect(() => {
-    if (currentStepInModal === 'newUserForm' && enteredDniOriginal) {
-      const currentDniInForm = newUserForm.getValues('dni');
-      if (currentDniInForm !== enteredDniOriginal || !newUserForm.getValues('name')) {
-        newUserForm.reset({ 
+    if (currentStepInModal === 'newQrClientForm' && enteredDniOriginal) {
+      const currentDniInForm = newQrClientForm.getValues('dni');
+      if (currentDniInForm !== enteredDniOriginal || !newQrClientForm.getValues('name')) {
+        newQrClientForm.reset({ 
           dni: enteredDniOriginal, 
           name: "", 
           surname: "", 
           phone: "", 
           dob: undefined,
-          address: "",
-          profession: "",
-          preferences: "",
         });
       }
     }
-  }, [currentStepInModal, enteredDniOriginal, newUserForm]);
+  }, [currentStepInModal, enteredDniOriginal, newQrClientForm]);
 
   const handleValidateAndShowDniModal = (promoCodeValue: string, promotion: PromotionDetails) => {
     const code = promoCodeValue.toUpperCase();
@@ -178,9 +165,9 @@ export default function HomePage() {
     
     setEnteredDniOriginal(values.dni);
 
-    if (values.dni === mockExistingUser.dni) {
+    if (values.dni === mockExistingQrClient.dni) { // Check against the mock QrClient
       const newQrData: QrCodeData = {
-        user: mockExistingUser,
+        user: mockExistingQrClient,
         promotion: activePromotion,
         qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
         code: validatedPromoCode,
@@ -189,22 +176,21 @@ export default function HomePage() {
       setQrData(newQrData);
       setShowDniModal(false);
       setPageViewState("qrDisplay");
-      toast({ title: `Bienvenido de vuelta ${mockExistingUser.name}!`, description: "Tu QR ha sido generado." });
+      toast({ title: `Bienvenido de vuelta ${mockExistingQrClient.name}!`, description: "Tu QR ha sido generado." });
     } else {
-      setCurrentStepInModal("newUserForm");
-      newUserForm.reset({ 
+      setCurrentStepInModal("newQrClientForm");
+      newQrClientForm.reset({ 
         dni: values.dni, 
         name: "", surname: "", phone: "", dob: undefined,
-        address: "", profession: "", preferences: ""
       });
       toast({ title: "Nuevo Usuario", description: "Por favor, completa tus datos para generar tu QR." });
     }
   };
 
-  const processNewUserRegistration = (userData: UserData) => {
+  const processNewQrClientRegistration = (qrClientData: QrClient) => {
     if (!activePromotion || !validatedPromoCode) return;
     const newQrData: QrCodeData = {
-      user: userData,
+      user: qrClientData,
       promotion: activePromotion,
       qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
       code: validatedPromoCode,
@@ -213,50 +199,50 @@ export default function HomePage() {
     setQrData(newQrData);
     setShowDniModal(false);
     setPageViewState("qrDisplay");
-    toast({ title: `Bienvenido ${userData.name}!`, description: "Tu QR ha sido generado con éxito." });
+    toast({ title: `Bienvenido ${qrClientData.name}!`, description: "Tu QR ha sido generado con éxito." });
   }
 
-  const handleNewUserSubmitInModal = async (values: NewUserFormData) => {
+  const handleNewQrClientSubmitInModal = async (values: NewQrClientFormData) => {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
 
-    if (values.dni === mockExistingUser.dni && values.dni !== enteredDniOriginal) {
+    // Check if the DNI entered in the form matches the mockExistingQrClient's DNI
+    // AND if this DNI is different from the one that initially led to this form
+    // (i.e., user changed DNI in the form to an existing one)
+    if (values.dni === mockExistingQrClient.dni && values.dni !== enteredDniOriginal) {
       setFormDataForDniWarning(values);
       setShowDniExistsWarningDialog(true);
       return; 
     }
     
-    const newUser: UserData = {
-      id: `user-${Date.now()}`,
+    const newQrClient: QrClient = {
+      id: `qrclient-${Date.now()}`,
       name: values.name,
       surname: values.surname,
       phone: values.phone,
       dob: format(values.dob, "yyyy-MM-dd"),
       dni: values.dni,
-      address: values.address,
-      profession: values.profession,
-      preferences: values.preferences?.split(',').map(p => p.trim()).filter(p => p),
+      registrationDate: new Date().toISOString(),
     };
-    processNewUserRegistration(newUser);
+    processNewQrClientRegistration(newQrClient);
   };
   
   const handleDniExistsConfirmation = (confirmed: boolean) => {
     setShowDniExistsWarningDialog(false);
     if (confirmed && formDataForDniWarning) {
-      newUserForm.reset({
-        dni: mockExistingUser.dni,
-        name: mockExistingUser.name,
-        surname: mockExistingUser.surname,
-        phone: mockExistingUser.phone,
-        dob: new Date(mockExistingUser.dob), 
-        address: mockExistingUser.address,
-        profession: mockExistingUser.profession,
-        preferences: mockExistingUser.preferences?.join(', '),
+      // User confirmed it's their DNI, prefill with mockExistingQrClient's data
+      newQrClientForm.reset({
+        dni: mockExistingQrClient.dni,
+        name: mockExistingQrClient.name,
+        surname: mockExistingQrClient.surname,
+        phone: mockExistingQrClient.phone,
+        dob: new Date(mockExistingQrClient.dob), 
       });
       toast({ title: "Datos Precargados", description: "Hemos rellenado el formulario con tus datos existentes. Revisa y confirma." });
     } else if (!confirmed && formDataForDniWarning) {
-       newUserForm.reset(formDataForDniWarning);
+       // User said "No", keep the data they had in the form
+       newQrClientForm.reset(formDataForDniWarning);
     }
     setFormDataForDniWarning(null);
   };
@@ -269,16 +255,17 @@ export default function HomePage() {
     setEnteredDniOriginal(null);
     setQrData(null);
     dniForm.reset();
-    newUserForm.reset();
+    newQrClientForm.reset();
   };
   
   const handleCloseDniModal = () => {
     setShowDniModal(false);
+    // Do not reset activePromotion or validatedPromoCode here
+    // so that if the modal is re-opened for the same promotion, context is kept.
+    // Reset forms and DNI tracking
     dniForm.reset();
-    newUserForm.reset();
-    setActivePromotion(null);
-    setValidatedPromoCode(null);
-    setEnteredDniOriginal(null);
+    newQrClientForm.reset();
+    setEnteredDniOriginal(null); 
   }
 
   const renderStatusIcon = (status: QrCodeStatus) => {
@@ -342,16 +329,18 @@ export default function HomePage() {
     qrImg.onerror = () => {
       toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
     };
+    // Ensure qrData.qrImageUrl is a valid URL, especially if it's from placehold.co
+    // If it might have query parameters that break it, sanitize or ensure it's correctly formed.
     qrImg.src = qrData.qrImageUrl;
   };
 
   const PromotionCodeForm = ({ promotion }: { promotion: PromotionDetails }) => {
-    const form = useForm<z.infer<typeof codeSchema>>({
-      resolver: zodResolver(codeSchema),
+    const form = useForm<z.infer<typeof promoCodeEntrySchema>>({
+      resolver: zodResolver(promoCodeEntrySchema),
       defaultValues: { promoCode: "" },
     });
 
-    function onSubmit(values: z.infer<typeof codeSchema>) {
+    function onSubmit(values: z.infer<typeof promoCodeEntrySchema>) {
       handleValidateAndShowDniModal(values.promoCode, promotion);
     }
 
@@ -452,13 +441,10 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-2 border-t pt-4">
-              <h3 className="text-lg font-semibold text-primary flex items-center"><User className="mr-2 h-5 w-5"/> Tus Datos</h3>
+              <h3 className="text-lg font-semibold text-primary flex items-center"><User className="mr-2 h-5 w-5"/> Tus Datos (Cliente QR)</h3>
               <p><strong className="font-medium">Nombre Completo:</strong> {qrData.user.name} {qrData.user.surname}</p>
               <p><strong className="font-medium">DNI/CE:</strong> {qrData.user.dni}</p>
               <p className="flex items-center"><Gift className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Cumpleaños:</strong> {format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}</p>
-              {qrData.user.address && <p className="flex items-center"><Home className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Dirección:</strong> {qrData.user.address}</p>}
-              {qrData.user.profession && <p className="flex items-center"><Briefcase className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Profesión:</strong> {qrData.user.profession}</p>}
-              {qrData.user.preferences && qrData.user.preferences.length > 0 && <p className="flex items-center"><Tags className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Preferencias:</strong> {qrData.user.preferences.join(', ')}</p>}
             </div>
 
             <div className="text-sm text-muted-foreground p-3 bg-secondary rounded-md flex items-start">
@@ -478,12 +464,12 @@ export default function HomePage() {
         <DialogContent className="sm:max-w-[425px]" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {currentStepInModal === 'enterDni' ? "Verificación de Identidad" : "Completa tus Datos"}
+              {currentStepInModal === 'enterDni' ? "Verificación de Identidad" : "Completa tus Datos (Cliente QR)"}
             </DialogTitle>
             <DialogDescription>
               {currentStepInModal === 'enterDni' 
                 ? `Para la promoción: "${activePromotion?.title}". Ingresa tu DNI o Carnet de Extranjería.`
-                : "Es la primera vez que usas un código con este DNI. Por favor, completa tu información."}
+                : "Es la primera vez que usas un código con este DNI. Por favor, completa tu información básica."}
             </DialogDescription>
           </DialogHeader>
 
@@ -513,11 +499,11 @@ export default function HomePage() {
             </Form>
           )}
 
-          {currentStepInModal === 'newUserForm' && (
-            <Form {...newUserForm}>
-              <form onSubmit={newUserForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-2">
+          {currentStepInModal === 'newQrClientForm' && (
+            <Form {...newQrClientForm}>
+              <form onSubmit={newQrClientForm.handleSubmit(handleNewQrClientSubmitInModal)} className="space-y-3 py-2 max-h-[70vh] overflow-y-auto pr-2">
                  <FormField
-                  control={newUserForm.control}
+                  control={newQrClientForm.control}
                   name="dni"
                   render={({ field }) => (
                     <FormItem>
@@ -530,7 +516,7 @@ export default function HomePage() {
                   )}
                 />
                 <FormField
-                  control={newUserForm.control}
+                  control={newQrClientForm.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
@@ -541,7 +527,7 @@ export default function HomePage() {
                   )}
                 />
                 <FormField
-                  control={newUserForm.control}
+                  control={newQrClientForm.control}
                   name="surname"
                   render={({ field }) => (
                     <FormItem>
@@ -552,7 +538,7 @@ export default function HomePage() {
                   )}
                 />
                 <FormField
-                  control={newUserForm.control}
+                  control={newQrClientForm.control}
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
@@ -563,7 +549,7 @@ export default function HomePage() {
                   )}
                 />
                 <FormField
-                  control={newUserForm.control}
+                  control={newQrClientForm.control}
                   name="dob"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
@@ -588,7 +574,7 @@ export default function HomePage() {
                             locale={es}
                             captionLayout="dropdown-buttons"
                             fromYear={1900}
-                            toYear={new Date().getFullYear() - 10} // At least 10 years old
+                            toYear={new Date().getFullYear() - 10} 
                             disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1900-01-01")}
                             initialFocus
                           />
@@ -598,43 +584,9 @@ export default function HomePage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={newUserForm.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Dirección (Opcional)</FormLabel>
-                      <FormControl><Input placeholder="Ej: Av. Larco 123, Miraflores" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={newUserForm.control}
-                  name="profession"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Profesión (Opcional)</FormLabel>
-                      <FormControl><Input placeholder="Ej: Ingeniero, Doctora" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={newUserForm.control}
-                  name="preferences"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Preferencias (Opcional)</FormLabel>
-                      <FormControl><Textarea placeholder="Ej: Música rock, Comida italiana, Viajes (separadas por comas)" {...field} /></FormControl>
-                      <FormDescription>Separa tus preferencias por comas.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               <DialogFooter className="pt-4">
                 <Button variant="outline" type="button" onClick={() => {
-                  const currentDniValue = newUserForm.getValues("dni");
+                  const currentDniValue = newQrClientForm.getValues("dni");
                   setCurrentStepInModal('enterDni');
                   dniForm.setValue("dni", currentDniValue || enteredDniOriginal || "");
                 }}>Volver</Button>
@@ -653,7 +605,7 @@ export default function HomePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>DNI Ya Registrado</AlertDialogTitle>
             <AlertDialogDescription>
-              El DNI que has ingresado ya está registrado. ¿Estás seguro que es tu número?
+              El DNI que has ingresado ya está registrado como Cliente QR. ¿Estás seguro que es tu número?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

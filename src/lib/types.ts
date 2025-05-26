@@ -1,16 +1,4 @@
 
-export interface UserData {
-  id: string;
-  name: string;
-  surname: string;
-  phone: string;
-  dob: string; // Date of Birth
-  dni: string; // Document ID
-  address?: string;
-  profession?: string;
-  preferences?: string[];
-}
-
 export interface PromotionDetails {
   id: string;
   title: string;
@@ -23,28 +11,52 @@ export interface PromotionDetails {
 
 export type QrCodeStatus = 'generated' | 'utilized' | 'expired';
 
+// Represents a client who generates QR codes via promotional codes (public page flow)
+export interface QrClient {
+  id: string;
+  name: string;
+  surname: string;
+  phone: string;
+  dob: string; // Date of Birth, YYYY-MM-DD
+  dni: string; // Document ID
+  registrationDate: string; // ISO date string of first QR generation
+}
+
+// Data for the QR code itself, linking a QrClient to a Promotion
 export interface QrCodeData {
-  user: UserData;
+  user: QrClient; // User who generated this specific promotional QR
   promotion: PromotionDetails;
   qrImageUrl: string;
-  code: string; // This would be the validatedPromoCode
+  code: string; // Validated promoCode used
   status: QrCodeStatus;
+}
+
+// Represents a VIP Member with a detailed profile and membership
+export interface SocioVipMember {
+  id: string;
+  name: string;
+  surname: string;
+  phone: string;
+  dob: string; // YYYY-MM-DD
+  dni: string;
+  email: string; // For account login
+  address?: string;
+  profession?: string;
+  preferences?: string[]; // Array of preference strings
+  loyaltyPoints: number;
+  membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
+  staticQrCodeUrl?: string; // URL to their static membership QR
+  joinDate: string; // ISO date string
 }
 
 // Admin Panel Specific Types
 export interface AdminDashboardStats {
   totalBusinesses: number;
-  totalPlatformUsers: number; // Admins/managers of businesses using the SaaS
+  totalPlatformUsers: number;
   totalPromotionsActive: number;
   totalQrCodesGenerated: number;
-  totalEndUsersRegistered: number; // End users who registered for QR codes
-}
-
-export interface RegisteredClient extends UserData {
-  registrationDate: string; // Date of first QR generation
-  lastPromotionId?: string;
-  lastPromotionTitle?: string;
-  loyaltyPoints: number;
+  totalQrClients: number; // Total QrClient records
+  totalSocioVipMembers: number; // Total SocioVipMember records
 }
 
 export interface PromotionAnalyticsData {
@@ -62,12 +74,12 @@ export interface Business {
   activePromotions: number;
 }
 
-export interface PlatformUser { // Admin user for a business, or superadmin
+export interface PlatformUser {
   id: string;
   name: string;
   email: string;
   role: 'superadmin' | 'business_admin' | 'staff';
-  businessId?: string; // if not superadmin
+  businessId?: string;
   lastLogin: string;
 }
 
@@ -82,4 +94,28 @@ export interface PlatformUserFormData {
   email: string;
   role: 'superadmin' | 'business_admin' | 'staff';
   businessId?: string;
+}
+
+// Form data for creating/editing a SocioVipMember
+export interface SocioVipMemberFormData {
+  name: string;
+  surname: string;
+  dni: string;
+  phone: string;
+  dob: Date; // Using Date type for form, will convert to string
+  email: string;
+  address?: string;
+  profession?: string;
+  preferences?: string; // Comma-separated for textarea, convert to array
+  loyaltyPoints: number;
+  membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
+}
+
+// Form data for creating a new QrClient (public page)
+export interface NewQrClientFormData {
+  dni: string;
+  name: string;
+  surname: string;
+  phone: string;
+  dob: Date; // Using Date type for form, will convert to string
 }

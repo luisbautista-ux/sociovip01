@@ -4,13 +4,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building, Users, BarChart3, ListChecks, Settings } from "lucide-react";
+import { LayoutDashboard, Building, Users, BarChart3, ListChecks, Settings, Star } from "lucide-react"; // Added Star for Socios VIP
 import { SocioVipLogo } from "@/components/icons";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/businesses", label: "Negocios", icon: Building },
   { href: "/admin/users", label: "Usuarios Plataforma", icon: Users },
+  { href: "/admin/socios-vip", label: "Socios VIP", icon: Star }, // New Item
   { href: "/admin/clients", label: "Clientes QR", icon: ListChecks },
   { href: "/admin/analytics", label: "Analíticas", icon: BarChart3 },
   // { href: "/admin/settings", label: "Configuración", icon: Settings }, // Example for later
@@ -32,7 +33,7 @@ export function AdminSidebar() {
             href={item.href}
             className={cn(
               "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
-              pathname === item.href ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+              pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground" // Use startsWith for active state
             )}
           >
             <item.icon className="h-5 w-5" />
