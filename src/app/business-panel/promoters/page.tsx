@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { BusinessPromoterForm } from "@/components/business/forms/BusinessPromoterForm";
+import { cn } from "@/lib/utils"; // Added import
 
 // Mock data for global promoter profiles
 const mockGlobalPromoters: PromoterProfile[] = [
