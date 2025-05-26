@@ -23,8 +23,8 @@ const mockBusinessQrClients: QrClient[] = [
 ];
 
 const mockBusinessSocioVipMembers: SocioVipMember[] = [ // Assuming these VIPs have interacted with biz1
-  { id: "vip1", name: "Elena", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12T12:00:00", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T00:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
-  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2025-06-01T00:00:00Z", preferences: ["Yoga", "Lectura"] },
+  { id: "vip1", name: "Elena", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12T12:00:00", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T12:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
+  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2025-06-01T12:00:00Z", preferences: ["Yoga", "Lectura"] }, // Adjusted joinDate to midday UTC
 ];
 
 const membershipStatusTranslations: Record<SocioVipMember['membershipStatus'], string> = {
@@ -197,3 +197,5 @@ export default function BusinessClientsPage() {
     </div>
   );
 }
+
+    
