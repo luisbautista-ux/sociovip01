@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ClipboardList, ClipboardCopy, ChevronDown, Copy } from "lucide-react"; // Added Copy
+import { PlusCircle, Trash2, ClipboardList, ClipboardCopy, ChevronDown, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -30,12 +30,12 @@ const statusColors: Record<GeneratedCode['status'], "default" | "secondary" | "d
 
 interface ProcessedCodeItem {
   isBatch: boolean;
-  id: string; 
-  batchId?: string; 
-  observation?: string; 
-  generatedDate?: string; 
-  codesInBatch?: GeneratedCode[]; 
-  singleCode?: GeneratedCode; 
+  id: string;
+  batchId?: string;
+  observation?: string;
+  generatedDate?: string;
+  codesInBatch?: GeneratedCode[];
+  singleCode?: GeneratedCode;
 }
 
 function groupAndSortCodes(codesToSort: GeneratedCode[]): ProcessedCodeItem[] {
@@ -61,7 +61,7 @@ function groupAndSortCodes(codesToSort: GeneratedCode[]): ProcessedCodeItem[] {
     }
 
     if (currentBatch.length > 1) {
-      const batchKey = `${currentCode.generatedDate}-${currentCode.observation || 'no-obs'}-${i}`; 
+      const batchKey = `${currentCode.generatedDate}-${currentCode.observation || 'no-obs'}-${i}`;
       processedItems.push({
         isBatch: true,
         id: batchKey,
@@ -70,14 +70,14 @@ function groupAndSortCodes(codesToSort: GeneratedCode[]): ProcessedCodeItem[] {
         generatedDate: currentCode.generatedDate,
         codesInBatch: currentBatch,
       });
-      i = j; 
+      i = j;
     } else {
       processedItems.push({
         isBatch: false,
         id: currentCode.id,
         singleCode: currentCode,
       });
-      i++; 
+      i++;
     }
   }
   return processedItems;
@@ -89,15 +89,15 @@ interface ManageCodesDialogProps {
   onOpenChange: (open: boolean) => void;
   entity: BusinessManagedEntity;
   onCodesUpdated: (entityId: string, updatedCodes: GeneratedCode[]) => void;
-  onRequestCreateNewCodes: () => void; 
+  onRequestCreateNewCodes: () => void;
 }
 
-export function ManageCodesDialog({ 
-    open, 
-    onOpenChange, 
-    entity, 
+export function ManageCodesDialog({
+    open,
+    onOpenChange,
+    entity,
     onCodesUpdated,
-    onRequestCreateNewCodes 
+    onRequestCreateNewCodes
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const { toast } = useToast();
@@ -124,7 +124,7 @@ export function ManageCodesDialog({
     }
     const updatedRawCodes = internalCodes.filter(c => c.id !== codeId);
     setInternalCodes(updatedRawCodes);
-    onCodesUpdated(entity.id, updatedRawCodes); 
+    onCodesUpdated(entity.id, updatedRawCodes);
     toast({ title: "Código Eliminado", description: "El código ha sido eliminado.", variant: "destructive" });
   };
 
@@ -171,9 +171,9 @@ export function ManageCodesDialog({
       <TableCell className="font-mono py-1.5 px-2">
         <div className="flex items-center gap-1">
             <span>{code.value}</span>
-            <Button 
-                variant="ghost" 
-                size="icon" 
+            <Button
+                variant="ghost"
+                size="icon"
                 className="h-6 w-6 text-muted-foreground hover:text-foreground"
                 onClick={() => handleCopyIndividualCode(code.value)}
                 title="Copiar código"
@@ -204,7 +204,7 @@ export function ManageCodesDialog({
                   <AlertDialogHeader>
                       <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                       <AlertDialogDescription>
-                      Esta acción no se puede deshacer. Esto eliminará permanentemente el código 
+                      Esta acción no se puede deshacer. Esto eliminará permanentemente el código
                       <span className="font-semibold font-mono"> {code.value}</span>.
                       </AlertDialogDescription>
                   </AlertDialogHeader>
@@ -224,23 +224,26 @@ export function ManageCodesDialog({
     </TableRow>
   );
 
+  const singleCodeItems = processedAndGroupedCodes.filter(item => item.singleCode);
+  const batchCodeItems = processedAndGroupedCodes.filter(item => item.isBatch && item.codesInBatch && item.codesInBatch.length > 0);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl"> 
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>Códigos para: {entity.name}</DialogTitle>
           <DialogDescription>
             Visualiza y gestiona los códigos existentes. Los códigos se muestran ordenados por fecha de creación (más recientes primero) y agrupados si se crearon juntos.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="my-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <Button onClick={onRequestCreateNewCodes} variant="default" className="bg-primary hover:bg-primary/90">
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevos Códigos
           </Button>
-          <Button 
-            onClick={handleCopyAllAvailableCodes} 
-            variant="outline" 
+          <Button
+            onClick={handleCopyAllAvailableCodes}
+            variant="outline"
             disabled={!internalCodes.some(c => c.status === 'available')}
           >
             <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Disponibles ({internalCodes.filter(c => c.status === 'available').length})
@@ -262,16 +265,19 @@ export function ManageCodesDialog({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <Accordion type="multiple" className="w-full">
-                  {processedAndGroupedCodes.map((item) => {
-                    if (item.isBatch && item.codesInBatch && item.codesInBatch.length > 0) { // Ensure codesInBatch is not empty
-                      return (
+                {/* Render single code items first */}
+                {singleCodeItems.map(item => renderCodeRow(item.singleCode!))}
+
+                {/* Then render batched items if any */}
+                {batchCodeItems.length > 0 && (
+                  <Accordion type="multiple" className="w-full">
+                    {batchCodeItems.map((item) => (
                         <AccordionItem value={item.batchId!} key={item.id} className="border-b-0">
                            <TableRow className="border-b hover:bg-transparent data-[state=open]:bg-muted/30">
                              <TableCell colSpan={7} className="p-0">
                                 <AccordionTrigger className="py-2.5 px-4 text-sm hover:no-underline justify-start group">
                                   <ChevronDown className="h-4 w-4 mr-2 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                                  Lote de {item.codesInBatch.length} códigos 
+                                  Lote de {item.codesInBatch!.length} códigos
                                   ({format(new Date(item.generatedDate!), "P p", { locale: es })})
                                   {item.observation ? <span className="ml-2 text-muted-foreground text-xs truncate" title={item.observation}> - Obs: {item.observation}</span> : ""}
                                 </AccordionTrigger>
@@ -280,18 +286,18 @@ export function ManageCodesDialog({
                           <AccordionContent asChild>
                              <tr className="w-full">
                                 <td colSpan={7} className="p-0">
-                                  <div className="pl-6 pr-2 pb-2 border-l-2 border-primary ml-5 mr-1 space-y-2"> 
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm" 
+                                  <div className="pl-6 pr-2 pb-2 border-l-2 border-primary ml-5 mr-1 space-y-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
                                         className="mt-2 text-xs h-auto py-1 px-2"
                                         onClick={() => handleCopyBatchCodes(item.codesInBatch!)}
                                       >
-                                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Códigos del Lote ({item.codesInBatch.length})
+                                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Códigos del Lote ({item.codesInBatch!.length})
                                       </Button>
                                       <Table>
                                         <TableBody>
-                                          {item.codesInBatch.map(code => renderCodeRow(code, true))}
+                                          {item.codesInBatch!.map(code => renderCodeRow(code, true))}
                                         </TableBody>
                                       </Table>
                                   </div>
@@ -299,13 +305,10 @@ export function ManageCodesDialog({
                             </tr>
                           </AccordionContent>
                         </AccordionItem>
-                      );
-                    } else if (item.singleCode) {
-                      return renderCodeRow(item.singleCode);
-                    }
-                    return null;
-                  })}
-                </Accordion>
+                      )
+                    )}
+                  </Accordion>
+                )}
               </TableBody>
             </Table>
           </ScrollArea>
@@ -323,6 +326,3 @@ export function ManageCodesDialog({
     </Dialog>
   );
 }
-
-
-    
