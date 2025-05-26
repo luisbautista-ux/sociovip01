@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Search, Ticket, BadgeCheck, BadgeX } from "lucide-react";
-import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/types";
+import { PlusCircle, Edit, Trash2, Search, Ticket, BadgeCheck, BadgeX, QrCode, ClipboardList } from "lucide-react";
+import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -15,12 +15,55 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { BusinessPromotionForm } from "@/components/business/forms/BusinessPromotionForm";
+import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog"; // Added import
 
 // Mock data for business promotions - In a real app, this would be fetched for the logged-in business
 let mockBusinessPromotions: BusinessManagedEntity[] = [
-  { id: "bp1", businessId: "biz1", type: "promotion", name: "Jueves de Alitas BBQ", description: "Todas las alitas BBQ a S/1 cada una.", startDate: "2024-08-01", endDate: "2024-12-31", usageLimit: 0, isActive: true, imageUrl: "https://placehold.co/300x200.png", aiHint: "chicken wings" },
-  { id: "bp2", businessId: "biz1", type: "promotion", name: "Happy Hour Extendido", description: "Tragos seleccionados 2x1 de 5 PM a 9 PM.", startDate: "2024-07-15", endDate: "2024-10-31", usageLimit: 500, isActive: true, imageUrl: "https://placehold.co/300x200.png", aiHint: "cocktails bar" },
-  { id: "bp3", businessId: "biz1", type: "promotion", name: "Promo Cumpleañero Mes", description: "Si cumples años este mes, tu postre es gratis.", startDate: "2024-01-01", endDate: "2024-12-31", isActive: false, imageUrl: "https://placehold.co/300x200.png", aiHint: "birthday cake" },
+  { 
+    id: "bp1", 
+    businessId: "biz1", 
+    type: "promotion", 
+    name: "Jueves de Alitas BBQ", 
+    description: "Todas las alitas BBQ a S/1 cada una.", 
+    startDate: "2024-08-01", 
+    endDate: "2024-12-31", 
+    usageLimit: 0, 
+    isActive: true, 
+    imageUrl: "https://placehold.co/300x200.png", 
+    aiHint: "chicken wings",
+    generatedCodes: [
+        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:00:00Z" },
+        { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:05:00Z", redemptionDate: "2024-07-21T12:00:00Z" },
+        { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:06:00Z" },
+    ]
+  },
+  { 
+    id: "bp2", 
+    businessId: "biz1", 
+    type: "promotion", 
+    name: "Happy Hour Extendido", 
+    description: "Tragos seleccionados 2x1 de 5 PM a 9 PM.", 
+    startDate: "2024-07-15", 
+    endDate: "2024-10-31", 
+    usageLimit: 500, 
+    isActive: true, 
+    imageUrl: "https://placehold.co/300x200.png", 
+    aiHint: "cocktails bar",
+    generatedCodes: []
+  },
+  { 
+    id: "bp3", 
+    businessId: "biz1", 
+    type: "promotion", 
+    name: "Promo Cumpleañero Mes", 
+    description: "Si cumples años este mes, tu postre es gratis.", 
+    startDate: "2024-01-01", 
+    endDate: "2024-12-31", 
+    isActive: false, 
+    imageUrl: "https://placehold.co/300x200.png", 
+    aiHint: "birthday cake",
+    generatedCodes: []
+  },
 ];
 
 
@@ -29,6 +72,8 @@ export default function BusinessPromotionsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<BusinessManagedEntity | null>(null);
   const [promotions, setPromotions] = useState<BusinessManagedEntity[]>(mockBusinessPromotions);
+  const [showManageCodesModal, setShowManageCodesModal] = useState(false);
+  const [selectedEntityForCodes, setSelectedEntityForCodes] = useState<BusinessManagedEntity | null>(null);
   const { toast } = useToast();
 
   const filteredPromotions = promotions.filter(promo =>
@@ -49,6 +94,7 @@ export default function BusinessPromotionsPage() {
       isActive: data.isActive,
       imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
       aiHint: data.aiHint,
+      generatedCodes: [],
     };
     setPromotions(prev => [newPromotion, ...prev]);
     setShowCreateModal(false);
@@ -77,6 +123,23 @@ export default function BusinessPromotionsPage() {
     setPromotions(prev => prev.filter(p => p.id !== promotionId));
     toast({ title: "Promoción Eliminada", description: `La promoción ha sido eliminada.`, variant: "destructive" });
   };
+
+  const handleOpenManageCodes = (promotion: BusinessManagedEntity) => {
+    setSelectedEntityForCodes(promotion);
+    setShowManageCodesModal(true);
+  };
+
+  const handleCodesUpdated = (entityId: string, updatedCodes: GeneratedCode[]) => {
+    setPromotions(prevPromotions => prevPromotions.map(promo => 
+      promo.id === entityId ? { ...promo, generatedCodes: updatedCodes } : promo
+    ));
+  };
+
+  const getRedemptionCount = (promotion: BusinessManagedEntity) => {
+    const redeemedCount = promotion.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
+    return `${redeemedCount} / ${promotion.usageLimit === 0 ? '∞' : promotion.usageLimit || 'N/A'}`;
+  };
+
 
   return (
     <div className="space-y-6">
@@ -110,7 +173,7 @@ export default function BusinessPromotionsPage() {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead className="hidden md:table-cell">Vigencia</TableHead>
-                <TableHead className="hidden lg:table-cell text-center">Límite Usos</TableHead>
+                <TableHead className="hidden lg:table-cell text-center">Canjeados / Límite</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -123,7 +186,7 @@ export default function BusinessPromotionsPage() {
                     <TableCell className="hidden md:table-cell">
                       {format(new Date(promo.startDate), "P", { locale: es })} - {format(new Date(promo.endDate), "P", { locale: es })}
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell text-center">{promo.usageLimit === 0 ? "Ilimitado" : promo.usageLimit || "N/A"}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-center">{getRedemptionCount(promo)}</TableCell>
                     <TableCell>
                       <Badge variant={promo.isActive ? "default" : "outline"} className={promo.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
                         {promo.isActive ? <BadgeCheck className="mr-1 h-3 w-3"/> : <BadgeX className="mr-1 h-3 w-3"/>}
@@ -131,6 +194,9 @@ export default function BusinessPromotionsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
+                      <Button variant="outline" size="sm" onClick={() => handleOpenManageCodes(promo)}>
+                        <QrCode className="h-4 w-4 mr-1" /> Códigos
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditingPromotion(promo)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Editar</span>
@@ -201,6 +267,15 @@ export default function BusinessPromotionsPage() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {selectedEntityForCodes && (
+        <ManageCodesDialog
+          open={showManageCodesModal}
+          onOpenChange={setShowManageCodesModal}
+          entity={selectedEntityForCodes}
+          onCodesUpdated={handleCodesUpdated}
+        />
       )}
     </div>
   );
