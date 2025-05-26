@@ -177,6 +177,23 @@ export interface EventBox {
   ownerDni?: string;   
 }
 
+// Business Panel Client View Type
+export type BusinessClientType = 'qr' | 'vip';
+
+export interface BusinessClientView {
+  id: string; // Unique ID for the view, can be QrClient.id or SocioVipMember.id
+  clientType: BusinessClientType;
+  name: string;
+  surname: string;
+  dni: string;
+  phone?: string;
+  email?: string; // More common for VIP
+  relevantDate: string; // registrationDate for QrClient, joinDate for SocioVipMember
+  isVip: boolean;
+  loyaltyPoints?: number; // Specific to SocioVipMember
+  membershipStatus?: SocioVipMember['membershipStatus']; // Specific to SocioVipMember
+}
+
 
 // Form data types
 export interface BusinessFormData {
@@ -281,3 +298,4 @@ export interface EventPromoterAssignmentFormData {
     commissionRate?: string;
     notes?: string;
 }
+

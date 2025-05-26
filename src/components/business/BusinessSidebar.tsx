@@ -4,13 +4,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Ticket, Calendar, ClipboardList, Users, UserPlus, ScanLine, BarChart3, Settings, Building } from "lucide-react";
+import { LayoutDashboard, Ticket, Calendar, ClipboardList, Users, UserPlus, ScanLine, BarChart3, Settings, Building, Contact } from "lucide-react"; // Added Contact
 import { SocioVipLogo } from "@/components/icons"; // Assuming this logo can be reused or a new Business one created
 
 const navItems = [
   { href: "/business-panel/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/business-panel/promotions", label: "Promociones", icon: Ticket },
   { href: "/business-panel/events", label: "Eventos", icon: Calendar },
+  { href: "/business-panel/clients", label: "Mis Clientes", icon: Contact }, // New Item
   { href: "/business-panel/surveys", label: "Encuestas", icon: ClipboardList },
   { href: "/business-panel/promoters", label: "Mis Promotores", icon: UserPlus },
   { href: "/business-panel/staff", label: "Mi Personal", icon: Users },
@@ -56,3 +57,4 @@ export function BusinessSidebar() {
     </aside>
   );
 }
+
