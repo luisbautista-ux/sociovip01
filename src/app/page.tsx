@@ -25,7 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { CloverPassLogo } from "@/components/icons";
+import { SocioVipLogo } from "@/components/icons";
 
 
 type Step = "enterCode" | "enterDni" | "newUserForm" | "displayQr";
@@ -202,8 +202,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
       <header className="mb-8 flex flex-col items-center">
-        <CloverPassLogo className="h-16 w-16 text-primary mb-2" />
-        <h1 className="text-4xl font-bold text-primary">CloverPass</h1>
+        <SocioVipLogo className="h-16 w-16 text-primary mb-2" />
+        <h1 className="text-4xl font-bold text-primary">SocioVIP</h1>
         <p className="text-muted-foreground">Tu acceso a promociones exclusivas.</p>
       </header>
 
@@ -439,7 +439,7 @@ export default function HomePage() {
         )}
       </Card>
       <footer className="mt-8 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} CloverPass. Todos los derechos reservados.</p>
+        <p>&copy; {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.</p>
       </footer>
     </div>
   );

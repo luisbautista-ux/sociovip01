@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'CloverPass',
+  title: 'SocioVIP',
   description: 'Gestión de eventos, promociones y fidelización de clientes.',
 };
 
