@@ -55,7 +55,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo1", 
     title: "Martes de 2x1 en Cocktails", 
     description: "Disfruta de dos cocktails al precio de uno. Válido todos los martes.", 
-    validUntil: "2024-12-31T12:00:00", 
+    validUntil: "2025-12-31T12:00:00", // Updated to 2025
     promoCode: "VALIDNEW1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "cocktails party"
@@ -64,7 +64,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo2", 
     title: "Sábado VIP: Entrada Gratuita", 
     description: "Acceso exclusivo a nuestra zona VIP este Sábado. ¡No te lo pierdas!", 
-    validUntil: "2024-11-30T12:00:00", 
+    validUntil: "2025-11-30T12:00:00", // Updated to 2025
     promoCode: "VALIDEXT1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "vip club"
@@ -73,27 +73,26 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo3", 
     title: "Noche de Salsa: Mojito Gratis", 
     description: "Ven a bailar y te regalamos un mojito con tu entrada.", 
-    validUntil: "2024-10-31T12:00:00", 
+    validUntil: "2025-10-31T12:00:00", // Updated to 2025
     promoCode: "SALSACOOL", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "salsa dancing"
   },
 ];
 
-// This mock user is for the public QR generation flow. It's a QrClient.
 const mockExistingQrClient: QrClient = {
   id: "qrclient123",
   name: "Ana",
   surname: "García",
   phone: "+51987654321",
-  dob: "1990-05-15T12:00:00", // YYYY-MM-DD
+  dob: "1990-05-15T12:00:00", 
   dni: "12345678",
   registrationDate: "2024-01-10T10:00:00Z"
 };
 
 const statusTranslations: { [key in QrCodeStatusGenerated]: string } = {
-  available: "Generado", // Changed from 'generated' to match QrCodeStatusGenerated
-  redeemed: "Utilizado", // Changed from 'utilized'
+  available: "Generado", 
+  redeemed: "Utilizado", 
   expired: "Vencido",
 };
 
@@ -165,13 +164,13 @@ export default function HomePage() {
     
     setEnteredDniOriginal(values.dni);
 
-    if (values.dni === mockExistingQrClient.dni) { // Check against the mock QrClient
+    if (values.dni === mockExistingQrClient.dni) { 
       const newQrData: QrCodeData = {
         user: mockExistingQrClient,
         promotion: activePromotion,
         qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
         code: validatedPromoCode,
-        status: "available", // QrCodeData uses its own status, 'available' might be 'generated'
+        status: "available", 
       };
       setQrData(newQrData);
       setShowDniModal(false);
@@ -207,9 +206,6 @@ export default function HomePage() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
 
-    // Check if the DNI entered in the form matches the mockExistingQrClient's DNI
-    // AND if this DNI is different from the one that initially led to this form
-    // (i.e., user changed DNI in the form to an existing one)
     if (values.dni === mockExistingQrClient.dni && values.dni !== enteredDniOriginal) {
       setFormDataForDniWarning(values);
       setShowDniExistsWarningDialog(true);
@@ -231,7 +227,6 @@ export default function HomePage() {
   const handleDniExistsConfirmation = (confirmed: boolean) => {
     setShowDniExistsWarningDialog(false);
     if (confirmed && formDataForDniWarning) {
-      // User confirmed it's their DNI, prefill with mockExistingQrClient's data
       newQrClientForm.reset({
         dni: mockExistingQrClient.dni,
         name: mockExistingQrClient.name,
@@ -241,7 +236,6 @@ export default function HomePage() {
       });
       toast({ title: "Datos Precargados", description: "Hemos rellenado el formulario con tus datos existentes. Revisa y confirma." });
     } else if (!confirmed && formDataForDniWarning) {
-       // User said "No", keep the data they had in the form
        newQrClientForm.reset(formDataForDniWarning);
     }
     setFormDataForDniWarning(null);
@@ -260,9 +254,6 @@ export default function HomePage() {
   
   const handleCloseDniModal = () => {
     setShowDniModal(false);
-    // Do not reset activePromotion or validatedPromoCode here
-    // so that if the modal is re-opened for the same promotion, context is kept.
-    // Reset forms and DNI tracking
     dniForm.reset();
     newQrClientForm.reset();
     setEnteredDniOriginal(null); 
@@ -329,8 +320,6 @@ export default function HomePage() {
     qrImg.onerror = () => {
       toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
     };
-    // Ensure qrData.qrImageUrl is a valid URL, especially if it's from placehold.co
-    // If it might have query parameters that break it, sanitize or ensure it's correctly formed.
     qrImg.src = qrData.qrImageUrl;
   };
 
@@ -623,3 +612,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

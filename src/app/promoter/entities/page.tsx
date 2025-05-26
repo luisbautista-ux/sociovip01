@@ -31,16 +31,16 @@ let mockAssignedEntities: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Jueves de Alitas BBQ (Asignada a Carlos)", 
     description: "Todas las alitas BBQ a S/1 cada una.", 
-    startDate: "2024-01-01T12:00:00", 
-    endDate: "2024-12-31T12:00:00",   
+    startDate: "2025-01-01T12:00:00", // Updated to 2025
+    endDate: "2025-12-31T12:00:00",   // Updated to 2025
     usageLimit: 0, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "chicken wings",
     generatedCodes: [ 
-        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:00:00Z" },
-        { id: "pp1bp1cd1", entityId: "bp1", value: "PROMOALAS", status: "available", generatedByName: mockLoggedInPromoter.name, generatedDate: "2024-08-02T10:00:00Z", observation: "Códigos Promotor Carlos" },
-        { id: "pp1bp1cd2", entityId: "bp1", value: "WINGKING1", status: "redeemed", generatedByName: mockLoggedInPromoter.name, generatedDate: "2024-08-03T11:00:00Z", redemptionDate: "2024-08-03T19:00:00Z" },
+        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:00:00Z" },
+        { id: "pp1bp1cd1", entityId: "bp1", value: "PROMOALAS", status: "available", generatedByName: mockLoggedInPromoter.name, generatedDate: "2025-01-02T10:00:00Z", observation: "Códigos Promotor Carlos" },
+        { id: "pp1bp1cd2", entityId: "bp1", value: "WINGKING1", status: "redeemed", generatedByName: mockLoggedInPromoter.name, generatedDate: "2025-01-03T11:00:00Z", redemptionDate: "2025-01-03T19:00:00Z" },
     ]
   },
   { 
@@ -49,15 +49,15 @@ let mockAssignedEntities: BusinessManagedEntity[] = [
     type: "event", 
     name: "Noche de Karaoke Estelar (Asignada a Carlos)", 
     description: "Saca la estrella que llevas dentro.", 
-    startDate: "2024-08-15T12:00:00", 
-    endDate: "2024-08-15T12:00:00", 
+    startDate: "2025-08-15T12:00:00", // Updated to 2025
+    endDate: "2025-08-15T12:00:00", // Updated to 2025
     maxAttendance: 100, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "karaoke night",
     generatedCodes: [
-        { id: "pp1evt1cd1", entityId: "evt1", value: "VOZSTAR01", status: "redeemed", generatedByName: mockLoggedInPromoter.name, generatedDate: "2024-08-05T10:00:00Z", redemptionDate: "2024-08-15T21:00:00Z", redeemedByInfo: {dni: "11223344", name: "Test User"} },
-        { id: "pp1evt1cd2", entityId: "evt1", value: "STARSHOW2", status: "available", generatedByName: mockLoggedInPromoter.name, generatedDate: "2024-08-06T10:00:00Z" },
+        { id: "pp1evt1cd1", entityId: "evt1", value: "VOZSTAR01", status: "redeemed", generatedByName: mockLoggedInPromoter.name, generatedDate: "2025-08-05T10:00:00Z", redemptionDate: "2025-08-15T21:00:00Z", redeemedByInfo: {dni: "11223344", name: "Test User"} },
+        { id: "pp1evt1cd2", entityId: "evt1", value: "STARSHOW2", status: "available", generatedByName: mockLoggedInPromoter.name, generatedDate: "2025-08-06T10:00:00Z" },
     ]
   },
    { 
@@ -66,8 +66,8 @@ let mockAssignedEntities: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Promo Pasada (Asignada a Carlos)", 
     description: "Esta promoción ya no está activa.", 
-    startDate: "2024-06-01T12:00:00", 
-    endDate: "2024-06-30T12:00:00", 
+    startDate: "2024-06-01T12:00:00", // Kept in past
+    endDate: "2024-06-30T12:00:00", // Kept in past
     usageLimit: 0, 
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -87,13 +87,17 @@ const isEntityCurrentlyActivatable = (entity: BusinessManagedEntity): boolean =>
   const entityEndDateObj = new Date(entity.endDate);
 
   if (isNaN(entityStartDateObj.getTime()) || isNaN(entityEndDateObj.getTime())) {
+    // Invalid date strings in mock data
+    console.error("Invalid date string for entity:", entity.name, entity.startDate, entity.endDate);
     return false; 
   }
 
-  const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate(), 0, 0, 0, 0);
-  const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
+  // Normalize to compare dates only, considering full day
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
+  const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999); // End of day
   
-  return now >= effectiveStartDate && now <= effectiveEndDate;
+  return today >= effectiveStartDate && today <= effectiveEndDate;
 };
 
 
@@ -109,7 +113,8 @@ export default function PromoterEntitiesPage() {
   const [selectedEntityForViewingCodes, setSelectedEntityForViewingCodes] = useState<BusinessManagedEntity | null>(null);
 
   const filteredEntities = entities.filter(entity =>
-    entity.name.toLowerCase().includes(searchTerm.toLowerCase()) && entity.isActive 
+    entity.name.toLowerCase().includes(searchTerm.toLowerCase()) 
+    // No longer filtering by isActive here, let isEntityCurrentlyActivatable handle button state
   );
   
   const openCreateCodesDialog = (entity: BusinessManagedEntity) => {
@@ -148,6 +153,8 @@ export default function PromoterEntitiesPage() {
   const handleCodesUpdatedFromManageDialog = (entityId: string, updatedCodes: GeneratedCode[]) => {
      setEntities(prevEntities => prevEntities.map(entity => {
       if (entity.id === entityId) {
+        // This logic needs to be careful not to overwrite codes generated by others if this view is promoter-specific
+        // For now, assuming updatedCodes contains only codes relevant to the current promoter view.
         const otherCodes = (entity.generatedCodes || []).filter(c => c.generatedByName !== mockLoggedInPromoter.name);
         return { ...entity, generatedCodes: [...otherCodes, ...updatedCodes] };
       }
@@ -174,8 +181,8 @@ export default function PromoterEntitiesPage() {
       </h1>
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Tus Promociones y Eventos Activos</CardTitle>
-          <CardDescription>Genera códigos para las promociones y eventos que te han sido asignados y están actualmente vigentes.</CardDescription>
+          <CardTitle>Tus Promociones y Eventos Asignados</CardTitle>
+          <CardDescription>Genera códigos para las promociones y eventos que te han sido asignados.</CardDescription>
           <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -203,7 +210,7 @@ export default function PromoterEntitiesPage() {
               <TableBody>
                 {filteredEntities.map((entity) => (
                   <TableRow key={entity.id}>
-                    <TableCell className="font-medium">{entity.name}</TableCell>
+                    <TableCell className="font-medium">{entity.name} <Badge variant={entity.isActive ? "default" : "outline"} className={entity.isActive ? "bg-green-600" : "bg-red-600"}>{entity.isActive ? "Activa" : "Inactiva"}</Badge></TableCell>
                     <TableCell>
                       <Badge variant="outline">{entity.type === 'promotion' ? 'Promoción' : 'Evento'}</Badge>
                     </TableCell>
@@ -237,7 +244,7 @@ export default function PromoterEntitiesPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
                 <AlertTriangle className="h-10 w-10 mb-2 text-yellow-500"/>
-                <p className="font-semibold">No tienes promociones o eventos activos asignados que coincidan con tu búsqueda.</p>
+                <p className="font-semibold">No tienes promociones o eventos asignados que coincidan con tu búsqueda.</p>
                 <p className="text-sm">Si esperabas ver alguna, contacta al administrador del negocio.</p>
             </div>
           )}
@@ -264,16 +271,14 @@ export default function PromoterEntitiesPage() {
           }}
           entity={{ 
             ...selectedEntityForViewingCodes,
-            // Filter codes to show only those generated by this promoter
             generatedCodes: selectedEntityForViewingCodes.generatedCodes?.filter(
               c => c.generatedByName === mockLoggedInPromoter.name
             ) || []
           }}
-          onCodesUpdated={handleCodesUpdatedFromManageDialog} // This will update the main 'entities' state
+          onCodesUpdated={handleCodesUpdatedFromManageDialog}
           onRequestCreateNewCodes={() => {
-            // This correctly gets the original entity from the main list to ensure fresh data
             const originalEntity = entities.find(e => e.id === selectedEntityForViewingCodes?.id);
-            setShowManageCodesModal(false); // Close the current modal
+            setShowManageCodesModal(false); 
             if(originalEntity) {
                  setTimeout(() => openCreateCodesDialog(originalEntity), 0); 
             }
@@ -283,3 +288,5 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
+
+    

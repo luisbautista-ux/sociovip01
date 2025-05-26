@@ -26,16 +26,16 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Jueves de Alitas BBQ", 
     description: "Todas las alitas BBQ a S/1 cada una.", 
-    startDate: "2024-08-01T12:00:00", 
-    endDate: "2024-12-31T12:00:00", 
+    startDate: "2025-01-01T12:00:00", // Updated to 2025
+    endDate: "2025-12-31T12:00:00", // Updated to 2025
     usageLimit: 0, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "chicken wings",
     generatedCodes: [
-        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:00:00Z", observation: "Código de lanzamiento" },
-        { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:05:00Z", redemptionDate: "2024-07-21T12:00:00Z" },
-        { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:06:00Z" },
+        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:00:00Z", observation: "Código de lanzamiento" },
+        { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:05:00Z", redemptionDate: "2025-01-21T12:00:00Z" },
+        { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:06:00Z" },
     ]
   },
   { 
@@ -44,8 +44,8 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Happy Hour Extendido", 
     description: "Tragos seleccionados 2x1 de 5 PM a 9 PM.", 
-    startDate: "2024-07-15T12:00:00", 
-    endDate: "2024-10-31T12:00:00", 
+    startDate: "2025-01-15T12:00:00", // Updated to 2025
+    endDate: "2025-10-31T12:00:00", // Updated to 2025
     usageLimit: 500, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -58,8 +58,8 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Promo Cumpleañero Mes", 
     description: "Si cumples años este mes, tu postre es gratis.", 
-    startDate: "2024-01-01T12:00:00", 
-    endDate: "2024-12-31T12:00:00", 
+    startDate: "2024-01-01T12:00:00", // Kept in past
+    endDate: "2024-12-31T12:00:00", // Kept in past
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "birthday cake",
@@ -90,13 +90,13 @@ export default function BusinessPromotionsPage() {
   const handleCreatePromotion = (data: BusinessPromotionFormData) => {
     const newPromotion: BusinessManagedEntity = {
       id: `bp${Date.now()}`,
-      businessId: "biz1", // This would come from the logged-in business context
+      businessId: "biz1", 
       type: "promotion",
       name: data.name,
       description: data.description,
       startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
       endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
-      usageLimit: data.usageLimit || 0, // 0 for unlimited
+      usageLimit: data.usageLimit || 0, 
       isActive: data.isActive,
       imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
       aiHint: data.aiHint,
@@ -149,7 +149,6 @@ export default function BusinessPromotionsPage() {
       }
       return promo;
     }));
-    // Toast is handled inside CreateCodesDialog
   };
 
   const handleCodesUpdatedFromManageDialog = (entityId: string, updatedCodes: GeneratedCode[]) => {
@@ -308,10 +307,9 @@ export default function BusinessPromotionsPage() {
           entity={selectedEntityForViewingCodes}
           onCodesUpdated={handleCodesUpdatedFromManageDialog}
           onRequestCreateNewCodes={() => {
-            // Close ManageCodesDialog and open CreateCodesDialog for the same entity
             setShowManageCodesModal(false);
-            if(selectedEntityForViewingCodes) { // Ensure it's still set
-                 setTimeout(() => openCreateCodesDialog(selectedEntityForViewingCodes), 0); // Timeout to ensure state updates
+            if(selectedEntityForViewingCodes) { 
+                 setTimeout(() => openCreateCodesDialog(selectedEntityForViewingCodes), 0); 
             }
           }}
         />
@@ -319,3 +317,5 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
+
+    

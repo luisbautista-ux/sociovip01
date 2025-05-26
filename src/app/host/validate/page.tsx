@@ -26,17 +26,17 @@ const allMockPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Jueves de Alitas BBQ", 
     description: "Todas las alitas BBQ a S/1 cada una.", 
-    startDate: "2024-08-01T12:00:00", 
-    endDate: "2024-12-31T12:00:00", 
+    startDate: "2025-01-01T12:00:00", // Updated to 2025
+    endDate: "2025-12-31T12:00:00", // Updated to 2025
     usageLimit: 0, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "chicken wings",
     generatedCodes: [
-        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:00:00Z", observation: "Código de lanzamiento" },
-        { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:05:00Z", redemptionDate: "2024-07-21T12:00:00Z", redeemedByInfo: {dni: "12345678", name: "Ana Garcia"} },
-        { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-20T10:06:00Z" },
-        { id: "bp1code4", entityId: "bp1", value: "BBQDEALS4", status: "available", generatedByName: "Staff Negocio", generatedDate: "2024-08-01T11:00:00Z"},
+        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:00:00Z", observation: "Código de lanzamiento" },
+        { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:05:00Z", redemptionDate: "2025-01-21T12:00:00Z", redeemedByInfo: {dni: "12345678", name: "Ana Garcia"} },
+        { id: "codePromo1-3", entityId: "bp1", value: "ALITAS003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:06:00Z" },
+        { id: "bp1code4", entityId: "bp1", value: "BBQDEALS4", status: "available", generatedByName: "Staff Negocio", generatedDate: "2025-01-01T11:00:00Z"},
     ]
   },
   { 
@@ -45,14 +45,14 @@ const allMockPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Happy Hour Extendido", 
     description: "Tragos seleccionados 2x1 de 5 PM a 9 PM.", 
-    startDate: "2024-07-15T12:00:00", 
-    endDate: "2024-10-31T12:00:00", 
+    startDate: "2025-01-15T12:00:00", // Updated to 2025
+    endDate: "2025-10-31T12:00:00", // Updated to 2025
     usageLimit: 500, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "cocktails bar",
     generatedCodes: [
-      { id: "bp2code1", entityId: "bp2", value: "HAPPYDRNK", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-07-15T10:00:00Z"},
+      { id: "bp2code1", entityId: "bp2", value: "HAPPYDRNK", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-15T10:00:00Z"},
     ]
   },
    { 
@@ -61,8 +61,8 @@ const allMockPromotions: BusinessManagedEntity[] = [
     type: "promotion", 
     name: "Promo Cumpleañero Mes (INACTIVA)", 
     description: "Si cumples años este mes, tu postre es gratis.", 
-    startDate: "2024-01-01T12:00:00", 
-    endDate: "2024-12-31T12:00:00", 
+    startDate: "2024-01-01T12:00:00", // Kept in past
+    endDate: "2024-12-31T12:00:00", // Kept in past
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "birthday cake",
@@ -77,26 +77,25 @@ const allMockEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Noche de Karaoke Estelar", 
     description: "Saca la estrella que llevas dentro. Premios para los mejores.", 
-    startDate: "2024-08-15T12:00:00", 
-    endDate: "2024-08-15T12:00:00", // Same day event
-    maxAttendance: 5, // Small for testing
+    startDate: "2025-08-15T12:00:00", // Updated to 2025
+    endDate: "2025-08-15T12:00:00", // Updated to 2025
+    maxAttendance: 5, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "karaoke night",
     generatedCodes: [
-        { id: "codeEvt1-1", entityId: "evt1", value: "KARAOKE01", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:00:00Z", observation: "Invitado especial" },
-        { id: "codeEvt1-2", entityId: "evt1", value: "KARAOKE02", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:05:00Z", redemptionDate: "2024-08-15T20:00:00Z", redeemedByInfo: {dni: "87654321", name: "Carlos Perez"} },
-        { id: "codeEvt1-3", entityId: "evt1", value: "SINGER003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:06:00Z"},
-        { id: "codeEvt1-4", entityId: "evt1", value: "VOCALSTAR", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:07:00Z"},
-        { id: "codeEvt1-5", entityId: "evt1", value: "MICNIGHT5", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:08:00Z"},
-        { id: "codeEvt1-6", entityId: "evt1", value: "EVENTSIX6", status: "expired", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:09:00Z"}, // Example of one more than maxAttendance
+        { id: "codeEvt1-1", entityId: "evt1", value: "KARAOKE01", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:00:00Z", observation: "Invitado especial" },
+        { id: "codeEvt1-2", entityId: "evt1", value: "KARAOKE02", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:05:00Z", redemptionDate: "2025-08-15T20:00:00Z", redeemedByInfo: {dni: "87654321", name: "Carlos Perez"} },
+        { id: "codeEvt1-3", entityId: "evt1", value: "SINGER003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:06:00Z"},
+        { id: "codeEvt1-4", entityId: "evt1", value: "VOCALSTAR", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:07:00Z"},
+        { id: "codeEvt1-5", entityId: "evt1", value: "MICNIGHT5", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:08:00Z"},
+        { id: "codeEvt1-6", entityId: "evt1", value: "EVENTSIX6", status: "expired", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:09:00Z"}, 
     ]
   },
 ];
 
-// TODO: Add mock data for surveys if they are to be listed for validation
 
-const hostBusinessId = "biz1"; // Host is associated with this business
+const hostBusinessId = "biz1"; 
 
 const statusTranslations: Record<GeneratedCode['status'], string> = {
   available: "Disponible para Canje/Uso",
@@ -113,22 +112,24 @@ export default function HostValidateQrPage() {
   const [isVipCandidate, setIsVipCandidate] = useState(false);
   const { toast } = useToast();
 
-  // Combine and filter active entities for this host's business
   const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
-
-  // In a real app, this would be fetched or passed after host login
   const businessName = "Pandora Lounge Bar"; 
 
   useEffect(() => {
     const now = new Date();
-    // Consider adding surveys here later if needed
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const allEntities = [...allMockPromotions, ...allMockEvents]; 
-    const filtered = allEntities.filter(entity => 
-      entity.businessId === hostBusinessId &&
-      entity.isActive &&
-      new Date(entity.startDate) <= now && 
-      new Date(entity.endDate) >= now     
-    );
+    const filtered = allEntities.filter(entity => {
+      const entityStartDateObj = new Date(entity.startDate);
+      const entityEndDateObj = new Date(entity.endDate);
+      const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
+      const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
+      
+      return entity.businessId === hostBusinessId &&
+             entity.isActive &&
+             today >= effectiveStartDate && 
+             today <= effectiveEndDate;
+    });
     setActiveBusinessEntities(filtered);
   }, []);
 
@@ -137,10 +138,6 @@ export default function HostValidateQrPage() {
       title: "Funcionalidad Pendiente",
       description: "El escaneo de QR con cámara se implementará próximamente.",
     });
-    // Placeholder for camera scanning logic
-    // For now, you can simulate a scan by manually entering a code:
-    // setScannedCode("ALITAS001"); 
-    // handleSearchCode();
   };
 
   const handleSearchCode = () => {
@@ -152,7 +149,7 @@ export default function HostValidateQrPage() {
     setSearchPerformed(false); 
     setFoundEntity(null);
     setFoundCode(null);
-    setIsVipCandidate(false); // Reset VIP candidate switch
+    setIsVipCandidate(false); 
 
     setTimeout(() => {
       let entityMatch: BusinessManagedEntity | null = null;
@@ -163,7 +160,7 @@ export default function HostValidateQrPage() {
         if (code) {
           entityMatch = entity;
           codeMatch = code;
-          setIsVipCandidate(code.isVipCandidate || false); // Pre-fill from existing data if any
+          setIsVipCandidate(code.isVipCandidate || false);
           break;
         }
       }
@@ -195,26 +192,48 @@ export default function HostValidateQrPage() {
         ...foundCode, 
         status: 'redeemed' as GeneratedCode['status'], 
         redemptionDate: new Date().toISOString(),
-        isVipCandidate: isVipCandidate // Save the state of the VIP candidate switch
+        isVipCandidate: isVipCandidate 
     };
     setFoundCode(updatedCode); 
 
-    setActiveBusinessEntities(prevEntities => prevEntities.map(entity => {
-        if (entity.id === foundEntity.id) {
-            return {
-                ...entity,
-                generatedCodes: entity.generatedCodes?.map(gc => gc.id === foundCode.id ? updatedCode : gc)
-            };
-        }
-        return entity;
-    }));
+    // Update in allMockPromotions and allMockEvents for broader "state" update if needed elsewhere
+    const updateMockList = (list: BusinessManagedEntity[]) => 
+        list.map(entity => {
+            if (entity.id === foundEntity.id) {
+                return {
+                    ...entity,
+                    generatedCodes: entity.generatedCodes?.map(gc => gc.id === foundCode.id ? updatedCode : gc)
+                };
+            }
+            return entity;
+        });
+    
+    allMockPromotions.splice(0, allMockPromotions.length, ...updateMockList(allMockPromotions));
+    allMockEvents.splice(0, allMockEvents.length, ...updateMockList(allMockEvents));
+    
+    // Re-filter active entities to reflect changes
+     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const filteredActive = [...allMockPromotions, ...allMockEvents].filter(entity => {
+      const entityStartDateObj = new Date(entity.startDate);
+      const entityEndDateObj = new Date(entity.endDate);
+      const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
+      const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
+      
+      return entity.businessId === hostBusinessId &&
+             entity.isActive &&
+             today >= effectiveStartDate && 
+             today <= effectiveEndDate;
+    });
+    setActiveBusinessEntities(filteredActive);
+
 
     toast({ title: "¡QR Validado y Canjeado!", description: `Código ${foundCode.value} para "${foundEntity.name}" marcado como utilizado. ${isVipCandidate ? 'Cliente marcado como Potencial VIP.' : ''}`, className: "bg-green-500 text-white" });
   };
   
   const handleVipCandidateToggle = (checked: boolean) => {
     setIsVipCandidate(checked);
-    if (foundCode && foundCode.status === 'available') { // Only show toast if we are about to redeem
+    if (foundCode && foundCode.status === 'available') { 
         toast({
             title: "Perfil de Cliente",
             description: checked ? "Cliente marcado como Potencial VIP." : "Cliente desmarcado como Potencial VIP.",
@@ -226,7 +245,14 @@ export default function HostValidateQrPage() {
   const isCodeRedeemable = () => {
     if (!foundEntity || !foundCode) return false;
     const now = new Date();
-    const entityActiveAndCurrent = foundEntity.isActive && new Date(foundEntity.startDate) <= now && new Date(foundEntity.endDate) >= now;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const entityStartDateObj = new Date(foundEntity.startDate);
+    const entityEndDateObj = new Date(foundEntity.endDate);
+    const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
+    const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
+    
+    const entityActiveAndCurrent = foundEntity.isActive && today >= effectiveStartDate && today <= effectiveEndDate;
     
     if (!entityActiveAndCurrent) return false; 
 
@@ -289,7 +315,7 @@ export default function HostValidateQrPage() {
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Código No Encontrado</AlertTitle>
-                <AlertDescription>El código "{scannedCode}" no se encontró en ninguna promoción o evento activo de este negocio.</AlertDescription>
+                <AlertDescription>El código "{scannedCode}" no se encontró en ninguna promoción o evento activo de este negocio, o no es un código válido.</AlertDescription>
               </Alert>
             )}
             {foundCode && foundEntity && (
@@ -305,10 +331,10 @@ export default function HostValidateQrPage() {
                         "El evento ha alcanzado su aforo máximo."
                     )}
                     {!isCodeRedeemable() && foundEntity.isActive && (new Date(foundEntity.startDate) > new Date() || new Date(foundEntity.endDate) < new Date()) && (
-                        `La entidad "${foundEntity.name}" no está vigente (Vigencia: ${format(new Date(foundEntity.startDate), "P", {locale: es})} - ${format(new Date(foundEntity.endDate), "P", {locale: es})}).`
+                        `La promoción/evento "${foundEntity.name}" no está vigente (Vigencia: ${format(new Date(foundEntity.startDate), "P", {locale: es})} - ${format(new Date(foundEntity.endDate), "P", {locale: es})}).`
                     )}
                      {!isCodeRedeemable() && !foundEntity.isActive && (
-                        `La entidad "${foundEntity.name}" está actualmente INACTIVA.`
+                        `La promoción/evento "${foundEntity.name}" está actualmente INACTIVA.`
                     )}
                   </AlertDescription>
                 </Alert>
@@ -393,3 +419,5 @@ export default function HostValidateQrPage() {
     </div>
   );
 }
+
+    

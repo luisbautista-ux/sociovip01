@@ -27,15 +27,15 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Noche de Karaoke Estelar", 
     description: "Saca la estrella que llevas dentro. Premios para los mejores.", 
-    startDate: "2024-08-15T12:00:00", 
-    endDate: "2024-08-15T12:00:00", 
+    startDate: "2025-08-15T12:00:00", // Updated to 2025
+    endDate: "2025-08-15T12:00:00", // Updated to 2025
     maxAttendance: 100, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "karaoke night",
     generatedCodes: [
-        { id: "codeEvt1-1", entityId: "evt1", value: "KARAOKE01", status: "available", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:00:00Z", observation: "Invitado especial" },
-        { id: "codeEvt1-2", entityId: "evt1", value: "KARAOKE02", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2024-08-01T10:05:00Z", redemptionDate: "2024-08-15T20:00:00Z" },
+        { id: "codeEvt1-1", entityId: "evt1", value: "KARAOKE01", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:00:00Z", observation: "Invitado especial" },
+        { id: "codeEvt1-2", entityId: "evt1", value: "KARAOKE02", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:05:00Z", redemptionDate: "2025-08-15T20:00:00Z" },
     ]
   },
   { 
@@ -44,8 +44,8 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Fiesta Temática: Años 80", 
     description: "Revive la mejor década con música y ambiente ochentero.", 
-    startDate: "2024-09-20T12:00:00", 
-    endDate: "2024-09-20T12:00:00", 
+    startDate: "2025-09-20T12:00:00", // Updated to 2025
+    endDate: "2025-09-20T12:00:00", // Updated to 2025
     maxAttendance: 200, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -58,8 +58,8 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Taller de Coctelería Premium", 
     description: "Aprende a preparar cocktails como un profesional.", 
-    startDate: "2024-10-05T12:00:00", 
-    endDate: "2024-10-05T12:00:00", 
+    startDate: "2024-10-05T12:00:00", // Kept in past
+    endDate: "2024-10-05T12:00:00", // Kept in past
     maxAttendance: 30, 
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -91,13 +91,13 @@ export default function BusinessEventsPage() {
   const handleCreateEvent = (data: BusinessEventFormData) => {
     const newEvent: BusinessManagedEntity = {
       id: `evt${Date.now()}`,
-      businessId: "biz1", // This would come from the logged-in business context
+      businessId: "biz1", 
       type: "event",
       name: data.name,
       description: data.description,
       startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
       endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
-      maxAttendance: data.maxAttendance || 0, // 0 for unlimited
+      maxAttendance: data.maxAttendance || 0, 
       isActive: data.isActive,
       imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
       aiHint: data.aiHint,
@@ -312,3 +312,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
+    
