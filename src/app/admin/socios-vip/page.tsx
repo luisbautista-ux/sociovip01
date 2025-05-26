@@ -18,9 +18,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 // Mock Data - make it mutable for updates
 let mockSocioVipMembers: SocioVipMember[] = [
-  { id: "vip1", name: "Elena", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T00:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
-  { id: "vip2", name: "Roberto", surname: "Chavez", email: "roberto.vip@example.com", phone: "+51911222333", dob: "1975-09-05", dni: "09876543", loyaltyPoints: 850, membershipStatus: "inactive", joinDate: "2022-11-10T00:00:00Z", address: "Calle Luna 123, Arequipa", profession: "Empresario", preferences: ["Vinos", "Golf"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ROBERTOQR"  },
-  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2024-06-01T00:00:00Z", preferences: ["Yoga", "Lectura"] },
+  { id: "vip1", name: "Elena", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12T12:00:00", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T00:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
+  { id: "vip2", name: "Roberto", surname: "Chavez", email: "roberto.vip@example.com", phone: "+51911222333", dob: "1975-09-05T12:00:00", dni: "09876543", loyaltyPoints: 850, membershipStatus: "inactive", joinDate: "2022-11-10T00:00:00Z", address: "Calle Luna 123, Arequipa", profession: "Empresario", preferences: ["Vinos", "Golf"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ROBERTOQR"  },
+  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2024-06-01T00:00:00Z", preferences: ["Yoga", "Lectura"] },
 ];
 
 const membershipStatusTranslations: Record<SocioVipMember['membershipStatus'], string> = {
@@ -78,7 +78,7 @@ export default function AdminSocioVipPage() {
       surname: data.surname,
       dni: data.dni,
       phone: data.phone,
-      dob: format(data.dob, "yyyy-MM-dd"),
+      dob: format(data.dob, "yyyy-MM-dd'T'HH:mm:ss"),
       email: data.email,
       address: data.address,
       profession: data.profession,
@@ -101,7 +101,7 @@ export default function AdminSocioVipPage() {
       surname: data.surname,
       dni: data.dni,
       phone: data.phone,
-      dob: format(data.dob, "yyyy-MM-dd"),
+      dob: format(data.dob, "yyyy-MM-dd'T'HH:mm:ss"),
       email: data.email,
       address: data.address,
       profession: data.profession,

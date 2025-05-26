@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Search, CalendarDays, BadgeCheck, BadgeX, QrCode, ClipboardList } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ClipboardList } from "lucide-react";
 import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -25,8 +25,8 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Noche de Karaoke Estelar", 
     description: "Saca la estrella que llevas dentro. Premios para los mejores.", 
-    startDate: "2024-08-15", 
-    endDate: "2024-08-15", 
+    startDate: "2024-08-15T12:00:00", 
+    endDate: "2024-08-15T12:00:00", 
     maxAttendance: 100, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -42,8 +42,8 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Fiesta Temática: Años 80", 
     description: "Revive la mejor década con música y ambiente ochentero.", 
-    startDate: "2024-09-20", 
-    endDate: "2024-09-20", 
+    startDate: "2024-09-20T12:00:00", 
+    endDate: "2024-09-20T12:00:00", 
     maxAttendance: 200, 
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -56,8 +56,8 @@ let mockBusinessEvents: BusinessManagedEntity[] = [
     type: "event", 
     name: "Taller de Coctelería Premium", 
     description: "Aprende a preparar cocktails como un profesional.", 
-    startDate: "2024-10-05", 
-    endDate: "2024-10-05", 
+    startDate: "2024-10-05T12:00:00", 
+    endDate: "2024-10-05T12:00:00", 
     maxAttendance: 30, 
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
@@ -88,8 +88,8 @@ export default function BusinessEventsPage() {
       type: "event",
       name: data.name,
       description: data.description,
-      startDate: format(data.startDate, "yyyy-MM-dd"),
-      endDate: format(data.endDate, "yyyy-MM-dd"),
+      startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
+      endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
       maxAttendance: data.maxAttendance || 0, // 0 for unlimited
       isActive: data.isActive,
       imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
@@ -107,8 +107,8 @@ export default function BusinessEventsPage() {
       ...editingEvent,
       name: data.name,
       description: data.description,
-      startDate: format(data.startDate, "yyyy-MM-dd"),
-      endDate: format(data.endDate, "yyyy-MM-dd"),
+      startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
+      endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
       maxAttendance: data.maxAttendance || 0,
       isActive: data.isActive,
       imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingEvent.imageUrl || `https://placehold.co/300x200.png`),
@@ -144,7 +144,7 @@ export default function BusinessEventsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
         <h1 className="text-3xl font-bold text-primary flex items-center">
-          <CalendarDays className="h-8 w-8 mr-2" /> Gestión de Eventos
+          <Calendar className="h-8 w-8 mr-2" /> Gestión de Eventos
         </h1>
         <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90">
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Evento

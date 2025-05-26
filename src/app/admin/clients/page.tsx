@@ -13,11 +13,11 @@ import { useState } from "react";
 
 // Mock Data for QrClient
 const mockQrClients: QrClient[] = [
-  { id: "user123", name: "Ana", surname: "García", phone: "+51987654321", dob: "1990-05-15", dni: "12345678", registrationDate: "2024-07-01T10:00:00Z" },
-  { id: "user456", name: "Carlos", surname: "Pérez", phone: "+51912345678", dob: "1985-11-20", dni: "87654321", registrationDate: "2024-07-02T11:30:00Z" },
-  { id: "user789", name: "Luisa", surname: "Martinez", phone: "+51998877665", dob: "1995-02-10", dni: "11223344", registrationDate: "2024-07-03T14:15:00Z" },
-  { id: "user101", name: "Jorge", surname: "Rodriguez", phone: "+51965432109", dob: "1988-08-25", dni: "44332211", registrationDate: "2024-07-04T09:00:00Z" },
-  { id: "user112", name: "Sofia", surname: "Lopez", phone: "+51955555555", dob: "2000-12-01", dni: "55667788", registrationDate: "2024-07-05T16:45:00Z" },
+  { id: "user123", name: "Ana", surname: "García", phone: "+51987654321", dob: "1990-05-15T12:00:00", dni: "12345678", registrationDate: "2024-07-01T10:00:00Z" },
+  { id: "user456", name: "Carlos", surname: "Pérez", phone: "+51912345678", dob: "1985-11-20T12:00:00", dni: "87654321", registrationDate: "2024-07-02T11:30:00Z" },
+  { id: "user789", name: "Luisa", surname: "Martinez", phone: "+51998877665", dob: "1995-02-10T12:00:00", dni: "11223344", registrationDate: "2024-07-03T14:15:00Z" },
+  { id: "user101", name: "Jorge", surname: "Rodriguez", phone: "+51965432109", dob: "1988-08-25T12:00:00", dni: "44332211", registrationDate: "2024-07-04T09:00:00Z" },
+  { id: "user112", name: "Sofia", surname: "Lopez", phone: "+51955555555", dob: "2000-12-01T12:00:00", dni: "55667788", registrationDate: "2024-07-05T16:45:00Z" },
 ];
 
 export default function AdminQrClientsPage() { // Renamed page function for clarity

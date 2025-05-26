@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import type { QrClient, PromotionDetails, QrCodeData, QrCodeStatus, NewQrClientFormData } from "@/lib/types";
+import type { QrClient, PromotionDetails, QrCodeData, QrCodeStatusGenerated, NewQrClientFormData } from "@/lib/types";
 import Image from "next/image";
 import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download, Gift } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -55,7 +55,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo1", 
     title: "Martes de 2x1 en Cocktails", 
     description: "Disfruta de dos cocktails al precio de uno. Válido todos los martes.", 
-    validUntil: "2024-12-31", 
+    validUntil: "2024-12-31T12:00:00", 
     promoCode: "VALIDNEW1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "cocktails party"
@@ -64,7 +64,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo2", 
     title: "Sábado VIP: Entrada Gratuita", 
     description: "Acceso exclusivo a nuestra zona VIP este Sábado. ¡No te lo pierdas!", 
-    validUntil: "2024-11-30", 
+    validUntil: "2024-11-30T12:00:00", 
     promoCode: "VALIDEXT1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "vip club"
@@ -73,7 +73,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo3", 
     title: "Noche de Salsa: Mojito Gratis", 
     description: "Ven a bailar y te regalamos un mojito con tu entrada.", 
-    validUntil: "2024-10-31", 
+    validUntil: "2024-10-31T12:00:00", 
     promoCode: "SALSACOOL", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "salsa dancing"
@@ -86,14 +86,14 @@ const mockExistingQrClient: QrClient = {
   name: "Ana",
   surname: "García",
   phone: "+51987654321",
-  dob: "1990-05-15", // YYYY-MM-DD
+  dob: "1990-05-15T12:00:00", // YYYY-MM-DD
   dni: "12345678",
   registrationDate: "2024-01-10T10:00:00Z"
 };
 
-const statusTranslations: { [key in QrCodeStatus]: string } = {
-  generated: "Generado",
-  utilized: "Utilizado",
+const statusTranslations: { [key in QrCodeStatusGenerated]: string } = {
+  available: "Generado", // Changed from 'generated' to match QrCodeStatusGenerated
+  redeemed: "Utilizado", // Changed from 'utilized'
   expired: "Vencido",
 };
 
@@ -171,7 +171,7 @@ export default function HomePage() {
         promotion: activePromotion,
         qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
         code: validatedPromoCode,
-        status: "generated",
+        status: "available", // QrCodeData uses its own status, 'available' might be 'generated'
       };
       setQrData(newQrData);
       setShowDniModal(false);
@@ -194,7 +194,7 @@ export default function HomePage() {
       promotion: activePromotion,
       qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
       code: validatedPromoCode,
-      status: "generated",
+      status: "available",
     };
     setQrData(newQrData);
     setShowDniModal(false);
@@ -221,7 +221,7 @@ export default function HomePage() {
       name: values.name,
       surname: values.surname,
       phone: values.phone,
-      dob: format(values.dob, "yyyy-MM-dd"),
+      dob: format(values.dob, "yyyy-MM-dd'T'HH:mm:ss"),
       dni: values.dni,
       registrationDate: new Date().toISOString(),
     };
@@ -268,10 +268,10 @@ export default function HomePage() {
     setEnteredDniOriginal(null); 
   }
 
-  const renderStatusIcon = (status: QrCodeStatus) => {
+  const renderStatusIcon = (status: QrCodeStatusGenerated) => {
     switch (status) {
-      case "generated": return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case "utilized": return <BadgeCheck className="h-5 w-5 text-blue-500" />;
+      case "available": return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+      case "redeemed": return <BadgeCheck className="h-5 w-5 text-blue-500" />;
       case "expired": return <XCircle className="h-5 w-5 text-red-500" />;
     }
   };
@@ -435,8 +435,8 @@ export default function HomePage() {
               <p><strong className="font-medium">Descripción:</strong> {activePromotion.description}</p>
               <p className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Válido hasta:</strong> {format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}</p>
               <p className="flex items-center">
-                {renderStatusIcon(qrData.status)}
-                <strong className="font-medium ml-2">Estado:</strong> <span className="ml-1">{statusTranslations[qrData.status]}</span>
+                {renderStatusIcon(qrData.status as QrCodeStatusGenerated)}
+                <strong className="font-medium ml-2">Estado:</strong> <span className="ml-1">{statusTranslations[qrData.status as QrCodeStatusGenerated]}</span>
               </p>
             </div>
 
