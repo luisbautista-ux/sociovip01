@@ -1,4 +1,5 @@
 
+
 export interface PromotionDetails { // For public display
   id: string;
   title: string;
@@ -149,7 +150,7 @@ export interface BusinessPromoterLink { // How a Business links to a Promoter (G
   commissionRate?: string; // e.g., "10%" or "S/5 por QR" - General commission with this business
   isActive: boolean;
   joinDate: string;
-  // promoterProfile?: PromoterProfile; // If we decide to embed for easier display
+  promoterProfile?: PromoterProfile; 
 }
 
 
@@ -299,3 +300,13 @@ export interface EventPromoterAssignmentFormData {
     notes?: string;
 }
 
+export interface BatchBoxFormData {
+  prefix: string;
+  fromNumber: number;
+  toNumber: number;
+  cost: number; // Cost per box
+  capacity?: number; // Capacity per box (optional)
+  description?: string; // Common description (optional)
+  status: 'available' | 'unavailable'; // Initial status for all boxes in batch
+}
+```

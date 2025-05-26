@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ListChecks, Ticket as TicketIcon, Box, Copy, UserPlus, BarChartHorizontalSquare } from "lucide-react";
-import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, TicketTypeFormData, EventBoxFormData, PromoterProfile, EventPromoterAssignment, BusinessEntityType } from "@/lib/types";
+import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, TicketTypeFormData, EventBoxFormData, PromoterProfile, EventPromoterAssignment, BatchBoxFormData } from "@/lib/types";
 import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import { EventBoxForm } from "@/components/business/forms/EventBoxForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { CreateBatchBoxesDialog } from "@/components/business/dialogs/CreateBatchBoxesDialog";
 
 
 // Mock data for business events
@@ -98,6 +100,25 @@ const mockBusinessPromoters: PromoterProfile[] = [
   { id: "pp3", name: "Pedro Pascal", email: "pedro.pascal@promo.com"},
 ];
 
+const isEntityCurrentlyActivatable = (entity: BusinessManagedEntity): boolean => {
+  if (!entity.isActive) {
+    return false;
+  }
+  const now = new Date();
+  const entityStartDateObj = new Date(entity.startDate);
+  const entityEndDateObj = new Date(entity.endDate);
+
+  if (isNaN(entityStartDateObj.getTime()) || isNaN(entityEndDateObj.getTime())) {
+    return false; 
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Current date at 00:00:00
+  const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
+  const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999); // End of day for end date
+  
+  return today >= effectiveStartDate && today <= effectiveEndDate;
+};
+
 
 export default function BusinessEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,12 +136,16 @@ export default function BusinessEventsPage() {
   
   const { toast } = useToast();
 
+  // State for Ticket Management within the main Event Modal
   const [editingTicketInEventModal, setEditingTicketInEventModal] = useState<TicketType | null>(null);
   const [showTicketFormInEventModal, setShowTicketFormInEventModal] = useState(false);
 
+  // State for Box Management within the main Event Modal
   const [editingBoxInEventModal, setEditingBoxInEventModal] = useState<EventBox | null>(null);
   const [showBoxFormInEventModal, setShowBoxFormInEventModal] = useState(false);
+  const [showCreateBatchBoxesModal, setShowCreateBatchBoxesModal] = useState(false);
   
+  // State for Promoter Assignment within the main Event Modal
   const [selectedPromoterForAssignment, setSelectedPromoterForAssignment] = useState<string>("");
   const [promoterEventCommission, setPromoterEventCommission] = useState("");
   const [promoterEventNotes, setPromoterEventNotes] = useState("");
@@ -150,7 +175,12 @@ export default function BusinessEventsPage() {
             assignedPromoters: event.assignedPromoters ? JSON.parse(JSON.stringify(event.assignedPromoters)) : [] 
         });
     } else if (event) { // Editing existing event
-        setEditingEvent({...event});
+        setEditingEvent({...event, 
+          ticketTypes: event.ticketTypes ? [...event.ticketTypes] : [], 
+          eventBoxes: event.eventBoxes ? [...event.eventBoxes] : [],
+          assignedPromoters: event.assignedPromoters ? [...event.assignedPromoters] : [],
+          generatedCodes: event.generatedCodes ? [...event.generatedCodes] : [],
+        });
     }
      else { // For a NEW event (event is null)
         const newEventScaffold: BusinessManagedEntity = {
@@ -178,10 +208,7 @@ export default function BusinessEventsPage() {
   
 
   const handleMainEventFormSubmit = (data: BusinessEventFormData) => {
-      if (editingEvent && !isDuplicating && showManageEventModal) { 
-        // This condition means we are either editing an existing event's details 
-        // or we are setting the details for a newly scaffolded event (editingEvent.id might be '' or temp)
-        
+      if (editingEvent && showManageEventModal) { 
         const updatedEventDetails: Partial<BusinessManagedEntity> = {
             name: data.name,
             description: data.description,
@@ -193,26 +220,24 @@ export default function BusinessEventsPage() {
             aiHint: data.aiHint,
         };
 
-        if (!editingEvent.id || editingEvent.id.startsWith('temp-')) { // Finalizing a new event's details
+        if (!editingEvent.id) { // Finalizing a new event's details from scratch
             const newEventId = `evt${Date.now()}`;
             setEditingEvent(prev => prev ? ({ 
                 ...prev, 
                 ...updatedEventDetails,
-                id: newEventId, // Assign permanent ID
-                businessId: prev.businessId || "biz1", // Ensure businessId
-                type: prev.type || "event", // Ensure type
+                id: newEventId, 
+                businessId: prev.businessId || "biz1", 
+                type: prev.type || "event", 
              }) : null);
             toast({ title: "Evento Configurado", description: `Los detalles de "${data.name}" están listos. Continúa en las otras pestañas si es necesario.` });
-        } else { // Updating an existing event's details
-            setEditingEvent(prev => prev ? ({ 
+        } else { // Updating an existing event's details (could be a duplicate being finalized or an actual edit)
+             setEditingEvent(prev => prev ? ({ 
                 ...prev, 
                 ...updatedEventDetails 
             }) : null);
             toast({ title: "Detalles del Evento Actualizados", description: `Los detalles de "${data.name}" han sido actualizados.` });
         }
-
-    } 
-    // Removed the `else if (!editingEvent?.id ...)` block as it's now covered above
+    }
   };
   
   const handleDeleteEvent = (eventId: string) => {
@@ -223,8 +248,7 @@ export default function BusinessEventsPage() {
   const handleSaveManagedEventAndClose = () => {
     if (!editingEvent) return;
 
-    // Validation before saving an event that might have just been scaffolded
-    if (!editingEvent.id || editingEvent.id.startsWith('temp-') || !editingEvent.name) {
+    if (!editingEvent.id || !editingEvent.name) {
         toast({
             title: "Faltan Detalles del Evento",
             description: "Por favor, completa y guarda los detalles básicos del evento en la pestaña 'Detalles del Evento' primero.",
@@ -233,10 +257,11 @@ export default function BusinessEventsPage() {
         return;
     }
 
+    const eventExists = events.some(e => e.id === editingEvent.id);
 
-    if (isDuplicating || !events.some(e => e.id === editingEvent.id)) { 
+    if (isDuplicating || !eventExists) { 
       setEvents(prev => [editingEvent, ...prev.filter(e => e.id !== editingEvent.id)]);
-      toast({ title: isDuplicating ? "Evento Duplicado" : "Evento Creado y Guardado", description: `El evento "${editingEvent.name}" ha sido ${isDuplicating ? 'duplicado' : 'guardado'}.` });
+      toast({ title: isDuplicating ? "Evento Duplicado y Guardado" : "Evento Creado y Guardado", description: `El evento "${editingEvent.name}" ha sido ${isDuplicating ? 'duplicado y guardado' : 'guardado'}.` });
     } else { 
       setEvents(prev => prev.map(e => e.id === editingEvent.id ? editingEvent : e));
       toast({ title: "Evento Guardado", description: `Los cambios en "${editingEvent.name}" han sido guardados.` });
@@ -248,6 +273,14 @@ export default function BusinessEventsPage() {
 
 
   const openCreateCodesDialog = (event: BusinessManagedEntity) => {
+    if (!isEntityCurrentlyActivatable(event)) {
+      toast({ 
+        title: "No se pueden crear códigos", 
+        description: "Este evento no está activo o está fuera de su periodo de vigencia.", 
+        variant: "destructive"
+      });
+      return;
+    }
     setSelectedEntityForCreatingCodes(event);
     setShowCreateCodesModal(true);
   };
@@ -291,34 +324,32 @@ export default function BusinessEventsPage() {
     let eventNameForToast = "";
     let newStatusForToast = false;
 
-    const updateStatusInEvent = (eventToUpdate: BusinessManagedEntity | null) => {
+    const updateStatusInEvent = (eventToUpdate: BusinessManagedEntity | null): BusinessManagedEntity | null => {
       if (!eventToUpdate || eventToUpdate.id !== eventId) return eventToUpdate;
       eventNameForToast = eventToUpdate.name;
       newStatusForToast = !eventToUpdate.isActive;
       return { ...eventToUpdate, isActive: !eventToUpdate.isActive };
     };
     
-    // Queue state updates
-    if (editingEvent && editingEvent.id === eventId) {
-      setEditingEvent(prev => updateStatusInEvent(prev));
-    }
     setEvents(prevEvents =>
       prevEvents.map(event =>
         event.id === eventId ? updateStatusInEvent(event) as BusinessManagedEntity : event
       )
     );
-
+    
+    if (editingEvent && editingEvent.id === eventId) {
+      setEditingEvent(prev => updateStatusInEvent(prev));
+    }
+    
     // Call toast after state updates are likely processed
-    // A small timeout can sometimes help ensure toast appears after render completes,
-    // but ideally, this direct call post-setState should be okay if toast system handles it.
-    setTimeout(() => {
-        if (eventNameForToast) {
-          toast({
+    if (eventNameForToast) {
+       setTimeout(() => {
+        toast({
             title: "Estado Actualizado",
             description: `El evento "${eventNameForToast}" ahora está ${newStatusForToast ? "Activo" : "Inactivo"}.`
-          });
-        }
-    }, 0);
+        });
+      }, 0);
+    }
   };
 
 
@@ -436,6 +467,57 @@ export default function BusinessEventsPage() {
     toast({title: "Promotor Desvinculado", description: `El promotor ha sido desvinculado de este evento.`, variant: "destructive"});
   };
 
+  const handleCreateBatchBoxes = (batchData: BatchBoxFormData) => {
+    if (!editingEvent) return;
+
+    const existingBoxNames = new Set((editingEvent.eventBoxes || []).map(box => box.name.toLowerCase()));
+    const newBoxesForBatch: EventBox[] = [];
+    let hasConflict = false;
+    let conflictingName = "";
+
+    for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
+      const boxName = `${batchData.prefix} ${i}`;
+      if (existingBoxNames.has(boxName.toLowerCase())) {
+        hasConflict = true;
+        conflictingName = boxName;
+        break;
+      }
+      newBoxesForBatch.push({
+        id: `box-${editingEvent.id}-${Date.now()}-${i}`,
+        businessId: editingEvent.businessId,
+        eventId: editingEvent.id,
+        name: boxName,
+        cost: batchData.cost,
+        description: batchData.description,
+        status: batchData.status,
+        capacity: batchData.capacity,
+      });
+    }
+
+    if (hasConflict) {
+      toast({
+        title: "Conflicto de Nombres",
+        description: `Ya existe un box con un nombre similar a '${conflictingName}'. No se crearon boxes del lote.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEditingEvent(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        eventBoxes: [...(prev.eventBoxes || []), ...newBoxesForBatch],
+      };
+    });
+
+    toast({
+      title: "Lote de Boxes Creado",
+      description: `${newBoxesForBatch.length} boxes han sido creados y añadidos al evento.`,
+    });
+    setShowCreateBatchBoxesModal(false);
+  };
+
 
   return (
     <div className="space-y-6">
@@ -502,7 +584,7 @@ export default function BusinessEventsPage() {
                         </div>
                     </TableCell>
                      <TableCell className="space-x-1">
-                      <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(event)}>
+                      <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(event)} disabled={!isEntityCurrentlyActivatable(event)}>
                         <QrCode className="h-3 w-3 mr-1" /> Crear
                       </Button>
                       <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(event)}>
@@ -570,7 +652,7 @@ export default function BusinessEventsPage() {
           <DialogHeader>
             <DialogTitle className="text-2xl">
                 {isDuplicating ? `Duplicar Evento: ${editingEvent?.name?.replace(' (Copia)','')}` : 
-                (editingEvent?.id && !editingEvent.id.startsWith('temp-') && events.some(e=>e.id === editingEvent.id) ? `Gestionar Evento: ${editingEvent.name}` : "Crear Nuevo Evento")}
+                (editingEvent?.id && events.some(e=>e.id === editingEvent.id && e.id !== '') ? `Gestionar Evento: ${editingEvent.name}` : "Crear Nuevo Evento")}
             </DialogTitle>
             <DialogDescription>
                  {isDuplicating ? `Creando una copia. Ajusta los detalles necesarios.` : "Administra todos los aspectos de tu evento desde las pestañas."}
@@ -623,13 +705,18 @@ export default function BusinessEventsPage() {
             <TabsContent value="boxes" className="flex-grow overflow-y-auto p-1 space-y-4">
                 <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Boxes del Evento</h3>
-                    <Button onClick={() => { setEditingBoxInEventModal(null); setShowBoxFormInEventModal(true); }} className="bg-primary hover:bg-primary/90">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevo Box
-                    </Button>
+                    <div className="space-x-2">
+                        <Button onClick={() => setShowCreateBatchBoxesModal(true)} variant="outline">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Crear Boxes en Lote
+                        </Button>
+                        <Button onClick={() => { setEditingBoxInEventModal(null); setShowBoxFormInEventModal(true); }} className="bg-primary hover:bg-primary/90">
+                            <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevo Box
+                        </Button>
+                    </div>
                 </div>
                 {(editingEvent.eventBoxes?.length || 0) > 0 ? (
                     <Table>
-                        <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Estado</TableHead><TableHead>Capacidad</TableHead><TableHead>Vendedor</TableHead><TableHead>Dueño</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Estado</TableHead><TableHead>Capacidad</TableHead><TableHead>Vendedor</TableHead><TableHead>Dueño (Cliente)</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {editingEvent.eventBoxes?.map((box) => (
                                 <TableRow key={box.id}>
@@ -708,7 +795,7 @@ export default function BusinessEventsPage() {
           <DialogFooter className="pt-4 border-t mt-auto"> {/* Ensure footer is at the bottom */}
             <Button variant="outline" onClick={() => {setShowManageEventModal(false); setEditingEvent(null); setIsDuplicating(false);}}>Cancelar</Button>
             <Button onClick={handleSaveManagedEventAndClose} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                {isDuplicating ? "Crear Evento Duplicado" : (editingEvent?.id && !editingEvent.id.startsWith('temp-') && events.some(e=>e.id === editingEvent.id) ? "Guardar Cambios y Cerrar" : "Guardar Evento y Cerrar")}
+                {isDuplicating ? "Crear Evento Duplicado" : (editingEvent?.id && events.some(e=>e.id === editingEvent.id && e.id !== '') ? "Guardar Cambios y Cerrar" : "Guardar Evento y Cerrar")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -754,6 +841,15 @@ export default function BusinessEventsPage() {
           </Dialog>
       )}
 
+      {/* Sub-Modal for BatchBoxForm (inside Manage Event Modal) */}
+      {editingEvent && showCreateBatchBoxesModal && (
+        <CreateBatchBoxesDialog
+          open={showCreateBatchBoxesModal}
+          onOpenChange={setShowCreateBatchBoxesModal}
+          onSubmit={handleCreateBatchBoxes}
+        />
+      )}
+
 
       {/* Create Codes Modal (for selected event from main list) */}
       {selectedEntityForCreatingCodes && (
@@ -782,8 +878,16 @@ export default function BusinessEventsPage() {
             setShowManageCodesModal(false); 
             if(currentEntity) { 
                 setTimeout(() => {
-                    setSelectedEntityForCreatingCodes(currentEntity);
-                    setShowCreateCodesModal(true);
+                    if (isEntityCurrentlyActivatable(currentEntity)) {
+                        setSelectedEntityForCreatingCodes(currentEntity);
+                        setShowCreateCodesModal(true);
+                    } else {
+                        toast({
+                            title: "No se pueden crear códigos",
+                            description: "Este evento no está activo o está fuera de su periodo de vigencia.",
+                            variant: "destructive"
+                        });
+                    }
                 }, 0);
             }
           }}
@@ -792,5 +896,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
-    
