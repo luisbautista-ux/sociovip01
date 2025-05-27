@@ -18,12 +18,11 @@ function Calendar({
 }: CalendarProps) {
 
   // Custom NavigationButton component for react-day-picker
+  // This component renders a div styled as a button to avoid <button> inside <button>
   const CustomNavigationButton = React.forwardRef<
-    HTMLDivElement, // Changed from HTMLButtonElement
-    RDPButtonProps // Use react-day-picker's ButtonProps for type safety
+    HTMLDivElement, // Renders a div
+    RDPButtonProps & { name?: 'previous-month' | 'next-month' } // react-day-picker's ButtonProps + name
   >(({ className: rdpBtnClassName, children, ...rdpProps }, ref) => {
-    // Determine if it's the previous or next button based on the name prop if needed,
-    // or rely on shadcn's classNames for specific styling.
     const isPrevious = rdpProps.name === 'previous-month';
     const isNext = rdpProps.name === 'next-month';
 
@@ -34,30 +33,32 @@ function Calendar({
         tabIndex={rdpProps.disabled ? -1 : 0}
         aria-label={rdpProps['aria-label']}
         className={cn(
-          // Base styles from shadcn's nav_button
+          // Base styles from shadcn's original nav_button approach
           "h-7 w-7 flex items-center justify-center rounded-md border border-input bg-transparent p-0 text-sm font-medium",
           "hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           rdpProps.disabled ? "pointer-events-none opacity-50" : "cursor-pointer",
-          // Apply specific shadcn classes for previous/next positioning if available
+          // Apply specific shadcn classes for previous/next positioning if available in classNames prop
           isPrevious && classNames?.nav_button_previous,
           isNext && classNames?.nav_button_next,
           rdpBtnClassName // Include any classes passed by react-day-picker itself
         )}
         onClick={(e) => {
           if (!rdpProps.disabled && rdpProps.onClick) {
+            // Cast event type if necessary, though often direct pass-through works
             rdpProps.onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
           }
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             if (!rdpProps.disabled && rdpProps.onClick) {
+              e.preventDefault(); // Prevent default spacebar scroll
               rdpProps.onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
             }
           }
         }}
       >
-        {children}
+        {children} {/* This will be the ChevronLeft or ChevronRight icon */}
       </div>
     );
   });
@@ -74,10 +75,9 @@ function Calendar({
         caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
         caption_dropdowns: "flex justify-center gap-1",
-        nav: "space-x-1 flex items-center", // This class is for the container of nav buttons
-        // nav_button: (styling is now handled by CustomNavigationButton using these as base)
-        nav_button_previous: "absolute left-1", // Used by CustomNavigationButton for positioning
-        nav_button_next: "absolute right-1",   // Used by CustomNavigationButton for positioning
+        nav: "space-x-1 flex items-center",
+        nav_button_previous: "absolute left-1", // For positioning of CustomNavigationButton
+        nav_button_next: "absolute right-1",   // For positioning of CustomNavigationButton
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
@@ -100,7 +100,7 @@ function Calendar({
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
-        ...classNames,
+        ...classNames, // Allow overriding these default classNames
       }}
       components={{
         NavigationButton: CustomNavigationButton, // Override the navigation button
@@ -141,7 +141,7 @@ function Calendar({
             </Select>
           )
         },
-        // Default icons for chevrons, react-day-picker will pass these as children to CustomNavigationButton
+        // Pass the icons as children to our CustomNavigationButton
         IconLeft: () => <ChevronLeft className="h-4 w-4" />,
         IconRight: () => <ChevronRight className="h-4 w-4" />,
       }}
@@ -152,4 +152,3 @@ function Calendar({
 Calendar.displayName = "Calendar"
 
 export { Calendar }
-
