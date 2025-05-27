@@ -15,8 +15,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { PlatformUser, PlatformUserFormData, Business } from "@/lib/types";
+import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMember } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 
@@ -38,31 +40,68 @@ const platformUserFormSchema = z.object({
 
 type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
 
+export interface InitialDataForPlatformUserCreation {
+  dni: string;
+  name?: string;
+  email?: string;
+  existingUserType?: 'QrClient' | 'SocioVipMember';
+}
+
 interface PlatformUserFormProps {
-  user?: PlatformUser;
+  user?: PlatformUser; // For editing
+  initialDataForCreation?: InitialDataForPlatformUserCreation; // For creation after DNI verification
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>; // onSubmit is now async
+  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
 
-export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmitting = false }: PlatformUserFormProps) {
+export function PlatformUserForm({ 
+  user, 
+  initialDataForCreation, 
+  businesses, 
+  onSubmit, 
+  onCancel, 
+  isSubmitting = false 
+}: PlatformUserFormProps) {
+  
+  const isEditing = !!user;
+
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(platformUserFormSchema),
-    defaultValues: {
-      dni: user?.dni || "",
-      name: user?.name || "",
-      email: user?.email || "",
-      role: user?.role || undefined,
-      businessId: user?.businessId || undefined,
-    },
+    // Default values are now primarily set by useEffect
   });
 
   const selectedRole = form.watch("role");
 
-  const handleSubmit = async (values: PlatformUserFormValues) => { // handleSubmit is now async
+  React.useEffect(() => {
+    if (isEditing && user) {
+      form.reset({
+        dni: user.dni || "",
+        name: user.name || "",
+        email: user.email || "",
+        role: user.role || undefined,
+        businessId: user.businessId || undefined,
+      });
+    } else if (!isEditing && initialDataForCreation) {
+      form.reset({
+        dni: initialDataForCreation.dni,
+        name: initialDataForCreation.name || "",
+        email: initialDataForCreation.email || "",
+        role: undefined, // Role needs to be selected by admin
+        businessId: undefined,
+      });
+    } else if (!isEditing && !initialDataForCreation) {
+        // This case might happen if the DNI-first modal is skipped or form is shown directly for creation
+        form.reset({ 
+            dni: "", name: "", email: "", role: undefined, businessId: undefined 
+        });
+    }
+  }, [user, initialDataForCreation, isEditing, form]);
+
+  const handleSubmit = async (values: PlatformUserFormValues) => {
     const dataToSubmit: PlatformUserFormData = { 
-      dni: values.dni.trim(),
+      dni: values.dni.trim(), // DNI comes from form, which was pre-filled and disabled if new
       name: values.name,
       email: values.email,
       role: values.role,
@@ -70,24 +109,27 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
     if (['business_admin', 'staff', 'host'].includes(values.role)) {
       dataToSubmit.businessId = values.businessId;
     } else {
-      dataToSubmit.businessId = undefined; // Ensure businessId is not set for roles that don't need it
+      dataToSubmit.businessId = undefined; 
     }
-    await onSubmit(dataToSubmit, !!user); // Pass isEditing flag
+    await onSubmit(dataToSubmit, isEditing);
   };
 
-  React.useEffect(() => {
-    form.reset({
-      dni: user?.dni || "",
-      name: user?.name || "",
-      email: user?.email || "",
-      role: user?.role || undefined,
-      businessId: user?.businessId || undefined,
-    });
-  }, [user, form]);
+  const shouldDisableDni = !isEditing && !!initialDataForCreation;
+  const showPrePopulatedAlert = !isEditing && initialDataForCreation?.existingUserType;
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        {showPrePopulatedAlert && (
+          <Alert variant="default" className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-700">DNI Encontrado</AlertTitle>
+            <AlertDescription>
+              Este DNI pertenece a un {initialDataForCreation?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Socio VIP'} existente.
+              Se han pre-rellenado los datos conocidos. Por favor, complete y asigne un rol.
+            </AlertDescription>
+          </Alert>
+        )}
         <FormField
           control={form.control}
           name="dni"
@@ -95,10 +137,14 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
             <FormItem>
               <FormLabel>DNI / Carnet de Extranjería</FormLabel>
               <FormControl>
-                <Input placeholder="Número de documento" {...field} disabled={isSubmitting || !!user} />
+                <Input 
+                  placeholder="Número de documento" 
+                  {...field} 
+                  disabled={isSubmitting || shouldDisableDni} 
+                />
               </FormControl>
-              {!!user && <FormMessage>El DNI no se puede cambiar para usuarios existentes.</FormMessage>}
-              {!user && <FormMessage />}
+              {shouldDisableDni && <FormDescription>El DNI ha sido verificado y no puede cambiarse en este paso.</FormDescription>}
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -122,10 +168,10 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
             <FormItem>
               <FormLabel>Email (para inicio de sesión)</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || !!user} />
+                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || (isEditing && !!user?.email)} />
               </FormControl>
-              {!!user && <FormMessage>El email no se puede cambiar para usuarios existentes.</FormMessage>}
-              {!user && <FormMessage />}
+              {isEditing && !!user?.email && <FormDescription>El email no se puede cambiar para usuarios existentes con un email ya asignado.</FormDescription>}
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -187,18 +233,17 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
             )}
           />
         )}
-        <DialogFooter>
+        <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {user ? "Guardar Cambios" : "Crear Usuario"}
+            {isEditing ? "Guardar Cambios" : "Crear Usuario de Plataforma"}
           </Button>
         </DialogFooter>
       </form>
     </Form>
   );
 }
-
     
