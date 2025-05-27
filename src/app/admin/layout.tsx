@@ -7,14 +7,14 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button"; // Added import
+import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -23,11 +23,11 @@ export default function AdminLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || loadingProfile) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando panel de administración...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Verificando autenticación...</p>
       </div>
     );
   }
@@ -41,8 +41,38 @@ export default function AdminLayout({
     );
   }
 
-  // After auth and profile are loaded, check role
-  if (!userProfile || !userProfile.roles || !userProfile.roles.includes('superadmin')) {
+  if (loadingProfile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Cargando perfil de usuario...</p>
+      </div>
+    );
+  }
+
+  if (!userProfile) {
+    // Profile loaded, but not found for this UID
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-destructive">Error de Perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              No se encontró un perfil de usuario en la base de datos para tu cuenta.
+              Asegúrate de que tu UID de autenticación ({currentUser.uid}) esté correctamente vinculado a un perfil con el rol 'superadmin' en la colección 'platformUsers'.
+            </CardDescription>
+            <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
+              Cerrar Sesión e Ir a Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (!userProfile.roles || !userProfile.roles.includes('superadmin')) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -51,7 +81,7 @@ export default function AdminLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder a esta sección (Super Administrador).
+              No tienes los permisos necesarios (Super Administrador) para acceder a esta sección. Roles actuales: {userProfile.roles.join(', ') || 'Ninguno'}.
               Si crees que esto es un error, por favor contacta al soporte.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">

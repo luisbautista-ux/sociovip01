@@ -3,12 +3,12 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { BarChart2, Gift, ListChecks, LogOut, Settings, UserCircle, DollarSign, Menu } from "lucide-react";
+import { BarChart2, Gift, DollarSign, Menu, UserCircle, LogOut } from "lucide-react"; // Added LogOut
 import { SocioVipLogo } from "@/components/icons"; 
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation"; 
 import { useAuth } from "@/context/AuthContext";
-import { useEffect } from "react";
+import React, { useEffect } from "react"; // Imported React
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -18,7 +18,6 @@ const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
   { href: "/promoter/entities", label: "Promociones y Eventos", icon: Gift },
   { href: "/promoter/commissions", label: "Mis Comisiones", icon: DollarSign },
-  // { href: "/promoter/settings", label: "Configuración", icon: Settings },
 ];
 
 
@@ -45,7 +44,7 @@ function PromoterSidebarNav({ closeSheet }: { closeSheet?: () => void }) {
               "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
               pathname?.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
             )}
-            onClick={closeSheet} // Close sheet on navigation
+            onClick={closeSheet} 
           >
             <item.icon className="h-5 w-5" />
             <span>{item.label}</span>
@@ -83,11 +82,11 @@ export default function PromoterLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || loadingProfile) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando panel de promotor...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Verificando autenticación...</p>
       </div>
     );
   }
@@ -95,12 +94,42 @@ export default function PromoterLayout({
   if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-         <p className="text-lg text-muted-foreground">Redirigiendo...</p>
+         <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
       </div>
     );
   }
   
-  if (!userProfile || !userProfile.roles || !userProfile.roles.includes('promoter')) {
+  if (loadingProfile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Cargando perfil de usuario...</p>
+      </div>
+    );
+  }
+
+  if (!userProfile) {
+     return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-destructive">Error de Perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              No se encontró un perfil de usuario en la base de datos para tu cuenta (UID: {currentUser.uid}).
+              Este perfil es necesario para acceder al panel de promotor.
+            </CardDescription>
+            <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
+              Cerrar Sesión e Ir a Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (!userProfile.roles || !userProfile.roles.includes('promoter')) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -109,7 +138,7 @@ export default function PromoterLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder al Panel de Promotor.
+              No tienes los permisos necesarios para acceder al Panel de Promotor. Roles actuales: {userProfile.roles.join(', ') || 'Ninguno'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
               Ir a la Página Principal
@@ -151,7 +180,7 @@ export default function PromoterLayout({
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {userProfile?.name || "Promotor"}
             </span>
-            <Button variant="outline" size="icon" onClick={logout}>
+            <Button variant="outline" size="icon" onClick={logout} title="Cerrar Sesión">
                 <LogOut className="h-4 w-4" />
                 <span className="sr-only">Cerrar Sesión</span>
             </Button>

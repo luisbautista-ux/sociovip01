@@ -14,20 +14,20 @@ export default function BusinessPanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
-      router.push("/login"); // Or a specific business login page
+      router.push("/login"); 
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || loadingProfile) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando panel de negocio...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Verificando autenticación...</p>
       </div>
     );
   }
@@ -35,12 +35,42 @@ export default function BusinessPanelLayout({
   if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-         <p className="text-lg text-muted-foreground">Redirigiendo...</p>
+         <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
       </div>
     );
   }
   
-  if (!userProfile || !userProfile.roles || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff'))) {
+  if (loadingProfile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Cargando perfil de usuario...</p>
+      </div>
+    );
+  }
+
+  if (!userProfile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-destructive">Error de Perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              No se encontró un perfil de usuario en la base de datos para tu cuenta (UID: {currentUser.uid}).
+              Este perfil es necesario para acceder al panel de negocio.
+            </CardDescription>
+            <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
+              Cerrar Sesión e Ir a Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  if (!userProfile.roles || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff'))) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -49,7 +79,7 @@ export default function BusinessPanelLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder al Panel de Negocio (Admin Negocio o Staff).
+              No tienes los permisos necesarios para acceder al Panel de Negocio (se requiere rol Admin Negocio o Staff). Roles actuales: {userProfile.roles.join(', ') || 'Ninguno'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
               Ir a la Página Principal
@@ -60,8 +90,26 @@ export default function BusinessPanelLayout({
     );
   }
   
-  // TODO: Pass userProfile.businessId to children or make it available via context for business panel pages
-  // For now, pages will continue to use MOCK_BUSINESS_ID for Firestore queries
+  if (!userProfile.businessId && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'))) {
+    return (
+       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-destructive">Configuración Incompleta</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              Tu perfil de usuario no está asociado a ningún negocio. Por favor, contacta al Super Administrador.
+            </CardDescription>
+            <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
+              Cerrar Sesión
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex min-h-screen bg-background">
