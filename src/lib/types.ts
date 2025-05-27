@@ -27,7 +27,7 @@ export interface QrClient {
 export interface QrCodeData {
   user: QrClient;
   promotion: PromotionDetails; // The public view of the promotion
-  qrImageUrl: string;
+  // qrImageUrl: string; // No longer needed, will be generated on the fly
   code: string; // Validated promoCode used or a generated unique code for public flow
   status: 'generated' | 'utilized' | 'expired'; // Status for public flow QR
 }
@@ -309,4 +309,3 @@ export interface BatchBoxFormData {
   description?: string; // Common description (optional)
   status: 'available' | 'unavailable'; // Initial status for all boxes in batch
 }
-```

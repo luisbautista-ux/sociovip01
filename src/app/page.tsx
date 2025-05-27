@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import type { QrClient, PromotionDetails, QrCodeData, QrCodeStatusGenerated, NewQrClientFormData } from "@/lib/types";
 import Image from "next/image";
+import QRCode from 'qrcode';
 import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download, Gift } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -55,7 +56,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo1", 
     title: "Martes de 2x1 en Cocktails", 
     description: "Disfruta de dos cocktails al precio de uno. Válido todos los martes.", 
-    validUntil: "2025-12-31T12:00:00", // Updated to 2025
+    validUntil: "2025-12-31T12:00:00",
     promoCode: "VALIDNEW1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "cocktails party"
@@ -64,7 +65,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo2", 
     title: "Sábado VIP: Entrada Gratuita", 
     description: "Acceso exclusivo a nuestra zona VIP este Sábado. ¡No te lo pierdas!", 
-    validUntil: "2025-11-30T12:00:00", // Updated to 2025
+    validUntil: "2025-11-30T12:00:00",
     promoCode: "VALIDEXT1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "vip club"
@@ -73,7 +74,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     id: "promo3", 
     title: "Noche de Salsa: Mojito Gratis", 
     description: "Ven a bailar y te regalamos un mojito con tu entrada.", 
-    validUntil: "2025-10-31T12:00:00", // Updated to 2025
+    validUntil: "2025-10-31T12:00:00",
     promoCode: "SALSACOOL", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "salsa dancing"
@@ -107,6 +108,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
+  const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
 
@@ -126,6 +128,23 @@ export default function HomePage() {
       dob: undefined,
     }
   });
+
+  useEffect(() => {
+    if (pageViewState === 'qrDisplay' && qrData && qrData.code) {
+      QRCode.toDataURL(qrData.code, { width: 250, errorCorrectionLevel: 'H', margin: 2 })
+        .then(url => {
+          setGeneratedQrDataUrl(url);
+        })
+        .catch(err => {
+          console.error("Failed to generate QR code", err);
+          setGeneratedQrDataUrl(null);
+          toast({ title: "Error al generar QR", description: "No se pudo generar el código QR.", variant: "destructive" });
+        });
+    } else {
+      setGeneratedQrDataUrl(null); // Clear QR when not in display view or no code
+    }
+  }, [qrData, pageViewState, toast]);
+
 
   useEffect(() => {
     if (currentStepInModal === 'newQrClientForm' && enteredDniOriginal) {
@@ -168,7 +187,6 @@ export default function HomePage() {
       const newQrData: QrCodeData = {
         user: mockExistingQrClient,
         promotion: activePromotion,
-        qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
         code: validatedPromoCode,
         status: "available", 
       };
@@ -191,7 +209,6 @@ export default function HomePage() {
     const newQrData: QrCodeData = {
       user: qrClientData,
       promotion: activePromotion,
-      qrImageUrl: `https://placehold.co/250x250.png?text=QR+${validatedPromoCode}`,
       code: validatedPromoCode,
       status: "available",
     };
@@ -248,6 +265,7 @@ export default function HomePage() {
     setValidatedPromoCode(null);
     setEnteredDniOriginal(null);
     setQrData(null);
+    setGeneratedQrDataUrl(null);
     dniForm.reset();
     newQrClientForm.reset();
   };
@@ -268,7 +286,7 @@ export default function HomePage() {
   };
 
   const handleSaveQrWithDetails = () => {
-    if (!qrData || !qrData.qrImageUrl || !activePromotion) {
+    if (!qrData || !generatedQrDataUrl || !activePromotion) {
       toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
       return;
     }
@@ -320,7 +338,7 @@ export default function HomePage() {
     qrImg.onerror = () => {
       toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
     };
-    qrImg.src = qrData.qrImageUrl;
+    qrImg.src = generatedQrDataUrl;
   };
 
   const PromotionCodeForm = ({ promotion }: { promotion: PromotionDetails }) => {
@@ -403,17 +421,23 @@ export default function HomePage() {
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
             <div className="flex justify-center">
-              <Image
-                src={qrData.qrImageUrl}
-                alt="QR Code"
-                width={250}
-                height={250}
-                className="rounded-lg shadow-lg border-4 border-primary"
-                data-ai-hint="qr code"
-              />
+              {generatedQrDataUrl ? (
+                <Image
+                  src={generatedQrDataUrl}
+                  alt="QR Code"
+                  width={250}
+                  height={250}
+                  className="rounded-lg shadow-lg border-4 border-primary"
+                  data-ai-hint="qr code"
+                />
+              ) : (
+                <div className="w-[250px] h-[250px] flex items-center justify-center border-4 border-dashed border-primary rounded-lg bg-muted">
+                  <p className="text-muted-foreground">Generando QR...</p>
+                </div>
+              )}
             </div>
             <div className="flex justify-center mt-4">
-              <Button variant="outline" className="w-auto" onClick={handleSaveQrWithDetails} disabled={!qrData?.qrImageUrl}>
+              <Button variant="outline" className="w-auto" onClick={handleSaveQrWithDetails} disabled={!generatedQrDataUrl}>
                 <Download className="mr-2 h-5 w-5"/> Guardar QR con Detalles
               </Button>
             </div>
@@ -612,5 +636,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    
