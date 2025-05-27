@@ -3,10 +3,10 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker, DropdownProps } from "react-day-picker"
+import { DayPicker, DropdownProps, type ButtonProps as RDPButtonProps } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select" // Assuming Select is used for dropdowns
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -16,6 +16,54 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
+
+  // Custom NavigationButton component for react-day-picker
+  const CustomNavigationButton = React.forwardRef<
+    HTMLDivElement, // Changed from HTMLButtonElement
+    RDPButtonProps // Use react-day-picker's ButtonProps for type safety
+  >(({ className: rdpBtnClassName, children, ...rdpProps }, ref) => {
+    // Determine if it's the previous or next button based on the name prop if needed,
+    // or rely on shadcn's classNames for specific styling.
+    const isPrevious = rdpProps.name === 'previous-month';
+    const isNext = rdpProps.name === 'next-month';
+
+    return (
+      <div
+        ref={ref}
+        role="button"
+        tabIndex={rdpProps.disabled ? -1 : 0}
+        aria-label={rdpProps['aria-label']}
+        className={cn(
+          // Base styles from shadcn's nav_button
+          "h-7 w-7 flex items-center justify-center rounded-md border border-input bg-transparent p-0 text-sm font-medium",
+          "hover:bg-accent hover:text-accent-foreground",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          rdpProps.disabled ? "pointer-events-none opacity-50" : "cursor-pointer",
+          // Apply specific shadcn classes for previous/next positioning if available
+          isPrevious && classNames?.nav_button_previous,
+          isNext && classNames?.nav_button_next,
+          rdpBtnClassName // Include any classes passed by react-day-picker itself
+        )}
+        onClick={(e) => {
+          if (!rdpProps.disabled && rdpProps.onClick) {
+            rdpProps.onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            if (!rdpProps.disabled && rdpProps.onClick) {
+              rdpProps.onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
+            }
+          }
+        }}
+      >
+        {children}
+      </div>
+    );
+  });
+  CustomNavigationButton.displayName = "CustomNavigationButton";
+
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -26,16 +74,10 @@ function Calendar({
         caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
         caption_dropdowns: "flex justify-center gap-1",
-        nav: "space-x-1 flex items-center",
-        nav_button: cn(
-          // Basic styling for a button-like element
-          "h-7 w-7 flex items-center justify-center rounded-md border border-input bg-transparent p-0 text-sm font-medium",
-          "hover:bg-accent hover:text-accent-foreground", // Hover state
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", // Focus state
-          "disabled:pointer-events-none disabled:opacity-50" // Disabled state
-        ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
+        nav: "space-x-1 flex items-center", // This class is for the container of nav buttons
+        // nav_button: (styling is now handled by CustomNavigationButton using these as base)
+        nav_button_previous: "absolute left-1", // Used by CustomNavigationButton for positioning
+        nav_button_next: "absolute right-1",   // Used by CustomNavigationButton for positioning
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
@@ -61,24 +103,25 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Dropdown: ({ value, onChange, children, ...dropdownProps }: DropdownProps) => {
+        NavigationButton: CustomNavigationButton, // Override the navigation button
+        Dropdown: ({ value, onChange, children: dropdownChildren, ...dropdownProps }: DropdownProps) => {
           const options = React.Children.toArray(
-            children
+            dropdownChildren
           ) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[]
           const selected = options.find((child) => child.props.value === value)
-          const handleChange = (value: string) => {
+          const handleChange = (newValue: string) => {
             const changeEvent = {
-              target: { value },
+              target: { value: newValue },
             } as React.ChangeEvent<HTMLSelectElement>
             onChange?.(changeEvent)
           }
           return (
             <Select
               value={value?.toString()}
-              onValueChange={(value) => {
-                handleChange(value)
+              onValueChange={(newValue) => {
+                handleChange(newValue)
               }}
-              {...(dropdownProps as Omit<React.ComponentProps<typeof Select>, 'value' | 'onValueChange'>)} // Cast to remove conflicting props
+              {...(dropdownProps as Omit<React.ComponentProps<typeof Select>, 'value' | 'onValueChange'>)}
             >
               <SelectTrigger className="h-7 w-auto px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
                 <SelectValue>{selected?.props?.children}</SelectValue>
@@ -98,39 +141,9 @@ function Calendar({
             </Select>
           )
         },
-        IconLeft: ({ ...iconProps }) => ( // Removed 'className' from props to avoid conflict
-            <div 
-                {...iconProps} // Spread props onto the div to handle onClick, disabled, etc.
-                className={cn(
-                    // Basic styling for a button-like element
-                    "h-7 w-7 flex items-center justify-center rounded-md border border-input bg-transparent p-0 text-sm font-medium",
-                    "hover:bg-accent hover:text-accent-foreground", // Hover state
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2", // Focus state
-                    (iconProps as any).disabled ? "pointer-events-none opacity-50" : "cursor-pointer" // Disabled state & cursor
-                )}
-                aria-label="Go to previous month" // Add aria-label for accessibility
-                role="button" // Add role button for accessibility
-                tabIndex={(iconProps as any).disabled ? -1 : 0} // Handle tabIndex for disabled state
-            >
-                <ChevronLeft className="h-4 w-4" />
-            </div>
-        ),
-        IconRight: ({ ...iconProps }) => ( // Removed 'className' from props
-             <div 
-                {...iconProps}
-                className={cn(
-                    "h-7 w-7 flex items-center justify-center rounded-md border border-input bg-transparent p-0 text-sm font-medium",
-                    "hover:bg-accent hover:text-accent-foreground", 
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    (iconProps as any).disabled ? "pointer-events-none opacity-50" : "cursor-pointer"
-                )}
-                aria-label="Go to next month"
-                role="button"
-                tabIndex={(iconProps as any).disabled ? -1 : 0}
-            >
-                <ChevronRight className="h-4 w-4" />
-            </div>
-        ),
+        // Default icons for chevrons, react-day-picker will pass these as children to CustomNavigationButton
+        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
+        IconRight: () => <ChevronRight className="h-4 w-4" />,
       }}
       {...props}
     />
@@ -140,4 +153,3 @@ Calendar.displayName = "Calendar"
 
 export { Calendar }
 
-    
