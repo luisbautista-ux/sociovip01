@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { EventBox, EventBoxFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 const eventBoxFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
@@ -39,9 +40,10 @@ interface EventBoxFormProps {
   eventBox?: EventBox;
   onSubmit: (data: EventBoxFormData) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps) {
+export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = false }: EventBoxFormProps) {
   const form = useForm<EventBoxFormValues>({
     resolver: zodResolver(eventBoxFormSchema),
     defaultValues: {
@@ -56,6 +58,20 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
     },
   });
 
+  // Reset form if eventBox prop changes
+  React.useEffect(() => {
+    form.reset({
+      name: eventBox?.name || "",
+      cost: eventBox?.cost || 0,
+      description: eventBox?.description || "",
+      status: eventBox?.status || 'available',
+      capacity: eventBox?.capacity === undefined || eventBox?.capacity === null ? undefined : eventBox.capacity,
+      sellerName: eventBox?.sellerName || "",
+      ownerName: eventBox?.ownerName || "",
+      ownerDni: eventBox?.ownerDni || "",
+    });
+  }, [eventBox, form]);
+
   const handleSubmit = (values: EventBoxFormValues) => {
     onSubmit(values);
   };
@@ -69,7 +85,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Box</FormLabel>
-              <FormControl><Input placeholder="Ej: Box A1 (Escenario)" {...field} /></FormControl>
+              <FormControl><Input placeholder="Ej: Box A1 (Escenario)" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -80,7 +96,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Costo (S/)</FormLabel>
-              <FormControl><Input type="number" placeholder="500.00" {...field} /></FormControl>
+              <FormControl><Input type="number" placeholder="500.00" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -91,7 +107,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Detalles del box..." {...field} rows={2} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del box..." {...field} rows={2} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -102,7 +118,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Capacidad (Personas)</FormLabel>
-              <FormControl><Input type="number" placeholder="8" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)}/></FormControl>
+              <FormControl><Input type="number" placeholder="8" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -113,7 +129,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Vendedor Asignado (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Nombre del vendedor" {...field} /></FormControl>
+              <FormControl><Input placeholder="Nombre del vendedor" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -124,7 +140,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre Dueño del Box (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} /></FormControl>
+              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} disabled={isSubmitting} /></FormControl>
               <FormDescription className="text-xs">Si el box es reservado por un cliente específico.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -136,7 +152,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>DNI/CE Dueño del Box (Opcional)</FormLabel>
-              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} /></FormControl>
+              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -147,7 +163,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           render={({ field }) => (
             <FormItem>
               <FormLabel>Estado</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona un estado" />
@@ -163,10 +179,11 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel }: EventBoxFormProps
           )}
         />
         <DialogFooter className="pt-6">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {eventBox ? "Guardar Cambios" : "Crear Box"}
           </Button>
         </DialogFooter>

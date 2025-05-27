@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -46,9 +46,10 @@ interface SocioVipMemberFormProps {
   member?: SocioVipMember; // For editing
   onSubmit: (data: SocioVipMemberFormData) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMemberFormProps) {
+export function SocioVipMemberForm({ member, onSubmit, onCancel, isSubmitting = false }: SocioVipMemberFormProps) {
   const form = useForm<SocioVipMemberFormValues>({
     resolver: zodResolver(socioVipMemberFormSchema),
     defaultValues: {
@@ -67,7 +68,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
   });
 
   const handleSubmit = (values: SocioVipMemberFormValues) => {
-    onSubmit(values); // The parent component will handle conversion (e.g. preferences string to array)
+    onSubmit(values);
   };
 
   return (
@@ -80,7 +81,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Nombre(s)</FormLabel>
-                <FormControl><Input placeholder="Nombres del socio" {...field} /></FormControl>
+                <FormControl><Input placeholder="Nombres del socio" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -91,7 +92,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Apellido(s)</FormLabel>
-                <FormControl><Input placeholder="Apellidos del socio" {...field} /></FormControl>
+                <FormControl><Input placeholder="Apellidos del socio" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -104,7 +105,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
             render={({ field }) => (
               <FormItem>
                 <FormLabel>DNI / Carnet de Extranjería</FormLabel>
-                <FormControl><Input placeholder="Documento de identidad" {...field} /></FormControl>
+                <FormControl><Input placeholder="Documento de identidad" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -115,7 +116,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Celular</FormLabel>
-                <FormControl><Input type="tel" placeholder="Número de celular" {...field} /></FormControl>
+                <FormControl><Input type="tel" placeholder="Número de celular" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -133,6 +134,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
                     <Button
                       variant={"outline"}
                       className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                      disabled={isSubmitting}
                     >
                       {field.value ? format(field.value, "d MMMM yyyy", { locale: es }) : <span>Selecciona una fecha</span>}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -163,7 +165,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
           render={({ field }) => (
             <FormItem>
               <FormLabel>Email (para cuenta)</FormLabel>
-              <FormControl><Input type="email" placeholder="correo@ejemplo.com" {...field} /></FormControl>
+              <FormControl><Input type="email" placeholder="correo@ejemplo.com" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -174,7 +176,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
           render={({ field }) => (
             <FormItem>
               <FormLabel>Dirección (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Ej: Av. Principal 123" {...field} /></FormControl>
+              <FormControl><Input placeholder="Ej: Av. Principal 123" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -185,7 +187,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
           render={({ field }) => (
             <FormItem>
               <FormLabel>Profesión (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Ej: Ingeniero, Abogada" {...field} /></FormControl>
+              <FormControl><Input placeholder="Ej: Ingeniero, Abogada" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -196,7 +198,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
           render={({ field }) => (
             <FormItem>
               <FormLabel>Preferencias (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Ej: Viajes, Cocina, Música Rock (separadas por comas)" {...field} /></FormControl>
+              <FormControl><Textarea placeholder="Ej: Viajes, Cocina, Música Rock (separadas por comas)" {...field} disabled={isSubmitting} /></FormControl>
               <FormDescription>Separa las preferencias por comas.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -209,7 +211,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Puntos de Lealtad</FormLabel>
-                <FormControl><Input type="number" placeholder="0" {...field} /></FormControl>
+                <FormControl><Input type="number" placeholder="0" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -220,7 +222,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Estado de Membresía</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona un estado" />
@@ -239,10 +241,11 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
           />
         </div>
         <DialogFooter className="pt-6">
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {member ? "Guardar Cambios" : "Crear Socio VIP"}
           </Button>
         </DialogFooter>
@@ -250,3 +253,5 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel }: SocioVipMembe
     </Form>
   );
 }
+
+    

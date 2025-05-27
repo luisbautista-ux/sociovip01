@@ -6,12 +6,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ListChecks, Ticket as TicketIcon, Box, Copy, UserPlus, BarChartHorizontalSquare } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, Calendar, BadgeCheck, BadgeX, QrCode, ListChecks, Ticket as TicketIcon, Box, Copy, UserPlus, BarChartHorizontalSquare, Loader2 } from "lucide-react";
 import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, TicketTypeFormData, EventBoxFormData, PromoterProfile, EventPromoterAssignment, BatchBoxFormData } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -27,86 +27,82 @@ import { Switch } from "@/components/ui/switch";
 import { CreateBatchBoxesDialog } from "@/components/business/dialogs/CreateBatchBoxesDialog";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
 
-
-// Mock data for business events
-let mockBusinessEvents: BusinessManagedEntity[] = [
-  { 
-    id: "evt1", 
-    businessId: "biz1", 
-    type: "event", 
-    name: "Noche de Karaoke Estelar", 
-    description: "Saca la estrella que llevas dentro. Premios para los mejores.", 
-    termsAndConditions: "Consumo mínimo S/ 50.00 por persona. Mayores de 18 años.",
-    startDate: "2025-08-15T12:00:00",
-    endDate: "2025-08-15T12:00:00",
-    maxAttendance: 100, 
-    isActive: true, 
-    imageUrl: "https://placehold.co/300x200.png", 
-    aiHint: "karaoke night",
-    generatedCodes: [
-        { id: "codeEvt1-1", entityId: "evt1", value: "KARAOKE01", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:00:00Z", observation: "Invitado especial" },
-        { id: "codeEvt1-2", entityId: "evt1", value: "KARAOKE02", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:05:00Z", redemptionDate: "2025-08-15T20:00:00Z" },
-    ],
-    ticketTypes: [
-      { id: "tt1-evt1", eventId:"evt1", businessId: "biz1", name: "Entrada General - Karaoke", cost: 50, description: "Acceso general al evento de Karaoke.", quantity: 80 },
-      { id: "tt2-evt1", eventId:"evt1", businessId: "biz1", name: "Entrada VIP - Karaoke", cost: 150, description: "Acceso VIP + 1 bebida para Karaoke.", quantity: 20 },
-    ],
-    eventBoxes: [
-      { id: "box1-evt1", eventId:"evt1", businessId: "biz1", name: "Box A1 (Escenario Karaoke)", cost: 800, description: "Para 8 personas, cerca al escenario.", status: 'available', capacity: 8, sellerName: "Ana Staff", ownerName: "Cliente VIP Juan", ownerDni:"12345670" },
-    ],
-    assignedPromoters: [
-      { promoterProfileId: "pp1", promoterName: "Carlos Santana", promoterEmail: "carlos.santana@promo.com", commissionRate: "5% por entrada vendida vía su código", notes: "Foco en entradas VIP" }
-    ]
-  },
-  { 
-    id: "evt2", 
-    businessId: "biz1", 
-    type: "event", 
-    name: "Fiesta Temática: Años 80", 
-    description: "Revive la mejor década con música y ambiente ochentero.", 
-    termsAndConditions: "Código de vestimenta: Ropa de los 80s.",
-    startDate: "2025-09-20T12:00:00",
-    endDate: "2025-09-20T12:00:00",
-    maxAttendance: 200, 
-    isActive: true, 
-    imageUrl: "https://placehold.co/300x200.png", 
-    aiHint: "80s party",
-    generatedCodes: [],
-    ticketTypes: [ { id: "tt3-evt2", eventId:"evt2", businessId: "biz1", name: "Entrada General - Fiesta 80s", cost: 70, description: "Acceso general a la Fiesta 80s.", quantity: 200 }],
-    eventBoxes: [],
-    assignedPromoters: []
-  },
-  { 
-    id: "evt3", 
-    businessId: "biz1", 
-    type: "event", 
-    name: "Taller de Coctelería Premium", 
-    description: "Aprende a preparar cocktails como un profesional.", 
-    termsAndConditions: "Cupos limitados. Incluye materiales.",
-    startDate: "2025-10-05T12:00:00", 
-    endDate: "2025-10-05T12:00:00", 
-    maxAttendance: 30, 
-    isActive: false, 
-    imageUrl: "https://placehold.co/300x200.png", 
-    aiHint: "cocktail workshop",
-    generatedCodes: [],
-    ticketTypes: [],
-    eventBoxes: [],
-    assignedPromoters: []
-  },
-];
-
-// Mock list of promoters available to this business (would typically come from /business-panel/promoters)
+// Mock list of promoters available to this business
 const mockBusinessPromoters: PromoterProfile[] = [
   { id: "pp1", name: "Carlos Santana", email: "carlos.santana@promo.com", phone: "+51911223344"},
   { id: "pp2", name: "Lucia Fernandez", email: "lucia.fernandez@promo.com", phone: "+51955667788"},
   { id: "pp3", name: "Pedro Pascal", email: "pedro.pascal@promo.com"},
 ];
 
+const apiClient = {
+  getEvents: async (businessId: string): Promise<BusinessManagedEntity[]> => {
+    console.log("API CALL: apiClient.getEvents for businessId:", businessId);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // return [
+    //   { id: "evt1", businessId, type: "event", name: "Noche de Karaoke Estelar (API)", description: "...", startDate: "2025-08-15T12:00:00", endDate: "2025-08-15T12:00:00", maxAttendance: 100, isActive: true, imageUrl: "...", generatedCodes: [], ticketTypes: [], eventBoxes: [], assignedPromoters: [] },
+    // ];
+    return [];
+  },
+  createEvent: async (businessId: string, data: BusinessEventFormData, ticketTypes: TicketType[] = [], eventBoxes: EventBox[] = [], assignedPromoters: EventPromoterAssignment[] = []): Promise<BusinessManagedEntity> => {
+    console.log("API CALL: apiClient.createEvent", businessId, data);
+    await new Promise(resolve => setTimeout(resolve, 700));
+    const newEventId = `evt${Date.now()}`;
+    return {
+      id: newEventId,
+      businessId,
+      type: "event",
+      name: data.name,
+      description: data.description,
+      termsAndConditions: data.termsAndConditions,
+      startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
+      endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
+      maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null || data.maxAttendance < 0 ? 0 : data.maxAttendance,
+      isActive: data.isActive,
+      imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
+      aiHint: data.aiHint,
+      generatedCodes: [],
+      ticketTypes: ticketTypes.map(tt => ({...tt, eventId: newEventId, businessId})), // Ensure IDs are linked
+      eventBoxes: eventBoxes.map(eb => ({...eb, eventId: newEventId, businessId})),
+      assignedPromoters,
+    };
+  },
+  updateEvent: async (id: string, data: BusinessEventFormData, existingEvent: BusinessManagedEntity): Promise<BusinessManagedEntity> => {
+    console.log("API CALL: apiClient.updateEvent", id, data);
+    await new Promise(resolve => setTimeout(resolve, 700));
+    return {
+      ...existingEvent,
+      name: data.name,
+      description: data.description,
+      termsAndConditions: data.termsAndConditions,
+      startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
+      endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
+      maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null || data.maxAttendance < 0 ? 0 : data.maxAttendance,
+      isActive: data.isActive,
+      imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : existingEvent.imageUrl || `https://placehold.co/300x200.png`),
+      aiHint: data.aiHint,
+      // ticketTypes, eventBoxes, assignedPromoters, generatedCodes would be updated via their specific API calls or as part of this one
+    };
+  },
+  deleteEvent: async (id: string): Promise<void> => {
+    console.log("API CALL: apiClient.deleteEvent", id);
+    await new Promise(resolve => setTimeout(resolve, 700));
+  },
+  updateEventCodes: async (eventId: string, codes: GeneratedCode[]): Promise<GeneratedCode[]> => {
+    console.log("API CALL: apiClient.updateEventCodes", eventId, codes.length);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return codes;
+  },
+  toggleEventStatus: async (eventId: string, isActive: boolean): Promise<void> => {
+    console.log("API CALL: apiClient.toggleEventStatus", eventId, isActive);
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+};
+
+const MOCK_BUSINESS_ID = "biz1";
 
 export default function BusinessEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [events, setEvents] = useState<BusinessManagedEntity[]>(mockBusinessEvents);
+  const [events, setEvents] = useState<BusinessManagedEntity[]>([]);
   
   const [showManageEventModal, setShowManageEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(null);
@@ -118,21 +114,43 @@ export default function BusinessEventsPage() {
   const [showCreateCodesModal, setShowCreateCodesModal] = useState(false);
   const [selectedEntityForCreatingCodes, setSelectedEntityForCreatingCodes] = useState<BusinessManagedEntity | null>(null);
   
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); // For main event form submission
   const { toast } = useToast();
 
-  // State for Ticket Management within the main Event Modal
   const [editingTicketInEventModal, setEditingTicketInEventModal] = useState<TicketType | null>(null);
   const [showTicketFormInEventModal, setShowTicketFormInEventModal] = useState(false);
 
-  // State for Box Management within the main Event Modal
   const [editingBoxInEventModal, setEditingBoxInEventModal] = useState<EventBox | null>(null);
   const [showBoxFormInEventModal, setShowBoxFormInEventModal] = useState(false);
   const [showCreateBatchBoxesModal, setShowCreateBatchBoxesModal] = useState(false);
   
-  // State for Promoter Assignment within the main Event Modal
   const [selectedPromoterForAssignment, setSelectedPromoterForAssignment] = useState<string>("");
   const [promoterEventCommission, setPromoterEventCommission] = useState("");
   const [promoterEventNotes, setPromoterEventNotes] = useState("");
+
+  const fetchEvents = async () => {
+    setIsLoading(true);
+    try {
+      const fetchedEvents = await apiClient.getEvents(MOCK_BUSINESS_ID);
+      setEvents(fetchedEvents);
+    } catch (error) {
+      console.error("Failed to fetch events:", error);
+      toast({
+        title: "Error al Cargar Eventos",
+        description: "No se pudieron obtener los eventos. Intenta de nuevo.",
+        variant: "destructive",
+      });
+      setEvents([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   const filteredEvents = events.filter(event => {
@@ -148,14 +166,14 @@ export default function BusinessEventsPage() {
   const handleOpenManageEventModal = (event: BusinessManagedEntity | null, duplicate = false) => {
     setIsDuplicating(duplicate);
     if (duplicate && event) {
-        const newId = `evt${Date.now()}`;
+        const newIdBase = `evt${Date.now()}`; // Base for new IDs if needed, though backend should assign final
         setEditingEvent({
             ...event,
-            id: newId, 
+            id: '', // Will be assigned by backend or on save if purely local
             name: `${event.name || 'Evento'} (Copia)`,
             generatedCodes: [], 
-            ticketTypes: event.ticketTypes ? JSON.parse(JSON.stringify(event.ticketTypes.map(tt => ({...tt, id: `tt-${newId}-${Math.random().toString(36).substring(7)}`, eventId: newId })))) : [],
-            eventBoxes: event.eventBoxes ? JSON.parse(JSON.stringify(event.eventBoxes.map(eb => ({...eb, id: `box-${newId}-${Math.random().toString(36).substring(7)}`, eventId: newId })))) : [],
+            ticketTypes: event.ticketTypes ? JSON.parse(JSON.stringify(event.ticketTypes.map(tt => ({...tt, id: `tt-${newIdBase}-${Math.random().toString(36).substring(7)}` })))) : [],
+            eventBoxes: event.eventBoxes ? JSON.parse(JSON.stringify(event.eventBoxes.map(eb => ({...eb, id: `box-${newIdBase}-${Math.random().toString(36).substring(7)}` })))) : [],
             assignedPromoters: event.assignedPromoters ? JSON.parse(JSON.stringify(event.assignedPromoters)) : [] 
         });
     } else if (event) { 
@@ -168,7 +186,7 @@ export default function BusinessEventsPage() {
     } else { 
         const newEventScaffold: BusinessManagedEntity = {
             id: '', 
-            businessId: "biz1", 
+            businessId: MOCK_BUSINESS_ID, 
             type: "event",
             name: "", 
             description: "",
@@ -192,6 +210,8 @@ export default function BusinessEventsPage() {
   
 
   const handleMainEventFormSubmit = (data: BusinessEventFormData) => {
+      // This function is primarily for updating the 'editingEvent' state
+      // The actual save to backend/main list happens in handleSaveManagedEventAndClose
       if (editingEvent && showManageEventModal) { 
         const updatedEventDetails: Partial<BusinessManagedEntity> = {
             name: data.name,
@@ -205,61 +225,82 @@ export default function BusinessEventsPage() {
             aiHint: data.aiHint,
         };
 
-        if (!editingEvent.id) { 
-            const newEventId = `evt${Date.now()}`;
-            const newCompleteEvent : BusinessManagedEntity = { 
-                ...(editingEvent || {}), // Spread existing fields from scaffold
-                ...updatedEventDetails,
-                id: newEventId, 
-                businessId: editingEvent.businessId || "biz1", 
-                type: editingEvent.type || "event",
-                ticketTypes: editingEvent.ticketTypes || [],
-                eventBoxes: editingEvent.eventBoxes || [],
-                assignedPromoters: editingEvent.assignedPromoters || [],
-                generatedCodes: editingEvent.generatedCodes || []
-             };
-            setEditingEvent(newCompleteEvent);
-            // Note: Actual addition to 'events' list happens in handleSaveManagedEventAndClose
-            toast({ title: "Evento Configurado", description: `Los detalles de "${data.name}" están listos. Continúa en las otras pestañas si es necesario.` });
-        } else { 
+        if (!editingEvent.id && !isDuplicating) { // If it's a truly new event being configured in the modal
+            setEditingEvent(prev => prev ? ({ 
+                ...prev, // Spread existing scaffold (like businessId, type, empty arrays)
+                ...updatedEventDetails 
+            }) : null);
+            toast({ title: "Detalles del Evento Configurados", description: `Los detalles de "${data.name}" están listos. Continúa en las otras pestañas si es necesario o guarda el evento.` });
+        } else { // Editing existing, or editing a duplicated copy
              setEditingEvent(prev => prev ? ({ 
                 ...prev, 
                 ...updatedEventDetails 
             }) : null);
-            toast({ title: "Detalles del Evento Actualizados", description: `Los detalles de "${data.name}" han sido actualizados.` });
+            toast({ title: "Detalles del Evento Actualizados", description: `Los detalles de "${data.name}" han sido actualizados en el editor.` });
         }
     }
   };
   
-  const handleDeleteEvent = (eventId: string) => {
-    setEvents(prev => prev.filter(p => p.id !== eventId));
-    toast({ title: "Evento Eliminado", description: `El evento ha sido eliminado.`, variant: "destructive" });
+  const handleDeleteEvent = async (eventId: string, eventName?: string) => {
+    setIsSubmitting(true);
+    try {
+      await apiClient.deleteEvent(eventId);
+      toast({ title: "Evento Eliminado", description: `El evento "${eventName || 'seleccionado'}" ha sido programado para eliminación.`, variant: "destructive" });
+      fetchEvents(); // Re-fetch
+    } catch (error) {
+      console.error("Failed to delete event:", error);
+      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el evento.", variant: "destructive"});
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSaveManagedEventAndClose = () => {
+  const handleSaveManagedEventAndClose = async () => {
     if (!editingEvent) return;
 
-    if (!editingEvent.id || !editingEvent.name) {
+    if (!editingEvent.name) { // Basic validation before attempting to save
         toast({
             title: "Faltan Detalles del Evento",
-            description: "Por favor, completa y guarda los detalles básicos del evento en la pestaña 'Detalles del Evento' primero.",
+            description: "Por favor, completa al menos el nombre del evento en la pestaña 'Detalles del Evento'.",
             variant: "destructive"
         });
         return;
     }
 
-    const eventExists = events.some(e => e.id === editingEvent.id && e.id !== ''); // Ensure ID is not empty for existing
+    setIsSubmitting(true);
+    try {
+      const eventDataForForm: BusinessEventFormData = {
+        name: editingEvent.name,
+        description: editingEvent.description,
+        termsAndConditions: editingEvent.termsAndConditions,
+        startDate: new Date(editingEvent.startDate),
+        endDate: new Date(editingEvent.endDate),
+        maxAttendance: editingEvent.maxAttendance,
+        isActive: editingEvent.isActive,
+        imageUrl: editingEvent.imageUrl,
+        aiHint: editingEvent.aiHint,
+      };
 
-    if (isDuplicating || !eventExists) { 
-      setEvents(prev => [editingEvent, ...prev.filter(e => e.id !== editingEvent.id)]);
-      toast({ title: isDuplicating ? "Evento Duplicado y Guardado" : "Evento Creado y Guardado", description: `El evento "${editingEvent.name}" ha sido ${isDuplicating ? 'duplicado y guardado' : 'guardado'}.` });
-    } else { 
-      setEvents(prev => prev.map(e => e.id === editingEvent.id ? editingEvent : e));
-      toast({ title: "Evento Guardado", description: `Los cambios en "${editingEvent.name}" han sido guardados.` });
+      if (editingEvent.id && !isDuplicating) { // Editing existing
+        // const updatedEvent = await apiClient.updateEvent(editingEvent.id, eventDataForForm, editingEvent);
+        // The API should handle updating tickets, boxes, promoters if passed, or have separate endpoints.
+        await apiClient.updateEvent(editingEvent.id, eventDataForForm, editingEvent); // Mock
+        toast({ title: "Evento Guardado", description: `Los cambios en "${editingEvent.name}" han sido programados para guardado.` });
+      } else { // Creating new or saving duplicated as new
+        // const newEvent = await apiClient.createEvent(MOCK_BUSINESS_ID, eventDataForForm, editingEvent.ticketTypes, editingEvent.eventBoxes, editingEvent.assignedPromoters);
+        await apiClient.createEvent(MOCK_BUSINESS_ID, eventDataForForm, editingEvent.ticketTypes, editingEvent.eventBoxes, editingEvent.assignedPromoters); // Mock
+        toast({ title: isDuplicating ? "Evento Duplicado y Guardado" : "Evento Creado y Guardado", description: `El evento "${editingEvent.name}" ha sido programado para ${isDuplicating ? 'duplicación y guardado' : 'creación y guardado'}.` });
+      }
+      setShowManageEventModal(false);
+      setEditingEvent(null);
+      setIsDuplicating(false);
+      fetchEvents(); // Re-fetch
+    } catch (error) {
+      console.error("Failed to save event:", error);
+      toast({ title: "Error al Guardar Evento", description: "No se pudo guardar el evento.", variant: "destructive"});
+    } finally {
+      setIsSubmitting(false);
     }
-    setShowManageEventModal(false);
-    setEditingEvent(null);
-    setIsDuplicating(false);
   };
 
 
@@ -281,29 +322,43 @@ export default function BusinessEventsPage() {
     setShowManageCodesModal(true);
   };
   
-  const handleNewCodesCreated = (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
-    const updateLogic = (prevEvent: BusinessManagedEntity | null): BusinessManagedEntity | null => {
-        if (!prevEvent || prevEvent.id !== entityId) return prevEvent;
-        const updatedCodes = [...(prevEvent.generatedCodes || []), ...newCodes];
-        return { ...prevEvent, generatedCodes: updatedCodes };
-    };
+  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
+    const targetEvent = editingEvent?.id === entityId ? editingEvent : events.find(e => e.id === entityId);
+    if (!targetEvent) return;
 
-    if (editingEvent && editingEvent.id === entityId) {
-        setEditingEvent(prev => updateLogic(prev));
+    const updatedCodes = [...(targetEvent.generatedCodes || []), ...newCodes];
+    // Simulate backend update for codes
+    try {
+      // await apiClient.updateEventCodes(entityId, updatedCodes);
+      // For mock, directly update state after simulation
+      if (editingEvent && editingEvent.id === entityId) {
+        setEditingEvent(prev => prev ? { ...prev, generatedCodes: updatedCodes } : null);
+      }
+      setEvents(prevEvents => prevEvents.map(event => 
+        event.id === entityId ? { ...event, generatedCodes: updatedCodes } : event
+      ));
+      toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEvent.name}`});
+    } catch (error) {
+      toast({title: "Error", description: "No se pudieron guardar los nuevos códigos.", variant: "destructive"});
     }
-    setEvents(prevEvents => prevEvents.map(event => event.id === entityId ? updateLogic(event) as BusinessManagedEntity : event));
   };
 
-  const handleCodesUpdatedFromManageDialog = (entityId: string, updatedCodes: GeneratedCode[]) => {
-     const updateLogic = (prevEvent: BusinessManagedEntity | null): BusinessManagedEntity | null => {
-        if (!prevEvent || prevEvent.id !== entityId) return prevEvent;
-        return { ...prevEvent, generatedCodes: updatedCodes };
-    };
-    
-    if (editingEvent && editingEvent.id === entityId) {
-        setEditingEvent(prev => updateLogic(prev));
+  const handleCodesUpdatedFromManageDialog = async (entityId: string, updatedCodes: GeneratedCode[]) => {
+     const targetEvent = editingEvent?.id === entityId ? editingEvent : events.find(e => e.id === entityId);
+     if (!targetEvent) return;
+    // Simulate backend update for codes
+    try {
+      // await apiClient.updateEventCodes(entityId, updatedCodes);
+      if (editingEvent && editingEvent.id === entityId) {
+        setEditingEvent(prev => prev ? { ...prev, generatedCodes: updatedCodes } : null);
+      }
+      setEvents(prevEvents => prevEvents.map(event => 
+        event.id === entityId ? { ...event, generatedCodes: updatedCodes } : event
+      ));
+      toast({title: "Códigos Actualizados", description: `Para: ${targetEvent.name}`});
+    } catch (error) {
+      toast({title: "Error", description: "No se pudieron actualizar los códigos.", variant: "destructive"});
     }
-    setEvents(prevEvents => prevEvents.map(event => event.id === entityId ? updateLogic(event) as BusinessManagedEntity : event));
   };
 
   const getAttendanceCount = (event: BusinessManagedEntity) => {
@@ -311,45 +366,40 @@ export default function BusinessEventsPage() {
     return `${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
   };
 
- const handleToggleEventStatus = (eventId: string) => {
-    let eventNameForToast = "";
-    let newStatusForToast = false;
+ const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
+    const newStatus = !eventToToggle.isActive;
+    const originalStatus = eventToToggle.isActive;
 
-    const updateStatusLogic = (eventToUpdate: BusinessManagedEntity | null): BusinessManagedEntity | null => {
-      if (!eventToUpdate || eventToUpdate.id !== eventId) return eventToUpdate;
-      
-      eventNameForToast = eventToUpdate.name;
-      newStatusForToast = !eventToUpdate.isActive;
-      
-      return { ...eventToUpdate, isActive: newStatusForToast };
-    };
-    
-    setEvents(prevEvents =>
-      prevEvents.map(event =>
-        event.id === eventId ? updateStatusLogic(event) as BusinessManagedEntity : event
-      )
-    );
-    
-    if (editingEvent && editingEvent.id === eventId) {
-      setEditingEvent(prev => updateStatusLogic(prev));
+    // Optimistic UI update
+    setEvents(prev => prev.map(e => e.id === eventToToggle.id ? { ...e, isActive: newStatus } : e));
+    if (editingEvent && editingEvent.id === eventToToggle.id) {
+      setEditingEvent(prev => prev ? { ...prev, isActive: newStatus } : null);
     }
-    
-    // Call toast after state updates are queued
-    if (eventNameForToast) {
-       setTimeout(() => { // Ensures toast is called after render cycle
-        toast({
-            title: "Estado Actualizado",
-            description: `El evento "${eventNameForToast}" ahora está ${newStatusForToast ? "Activo" : "Inactivo"}.`
-        });
-      }, 0);
+
+    try {
+      await apiClient.toggleEventStatus(eventToToggle.id, newStatus);
+      toast({
+        title: "Estado Actualizado",
+        description: `El evento "${eventToToggle.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
+      });
+    } catch (error) {
+      // Revert UI on error
+      setEvents(prev => prev.map(e => e.id === eventToToggle.id ? { ...e, isActive: originalStatus } : e));
+       if (editingEvent && editingEvent.id === eventToToggle.id) {
+        setEditingEvent(prev => prev ? { ...prev, isActive: originalStatus } : null);
+      }
+      toast({
+        title: "Error al Actualizar Estado",
+        description: "No se pudo cambiar el estado del evento.",
+        variant: "destructive"
+      });
     }
   };
-
 
   // CRUD for Ticket Types within an Event (inside Manage Event Modal)
   const handleCreateOrEditTicketTypeForEvent = (data: TicketTypeFormData) => {
     if (!editingEvent || !editingEvent.id) {
-        toast({title: "Error", description: "Primero guarda los detalles del evento.", variant: "destructive"});
+        toast({title: "Error", description: "El evento no está seleccionado o no tiene ID.", variant: "destructive"});
         return;
     }
 
@@ -360,7 +410,7 @@ export default function BusinessEventsPage() {
       updatedTicketTypes = (editingEvent.ticketTypes || []).map(tt =>
         tt.id === editingTicketInEventModal.id ? { ...editingTicketInEventModal, ...data, eventId, businessId: editingEvent.businessId } : tt
       );
-      toast({ title: "Entrada Actualizada", description: `La entrada "${data.name}" ha sido actualizada.` });
+      toast({ title: "Entrada Actualizada", description: `La entrada "${data.name}" ha sido actualizada para este evento.` });
     } else { // Creating
       const newTicketType: TicketType = {
         id: `tt-${eventId}-${Date.now()}`,
@@ -369,7 +419,7 @@ export default function BusinessEventsPage() {
         ...data,
       };
       updatedTicketTypes = [...(editingEvent.ticketTypes || []), newTicketType];
-      toast({ title: "Entrada Creada", description: `La entrada "${newTicketType.name}" ha sido creada.` });
+      toast({ title: "Entrada Creada", description: `La entrada "${newTicketType.name}" ha sido añadida a este evento.` });
     }
     
     setEditingEvent(prev => prev ? {...prev, ticketTypes: updatedTicketTypes} : null);
@@ -381,13 +431,13 @@ export default function BusinessEventsPage() {
      if (!editingEvent) return;
      const updatedTicketTypes = (editingEvent.ticketTypes || []).filter(tt => tt.id !== ticketTypeId);
      setEditingEvent(prev => prev ? {...prev, ticketTypes: updatedTicketTypes} : null);
-     toast({ title: "Entrada Eliminada", variant: "destructive" });
+     toast({ title: "Entrada Eliminada", description: "La entrada ha sido eliminada de este evento.", variant: "destructive" });
   };
 
   // CRUD for Event Boxes within an Event (inside Manage Event Modal)
   const handleCreateOrEditBoxForEvent = (data: EventBoxFormData) => {
     if (!editingEvent || !editingEvent.id) {
-      toast({title: "Error", description: "Primero guarda los detalles del evento.", variant: "destructive"});
+      toast({title: "Error", description: "El evento no está seleccionado o no tiene ID.", variant: "destructive"});
       return;
     }
     const eventId = editingEvent.id;
@@ -397,7 +447,7 @@ export default function BusinessEventsPage() {
         updatedEventBoxes = (editingEvent.eventBoxes || []).map(box => 
             box.id === editingBoxInEventModal.id ? {...editingBoxInEventModal, ...data, eventId, businessId: editingEvent.businessId} : box
         );
-        toast({ title: "Box Actualizado", description: `El box "${data.name}" ha sido actualizado.` });
+        toast({ title: "Box Actualizado", description: `El box "${data.name}" ha sido actualizado para este evento.` });
     } else { // Creating
         const newBox: EventBox = {
             id: `box-${eventId}-${Date.now()}`,
@@ -406,7 +456,7 @@ export default function BusinessEventsPage() {
             ...data,
         };
         updatedEventBoxes = [...(editingEvent.eventBoxes || []), newBox];
-        toast({ title: "Box Creado", description: `El box "${newBox.name}" ha sido creado.` });
+        toast({ title: "Box Creado", description: `El box "${newBox.name}" ha sido añadido a este evento.` });
     }
     setEditingEvent(prev => prev ? {...prev, eventBoxes: updatedEventBoxes} : null);
     setShowBoxFormInEventModal(false);
@@ -417,13 +467,13 @@ export default function BusinessEventsPage() {
     if (!editingEvent) return;
     const updatedEventBoxes = (editingEvent.eventBoxes || []).filter(box => box.id !== boxId);
     setEditingEvent(prev => prev ? {...prev, eventBoxes: updatedEventBoxes} : null);
-    toast({ title: "Box Eliminado", variant: "destructive" });
+    toast({ title: "Box Eliminado", description: "El box ha sido eliminado de este evento.", variant: "destructive" });
   };
 
   // Promoter Assignment Logic (inside Manage Event Modal)
   const handleAssignPromoterToEvent = () => {
     if (!editingEvent || !editingEvent.id) {
-        toast({title: "Error", description: "Primero guarda los detalles del evento.", variant: "destructive"});
+        toast({title: "Error", description: "El evento no está seleccionado o no tiene ID.", variant: "destructive"});
         return;
     }
     if (!selectedPromoterForAssignment) {
@@ -472,7 +522,7 @@ export default function BusinessEventsPage() {
 
   const handleCreateBatchBoxes = (batchData: BatchBoxFormData) => {
     if (!editingEvent || !editingEvent.id) {
-        toast({title: "Error", description: "Primero guarda los detalles del evento.", variant: "destructive"});
+        toast({title: "Error", description: "El evento no está seleccionado o no tiene ID.", variant: "destructive"});
         return;
     }
 
@@ -531,7 +581,7 @@ export default function BusinessEventsPage() {
         <h1 className="text-3xl font-bold text-primary flex items-center">
           <Calendar className="h-8 w-8 mr-2" /> Gestión de Eventos
         </h1>
-        <Button onClick={() => handleOpenManageEventModal(null)} className="bg-primary hover:bg-primary/90">
+        <Button onClick={() => handleOpenManageEventModal(null)} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Evento
         </Button>
       </div>
@@ -548,116 +598,131 @@ export default function BusinessEventsPage() {
               className="pl-8 w-full sm:w-[300px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={isLoading}
             />
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead className="hidden md:table-cell">Vigencia</TableHead>
-                <TableHead className="hidden lg:table-cell text-center">Asistencia / Aforo</TableHead>
-                <TableHead className="text-center">Estado</TableHead>
-                <TableHead>Códigos</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEvents.length > 0 ? (
-                filteredEvents.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.name}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {event.startDate ? format(new Date(event.startDate), "P", { locale: es }) : 'N/A'} - {event.endDate ? format(new Date(event.endDate), "P", { locale: es }) : 'N/A'}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-center">{getAttendanceCount(event)}</TableCell>
-                    <TableCell className="text-center">
-                        <div className="flex items-center justify-center space-x-2">
-                            <Switch
-                                checked={event.isActive}
-                                onCheckedChange={() => handleToggleEventStatus(event.id)}
-                                aria-label={`Estado del evento ${event.name}`}
-                                id={`status-switch-${event.id}`}
-                            />
-                            <Label htmlFor={`status-switch-${event.id}`} className="sr-only">
-                                {event.isActive ? "Activo" : "Inactivo"}
-                            </Label>
-                            <Badge variant={event.isActive ? "default" : "outline"} className={event.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
-                                {event.isActive ? <BadgeCheck className="mr-1 h-3 w-3"/> : <BadgeX className="mr-1 h-3 w-3"/>}
-                                {event.isActive ? "Activo" : "Inactivo"}
-                            </Badge>
-                        </div>
-                    </TableCell>
-                     <TableCell className="space-x-1">
-                      <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(event)} disabled={!isEntityCurrentlyActivatable(event)} className="bg-accent hover:bg-accent/90 text-accent-foreground px-2 py-1 h-auto">
-                        <QrCode className="h-3 w-3 mr-1" /> Crear
-                      </Button>
-                      <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(event)} className="px-2 py-1 h-auto">
-                        <ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})
-                      </Button>
-                    </TableCell>
-                    <TableCell className="text-right space-x-1">
-                       <Button variant="ghost" size="icon" title="Duplicar Evento" onClick={() => handleOpenManageEventModal(event, true)}>
-                        <Copy className="h-4 w-4" />
-                        <span className="sr-only">Duplicar</span>
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Gestionar Evento" onClick={() => handleOpenManageEventModal(event)}>
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Gestionar</span>
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" title="Eliminar Evento" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Eliminar</span>
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción no se puede deshacer. Esto eliminará permanentemente el evento:
-                              <span className="font-semibold"> {event.name}</span> y todas sus entradas, boxes y códigos asociados.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteEvent(event.id)}
-                              className="bg-destructive hover:bg-destructive/90"
-                            >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
+          {isLoading ? (
+            <div className="flex justify-center items-center h-60">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="ml-4 text-lg text-muted-foreground">Cargando eventos...</p>
+            </div>
+          ) : filteredEvents.length === 0 && !searchTerm ? (
+            <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
+              No hay eventos registrados. Haz clic en "Crear Evento" para empezar.
+            </p>
+          ): (
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">No se encontraron eventos.</TableCell>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead className="hidden md:table-cell">Vigencia</TableHead>
+                  <TableHead className="hidden lg:table-cell text-center">Asistencia / Aforo</TableHead>
+                  <TableHead className="text-center">Estado</TableHead>
+                  <TableHead>Códigos</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredEvents.length > 0 ? (
+                  filteredEvents.map((event) => (
+                    <TableRow key={event.id}>
+                      <TableCell className="font-medium">{event.name}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {event.startDate ? format(new Date(event.startDate), "P", { locale: es }) : 'N/A'} - {event.endDate ? format(new Date(event.endDate), "P", { locale: es }) : 'N/A'}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-center">{getAttendanceCount(event)}</TableCell>
+                      <TableCell className="text-center">
+                          <div className="flex items-center justify-center space-x-2">
+                              <Switch
+                                  checked={event.isActive}
+                                  onCheckedChange={() => handleToggleEventStatus(event)}
+                                  aria-label={`Estado del evento ${event.name}`}
+                                  id={`status-switch-${event.id}`}
+                                  disabled={isSubmitting}
+                              />
+                              <Label htmlFor={`status-switch-${event.id}`} className="sr-only">
+                                  {event.isActive ? "Activo" : "Inactivo"}
+                              </Label>
+                              <Badge variant={event.isActive ? "default" : "outline"} className={event.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
+                                  {event.isActive ? <BadgeCheck className="mr-1 h-3 w-3"/> : <BadgeX className="mr-1 h-3 w-3"/>}
+                                  {event.isActive ? "Activo" : "Inactivo"}
+                              </Badge>
+                          </div>
+                      </TableCell>
+                      <TableCell className="space-x-1">
+                        <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(event)} disabled={!isEntityCurrentlyActivatable(event) || isSubmitting} className="bg-accent hover:bg-accent/90 text-accent-foreground px-2 py-1 h-auto">
+                          <QrCode className="h-3 w-3 mr-1" /> Crear
+                        </Button>
+                        <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(event)} disabled={isSubmitting} className="px-2 py-1 h-auto">
+                          <ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" title="Duplicar Evento" onClick={() => handleOpenManageEventModal(event, true)} disabled={isSubmitting}>
+                          <Copy className="h-4 w-4" />
+                          <span className="sr-only">Duplicar</span>
+                        </Button>
+                        <Button variant="ghost" size="icon" title="Gestionar Evento" onClick={() => handleOpenManageEventModal(event)} disabled={isSubmitting}>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Gestionar</span>
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Eliminar Evento" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Eliminar</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente el evento:
+                                <span className="font-semibold"> {event.name}</span> y todas sus entradas, boxes y códigos asociados.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteEvent(event.id, event.name)}
+                                className="bg-destructive hover:bg-destructive/90"
+                                disabled={isSubmitting}
+                              >
+                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center h-24">No se encontraron eventos con los filtros aplicados.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
       
-      {/* Comprehensive Manage Event Modal */}
       {editingEvent && (
       <Dialog open={showManageEventModal} onOpenChange={(isOpen) => {
         if (!isOpen) {
-            // Only reset if not actively managing sub-dialogs or if user explicitly closes main dialog
-            if (!showTicketFormInEventModal && !showBoxFormInEventModal && !showCreateBatchBoxesModal) {
+            if (!showTicketFormInEventModal && !showBoxFormInEventModal && !showCreateBatchBoxesModal) { // Only close if no sub-modals are active
                  setEditingEvent(null); 
                  setIsDuplicating(false);
+                 setShowManageEventModal(false); // Explicitly set to false
             }
+        } else {
+            setShowManageEventModal(true);
         }
-        setShowManageEventModal(isOpen);
       }}>
-        <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col"> {/* Increased max-width and height, added flex flex-col */}
+        <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-2xl">
                 {isDuplicating ? `Duplicar Evento: ${editingEvent?.name?.replace(' (Copia)','') || 'Nuevo Evento'}` : 
@@ -668,8 +733,8 @@ export default function BusinessEventsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="details" className="flex-grow flex flex-col overflow-hidden"> {/* Added flex flex-col for proper layout */}
-            <TabsList className="mb-4 shrink-0"> {/* shrink-0 for tabs list */}
+          <Tabs defaultValue="details" className="flex-grow flex flex-col overflow-hidden">
+            <TabsList className="mb-4 shrink-0">
               <TabsTrigger value="details">Detalles del Evento</TabsTrigger>
               <TabsTrigger value="tickets">Entradas</TabsTrigger>
               <TabsTrigger value="boxes">Boxes</TabsTrigger>
@@ -681,14 +746,15 @@ export default function BusinessEventsPage() {
               <BusinessEventForm
                 event={editingEvent} 
                 onSubmit={handleMainEventFormSubmit} 
-                onCancel={() => {setShowManageEventModal(false); setEditingEvent(null); setIsDuplicating(false);}}
+                onCancel={() => { /* Main cancel/submit is now on DialogFooter */ }}
+                isSubmitting={isSubmitting} 
               />
             </TabsContent>
 
             <TabsContent value="tickets" className="flex-grow overflow-y-auto p-1 space-y-4">
                 <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Entradas del Evento</h3>
-                    <Button onClick={() => { setEditingTicketInEventModal(null); setShowTicketFormInEventModal(true); }} className="bg-primary hover:bg-primary/90">
+                    <Button onClick={() => { setEditingTicketInEventModal(null); setShowTicketFormInEventModal(true); }} className="bg-primary hover:bg-primary/90" disabled={isSubmitting || !editingEvent?.id}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Crear Nueva Entrada
                     </Button>
                 </div>
@@ -700,25 +766,25 @@ export default function BusinessEventsPage() {
                                 <TableRow key={tt.id}>
                                     <TableCell>{tt.name}</TableCell><TableCell>{tt.cost.toFixed(2)}</TableCell><TableCell>{tt.description || "N/A"}</TableCell><TableCell>{tt.quantity === undefined || tt.quantity === null ? 'Ilimitada' : tt.quantity}</TableCell>
                                     <TableCell className="text-right">
-                                      <Button variant="ghost" size="icon" onClick={() => { setEditingTicketInEventModal(tt); setShowTicketFormInEventModal(true); }}><Edit className="h-4 w-4" /></Button>
-                                      <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Eliminar "{tt.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteTicketTypeFromEvent(tt.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                                      <Button variant="ghost" size="icon" onClick={() => { setEditingTicketInEventModal(tt); setShowTicketFormInEventModal(true); }} disabled={isSubmitting}><Edit className="h-4 w-4" /></Button>
+                                      <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Eliminar "{tt.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteTicketTypeFromEvent(tt.id)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                                       </AlertDialog>
                                     </TableCell>
                                 </TableRow>))}
                         </TableBody>
                     </Table>
-                ) : <p className="text-muted-foreground text-center py-4">No hay entradas definidas para este evento.</p>}
+                ) : <p className="text-muted-foreground text-center py-4">No hay entradas definidas para este evento. Crea los detalles del evento primero si es nuevo.</p>}
             </TabsContent>
 
             <TabsContent value="boxes" className="flex-grow overflow-y-auto p-1 space-y-4">
                 <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Boxes del Evento</h3>
                     <div className="space-x-2">
-                        <Button onClick={() => setShowCreateBatchBoxesModal(true)} variant="outline">
+                        <Button onClick={() => setShowCreateBatchBoxesModal(true)} variant="outline" disabled={isSubmitting || !editingEvent?.id}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Crear Boxes en Lote
                         </Button>
-                        <Button onClick={() => { setEditingBoxInEventModal(null); setShowBoxFormInEventModal(true); }} className="bg-primary hover:bg-primary/90">
+                        <Button onClick={() => { setEditingBoxInEventModal(null); setShowBoxFormInEventModal(true); }} className="bg-primary hover:bg-primary/90" disabled={isSubmitting || !editingEvent?.id}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevo Box
                         </Button>
                     </div>
@@ -731,15 +797,15 @@ export default function BusinessEventsPage() {
                                 <TableRow key={box.id}>
                                     <TableCell>{box.name}</TableCell><TableCell>{box.cost.toFixed(2)}</TableCell><TableCell><Badge variant={box.status === 'available' ? 'default' : 'secondary'}>{box.status === 'available' ? "Disponible" : "No Disp."}</Badge></TableCell><TableCell>{box.capacity || "N/A"}</TableCell><TableCell>{box.sellerName || "N/A"}</TableCell><TableCell>{box.ownerName || "N/A"} {box.ownerDni && `(${box.ownerDni})`}</TableCell>
                                     <TableCell className="text-right">
-                                      <Button variant="ghost" size="icon" onClick={() => { setEditingBoxInEventModal(box); setShowBoxFormInEventModal(true);}}><Edit className="h-4 w-4" /></Button>
-                                      <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar box?</AlertDialogTitle><AlertDialogDescription>Eliminar "{box.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBoxFromEvent(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                                      <Button variant="ghost" size="icon" onClick={() => { setEditingBoxInEventModal(box); setShowBoxFormInEventModal(true);}} disabled={isSubmitting}><Edit className="h-4 w-4" /></Button>
+                                      <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar box?</AlertDialogTitle><AlertDialogDescription>Eliminar "{box.name}"?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBoxFromEvent(box.id)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                                       </AlertDialog>
                                     </TableCell>
                                 </TableRow>))}
                         </TableBody>
                     </Table>
-                ) : <p className="text-muted-foreground text-center py-4">No hay boxes definidos para este evento.</p>}
+                ) : <p className="text-muted-foreground text-center py-4">No hay boxes definidos para este evento. Crea los detalles del evento primero si es nuevo.</p>}
             </TabsContent>
 
             <TabsContent value="promoters" className="flex-grow overflow-y-auto p-1 space-y-4">
@@ -747,7 +813,7 @@ export default function BusinessEventsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end p-4 border rounded-md">
                     <div className="space-y-1">
                         <Label htmlFor="promoter-select">Seleccionar Promotor</Label>
-                        <Select value={selectedPromoterForAssignment} onValueChange={setSelectedPromoterForAssignment}>
+                        <Select value={selectedPromoterForAssignment} onValueChange={setSelectedPromoterForAssignment} disabled={isSubmitting || !editingEvent?.id}>
                             <SelectTrigger id="promoter-select"><SelectValue placeholder="Elige un promotor" /></SelectTrigger>
                             <SelectContent>
                                 {mockBusinessPromoters.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.email})</SelectItem>)}
@@ -756,13 +822,13 @@ export default function BusinessEventsPage() {
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="promoter-commission">Comisión para este Evento (Opcional)</Label>
-                        <Input id="promoter-commission" placeholder="Ej: 10% por entrada" value={promoterEventCommission} onChange={(e) => setPromoterEventCommission(e.target.value)} />
+                        <Input id="promoter-commission" placeholder="Ej: 10% por entrada" value={promoterEventCommission} onChange={(e) => setPromoterEventCommission(e.target.value)} disabled={isSubmitting || !editingEvent?.id} />
                     </div>
                      <div className="space-y-1">
                         <Label htmlFor="promoter-notes">Notas (Opcional)</Label>
-                        <Input id="promoter-notes" placeholder="Notas específicas para el promotor" value={promoterEventNotes} onChange={(e) => setPromoterEventNotes(e.target.value)} />
+                        <Input id="promoter-notes" placeholder="Notas específicas para el promotor" value={promoterEventNotes} onChange={(e) => setPromoterEventNotes(e.target.value)} disabled={isSubmitting || !editingEvent?.id} />
                     </div>
-                    <Button onClick={handleAssignPromoterToEvent} className="md:col-span-3 bg-primary hover:bg-primary/90">
+                    <Button onClick={handleAssignPromoterToEvent} className="md:col-span-3 bg-primary hover:bg-primary/90" disabled={isSubmitting || !editingEvent?.id}>
                         <UserPlus className="mr-2 h-4 w-4" /> Asignar Promotor al Evento
                     </Button>
                 </div>
@@ -775,16 +841,15 @@ export default function BusinessEventsPage() {
                                 <TableRow key={ap.promoterProfileId}>
                                     <TableCell>{ap.promoterName}</TableCell><TableCell>{ap.promoterEmail || "N/A"}</TableCell><TableCell>{ap.commissionRate || "General del negocio"}</TableCell><TableCell>{ap.notes || "N/A"}</TableCell>
                                     <TableCell className="text-right">
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild><Button variant="link" size="sm" className="text-destructive hover:text-destructive">Desvincular</Button></AlertDialogTrigger>
-                                            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Desvincular Promotor?</AlertDialogTitle><AlertDialogDescription>Desvincular a {ap.promoterName} de este evento?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleUnassignPromoterFromEvent(ap.promoterProfileId)} className="bg-destructive hover:bg-destructive/90">Desvincular</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                                        <AlertDialog><AlertDialogTrigger asChild><Button variant="link" size="sm" className="text-destructive hover:text-destructive" disabled={isSubmitting}>Desvincular</Button></AlertDialogTrigger>
+                                            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Desvincular Promotor?</AlertDialogTitle><AlertDialogDescription>Desvincular a {ap.promoterName} de este evento?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleUnassignPromoterFromEvent(ap.promoterProfileId)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>Desvincular</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
                                         </AlertDialog>
                                     </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
-                ): <p className="text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>}
+                ): <p className="text-muted-foreground text-center py-4">No hay promotores asignados a este evento. Crea los detalles del evento primero si es nuevo.</p>}
             </TabsContent>
 
             <TabsContent value="stats" className="flex-grow overflow-y-auto p-1 space-y-4">
@@ -801,9 +866,10 @@ export default function BusinessEventsPage() {
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="pt-4 border-t mt-auto shrink-0"> {/* shrink-0 for footer */}
-            <Button variant="outline" onClick={() => {setShowManageEventModal(false); setEditingEvent(null); setIsDuplicating(false);}}>Cancelar</Button>
-            <Button onClick={handleSaveManagedEventAndClose} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+          <DialogFooter className="pt-4 border-t mt-auto shrink-0">
+            <Button variant="outline" onClick={() => {setShowManageEventModal(false); setEditingEvent(null); setIsDuplicating(false);}} disabled={isSubmitting}>Cancelar</Button>
+            <Button onClick={handleSaveManagedEventAndClose} className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isDuplicating ? "Crear Evento Duplicado" : (editingEvent?.id && events.some(e=>e.id === editingEvent.id && e.id !== '') ? "Guardar Cambios y Cerrar" : "Guardar Evento y Cerrar")}
             </Button>
           </DialogFooter>
@@ -811,8 +877,6 @@ export default function BusinessEventsPage() {
       </Dialog>
       )}
 
-
-      {/* Sub-Modal for TicketTypeForm (inside Manage Event Modal) */}
       {editingEvent && showTicketFormInEventModal && (
           <Dialog open={showTicketFormInEventModal} onOpenChange={(isOpen) => {
               setShowTicketFormInEventModal(isOpen);
@@ -826,12 +890,12 @@ export default function BusinessEventsPage() {
                       ticketType={editingTicketInEventModal || undefined}
                       onSubmit={handleCreateOrEditTicketTypeForEvent}
                       onCancel={() => { setShowTicketFormInEventModal(false); setEditingTicketInEventModal(null); }}
+                      isSubmitting={isSubmitting}
                   />
               </DialogContent>
           </Dialog>
       )}
 
-      {/* Sub-Modal for EventBoxForm (inside Manage Event Modal) */}
       {editingEvent && showBoxFormInEventModal && (
           <Dialog open={showBoxFormInEventModal} onOpenChange={(isOpen) => {
               setShowBoxFormInEventModal(isOpen);
@@ -845,22 +909,21 @@ export default function BusinessEventsPage() {
                       eventBox={editingBoxInEventModal || undefined}
                       onSubmit={handleCreateOrEditBoxForEvent}
                       onCancel={() => { setShowBoxFormInEventModal(false); setEditingBoxInEventModal(null);}}
+                      isSubmitting={isSubmitting}
                   />
               </DialogContent>
           </Dialog>
       )}
 
-      {/* Sub-Modal for BatchBoxForm (inside Manage Event Modal) */}
       {editingEvent && showCreateBatchBoxesModal && (
         <CreateBatchBoxesDialog
           open={showCreateBatchBoxesModal}
           onOpenChange={setShowCreateBatchBoxesModal}
           onSubmit={handleCreateBatchBoxes}
+          // isSubmitting could be passed if the dialog form needs a loading state
         />
       )}
 
-
-      {/* Create Codes Modal (for selected event from main list) */}
       {selectedEntityForCreatingCodes && (
         <CreateCodesDialog
           open={showCreateCodesModal}
@@ -872,7 +935,6 @@ export default function BusinessEventsPage() {
         />
       )}
 
-      {/* Manage Codes Modal (for selected event from main list) */}
       {selectedEntityForViewingCodes && (
         <ManageCodesDialog
           open={showManageCodesModal}
@@ -905,3 +967,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
+    

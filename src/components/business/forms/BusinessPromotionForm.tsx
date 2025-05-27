@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -46,9 +46,10 @@ interface BusinessPromotionFormProps {
   promotion?: BusinessManagedEntity; // For editing
   onSubmit: (data: BusinessPromotionFormData) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: BusinessPromotionFormProps) {
+export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitting = false }: BusinessPromotionFormProps) {
   const form = useForm<PromotionFormValues>({
     resolver: zodResolver(promotionFormSchema),
     defaultValues: {
@@ -77,7 +78,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre de la Promoción</FormLabel>
-              <FormControl><Input placeholder="Ej: 2x1 en Cervezas" {...field} /></FormControl>
+              <FormControl><Input placeholder="Ej: 2x1 en Cervezas" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -88,7 +89,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción</FormLabel>
-              <FormControl><Textarea placeholder="Detalles de la promoción..." {...field} rows={3} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles de la promoción..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -99,7 +100,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
           render={({ field }) => (
             <FormItem>
               <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Condiciones de la promoción..." {...field} rows={3} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones de la promoción..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -114,7 +115,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
-                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
@@ -137,7 +138,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
-                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
@@ -158,7 +159,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
           render={({ field }) => (
             <FormItem>
               <FormLabel>Límite de Usos (Opcional)</FormLabel>
-              <FormControl><Input type="number" placeholder="Ej: 100 (0 para ilimitado)" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} /></FormControl>
+              <FormControl><Input type="number" placeholder="Ej: 100 (0 para ilimitado)" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -172,7 +173,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
               <FormControl>
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="https://ejemplo.com/imagen.png" {...field} />
+                  <Input placeholder="https://ejemplo.com/imagen.png" {...field} disabled={isSubmitting} />
                 </div>
               </FormControl>
               <FormMessage />
@@ -185,7 +186,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
           render={({ field }) => (
             <FormItem>
               <FormLabel>Palabras Clave para Imagen (si URL está vacía)</FormLabel>
-              <FormControl><Input placeholder="Ej: fiesta cocteles (máx 2 palabras)" {...field} /></FormControl>
+              <FormControl><Input placeholder="Ej: fiesta cocteles (máx 2 palabras)" {...field} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
           )}
@@ -199,16 +200,20 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
                 <FormLabel>Activar Promoción</FormLabel>
                 <FormMessage />
               </div>
-              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
             </FormItem>
           )}
         />
         <DialogFooter className="pt-6">
-          <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">{promotion ? "Guardar Cambios" : "Crear Promoción"}</Button>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {promotion ? "Guardar Cambios" : "Crear Promoción"}
+          </Button>
         </DialogFooter>
       </form>
     </Form>
   );
 }
 
+    

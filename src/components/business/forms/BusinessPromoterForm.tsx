@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import type { BusinessPromoterFormData, BusinessPromoterLink, PromoterProfile } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 const promoterFormSchema = z.object({
   promoterName: z.string().min(3, "Nombre del promotor es requerido."),
@@ -27,13 +28,14 @@ const promoterFormSchema = z.object({
 type PromoterFormValues = z.infer<typeof promoterFormSchema>;
 
 interface BusinessPromoterFormProps {
-  promoterLink?: BusinessPromoterLink & { promoterProfile?: PromoterProfile }; // For editing existing link
+  promoterLink?: BusinessPromoterLink & { promoterProfile?: PromoterProfile }; 
   onSubmit: (data: BusinessPromoterFormData) => void;
   onCancel: () => void;
-  isEditing?: boolean; // To distinguish if we are editing an existing promoter's link details or adding a new one
+  isEditing?: boolean; 
+  isSubmitting?: boolean;
 }
 
-export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditing }: BusinessPromoterFormProps) {
+export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditing, isSubmitting = false }: BusinessPromoterFormProps) {
   const form = useForm<PromoterFormValues>({
     resolver: zodResolver(promoterFormSchema),
     defaultValues: {
@@ -43,6 +45,17 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
       commissionRate: promoterLink?.commissionRate || "",
     },
   });
+
+  // Reset form if promoterLink prop changes
+  React.useEffect(() => {
+    form.reset({
+      promoterName: promoterLink?.promoterProfile?.name || "",
+      promoterEmail: promoterLink?.promoterProfile?.email || "",
+      promoterPhone: promoterLink?.promoterProfile?.phone || "",
+      commissionRate: promoterLink?.commissionRate || "",
+    });
+  }, [promoterLink, form]);
+
 
   const handleSubmit = (values: PromoterFormValues) => {
     onSubmit(values);
@@ -57,7 +70,7 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Promotor</FormLabel>
-              <FormControl><Input placeholder="Ej: Juan Pérez" {...field} disabled={isEditing} /></FormControl>
+              <FormControl><Input placeholder="Ej: Juan Pérez" {...field} disabled={isEditing || isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -68,7 +81,7 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
           render={({ field }) => (
             <FormItem>
               <FormLabel>Email del Promotor</FormLabel>
-              <FormControl><Input type="email" placeholder="Ej: juan.promotor@example.com" {...field} disabled={isEditing} /></FormControl>
+              <FormControl><Input type="email" placeholder="Ej: juan.promotor@example.com" {...field} disabled={isEditing || isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -79,7 +92,7 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
           render={({ field }) => (
             <FormItem>
               <FormLabel>Teléfono del Promotor (Opcional)</FormLabel>
-              <FormControl><Input type="tel" placeholder="+51 987654321" {...field} disabled={isEditing} /></FormControl>
+              <FormControl><Input type="tel" placeholder="+51 987654321" {...field} disabled={isEditing || isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -90,16 +103,17 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
           render={({ field }) => (
             <FormItem>
               <FormLabel>Tasa de Comisión (Ej: 10% o S/5 por código)</FormLabel>
-              <FormControl><Input placeholder="Definir comisión" {...field} /></FormControl>
+              <FormControl><Input placeholder="Definir comisión" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {promoterLink ? "Guardar Cambios" : "Añadir Promotor"}
           </Button>
         </DialogFooter>
@@ -107,3 +121,5 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
     </Form>
   );
 }
+
+    

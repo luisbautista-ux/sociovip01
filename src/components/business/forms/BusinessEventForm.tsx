@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -45,10 +45,11 @@ type EventFormValues = z.infer<typeof eventFormSchema>;
 interface BusinessEventFormProps {
   event?: BusinessManagedEntity; // For editing
   onSubmit: (data: BusinessEventFormData) => void;
-  onCancel: () => void;
+  onCancel: () => void; // Kept for symmetry, but main modal controls close
+  isSubmitting?: boolean;
 }
 
-export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFormProps) {
+export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = false }: BusinessEventFormProps) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: {
@@ -64,20 +65,36 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
     },
   });
 
+  // Watch for changes in event prop to reset form if a different event is selected for editing
+  React.useEffect(() => {
+    form.reset({
+      name: event?.name || "",
+      description: event?.description || "",
+      termsAndConditions: event?.termsAndConditions || "",
+      startDate: event?.startDate ? new Date(event.startDate) : new Date(),
+      endDate: event?.endDate ? new Date(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
+      maxAttendance: event?.maxAttendance || undefined,
+      isActive: event?.isActive === undefined ? true : event.isActive,
+      imageUrl: event?.imageUrl || "",
+      aiHint: event?.aiHint || "",
+    });
+  }, [event, form]);
+
+
   const handleSubmit = (values: EventFormValues) => {
-    onSubmit(values);
+    onSubmit(values); // This now updates the 'editingEvent' state in the parent (BusinessEventsPage)
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Evento</FormLabel>
-              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} /></FormControl>
+              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -88,7 +105,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción</FormLabel>
-              <FormControl><Textarea placeholder="Detalles del evento..." {...field} rows={3} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del evento..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -99,7 +116,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
           render={({ field }) => (
             <FormItem>
               <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento..." {...field} rows={3} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones del evento..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -114,7 +131,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
-                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
@@ -137,7 +154,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
-                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
@@ -158,7 +175,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
           render={({ field }) => (
             <FormItem>
               <FormLabel>Aforo Máximo (Opcional)</FormLabel>
-              <FormControl><Input type="number" placeholder="Ej: 150 (0 para ilimitado)" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} /></FormControl>
+              <FormControl><Input type="number" placeholder="Ej: 150 (0 para ilimitado)" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -172,7 +189,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
               <FormControl>
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="https://ejemplo.com/imagen_evento.png" {...field} />
+                  <Input placeholder="https://ejemplo.com/imagen_evento.png" {...field} disabled={isSubmitting} />
                 </div>
               </FormControl>
               <FormMessage />
@@ -185,7 +202,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
           render={({ field }) => (
             <FormItem>
               <FormLabel>Palabras Clave para Imagen (si URL está vacía)</FormLabel>
-              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} /></FormControl>
+              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
           )}
@@ -199,16 +216,21 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
                 <FormLabel>Activar Evento</FormLabel>
                 <FormMessage />
               </div>
-              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
             </FormItem>
           )}
         />
         <DialogFooter className="pt-6">
-          {/* Cancel button might be handled by the parent Dialog's close button */}
-          <Button type="submit" className="bg-primary hover:bg-primary/90">{event && event.id ? "Guardar Cambios en Detalles" : "Guardar Detalles y Continuar"}</Button>
+           {/* The main "Save Event and Close" button is in the parent Dialog (BusinessEventsPage) */}
+           {/* This button saves the current tab's details to the editingEvent state */}
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar Cambios en Detalles
+          </Button>
         </DialogFooter>
       </form>
     </Form>
   );
 }
 
+    

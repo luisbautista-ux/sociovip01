@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { PlatformUser, PlatformUserFormData, Business } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 const platformUserFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -35,9 +36,10 @@ interface PlatformUserFormProps {
   businesses: Business[];
   onSubmit: (data: PlatformUserFormData) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-export function PlatformUserForm({ user, businesses, onSubmit, onCancel }: PlatformUserFormProps) {
+export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmitting = false }: PlatformUserFormProps) {
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(platformUserFormSchema),
     defaultValues: {
@@ -68,7 +70,7 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel }: Platf
             <FormItem>
               <FormLabel>Nombre Completo</FormLabel>
               <FormControl>
-                <Input placeholder="Ej: Juan Pérez" {...field} />
+                <Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -81,7 +83,7 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel }: Platf
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} />
+                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -93,7 +95,7 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel }: Platf
           render={({ field }) => (
             <FormItem>
               <FormLabel>Rol</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona un rol" />
@@ -116,7 +118,7 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel }: Platf
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Negocio Asociado</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona un negocio" />
@@ -134,10 +136,11 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel }: Platf
           />
         )}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {user ? "Guardar Cambios" : "Crear Usuario"}
           </Button>
         </DialogFooter>
@@ -145,3 +148,5 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel }: Platf
     </Form>
   );
 }
+
+    
