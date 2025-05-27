@@ -34,6 +34,7 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "chicken wings",
+    termsAndConditions: "Válido solo para consumo en local. Máximo 20 alitas por persona con código.",
     generatedCodes: [
         { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:00:00Z", observation: "Código de lanzamiento" },
         { id: "codePromo1-2", entityId: "bp1", value: "ALITAS002", status: "redeemed", generatedByName: "Admin Negocio", generatedDate: "2025-01-20T10:05:00Z", redemptionDate: "2025-01-21T12:00:00Z" },
@@ -52,6 +53,7 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     isActive: true, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "cocktails bar",
+    termsAndConditions: "No aplica para tragos premium. Sujeto a disponibilidad.",
     generatedCodes: []
   },
   { 
@@ -65,13 +67,14 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
     isActive: false, 
     imageUrl: "https://placehold.co/300x200.png", 
     aiHint: "birthday cake",
+    termsAndConditions: "Presentar DNI para validar fecha de nacimiento. Un postre por cumpleañero.",
     generatedCodes: []
   },
 ];
 
 const isEntityCurrentlyActivatable = (entity: BusinessManagedEntity): boolean => {
-  if (!entity.isActive) { // If it's globally set to inactive, it's not activatable for codes
-    // return false; // This line was too restrictive; isActive refers to general status, not date validity for code generation
+  if (!entity.isActive) { 
+    return false; 
   }
   
   const now = new Date();
@@ -86,7 +89,7 @@ const isEntityCurrentlyActivatable = (entity: BusinessManagedEntity): boolean =>
   const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
   const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
   
-  return today >= effectiveStartDate && today <= effectiveEndDate && entity.isActive;
+  return today >= effectiveStartDate && today <= effectiveEndDate;
 };
 
 
@@ -119,9 +122,9 @@ export default function BusinessPromotionsPage() {
     if (duplicate && promotion) {
       setEditingPromotion({
         ...promotion,
-        id: `bp${Date.now()}`, // New ID for duplicated item
+        id: `bp${Date.now()}`, 
         name: `${promotion.name} (Copia)`,
-        generatedCodes: [], // Codes are not duplicated
+        generatedCodes: [], 
       });
     } else {
       setEditingPromotion(promotion);
@@ -130,11 +133,12 @@ export default function BusinessPromotionsPage() {
   };
 
   const handleFormSubmit = (data: BusinessPromotionFormData) => {
-    if (editingPromotion && !isDuplicating) { // Editing existing
+    if (editingPromotion && !isDuplicating) { 
       const updatedPromotion: BusinessManagedEntity = {
         ...editingPromotion,
         name: data.name,
         description: data.description,
+        termsAndConditions: data.termsAndConditions,
         startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
         endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
         usageLimit: data.usageLimit || 0,
@@ -144,22 +148,23 @@ export default function BusinessPromotionsPage() {
       };
       setPromotions(prev => prev.map(p => p.id === editingPromotion.id ? updatedPromotion : p));
       toast({ title: "Promoción Actualizada", description: `La promoción "${updatedPromotion.name}" ha sido actualizada.` });
-    } else { // Creating new or duplicated
+    } else { 
       const newPromotion: BusinessManagedEntity = {
-        id: editingPromotion?.id || `bp${Date.now()}`, // Use ID from duplicated if available, else new
-        businessId: "biz1", // TODO: Replace with actual business ID from context/auth
+        id: editingPromotion?.id || `bp${Date.now()}`, 
+        businessId: "biz1", 
         type: "promotion",
         name: data.name,
         description: data.description,
+        termsAndConditions: data.termsAndConditions,
         startDate: format(data.startDate, "yyyy-MM-dd'T'HH:mm:ss"),
         endDate: format(data.endDate, "yyyy-MM-dd'T'HH:mm:ss"),
         usageLimit: data.usageLimit || 0,
         isActive: data.isActive,
         imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
         aiHint: data.aiHint,
-        generatedCodes: [], // New promotions start with no codes
+        generatedCodes: [], 
       };
-      setPromotions(prev => [newPromotion, ...prev.filter(p => p.id !== newPromotion.id)]); // Add new, remove old if duplicating
+      setPromotions(prev => [newPromotion, ...prev.filter(p => p.id !== newPromotion.id)]); 
       toast({ title: isDuplicating ? "Promoción Duplicada" : "Promoción Creada", description: `La promoción "${newPromotion.name}" ha sido ${isDuplicating ? 'duplicada' : 'creada'}.` });
     }
     setShowCreateEditPromotionModal(false);
@@ -219,11 +224,13 @@ export default function BusinessPromotionsPage() {
     let promotionNameForToast = "";
     let newStatusForToast = false;
 
-    const updateStatusInPromotion = (promoToUpdate: BusinessManagedEntity | null) => {
+    const updateStatusInPromotion = (promoToUpdate: BusinessManagedEntity | null): BusinessManagedEntity | null => {
       if (!promoToUpdate || promoToUpdate.id !== promotionId) return promoToUpdate;
+      
       promotionNameForToast = promoToUpdate.name;
       newStatusForToast = !promoToUpdate.isActive;
-      return { ...promoToUpdate, isActive: !promoToUpdate.isActive };
+      
+      return { ...promoToUpdate, isActive: newStatusForToast };
     };
     
     setPromotions(prevPromotions =>
@@ -231,9 +238,7 @@ export default function BusinessPromotionsPage() {
         promo.id === promotionId ? updateStatusInPromotion(promo) as BusinessManagedEntity : promo
       )
     );
-    
-    // Call toast after state updates are likely processed
-    // This ensures the toast reflects the new state if the update was successful
+        
     setTimeout(() => {
         if (promotionNameForToast) {
           toast({
@@ -380,7 +385,7 @@ export default function BusinessPromotionsPage() {
             </DialogDescription>
           </DialogHeader>
           <BusinessPromotionForm
-            promotion={editingPromotion || undefined} // Pass undefined if new, or the object if editing/duplicating
+            promotion={editingPromotion || undefined} 
             onSubmit={handleFormSubmit} 
             onCancel={() => {
                 setShowCreateEditPromotionModal(false);

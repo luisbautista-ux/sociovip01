@@ -28,6 +28,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 const eventFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
+  termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
   maxAttendance: z.coerce.number().int().positive().optional().or(z.literal(0)).or(z.literal(undefined)), // 0 for unlimited
@@ -53,6 +54,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
     defaultValues: {
       name: event?.name || "",
       description: event?.description || "",
+      termsAndConditions: event?.termsAndConditions || "",
       startDate: event?.startDate ? new Date(event.startDate) : new Date(),
       endDate: event?.endDate ? new Date(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
       maxAttendance: event?.maxAttendance || undefined,
@@ -87,6 +89,17 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
             <FormItem>
               <FormLabel>Descripción</FormLabel>
               <FormControl><Textarea placeholder="Detalles del evento..." {...field} rows={3} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="termsAndConditions"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
+              <FormControl><Textarea placeholder="Condiciones del evento..." {...field} rows={3} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -191,10 +204,11 @@ export function BusinessEventForm({ event, onSubmit, onCancel }: BusinessEventFo
           )}
         />
         <DialogFooter className="pt-6">
-          <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">{event ? "Guardar Cambios" : "Crear Evento"}</Button>
+          {/* Cancel button might be handled by the parent Dialog's close button */}
+          <Button type="submit" className="bg-primary hover:bg-primary/90">{event && event.id ? "Guardar Cambios en Detalles" : "Guardar Detalles y Continuar"}</Button>
         </DialogFooter>
       </form>
     </Form>
   );
 }
+

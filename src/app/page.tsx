@@ -59,7 +59,8 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     validUntil: "2025-12-31T12:00:00",
     promoCode: "VALIDNEW1", 
     imageUrl: "https://placehold.co/600x400.png",
-    aiHint: "cocktails party"
+    aiHint: "cocktails party",
+    termsAndConditions: "Válido para cocktails seleccionados. No acumulable con otras promociones. Máximo 2 promociones por mesa."
   },
   { 
     id: "promo2", 
@@ -68,7 +69,8 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     validUntil: "2025-11-30T12:00:00",
     promoCode: "VALIDEXT1", 
     imageUrl: "https://placehold.co/600x400.png",
-    aiHint: "vip club"
+    aiHint: "vip club",
+    termsAndConditions: "Presentar este QR en puerta. Aforo limitado. Dress code: Elegante."
   },
   { 
     id: "promo3", 
@@ -77,7 +79,8 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     validUntil: "2025-10-31T12:00:00",
     promoCode: "SALSACOOL", 
     imageUrl: "https://placehold.co/600x400.png",
-    aiHint: "salsa dancing"
+    aiHint: "salsa dancing",
+    termsAndConditions: "Un mojito gratis por persona al presentar este QR y pagar entrada al evento de salsa."
   },
 ];
 
@@ -285,20 +288,75 @@ export default function HomePage() {
     }
   };
 
-  const handleSaveQrWithDetails = () => {
+  const handleSaveQrWithDetails = async () => {
     if (!qrData || !generatedQrDataUrl || !activePromotion) {
       toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
       return;
     }
 
-    const canvas = document.createElement('canvas');
-    const qrSize = 250;
+    const businessName = "Pandora Lounge Bar"; // Mock business name
+    const businessLogoUrl = "https://placehold.co/100x30.png?text=Pandora+Logo"; // Mock logo URL
+    const logoHeight = 30;
+    const logoWidth = 100;
     const padding = 20;
-    const lineHeight = 20;
-    const textLines = 4; 
+    const qrSize = 250;
+    const lineHeight = 18;
+    const smallLineHeight = 14;
+    let currentY = padding;
+
+    const canvas = document.createElement('canvas');
+    // Calculate canvas height dynamically
+    let estimatedHeight = padding; // Top padding
+
+    // Logo
+    if (businessLogoUrl) {
+        estimatedHeight += logoHeight + 10; // Logo height + space after
+    }
+    // Business Name
+    estimatedHeight += lineHeight + 10; // Business name + space after
     
+    // QR Code
+    estimatedHeight += qrSize + 10; // QR size + space after
+
+    // User Name
+    estimatedHeight += 24 + 10; // User name (larger font) + space after
+    // Promotion Title
+    estimatedHeight += lineHeight + 5;
+    // Promotion Description
+    estimatedHeight += lineHeight + 5;
+    // Promotion Valid Until
+    estimatedHeight += lineHeight + 10;
+    // User DNI
+    estimatedHeight += lineHeight + 5;
+    // User DOB
+    estimatedHeight += lineHeight + 10;
+
+    // Terms and Conditions
+    if (activePromotion.termsAndConditions) {
+        const tempCtx = canvas.getContext('2d');
+        if (tempCtx) {
+            tempCtx.font = '10px Arial';
+            const words = activePromotion.termsAndConditions.split(' ');
+            let line = '';
+            for (const word of words) {
+                const testLine = line + word + ' ';
+                const metrics = tempCtx.measureText(testLine);
+                const testWidth = metrics.width;
+                if (testWidth > (qrSize + padding * 2 - 2 * padding) && line !== '') { // qrSize + padding * 2 is approx content width
+                    estimatedHeight += smallLineHeight;
+                    line = word + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            estimatedHeight += smallLineHeight; // For the last line
+        }
+        estimatedHeight += 10; // Space after terms
+    }
+    estimatedHeight += padding; // Bottom padding
+
     canvas.width = qrSize + 2 * padding;
-    canvas.height = qrSize + (textLines + 2) * lineHeight + 2 * padding; 
+    canvas.height = estimatedHeight;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -306,27 +364,109 @@ export default function HomePage() {
       return;
     }
 
+    // Background
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Function to draw wrapped text
+    const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number, font: string, color: string, textAlign: CanvasTextAlign = 'center') => {
+        ctx.font = font;
+        ctx.fillStyle = color;
+        ctx.textAlign = textAlign;
+        const words = text.split(' ');
+        let line = '';
+        let currentY = y;
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line, x, currentY);
+                line = words[n] + ' ';
+                currentY += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, x, currentY);
+        return currentY + lineHeight; // Return new Y position
+    };
+    
+    // Load and draw Business Logo
+    const drawBusinessInfo = new Promise<void>((resolve, reject) => {
+        if (businessLogoUrl) {
+            const logoImg = new window.Image();
+            logoImg.crossOrigin = "anonymous";
+            logoImg.onload = () => {
+                const logoX = (canvas.width - logoWidth) / 2;
+                ctx.drawImage(logoImg, logoX, currentY, logoWidth, logoHeight);
+                currentY += logoHeight + 5; 
+                resolve();
+            };
+            logoImg.onerror = () => {
+                console.error("Failed to load business logo for canvas.");
+                resolve(); // Continue without logo if it fails
+            };
+            logoImg.src = businessLogoUrl;
+        } else {
+            resolve();
+        }
+    });
+
+    await drawBusinessInfo;
+
+    // Business Name
+    ctx.font = 'bold 16px Arial';
+    ctx.fillStyle = '#333'; // Darker color for business name
+    ctx.textAlign = 'center';
+    ctx.fillText(businessName, canvas.width / 2, currentY);
+    currentY += lineHeight + 10;
+
+    // QR Image
     const qrImg = new window.Image();
     qrImg.crossOrigin = "anonymous"; 
     qrImg.onload = () => {
-      ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
-      ctx.fillStyle = 'black';
-      ctx.font = '14px Arial';
+      ctx.drawImage(qrImg, padding, currentY, qrSize, qrSize);
+      currentY += qrSize + 10;
+
+      // User Name (Larger, Primary Color)
+      ctx.font = 'bold 20px Arial';
+      ctx.fillStyle = 'hsl(var(--primary))'; // Use primary color
       ctx.textAlign = 'center';
-      
-      let currentY = padding + qrSize + lineHeight * 1.5; 
+      ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
+      currentY += 24 + 10; // Adjusted for larger font
 
-      ctx.fillText(`Promo: ${activePromotion.title}`, canvas.width / 2, currentY);
-      currentY += lineHeight;
-      ctx.fillText(`Usuario: ${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
-      currentY += lineHeight;
-      ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
-      currentY += lineHeight;
+      // Promotion Title
+      ctx.font = 'bold 14px Arial';
+      ctx.fillStyle = 'black';
+      currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, lineHeight, 'bold 14px Arial', 'black');
+      currentY += 5;
+
+      // Promotion Description
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#555';
+      currentY = drawWrappedText(activePromotion.description, canvas.width / 2, currentY, canvas.width - 2 * padding, lineHeight, '12px Arial', '#555');
+      currentY += 5;
+
+      // Valid Until
       ctx.fillText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+      currentY += lineHeight + 10;
 
+      // User DNI
+      ctx.font = '12px Arial';
+      ctx.fillStyle = 'black';
+      ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+      currentY += lineHeight + 5;
+      
+      // User DOB
+      ctx.fillText(`Fecha Nac.: ${format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+      currentY += lineHeight + 10;
+
+      // Terms and Conditions
+      if (activePromotion.termsAndConditions) {
+        currentY = drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding, smallLineHeight, '10px Arial', '#777');
+      }
+      
       const link = document.createElement('a');
       link.href = canvas.toDataURL('image/png');
       link.download = `SocioVIP_QR_Detalles_${qrData.code}.png`;
@@ -416,7 +556,7 @@ export default function HomePage() {
       {pageViewState === 'qrDisplay' && qrData && activePromotion && (
         <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
-            <CardTitle className="text-3xl text-center">¡Bienvenido, {qrData.user.name}!</CardTitle>
+            <CardTitle className="text-3xl text-center">¡Bienvenido!</CardTitle>
             <CardDescription className="text-center text-primary-foreground/80">Tu QR para "{activePromotion.title}" está listo.</CardDescription>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
@@ -442,7 +582,13 @@ export default function HomePage() {
               </Button>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-3 text-center">
+              <h2 className="text-2xl font-semibold text-primary">{qrData.user.name} {qrData.user.surname}</h2>
+              <p><strong className="font-medium">DNI/CE:</strong> {qrData.user.dni}</p>
+              <p className="flex items-center justify-center"><Gift className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Cumpleaños:</strong> {format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}</p>
+            </div>
+            
+            <div className="space-y-3 border-t pt-4">
               <h3 className="text-lg font-semibold text-primary flex items-center"><Ticket className="mr-2 h-5 w-5"/> Detalles de la Promoción</h3>
               <p><strong className="font-medium">Título:</strong> {activePromotion.title}</p>
               <p><strong className="font-medium">Descripción:</strong> {activePromotion.description}</p>
@@ -451,13 +597,12 @@ export default function HomePage() {
                 {renderStatusIcon(qrData.status as QrCodeStatusGenerated)}
                 <strong className="font-medium ml-2">Estado:</strong> <span className="ml-1">{statusTranslations[qrData.status as QrCodeStatusGenerated]}</span>
               </p>
-            </div>
-
-            <div className="space-y-2 border-t pt-4">
-              <h3 className="text-lg font-semibold text-primary flex items-center"><User className="mr-2 h-5 w-5"/> Tus Datos (Cliente QR)</h3>
-              <p><strong className="font-medium">Nombre Completo:</strong> {qrData.user.name} {qrData.user.surname}</p>
-              <p><strong className="font-medium">DNI/CE:</strong> {qrData.user.dni}</p>
-              <p className="flex items-center"><Gift className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Cumpleaños:</strong> {format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}</p>
+              {activePromotion.termsAndConditions && (
+                <div className="text-xs text-muted-foreground pt-2">
+                    <h4 className="font-semibold mb-0.5">Términos y Condiciones:</h4>
+                    <p>{activePromotion.termsAndConditions}</p>
+                </div>
+              )}
             </div>
 
             <div className="text-sm text-muted-foreground p-3 bg-secondary rounded-md flex items-start">
@@ -636,3 +781,4 @@ export default function HomePage() {
     </div>
   );
 }
+

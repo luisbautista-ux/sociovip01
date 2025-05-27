@@ -34,6 +34,7 @@ const promotionFormSchema = z.object({
   isActive: z.boolean().default(true),
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
   aiHint: z.string().optional(),
+  termsAndConditions: z.string().optional(),
 }).refine(data => data.endDate >= data.startDate, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
   path: ["endDate"],
@@ -59,6 +60,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
       isActive: promotion?.isActive === undefined ? true : promotion.isActive,
       imageUrl: promotion?.imageUrl || "",
       aiHint: promotion?.aiHint || "",
+      termsAndConditions: promotion?.termsAndConditions || "",
     },
   });
 
@@ -87,6 +89,17 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
             <FormItem>
               <FormLabel>Descripción</FormLabel>
               <FormControl><Textarea placeholder="Detalles de la promoción..." {...field} rows={3} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="termsAndConditions"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
+              <FormControl><Textarea placeholder="Condiciones de la promoción..." {...field} rows={3} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -198,3 +211,4 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel }: Busines
     </Form>
   );
 }
+

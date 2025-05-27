@@ -8,6 +8,7 @@ export interface PromotionDetails { // For public display
   imageUrl: string;
   promoCode: string; // Unique code for this promotion, might be optional if QR is direct
   aiHint: string; // Hint for placeholder image
+  termsAndConditions?: string;
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'expired'; 
@@ -27,7 +28,6 @@ export interface QrClient {
 export interface QrCodeData {
   user: QrClient;
   promotion: PromotionDetails; // The public view of the promotion
-  // qrImageUrl: string; // No longer needed, will be generated on the fly
   code: string; // Validated promoCode used or a generated unique code for public flow
   status: 'generated' | 'utilized' | 'expired'; // Status for public flow QR
 }
@@ -99,12 +99,12 @@ export interface GeneratedCode {
   generatedByName: string; // Mock: "Business Admin" or specific staff name or promoter name
   generatedDate: string; // ISO Date string
   redemptionDate?: string; // ISO Date string, if redeemed
-  observation?: string; // Optional observation for the code
   redeemedByInfo?: { // Info of the client who redeemed this specific code
     dni: string;
     name: string;
     phone?: string; // Optional, if captured during a simplified redemption
   };
+  observation?: string; // Optional observation for the code
   isVipCandidate?: boolean; // Marked by Host during redemption
 }
 
@@ -130,6 +130,7 @@ export interface BusinessManagedEntity { // Promotions, Events, Surveys created 
   isActive: boolean;
   imageUrl?: string; // Optional image for the entity
   aiHint?: string;
+  termsAndConditions?: string;
   generatedCodes?: GeneratedCode[]; // Codes generated for this entity
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
@@ -240,6 +241,7 @@ export interface BusinessPromotionFormData {
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
+  termsAndConditions?: string;
 }
 
 export interface BusinessEventFormData {
@@ -251,6 +253,7 @@ export interface BusinessEventFormData {
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
+  termsAndConditions?: string;
 }
 
 export interface BusinessPromoterFormData { // For inviting/linking a promoter to the business globally
@@ -309,3 +312,4 @@ export interface BatchBoxFormData {
   description?: string; // Common description (optional)
   status: 'available' | 'unavailable'; // Initial status for all boxes in batch
 }
+
