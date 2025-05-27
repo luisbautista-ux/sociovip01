@@ -18,6 +18,8 @@ export default function AdminLayout({
   const router = useRouter();
 
   useEffect(() => {
+    // This useEffect is primarily for redirecting if currentUser is not available after auth check.
+    // Further role-based protection is handled in the return statement.
     if (!loadingAuth && !currentUser) {
       router.push("/login");
     }
@@ -33,7 +35,7 @@ export default function AdminLayout({
   }
 
   if (!currentUser) {
-    // This case is mainly a fallback if redirect hasn't happened yet
+    // This state is briefly shown if the useEffect redirect hasn't kicked in yet.
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
          <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
@@ -41,6 +43,7 @@ export default function AdminLayout({
     );
   }
 
+  // At this point, currentUser exists. Now check for profile loading.
   if (loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -50,8 +53,9 @@ export default function AdminLayout({
     );
   }
 
+  // Profile loading is complete. Check if userProfile exists.
   if (!userProfile) {
-    // Profile loaded, but not found for this UID
+    // Profile not found in Firestore for this authenticated user.
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -60,8 +64,8 @@ export default function AdminLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No se encontró un perfil de usuario en la base de datos para tu cuenta.
-              Asegúrate de que tu UID de autenticación ({currentUser.uid}) esté correctamente vinculado a un perfil con el rol 'superadmin' en la colección 'platformUsers'.
+              No se encontró un perfil de usuario en la base de datos para tu cuenta de autenticación (UID: {currentUser.uid}).
+              Asegúrate de que este UID esté correctamente vinculado a un perfil en la colección 'platformUsers' y que dicho perfil tenga un campo 'roles' (array de strings).
             </CardDescription>
             <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
               Cerrar Sesión e Ir a Login
@@ -72,7 +76,8 @@ export default function AdminLayout({
     );
   }
   
-  if (!userProfile.roles || !userProfile.roles.includes('superadmin')) {
+  // At this point, userProfile exists. Now check for specific roles.
+  if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('superadmin')) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -81,7 +86,8 @@ export default function AdminLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios (Super Administrador) para acceder a esta sección. Roles actuales: {userProfile.roles.join(', ') || 'Ninguno'}.
+              No tienes los permisos necesarios (Super Administrador) para acceder a esta sección. 
+              Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
               Si crees que esto es un error, por favor contacta al soporte.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
@@ -93,6 +99,7 @@ export default function AdminLayout({
     );
   }
 
+  // All checks passed, render the admin layout.
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />

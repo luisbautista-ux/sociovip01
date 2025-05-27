@@ -2,12 +2,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { LogOut, Menu } from "lucide-react"; // Removed ScanEye, kept Menu for potential mobile
+import { LogOut, Menu } from "lucide-react";
 import Link from "next/link";
 import { SocioVipLogo } from "@/components/icons";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react"; // Imported React
+import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; 
@@ -20,10 +20,10 @@ export default function HostLayout({
 }) {
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
-  const [isSheetOpen, setIsSheetOpen] = useState(false); // Not used yet, but good for future
+  const [isSheetOpen, setIsSheetOpen] = useState(false); 
 
-  const businessName = userProfile?.businessId && userProfile.name // Assuming business name might be part of host's profile or fetched differently
-    ? `${userProfile.name} (Anfitrión)` 
+  const businessName = userProfile?.businessId && userProfile.name 
+    ? `${userProfile.name} (Anfitrión)` // This might need adjustment based on actual business name source
     : "Anfitrión SocioVIP"; 
   const hostUserName = userProfile?.name || "Anfitrión";
 
@@ -80,7 +80,7 @@ export default function HostLayout({
    );
  }
   
-  if (!userProfile.roles || !userProfile.roles.includes('host')) {
+  if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('host')) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -89,7 +89,8 @@ export default function HostLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder al Panel de Anfitrión. Roles actuales: {userProfile.roles.join(', ') || 'Ninguno'}.
+              No tienes los permisos necesarios para acceder al Panel de Anfitrión. 
+              Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
               Ir a la Página Principal
@@ -109,7 +110,7 @@ export default function HostLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Tu perfil de anfitrión no está asociado a ningún negocio. Por favor, contacta al administrador.
+              Tu perfil de anfitrión requiere estar asociado a un negocio, pero no se encontró un ID de negocio vinculado. Por favor, contacta al administrador.
             </CardDescription>
             <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
               Cerrar Sesión
@@ -119,7 +120,6 @@ export default function HostLayout({
       </div>
     );
   }
-
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">

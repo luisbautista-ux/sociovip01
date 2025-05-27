@@ -3,12 +3,12 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { BarChart2, Gift, DollarSign, Menu, UserCircle, LogOut } from "lucide-react"; // Added LogOut
+import { BarChart2, Gift, DollarSign, Menu, UserCircle, LogOut } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons"; 
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation"; 
 import { useAuth } from "@/context/AuthContext";
-import React, { useEffect } from "react"; // Imported React
+import React, { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,10 +21,8 @@ const navItems = [
 ];
 
 
-function PromoterSidebarNav({ closeSheet }: { closeSheet?: () => void }) {
+function PromoterSidebarNav({ closeSheet, promoterName }: { closeSheet?: () => void, promoterName?: string }) {
   const pathname = usePathname(); 
-  const { userProfile } = useAuth();
-  const promoterName = userProfile?.name || "Promotor";
 
   return (
     <>
@@ -32,7 +30,7 @@ function PromoterSidebarNav({ closeSheet }: { closeSheet?: () => void }) {
         <UserCircle className="h-8 w-8 text-primary" />
         <div>
           <h1 className="text-md font-semibold text-primary">Panel Promotor</h1>
-          <p className="text-xs text-muted-foreground">{promoterName}</p>
+          {promoterName && <p className="text-xs text-muted-foreground">{promoterName}</p>}
         </div>
       </div>
       <nav className="flex-grow p-4 space-y-1">
@@ -55,10 +53,10 @@ function PromoterSidebarNav({ closeSheet }: { closeSheet?: () => void }) {
   );
 }
 
-function PromoterSidebar() {
+function PromoterSidebar({ promoterName }: { promoterName?: string }) {
   return (
     <aside className="w-60 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
-      <PromoterSidebarNav />
+      <PromoterSidebarNav promoterName={promoterName} />
       <div className="p-4 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">© {new Date().getFullYear()} SocioVIP Promotor</p>
       </div>
@@ -129,7 +127,7 @@ export default function PromoterLayout({
     );
   }
   
-  if (!userProfile.roles || !userProfile.roles.includes('promoter')) {
+  if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('promoter')) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -138,7 +136,8 @@ export default function PromoterLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder al Panel de Promotor. Roles actuales: {userProfile.roles.join(', ') || 'Ninguno'}.
+              No tienes los permisos necesarios para acceder al Panel de Promotor. 
+              Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
               Ir a la Página Principal
@@ -152,7 +151,7 @@ export default function PromoterLayout({
   return (
     <div className="flex min-h-screen bg-muted/40">
       <div className="hidden md:flex">
-          <PromoterSidebar /> 
+          <PromoterSidebar promoterName={userProfile?.name}/> 
       </div>
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
@@ -165,7 +164,7 @@ export default function PromoterLayout({
                     </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="p-0 w-60 bg-card">
-                    <PromoterSidebarNav closeSheet={() => setIsSheetOpen(false)} />
+                    <PromoterSidebarNav promoterName={userProfile?.name} closeSheet={() => setIsSheetOpen(false)} />
                      <div className="p-4 border-t border-border">
                         <p className="text-xs text-muted-foreground text-center">© {new Date().getFullYear()} SocioVIP Promotor</p>
                     </div>

@@ -70,7 +70,7 @@ export default function BusinessPanelLayout({
     );
   }
   
-  if (!userProfile.roles || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff'))) {
+  if (!userProfile.roles || !Array.isArray(userProfile.roles) || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff'))) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -79,7 +79,8 @@ export default function BusinessPanelLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder al Panel de Negocio (se requiere rol Admin Negocio o Staff). Roles actuales: {userProfile.roles.join(', ') || 'Ninguno'}.
+              No tienes los permisos necesarios para acceder al Panel de Negocio (se requiere rol Admin Negocio o Staff). 
+              Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
               Ir a la Página Principal
@@ -90,7 +91,9 @@ export default function BusinessPanelLayout({
     );
   }
   
-  if (!userProfile.businessId && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'))) {
+  // Check if businessId is associated if role requires it
+  const requiresBusinessId = userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff');
+  if (requiresBusinessId && !userProfile.businessId) {
     return (
        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -99,7 +102,7 @@ export default function BusinessPanelLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Tu perfil de usuario no está asociado a ningún negocio. Por favor, contacta al Super Administrador.
+              Tu perfil de usuario ({userProfile.roles.join(', ')}) requiere estar asociado a un negocio, pero no se encontró un ID de negocio vinculado. Por favor, contacta al Super Administrador.
             </CardDescription>
             <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
               Cerrar Sesión
@@ -109,7 +112,6 @@ export default function BusinessPanelLayout({
       </div>
     );
   }
-
 
   return (
     <div className="flex min-h-screen bg-background">
