@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +23,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { ALL_PLATFORM_USER_ROLES, PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
-
 
 const platformUserFormSchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
@@ -48,10 +47,10 @@ interface PlatformUserFormProps {
   user?: PlatformUser; 
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData, isEditingOperation: boolean) => Promise<void>; 
+  onSubmit: (data: PlatformUserFormData) => Promise<void>; 
   onCancel: () => void;
   isSubmitting?: boolean;
-  disableSubmitOverride?: boolean; // New prop to disable submit from parent
+  disableSubmitOverride?: boolean; 
 }
 
 export function PlatformUserForm({ 
@@ -68,7 +67,13 @@ export function PlatformUserForm({
 
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(platformUserFormSchema),
-    // Default values are set in useEffect to handle dynamic props
+    defaultValues: {
+      dni:  "",
+      name: "",
+      email: "",
+      roles: [],
+      businessId: undefined,
+    },
   });
 
   const watchedRoles = form.watch("roles", user?.roles || initialDataForCreation?.existingPlatformUserRoles || []);
@@ -91,18 +96,17 @@ export function PlatformUserForm({
         dni: initialDataForCreation.dni,
         name: initialDataForCreation.name || "",
         email: initialDataForCreation.email || "",
-        roles: initialDataForCreation.existingPlatformUserRoles || [], // Pre-fill roles if editing existing platform user
+        roles: initialDataForCreation.existingPlatformUserRoles || [],
         businessId: initialDataForCreation.existingPlatformUser?.businessId || undefined,
       });
-    } else if (!isEditing && !initialDataForCreation) { // Truly new, no DNI verification yet (or DNI was new)
+    } else if (!isEditing && !initialDataForCreation) {
         form.reset({ dni: "", name: "", email: "", roles: [], businessId: undefined });
     }
   }, [user, initialDataForCreation, isEditing, form]);
 
-  // Effect to clear businessId if roles no longer require it
   React.useEffect(() => {
     if (!showBusinessIdField && form.getValues('businessId')) {
-      form.setValue('businessId', undefined, { shouldValidate: true });
+      form.setValue('businessId', undefined); // Do not trigger validation here if just clearing
     }
   }, [showBusinessIdField, form]);
 
@@ -114,15 +118,11 @@ export function PlatformUserForm({
       roles: values.roles,
       businessId: showBusinessIdField ? values.businessId : undefined,
     };
-    await onSubmit(dataToSubmit, isEditing);
+    await onSubmit(dataToSubmit);
   };
 
-  // DNI field is disabled if:
-  // 1. We are editing an existing user (user prop is present).
-  // 2. We are in a creation flow AFTER DNI verification (initialDataForCreation prop is present).
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);
-  
-  const showPrePopulatedAlert = !isEditing && initialDataForCreation?.existingUserIsOtherType && !initialDataForCreation?.existingUserIsPlatformUser;
+  const showPrePopulatedAlert = !isEditing && initialDataForCreation?.existingUserType && initialDataForCreation.existingUserType !== 'PlatformUser';
 
   return (
     <Form {...form}>
@@ -130,7 +130,7 @@ export function PlatformUserForm({
         {showPrePopulatedAlert && (
           <Alert variant="default" className="bg-blue-50 border-blue-200">
             <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-700">DNI Encontrado como {initialDataForCreation?.existingUserType}</AlertTitle>
+            <AlertTitle className="text-blue-700">DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation?.existingUserType as PlatformUserRole] || initialDataForCreation?.existingUserType}</AlertTitle>
             <AlertDescription>
               Este DNI pertenece a un {initialDataForCreation?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Socio VIP'} existente.
               Se han pre-rellenado los datos conocidos. Por favor, complete y asigne roles de plataforma.
@@ -142,10 +142,10 @@ export function PlatformUserForm({
           name="dni"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>DNI / Carnet de Extranjería</FormLabel>
+              <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
               <FormControl>
                 <Input 
-                  placeholder="Número de documento" 
+                  placeholder="Ingrese el número de documento" 
                   {...field} 
                   disabled={isSubmitting || shouldDisableDni} 
                 />
@@ -161,7 +161,7 @@ export function PlatformUserForm({
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre Completo</FormLabel>
+              <FormLabel>Nombre Completo <span className="text-destructive">*</span></FormLabel>
               <FormControl>
                 <Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting} />
               </FormControl>
@@ -174,7 +174,7 @@ export function PlatformUserForm({
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email (para inicio de sesión)</FormLabel>
+              <FormLabel>Email (para inicio de sesión) <span className="text-destructive">*</span></FormLabel>
               <FormControl>
                 <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || (isEditing && !!user?.email)} />
               </FormControl>
@@ -185,7 +185,7 @@ export function PlatformUserForm({
         />
         
         <FormItem>
-          <FormLabel>Roles de Plataforma</FormLabel>
+          <FormLabel>Roles de Plataforma <span className="text-destructive">*</span></FormLabel>
           <div className="space-y-2">
             {ALL_PLATFORM_USER_ROLES.map((roleValue) => (
               <FormField
@@ -199,12 +199,23 @@ export function PlatformUserForm({
                         checked={field.value?.includes(roleValue)}
                         onCheckedChange={(checked) => {
                           const currentRoles = field.value || [];
-                          const newRoles = checked
-                            ? [...currentRoles, roleValue]
-                            : currentRoles.filter((value) => value !== roleValue);
+                          let newRoles: PlatformUserRole[];
+                          if (checked) {
+                            newRoles = [...currentRoles, roleValue];
+                          } else {
+                            newRoles = currentRoles.filter((value) => value !== roleValue);
+                          }
                           field.onChange(newRoles);
+                          // If "superadmin" is selected, ensure no other roles are selected
+                          if (roleValue === 'superadmin' && checked) {
+                            field.onChange(['superadmin']);
+                          }
+                          // If another role is selected and "superadmin" was previously selected, deselect "superadmin"
+                          if (roleValue !== 'superadmin' && checked && newRoles.includes('superadmin') && newRoles.length > 1) {
+                             field.onChange(newRoles.filter(r => r !== 'superadmin'));
+                          }
                         }}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || (roleValue !== 'superadmin' && watchedRoles.includes('superadmin'))}
                       />
                     </FormControl>
                     <FormLabel className="font-normal text-sm">
@@ -216,7 +227,7 @@ export function PlatformUserForm({
             ))}
           </div>
           <FormDescription className="text-xs">
-            La gestión detallada de permisos por rol múltiple se definirá en el backend.
+            Si selecciona "Super Admin", no podrá seleccionar otros roles.
           </FormDescription>
           <FormMessage>{form.formState.errors.roles?.message}</FormMessage>
         </FormItem>
@@ -227,7 +238,7 @@ export function PlatformUserForm({
             name="businessId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Negocio Asociado</FormLabel>
+                <FormLabel>Negocio Asociado <span className="text-destructive">*</span></FormLabel>
                 <Select 
                     onValueChange={field.onChange} 
                     value={field.value || ""} 

@@ -53,7 +53,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre del Negocio</FormLabel>
+              <FormLabel>Nombre del Negocio <span className="text-destructive">*</span></FormLabel>
               <FormControl>
                 <Input placeholder="Ej: Pandora Lounge Bar" {...field} disabled={isSubmitting} />
               </FormControl>
@@ -66,7 +66,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="contactEmail"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email de Contacto</FormLabel>
+              <FormLabel>Email de Contacto <span className="text-destructive">*</span></FormLabel>
               <FormControl>
                 <Input type="email" placeholder="Ej: contacto@negocio.com" {...field} disabled={isSubmitting} />
               </FormControl>
@@ -87,4 +87,3 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
     </Form>
   );
 }
-

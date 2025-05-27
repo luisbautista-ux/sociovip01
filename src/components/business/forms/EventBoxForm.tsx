@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -26,7 +27,7 @@ const eventBoxFormSchema = z.object({
   cost: z.coerce.number().min(0, "El costo no puede ser negativo."),
   description: z.string().optional(),
   status: z.enum(['available', 'unavailable'], { required_error: "Debes seleccionar un estado."}),
-  capacity: z.coerce.number().int().min(1, "La capacidad debe ser al menos 1.").optional(),
+  capacity: z.coerce.number().int().min(1, "La capacidad debe ser al menos 1.").optional().or(z.literal(undefined)),
   sellerName: z.string().optional(),
   ownerName: z.string().optional(),
   ownerDni: z.string().optional().refine(val => !val || (val.length >= 7 && val.length <= 15), {
@@ -51,14 +52,13 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       cost: eventBox?.cost || 0,
       description: eventBox?.description || "",
       status: eventBox?.status || 'available',
-      capacity: eventBox?.capacity || undefined,
+      capacity: eventBox?.capacity === undefined || eventBox?.capacity === null ? undefined : eventBox.capacity,
       sellerName: eventBox?.sellerName || "",
       ownerName: eventBox?.ownerName || "",
       ownerDni: eventBox?.ownerDni || "",
     },
   });
 
-  // Reset form if eventBox prop changes
   React.useEffect(() => {
     form.reset({
       name: eventBox?.name || "",
@@ -84,8 +84,8 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre del Box</FormLabel>
-              <FormControl><Input placeholder="Ej: Box A1 (Escenario)" {...field} disabled={isSubmitting} /></FormControl>
+              <FormLabel>Nombre del Box <span className="text-destructive">*</span></FormLabel>
+              <FormControl><Input placeholder="Ej: Box A1 (Escenario), Mesa VIP 5" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -95,7 +95,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           name="cost"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Costo (S/)</FormLabel>
+              <FormLabel>Costo (S/) <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input type="number" placeholder="500.00" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -107,7 +107,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Detalles del box..." {...field} rows={2} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del box, ej: Incluye 2 botellas y piqueos." {...field} rows={2} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -162,7 +162,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           name="status"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Estado</FormLabel>
+              <FormLabel>Estado <span className="text-destructive">*</span></FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                 <FormControl>
                   <SelectTrigger>
@@ -191,5 +191,3 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
     </Form>
   );
 }
-
-    

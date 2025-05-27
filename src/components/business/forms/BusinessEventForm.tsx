@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,7 +33,7 @@ const eventFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
-  maxAttendance: z.coerce.number().int().positive().optional().or(z.literal(0)).or(z.literal(undefined)), // 0 for unlimited
+  maxAttendance: z.coerce.number().int().min(0).optional().or(z.literal(undefined)), // Allow 0 for unlimited
   isActive: z.boolean().default(true),
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
   aiHint: z.string().optional(),
@@ -43,13 +45,20 @@ const eventFormSchema = z.object({
 type EventFormValues = z.infer<typeof eventFormSchema>;
 
 interface BusinessEventFormProps {
-  event?: BusinessManagedEntity; // For editing
+  event?: BusinessManagedEntity; 
   onSubmit: (data: BusinessEventFormData) => void;
-  onCancel: () => void; // Kept for symmetry, but main modal controls close
+  onCancel?: () => void; 
   isSubmitting?: boolean;
+  submitButtonText?: string;
 }
 
-export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = false }: BusinessEventFormProps) {
+export function BusinessEventForm({ 
+  event, 
+  onSubmit, 
+  onCancel, 
+  isSubmitting = false,
+  submitButtonText 
+}: BusinessEventFormProps) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: {
@@ -58,14 +67,13 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
       termsAndConditions: event?.termsAndConditions || "",
       startDate: event?.startDate ? new Date(event.startDate) : new Date(),
       endDate: event?.endDate ? new Date(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
-      maxAttendance: event?.maxAttendance || undefined,
+      maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
       aiHint: event?.aiHint || "",
     },
   });
 
-  // Watch for changes in event prop to reset form if a different event is selected for editing
   React.useEffect(() => {
     form.reset({
       name: event?.name || "",
@@ -73,7 +81,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
       termsAndConditions: event?.termsAndConditions || "",
       startDate: event?.startDate ? new Date(event.startDate) : new Date(),
       endDate: event?.endDate ? new Date(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
-      maxAttendance: event?.maxAttendance || undefined,
+      maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
       aiHint: event?.aiHint || "",
@@ -82,7 +90,11 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
 
 
   const handleSubmit = (values: EventFormValues) => {
-    onSubmit(values); // This now updates the 'editingEvent' state in the parent (BusinessEventsPage)
+    const dataToSubmit: BusinessEventFormData = {
+        ...values,
+        maxAttendance: values.maxAttendance === undefined || values.maxAttendance === null || values.maxAttendance < 0 ? 0 : values.maxAttendance,
+    };
+    onSubmit(dataToSubmit); 
   };
 
   return (
@@ -93,7 +105,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre del Evento</FormLabel>
+              <FormLabel>Nombre del Evento <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -104,7 +116,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Descripción</FormLabel>
+              <FormLabel>Descripción <span className="text-destructive">*</span></FormLabel>
               <FormControl><Textarea placeholder="Detalles del evento..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -116,7 +128,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
           render={({ field }) => (
             <FormItem>
               <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -127,7 +139,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
             name="startDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Inicio</FormLabel>
+                <FormLabel>Fecha de Inicio <span className="text-destructive">*</span></FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -150,7 +162,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
             name="endDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Fin</FormLabel>
+                <FormLabel>Fecha de Fin <span className="text-destructive">*</span></FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -176,6 +188,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
             <FormItem>
               <FormLabel>Aforo Máximo (Opcional)</FormLabel>
               <FormControl><Input type="number" placeholder="Ej: 150 (0 para ilimitado)" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} disabled={isSubmitting} /></FormControl>
+               <FormDescription>Dejar en 0 o vacío para aforo ilimitado.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -213,7 +226,7 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
               <div className="space-y-0.5">
-                <FormLabel>Activar Evento</FormLabel>
+                <FormLabel>Activar Evento <span className="text-destructive">*</span></FormLabel>
                 <FormMessage />
               </div>
               <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
@@ -221,16 +234,13 @@ export function BusinessEventForm({ event, onSubmit, onCancel, isSubmitting = fa
           )}
         />
         <DialogFooter className="pt-6">
-           {/* The main "Save Event and Close" button is in the parent Dialog (BusinessEventsPage) */}
-           {/* This button saves the current tab's details to the editingEvent state */}
+          {onCancel && <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button> }
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar Cambios en Detalles
+            {submitButtonText || (event ? "Guardar Cambios en Detalles" : "Crear Evento")}
           </Button>
         </DialogFooter>
       </form>
     </Form>
   );
 }
-
-    

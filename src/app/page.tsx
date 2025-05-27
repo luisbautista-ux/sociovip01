@@ -147,7 +147,7 @@ export default function HomePage() {
           toast({ title: "Error al generar QR", description: "No se pudo generar el código QR.", variant: "destructive" });
         });
     } else {
-      setGeneratedQrDataUrl(null); // Clear QR when not in display view or no code
+      setGeneratedQrDataUrl(null); 
     }
   }, [qrData, pageViewState, toast]);
 
@@ -184,25 +184,27 @@ export default function HomePage() {
   const handleDniSubmitInModal = async (values: z.infer<typeof dniSchema>) => {
     if (!activePromotion || !validatedPromoCode) return;
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
     setIsLoading(false);
 
     setEnteredDniOriginal(values.dni);
 
+    // TODO: Replace with actual API call to check DNI and fetch user data if exists
+    // For now, use mockExistingQrClient
     if (values.dni === mockExistingQrClient.dni) {
       const newQrData: QrCodeData = {
         user: mockExistingQrClient,
         promotion: activePromotion,
-        code: validatedPromoCode,
+        code: validatedPromoCode, // This should be the unique generated code, not promoCode itself for real scenario
         status: "available",
       };
       setQrData(newQrData);
       setShowDniModal(false);
       setPageViewState("qrDisplay");
-      toast({ title: `Bienvenido de vuelta ${mockExistingQrClient.name}!`, description: "Tu QR ha sido generado." });
+      toast({ title: `¡Bienvenido de vuelta ${mockExistingQrClient.name}!`, description: "Tu QR ha sido generado." });
     } else {
       setCurrentStepInModal("newQrClientForm");
-      newQrClientForm.reset({
+      newQrClientForm.reset({ // Pre-fill DNI in the new client form
         dni: values.dni,
         name: "", surname: "", phone: "", dob: undefined,
       });
@@ -212,31 +214,34 @@ export default function HomePage() {
 
   const processNewQrClientRegistration = (qrClientData: QrClient) => {
     if (!activePromotion || !validatedPromoCode) return;
+    // TODO: Replace with actual API call to register new QrClient
+
     const newQrData: QrCodeData = {
       user: qrClientData,
       promotion: activePromotion,
-      code: validatedPromoCode,
+      code: validatedPromoCode, // This should be a unique generated code for this user & promo
       status: "available",
     };
     setQrData(newQrData);
     setShowDniModal(false);
     setPageViewState("qrDisplay");
-    toast({ title: `Bienvenido ${qrClientData.name}!`, description: "Tu QR ha sido generado con éxito." });
+    toast({ title: `¡Bienvenido ${qrClientData.name}!`, description: "Tu QR ha sido generado con éxito." });
   }
 
   const handleNewQrClientSubmitInModal = async (values: NewQrClientFormData) => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
     setIsLoading(false);
 
+    // Check if the DNI entered in this form (which could have been changed) now matches an existing user
     if (values.dni === mockExistingQrClient.dni && values.dni !== enteredDniOriginal) {
-      setFormDataForDniWarning(values);
+      setFormDataForDniWarning(values); // Store current form data
       setShowDniExistsWarningDialog(true);
-      return;
+      return; // Stop further processing until user confirms in the dialog
     }
 
     const newQrClient: QrClient = {
-      id: `qrclient-${Date.now()}`,
+      id: `qrclient-${Date.now()}`, // Mock ID generation
       name: values.name,
       surname: values.surname,
       phone: values.phone,
@@ -250,6 +255,7 @@ export default function HomePage() {
   const handleDniExistsConfirmation = (confirmed: boolean) => {
     setShowDniExistsWarningDialog(false);
     if (confirmed && formDataForDniWarning) {
+      // User confirmed it's their DNI, pre-fill with existing data
       newQrClientForm.reset({
         dni: mockExistingQrClient.dni,
         name: mockExistingQrClient.name,
@@ -259,9 +265,10 @@ export default function HomePage() {
       });
       toast({ title: "Datos Precargados", description: "Hemos rellenado el formulario con tus datos existentes. Revisa y confirma." });
     } else if (!confirmed && formDataForDniWarning) {
+       // User said "No", revert to the data they were trying to submit
        newQrClientForm.reset(formDataForDniWarning);
     }
-    setFormDataForDniWarning(null);
+    setFormDataForDniWarning(null); // Clear temp data
   };
 
   const resetProcess = () => {
@@ -279,8 +286,8 @@ export default function HomePage() {
   const handleCloseDniModal = () => {
     setShowDniModal(false);
     dniForm.reset();
-    newQrClientForm.reset();
-    setEnteredDniOriginal(null);
+    newQrClientForm.reset(); // Ensure new client form is also reset
+    setEnteredDniOriginal(null); // Clear the DNI that initiated the modal flow
   }
 
   const renderStatusIcon = (status: QrCodeStatusGenerated) => {
@@ -297,8 +304,8 @@ export default function HomePage() {
       return;
     }
 
-    const businessName = "Pandora Lounge Bar"; // Mock
-    const businessLogoUrl = "https://placehold.co/120x40.png"; // Mock, e.g., SocioVIP logo or business logo
+    const businessName = "Pandora Lounge Bar"; 
+    const businessLogoUrl = "https://placehold.co/120x40.png?text=Pandora"; 
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -307,45 +314,30 @@ export default function HomePage() {
       return;
     }
 
-    // --- Configuration ---
-    const canvasWidth = 320; // Increased width
+    const canvasWidth = 320; 
     const padding = 20;
     const lineHeightMultiplier = 1.3;
 
-    // Theme Colors (from globals.css or SocioVIP proposal)
-    const headerColor = 'hsl(283, 44%, 53%)'; // Vibrant Purple (Primary)
-    const headerTextColor = 'hsl(0, 0%, 98%)';  // White (Primary Foreground)
-    const primaryTextColor = 'hsl(283, 44%, 53%)'; // Vibrant Purple
-    const defaultTextColor = 'hsl(0, 0%, 3.9%)';  // Dark Gray / Black
-    const mutedTextColor = 'hsl(0, 0%, 45.1%)';   // Medium Gray
-    const canvasBackgroundColor = 'hsl(280, 13%, 96%)'; // Light Gray EAE4EC (adjusting HSL)
+    const headerColor = 'hsl(283, 44%, 53%)'; 
+    const headerTextColor = 'hsl(0, 0%, 98%)';  
+    const primaryTextColor = 'hsl(283, 44%, 53%)'; 
+    const defaultTextColor = 'hsl(0, 0%, 3.9%)';  
+    const mutedTextColor = 'hsl(0, 0%, 45.1%)';   
+    const canvasBackgroundColor = 'hsl(280, 13%, 96%)';
 
-    // Font Sizes
-    const businessNameFontSize = 14;
+    const maxLogoHeight = 50; 
+    const logoNameSpacing = 20; 
+    const headerBottomMargin = 40; 
     const promoTitleFontSize = 18;
+    const qrSectionSpacing = 15; 
     const userNameFontSize = 22;
     const dniFontSize = 13;
-    const defaultTextFontSize = 13;
-    const smallTextFontSize = 10; // For terms
+    const detailsTextFontSize = 13;
+    const smallTextFontSize = 10; 
 
-    // QR and Layout
-    const qrDisplaySize = 180; // Slightly reduced to make space
+    const qrDisplaySize = 180; 
     const qrBorderColor = primaryTextColor;
     const qrBorderWidth = 2;
-
-    // Logo
-    const maxLogoHeight = 50; // Increased height for logo
-    const maxLogoWidth = canvasWidth - 2 * padding;
-
-    // Spacing constants
-    let spacingAfterLogo = 20; // Space between logo and business name text
-    const spacingAfterBusinessName = 40; // Space after the entire header block (logo+biz name) and before promo title
-    const spacingAfterPromoTitle = 15; // Space after promo title, before QR
-    const spacingBeforeQr = 10; // Reduced space before QR
-    const spacingAfterQr = 20; // Space after QR, before user name
-    const spacingAfterUserName = 5; // Space after user name, before DNI
-    const spacingAfterDni = 15; // Space after DNI, before valid until
-    const spacingAfterValidUntil = 10; // Space after valid until, before terms
 
     const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number, fontWeight: string, color: string, textAlign: CanvasTextAlign = 'center', fontName: string = 'Arial') => {
         ctx.font = `${fontWeight} ${fontSize}px ${fontName}`;
@@ -369,7 +361,7 @@ export default function HomePage() {
             }
         }
         ctx.fillText(line.trim(), x, currentYPos);
-        return currentYPos + actualLineHeight / lineHeightMultiplier; // Return baseline of the last line drawn
+        return currentYPos + actualLineHeight; 
     };
 
     const businessLogoImg = new window.Image();
@@ -385,29 +377,24 @@ export default function HomePage() {
                 const aspectRatio = businessLogoImg.naturalWidth / businessLogoImg.naturalHeight;
                 actualLogoHeight = maxLogoHeight;
                 actualLogoWidth = actualLogoHeight * aspectRatio;
-                if (actualLogoWidth > maxLogoWidth) {
-                    actualLogoWidth = maxLogoWidth;
+                if (actualLogoWidth > canvasWidth - 2 * padding) {
+                    actualLogoWidth = canvasWidth - 2 * padding;
                     actualLogoHeight = actualLogoWidth / aspectRatio;
                 }
             }
-
-            // Calculate height needed for header content (logo + space + business name)
-            let headerContentInternalHeight = actualLogoHeight;
-            if (actualLogoHeight > 0) {
-                headerContentInternalHeight += spacingAfterLogo; // User-requested space
-            }
-            headerContentInternalHeight += (businessNameFontSize * lineHeightMultiplier); // Approximate height for business name
-
-            const fullContentHeaderHeight = padding + headerContentInternalHeight + padding;
-            const headerBackgroundDrawnHeight = fullContentHeaderHeight - 15;
+            
+            const businessNameFontSize = 14;
+            ctx.font = `normal ${businessNameFontSize}px Arial`;
+            const businessNameHeight = businessNameFontSize * lineHeightMultiplier;
+            
+            const headerContentHeight = actualLogoHeight + (actualLogoHeight > 0 ? logoNameSpacing : 0) + businessNameHeight;
+            const headerBackgroundHeight = headerContentHeight + padding * 2 - 15;
 
 
-            // --- Calculate total canvas height dynamically ---
-            let calculatedHeight = headerBackgroundDrawnHeight; // Start with the (potentially reduced) header background height
-            calculatedHeight += spacingAfterBusinessName; // Space after the header block (user requested 40)
+            let calculatedHeight = headerBackgroundHeight;
+            calculatedHeight += headerBottomMargin;
 
-            // Promotion/Event Title height
-            const tempCtx = document.createElement('canvas').getContext('2d')!; // For text measurement
+            const tempCtx = document.createElement('canvas').getContext('2d')!;
             tempCtx.font = `bold ${promoTitleFontSize}px Arial`;
             let lineCount = 1;
             let currentLine = '';
@@ -420,31 +407,25 @@ export default function HomePage() {
                 }
             });
             calculatedHeight += (lineCount * promoTitleFontSize * lineHeightMultiplier);
-            calculatedHeight += spacingBeforeQr; // Space before QR
+            calculatedHeight += qrSectionSpacing;
 
-            // QR Image height
             calculatedHeight += qrDisplaySize + qrBorderWidth * 2;
-            calculatedHeight += spacingAfterQr; // Space after QR
+            calculatedHeight += qrSectionSpacing + 5; // Increased space after QR
 
-            // User Name height
             calculatedHeight += userNameFontSize * lineHeightMultiplier;
-            calculatedHeight += spacingAfterUserName; // Space after user name before DNI
-
-            // DNI height
+            calculatedHeight += 5; 
             calculatedHeight += dniFontSize * lineHeightMultiplier;
-            calculatedHeight += spacingAfterDni; // Space after DNI
+            calculatedHeight += 15; 
 
-            // Valid Until height
-            calculatedHeight += defaultTextFontSize * lineHeightMultiplier;
-            calculatedHeight += spacingAfterValidUntil; // Space after valid until
+            calculatedHeight += detailsTextFontSize * lineHeightMultiplier; 
+            calculatedHeight += 10;
 
-            // Terms and Conditions height
             if (activePromotion.termsAndConditions) {
                 tempCtx.font = `normal ${smallTextFontSize}px Arial`;
                 lineCount = 1;
                 currentLine = '';
                 activePromotion.termsAndConditions.split(' ').forEach(word => {
-                    if (tempCtx.measureText(currentLine + word + ' ').width > canvasWidth - 2 * padding - 10) { // Slightly less width for terms
+                    if (tempCtx.measureText(currentLine + word + ' ').width > canvasWidth - 2 * padding - 10) {
                         lineCount++;
                         currentLine = word + ' ';
                     } else {
@@ -453,64 +434,51 @@ export default function HomePage() {
                 });
                 calculatedHeight += (lineCount * smallTextFontSize * lineHeightMultiplier);
             }
-            calculatedHeight += padding; // Bottom padding
+            calculatedHeight += padding;
 
             canvas.width = canvasWidth;
             canvas.height = Math.ceil(calculatedHeight);
 
-            // --- Start Drawing ---
             ctx.fillStyle = canvasBackgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Header Background
             ctx.fillStyle = headerColor;
-            ctx.fillRect(0, 0, canvas.width, headerBackgroundDrawnHeight);
+            ctx.fillRect(0, 0, canvas.width, headerBackgroundHeight);
 
-            let currentY = padding; // Reset Y for drawing content within the header
+            let currentY = padding;
 
-            // Draw Logo (centered)
             if (actualLogoWidth > 0 && actualLogoHeight > 0) {
                 const logoX = (canvas.width - actualLogoWidth) / 2;
                 ctx.drawImage(businessLogoImg, logoX, currentY, actualLogoWidth, actualLogoHeight);
-                currentY += actualLogoHeight;
+                currentY += actualLogoHeight + logoNameSpacing;
             } else {
-                currentY += maxLogoHeight; // Reserve space even if logo fails
+                currentY += maxLogoHeight + logoNameSpacing; 
             }
-            currentY += spacingAfterLogo; // Space between logo and business name text
 
-            // Draw Business Name (below logo, centered)
             currentY = drawWrappedText(businessName, canvas.width / 2, currentY, canvas.width - 2 * padding, businessNameFontSize, 'normal', headerTextColor, 'center');
             
-            // currentY is now at the bottom of the business name text.
-            // Set currentY for content AFTER the header background block
-            currentY = headerBackgroundDrawnHeight + spacingAfterBusinessName;
+            currentY = headerBackgroundHeight + headerBottomMargin;
 
-            // Draw Promotion/Event Title (Centered)
             currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, promoTitleFontSize, 'bold', primaryTextColor, 'center');
-            currentY += spacingBeforeQr; // Add space before QR
+            currentY += qrSectionSpacing;
 
-            // Draw QR Image (Centered)
             const qrX = (canvas.width - qrDisplaySize) / 2;
-            const qrY = currentY; // currentY is already at the correct position after title and spacing
+            const qrY = currentY;
             ctx.drawImage(qrImg, qrX, qrY, qrDisplaySize, qrDisplaySize);
             ctx.strokeStyle = qrBorderColor;
             ctx.lineWidth = qrBorderWidth;
             ctx.strokeRect(qrX - qrBorderWidth / 2, qrY - qrBorderWidth / 2, qrDisplaySize + qrBorderWidth, qrDisplaySize + qrBorderWidth);
-            currentY += qrDisplaySize + qrBorderWidth * 2 + spacingAfterQr;
+            currentY += qrDisplaySize + qrBorderWidth * 2 + qrSectionSpacing + 5;
 
-            // Draw User Name (Centered)
             currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY, canvas.width - 2 * padding, userNameFontSize, 'bold', primaryTextColor, 'center');
-            currentY += spacingAfterUserName;
+            currentY += 5;
 
-            // Draw DNI (Centered, below user name)
             currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY, canvas.width - 2 * padding, dniFontSize, 'normal', defaultTextColor, 'center');
-            currentY += spacingAfterDni;
+            currentY += 15;
 
-            // Draw Valid Until (Centered)
-            currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY, canvas.width - 2 * padding, defaultTextFontSize, 'normal', mutedTextColor, 'center');
-            currentY += spacingAfterValidUntil;
+            currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY, canvas.width - 2 * padding, detailsTextFontSize, 'normal', mutedTextColor, 'center');
+            currentY += 10;
 
-            // Draw Terms and Conditions (Centered)
             if (activePromotion.termsAndConditions) {
               drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding - 10, smallTextFontSize, 'normal', mutedTextColor, 'center');
             }
@@ -526,9 +494,9 @@ export default function HomePage() {
         };
         businessLogoImg.onerror = () => {
             console.error("Failed to load business logo for canvas. Drawing without it.");
-            businessLogoImg.onload!(); // Trigger onload logic even if image failed to load to continue canvas drawing
+            businessLogoImg.onload!(); 
         };
-        businessLogoImg.src = `${businessLogoUrl}?text=${encodeURIComponent(businessName.substring(0,10))}&width=${maxLogoWidth}&height=${maxLogoHeight}`; // Using placehold.co for mock logo
+        businessLogoImg.src = `${businessLogoUrl}?text=${encodeURIComponent(businessName.substring(0,10))}&width=${canvasWidth - 2*padding}&height=${maxLogoHeight}`; 
 
     };
     qrImg.onerror = () => {
@@ -559,9 +527,9 @@ export default function HomePage() {
             name="promoCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="sr-only">Código de Promoción</FormLabel>
+                <FormLabel className="sr-only">Código de Promoción <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
-                  <Input placeholder="Ingresar código" {...field} className="text-sm tracking-wider" maxLength={9} />
+                  <Input placeholder="Ingresar código (9 caracteres)" {...field} className="text-sm tracking-wider" maxLength={9} />
                 </FormControl>
                 <FormMessage className="text-xs"/>
               </FormItem>
@@ -703,9 +671,9 @@ export default function HomePage() {
                   name="dni"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>DNI / Carnet de Extranjería</FormLabel>
+                      <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="Tu número de documento" {...field} className="text-center text-lg"/>
+                        <Input placeholder="Ingresa tu número de documento" {...field} className="text-center text-lg"/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -729,7 +697,7 @@ export default function HomePage() {
                   name="dni"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>DNI / Carnet de Extranjería</FormLabel>
+                      <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input placeholder="Tu número de documento" {...field} />
                       </FormControl>
@@ -742,8 +710,8 @@ export default function HomePage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre(s)</FormLabel>
-                      <FormControl><Input placeholder="Tus nombres" {...field} /></FormControl>
+                      <FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input placeholder="Ingresa tus nombres" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -753,8 +721,8 @@ export default function HomePage() {
                   name="surname"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Apellido(s)</FormLabel>
-                      <FormControl><Input placeholder="Tus apellidos" {...field} /></FormControl>
+                      <FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input placeholder="Ingresa tus apellidos" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -764,8 +732,8 @@ export default function HomePage() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Celular</FormLabel>
-                      <FormControl><Input type="tel" placeholder="Tu número de celular" {...field} /></FormControl>
+                      <FormLabel>Celular <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input type="tel" placeholder="Ingresa tu número de celular" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -775,7 +743,7 @@ export default function HomePage() {
                   name="dob"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Fecha de Nacimiento</FormLabel>
+                      <FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -845,4 +813,3 @@ export default function HomePage() {
     </div>
   );
 }
-

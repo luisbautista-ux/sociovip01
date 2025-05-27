@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import type { GeneratedCode } from "@/lib/types";
-import { CheckCircle, Copy, PlusCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle, Copy, PlusCircle, Loader2 } from "lucide-react"; // Added Loader2
 import { useToast } from "@/hooks/use-toast";
 
 function generateAlphanumericCode(length: number): string {
@@ -26,7 +26,8 @@ interface CreateCodesDialogProps {
   entityName: string;
   entityId: string;
   onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string) => void;
-  existingCodesValues: string[]; // Pass only values of existing codes for uniqueness check
+  existingCodesValues: string[]; 
+  isSubmitting?: boolean; // Added for consistency
 }
 
 export function CreateCodesDialog({ 
@@ -35,7 +36,8 @@ export function CreateCodesDialog({
     entityName, 
     entityId, 
     onCodesCreated,
-    existingCodesValues 
+    existingCodesValues,
+    isSubmitting = false, // Default to false
 }: CreateCodesDialogProps) {
   const [numCodes, setNumCodes] = useState(1);
   const [observation, setObservation] = useState("");
@@ -53,7 +55,7 @@ export function CreateCodesDialog({
   }, [open]);
 
   const handleCreateCodes = () => {
-    if (numCodes < 1 || numCodes > 50) { // Increased max to 50
+    if (numCodes < 1 || numCodes > 50) { 
       toast({
         title: "Cantidad Inválida",
         description: "Por favor, ingresa un número entre 1 y 50.",
@@ -67,16 +69,29 @@ export function CreateCodesDialog({
 
     for (let i = 0; i < numCodes; i++) {
       let newCodeValue = generateAlphanumericCode(9);
-      while (currentAndNewCodes.has(newCodeValue)) {
-        newCodeValue = generateAlphanumericCode(9); // Regenerate if not unique
+      let attemptCount = 0;
+      const maxAttempts = 100; // Prevent infinite loop if character space is too small for many codes
+
+      while (currentAndNewCodes.has(newCodeValue) && attemptCount < maxAttempts) {
+        newCodeValue = generateAlphanumericCode(9); 
+        attemptCount++;
       }
+      if (attemptCount >= maxAttempts) {
+        toast({
+            title: "Error al generar código único",
+            description: "No se pudo generar un código único después de varios intentos. Intente con menos códigos o más tarde.",
+            variant: "destructive"
+        });
+        return; // Stop if we can't find a unique code
+      }
+
       currentAndNewCodes.add(newCodeValue);
       newCodesBatch.push({
-        id: `code-${entityId}-${Date.now()}-${i}`,
+        id: `code-${entityId}-${Date.now()}-${i}`, // Consider a more robust ID generation if needed
         entityId: entityId,
         value: newCodeValue,
         status: "available",
-        generatedByName: "Negocio (Mock)", // Placeholder
+        generatedByName: "Negocio", // Updated to be more generic
         generatedDate: new Date().toISOString(),
         observation: observation || undefined,
       });
@@ -100,11 +115,18 @@ export function CreateCodesDialog({
 
   const handleCloseAndReset = () => {
     onOpenChange(false); 
-    // Reset is handled by useEffect on 'open'
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleCloseAndReset}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+        if (!isOpen) { // Reset states when dialog is closed
+            setNumCodes(1);
+            setObservation("");
+            setShowSuccess(false);
+            setJustCreatedCodes([]);
+        }
+        onOpenChange(isOpen);
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -112,7 +134,7 @@ export function CreateCodesDialog({
           </DialogTitle>
           {!showSuccess && (
             <DialogDescription>
-              Define la cantidad de códigos y una observación opcional.
+              Define la cantidad de códigos y una observación opcional que se aplicará a todos los códigos de este lote.
             </DialogDescription>
           )}
         </DialogHeader>
@@ -120,7 +142,7 @@ export function CreateCodesDialog({
         {!showSuccess ? (
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">Cantidad de Códigos (1-50)</Label>
+              <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">Cantidad de Códigos (1-50) <span className="text-destructive">*</span></Label>
               <Input
                 id="numCodesToGenerate"
                 type="number"
@@ -129,6 +151,7 @@ export function CreateCodesDialog({
                 value={numCodes}
                 onChange={(e) => setNumCodes(parseInt(e.target.value, 10) || 1)}
                 className="mt-1"
+                disabled={isSubmitting}
               />
             </div>
             <div>
@@ -140,6 +163,7 @@ export function CreateCodesDialog({
                 onChange={(e) => setObservation(e.target.value)}
                 className="mt-1"
                 rows={3}
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -163,8 +187,9 @@ export function CreateCodesDialog({
             <Button onClick={handleCloseAndReset} className="w-full" variant="outline">Cerrar</Button>
           ) : (
             <>
-              <Button variant="outline" onClick={handleCloseAndReset}>Cancelar</Button>
-              <Button onClick={handleCreateCodes} className="bg-primary hover:bg-primary/90">
+              <Button variant="outline" onClick={handleCloseAndReset} disabled={isSubmitting}>Cancelar</Button>
+              <Button onClick={handleCreateCodes} className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <PlusCircle className="mr-2 h-4 w-4" /> Crear Códigos
               </Button>
             </>

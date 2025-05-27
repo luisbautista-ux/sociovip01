@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -46,7 +47,6 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
     },
   });
 
-  // Reset form if promoterLink prop changes
   React.useEffect(() => {
     form.reset({
       promoterName: promoterLink?.promoterProfile?.name || "",
@@ -69,7 +69,7 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
           name="promoterName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre del Promotor</FormLabel>
+              <FormLabel>Nombre del Promotor <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input placeholder="Ej: Juan Pérez" {...field} disabled={isEditing || isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -80,7 +80,7 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
           name="promoterEmail"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email del Promotor</FormLabel>
+              <FormLabel>Email del Promotor <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input type="email" placeholder="Ej: juan.promotor@example.com" {...field} disabled={isEditing || isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -103,7 +103,7 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
           render={({ field }) => (
             <FormItem>
               <FormLabel>Tasa de Comisión (Ej: 10% o S/5 por código)</FormLabel>
-              <FormControl><Input placeholder="Definir comisión" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Definir comisión para este negocio" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -121,5 +121,3 @@ export function BusinessPromoterForm({ promoterLink, onSubmit, onCancel, isEditi
     </Form>
   );
 }
-
-    

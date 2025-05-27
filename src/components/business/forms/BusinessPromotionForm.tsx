@@ -43,7 +43,7 @@ const promotionFormSchema = z.object({
 type PromotionFormValues = z.infer<typeof promotionFormSchema>;
 
 interface BusinessPromotionFormProps {
-  promotion?: BusinessManagedEntity; // For editing
+  promotion?: BusinessManagedEntity; 
   onSubmit: (data: BusinessPromotionFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -77,7 +77,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre de la Promoción</FormLabel>
+              <FormLabel>Nombre de la Promoción <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input placeholder="Ej: 2x1 en Cervezas" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -88,7 +88,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Descripción</FormLabel>
+              <FormLabel>Descripción <span className="text-destructive">*</span></FormLabel>
               <FormControl><Textarea placeholder="Detalles de la promoción..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -100,7 +100,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           render={({ field }) => (
             <FormItem>
               <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Condiciones de la promoción..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones de la promoción, ej: Válido solo para consumo en local." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -111,7 +111,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             name="startDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Inicio</FormLabel>
+                <FormLabel>Fecha de Inicio <span className="text-destructive">*</span></FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -134,7 +134,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             name="endDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Fin</FormLabel>
+                <FormLabel>Fecha de Fin <span className="text-destructive">*</span></FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -197,7 +197,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
               <div className="space-y-0.5">
-                <FormLabel>Activar Promoción</FormLabel>
+                <FormLabel>Activar Promoción <span className="text-destructive">*</span></FormLabel>
                 <FormMessage />
               </div>
               <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
@@ -215,5 +215,3 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     </Form>
   );
 }
-
-    

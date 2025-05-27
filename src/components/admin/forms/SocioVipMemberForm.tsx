@@ -27,6 +27,8 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { SocioVipMember, SocioVipMemberFormData, InitialDataForSocioVipCreation } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
+import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
+
 
 const socioVipMemberFormSchema = z.object({
   name: z.string().min(2, "Nombre es requerido."),
@@ -45,8 +47,8 @@ const socioVipMemberFormSchema = z.object({
 type SocioVipMemberFormValues = z.infer<typeof socioVipMemberFormSchema>;
 
 interface SocioVipMemberFormProps {
-  member?: SocioVipMember; // For editing
-  initialData?: InitialDataForSocioVipCreation; // For creation after DNI verification
+  member?: SocioVipMember; 
+  initialData?: InitialDataForSocioVipCreation; 
   onSubmit: (data: SocioVipMemberFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -72,11 +74,11 @@ export function SocioVipMemberForm({
       phone: "",
       dob: undefined,
       email: "",
-      address: "",     // Initialize optional strings to ""
-      profession: "",  // Initialize optional strings to ""
-      preferences: "", // Initialize optional strings to ""
+      address: "",     
+      profession: "",  
+      preferences: "", 
       loyaltyPoints: 0,
-      membershipStatus: 'active', // Default for new members or if undefined
+      membershipStatus: 'active', 
     },
   });
 
@@ -122,7 +124,7 @@ export function SocioVipMemberForm({
   };
 
   const shouldDisableDniField = isEditing || (!isEditing && !!initialData?.dni);
-  const showPrePopulatedAlert = !isEditing && initialData?.existingUserType;
+  const showPrePopulatedAlert = !isEditing && initialData?.preExistingUserType;
 
   return (
     <Form {...form}>
@@ -131,10 +133,10 @@ export function SocioVipMemberForm({
           <Alert variant="default" className="bg-blue-50 border-blue-200">
             <Info className="h-4 w-4 text-blue-600" />
             <AlertTitle className="text-blue-700">
-              DNI Encontrado como {initialData?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'}
+              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialData?.preExistingUserType as PlatformUserRole] || initialData?.preExistingUserType}
             </AlertTitle>
             <AlertDescription>
-              Este DNI pertenece a un {initialData?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
+              Este DNI pertenece a un {initialData?.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
               Se han pre-rellenado los datos conocidos. Por favor, complete la información para registrarlo como Socio VIP.
             </AlertDescription>
           </Alert>
@@ -144,8 +146,8 @@ export function SocioVipMemberForm({
             name="dni"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>DNI / Carnet de Extranjería</FormLabel>
-                <FormControl><Input placeholder="Documento de identidad" {...field} disabled={isSubmitting || shouldDisableDniField} /></FormControl>
+                <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input placeholder="Ingrese el documento de identidad" {...field} disabled={isSubmitting || shouldDisableDniField} /></FormControl>
                 {shouldDisableDniField && !isEditing && <FormDescription className="text-xs">El DNI ha sido verificado y no puede cambiarse en este paso.</FormDescription>}
                 {isEditing && <FormDescription className="text-xs">El DNI no puede ser modificado para socios existentes.</FormDescription>}
                 <FormMessage />
@@ -158,8 +160,8 @@ export function SocioVipMemberForm({
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nombre(s)</FormLabel>
-                <FormControl><Input placeholder="Nombres del socio" {...field} disabled={isSubmitting} /></FormControl>
+                <FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input placeholder="Ingrese los nombres del socio" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -169,8 +171,8 @@ export function SocioVipMemberForm({
             name="surname"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Apellido(s)</FormLabel>
-                <FormControl><Input placeholder="Apellidos del socio" {...field} disabled={isSubmitting} /></FormControl>
+                <FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input placeholder="Ingrese los apellidos del socio" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -182,8 +184,8 @@ export function SocioVipMemberForm({
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Celular</FormLabel>
-                <FormControl><Input type="tel" placeholder="Número de celular" {...field} disabled={isSubmitting} /></FormControl>
+                <FormLabel>Celular <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input type="tel" placeholder="Ingrese el número de celular" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -193,7 +195,7 @@ export function SocioVipMemberForm({
             name="dob"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Nacimiento</FormLabel>
+                <FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -215,7 +217,7 @@ export function SocioVipMemberForm({
                       locale={es}
                       captionLayout="dropdown-buttons"
                       fromYear={1920}
-                      toYear={new Date().getFullYear() - 18} // Must be at least 18
+                      toYear={new Date().getFullYear() - 18} 
                       disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18)) || date < new Date("1920-01-01")}
                       initialFocus
                     />
@@ -231,8 +233,8 @@ export function SocioVipMemberForm({
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email (para cuenta)</FormLabel>
-              <FormControl><Input type="email" placeholder="correo@ejemplo.com" {...field} disabled={isSubmitting} /></FormControl>
+              <FormLabel>Email (para cuenta) <span className="text-destructive">*</span></FormLabel>
+              <FormControl><Input type="email" placeholder="Ingrese el correo electrónico" {...field} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -277,7 +279,7 @@ export function SocioVipMemberForm({
             name="loyaltyPoints"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Puntos de Lealtad</FormLabel>
+                <FormLabel>Puntos de Lealtad <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input type="number" placeholder="0" {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -288,7 +290,7 @@ export function SocioVipMemberForm({
             name="membershipStatus"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Estado de Membresía</FormLabel>
+                <FormLabel>Estado de Membresía <span className="text-destructive">*</span></FormLabel>
                 <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                   <FormControl>
                     <SelectTrigger>
@@ -320,4 +322,3 @@ export function SocioVipMemberForm({
     </Form>
   );
 }
-
