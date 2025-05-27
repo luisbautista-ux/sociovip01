@@ -52,34 +52,34 @@ const newQrClientSchema = z.object({
 
 
 const MOCK_PROMOTIONS: PromotionDetails[] = [
-  { 
-    id: "promo1", 
-    title: "Martes de 2x1 en Cocktails", 
-    description: "Disfruta de dos cocktails al precio de uno. Válido todos los martes.", 
+  {
+    id: "promo1",
+    title: "Martes de 2x1 en Cocktails",
+    description: "Disfruta de dos cocktails al precio de uno. Válido todos los martes.",
     validUntil: "2025-12-31T12:00:00",
-    promoCode: "VALIDNEW1", 
+    promoCode: "VALIDNEW1",
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "cocktails party",
     type: "promotion",
     termsAndConditions: "Válido para cocktails seleccionados. No acumulable con otras promociones. Máximo 2 promociones por mesa."
   },
-  { 
-    id: "promo2", 
-    title: "Sábado VIP: Entrada Gratuita", 
-    description: "Acceso exclusivo a nuestra zona VIP este Sábado. ¡No te lo pierdas!", 
+  {
+    id: "promo2",
+    title: "Sábado VIP: Entrada Gratuita",
+    description: "Acceso exclusivo a nuestra zona VIP este Sábado. ¡No te lo pierdas!",
     validUntil: "2025-11-30T12:00:00",
-    promoCode: "VALIDEXT1", 
+    promoCode: "VALIDEXT1",
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "vip club",
-    type: "event", // Changed to event for dynamic text testing
+    type: "event",
     termsAndConditions: "Presentar este QR en puerta. Aforo limitado. Dress code: Elegante."
   },
-  { 
-    id: "promo3", 
-    title: "Noche de Salsa: Mojito Gratis", 
-    description: "Ven a bailar y te regalamos un mojito con tu entrada.", 
+  {
+    id: "promo3",
+    title: "Noche de Salsa: Mojito Gratis",
+    description: "Ven a bailar y te regalamos un mojito con tu entrada.",
     validUntil: "2025-10-31T12:00:00",
-    promoCode: "SALSACOOL", 
+    promoCode: "SALSACOOL",
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "salsa dancing",
     type: "promotion",
@@ -92,14 +92,14 @@ const mockExistingQrClient: QrClient = {
   name: "Ana",
   surname: "García",
   phone: "+51987654321",
-  dob: "1990-05-15T12:00:00", 
+  dob: "1990-05-15T12:00:00",
   dni: "12345678",
   registrationDate: "2025-01-10T10:00:00Z"
 };
 
 const statusTranslations: { [key in QrCodeStatusGenerated]: string } = {
-  available: "Generado", 
-  redeemed: "Utilizado", 
+  available: "Generado",
+  redeemed: "Utilizado",
   expired: "Vencido",
 };
 
@@ -109,11 +109,11 @@ export default function HomePage() {
   const [currentStepInModal, setCurrentStepInModal] = useState<ModalStep>("enterDni");
   const [activePromotion, setActivePromotion] = useState<PromotionDetails | null>(null);
   const [validatedPromoCode, setValidatedPromoCode] = useState<string | null>(null);
-  const [enteredDniOriginal, setEnteredDniOriginal] = useState<string | null>(null); 
+  const [enteredDniOriginal, setEnteredDniOriginal] = useState<string | null>(null);
   const [qrData, setQrData] = useState<QrCodeData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  
+
   const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
@@ -156,11 +156,11 @@ export default function HomePage() {
     if (currentStepInModal === 'newQrClientForm' && enteredDniOriginal) {
       const currentDniInForm = newQrClientForm.getValues('dni');
       if (currentDniInForm !== enteredDniOriginal || !newQrClientForm.getValues('name')) {
-        newQrClientForm.reset({ 
-          dni: enteredDniOriginal, 
-          name: "", 
-          surname: "", 
-          phone: "", 
+        newQrClientForm.reset({
+          dni: enteredDniOriginal,
+          name: "",
+          surname: "",
+          phone: "",
           dob: undefined,
         });
       }
@@ -173,9 +173,9 @@ export default function HomePage() {
       setActivePromotion(promotion);
       setValidatedPromoCode(code);
       setCurrentStepInModal("enterDni");
-      dniForm.reset(); 
+      dniForm.reset();
       setShowDniModal(true);
-      toast({ title: "Código Válido", description: `Para la ${promotion.type === 'event' ? 'entrada al evento' : 'promoción'}: "${promotion.title}". Ingresa tu DNI.` });
+      toast({ title: "Código Válido", description: `Para ${promotion.type === 'event' ? 'la entrada al evento' : 'la promoción'}: "${promotion.title}". Ingresa tu DNI.` });
     } else {
       toast({ title: "Error", description: "El código ingresado no es válido para esta promoción.", variant: "destructive" });
     }
@@ -184,17 +184,17 @@ export default function HomePage() {
   const handleDniSubmitInModal = async (values: z.infer<typeof dniSchema>) => {
     if (!activePromotion || !validatedPromoCode) return;
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
+    await new Promise(resolve => setTimeout(resolve, 1000));
     setIsLoading(false);
-    
+
     setEnteredDniOriginal(values.dni);
 
-    if (values.dni === mockExistingQrClient.dni) { 
+    if (values.dni === mockExistingQrClient.dni) {
       const newQrData: QrCodeData = {
         user: mockExistingQrClient,
         promotion: activePromotion,
         code: validatedPromoCode,
-        status: "generated", 
+        status: "available",
       };
       setQrData(newQrData);
       setShowDniModal(false);
@@ -202,8 +202,8 @@ export default function HomePage() {
       toast({ title: `Bienvenido de vuelta ${mockExistingQrClient.name}!`, description: "Tu QR ha sido generado." });
     } else {
       setCurrentStepInModal("newQrClientForm");
-      newQrClientForm.reset({ 
-        dni: values.dni, 
+      newQrClientForm.reset({
+        dni: values.dni,
         name: "", surname: "", phone: "", dob: undefined,
       });
       toast({ title: "Nuevo Usuario", description: "Por favor, completa tus datos para generar tu QR." });
@@ -216,7 +216,7 @@ export default function HomePage() {
       user: qrClientData,
       promotion: activePromotion,
       code: validatedPromoCode,
-      status: "generated",
+      status: "available",
     };
     setQrData(newQrData);
     setShowDniModal(false);
@@ -232,9 +232,9 @@ export default function HomePage() {
     if (values.dni === mockExistingQrClient.dni && values.dni !== enteredDniOriginal) {
       setFormDataForDniWarning(values);
       setShowDniExistsWarningDialog(true);
-      return; 
+      return;
     }
-    
+
     const newQrClient: QrClient = {
       id: `qrclient-${Date.now()}`,
       name: values.name,
@@ -246,7 +246,7 @@ export default function HomePage() {
     };
     processNewQrClientRegistration(newQrClient);
   };
-  
+
   const handleDniExistsConfirmation = (confirmed: boolean) => {
     setShowDniExistsWarningDialog(false);
     if (confirmed && formDataForDniWarning) {
@@ -255,7 +255,7 @@ export default function HomePage() {
         name: mockExistingQrClient.name,
         surname: mockExistingQrClient.surname,
         phone: mockExistingQrClient.phone,
-        dob: new Date(mockExistingQrClient.dob), 
+        dob: new Date(mockExistingQrClient.dob),
       });
       toast({ title: "Datos Precargados", description: "Hemos rellenado el formulario con tus datos existentes. Revisa y confirma." });
     } else if (!confirmed && formDataForDniWarning) {
@@ -275,12 +275,12 @@ export default function HomePage() {
     dniForm.reset();
     newQrClientForm.reset();
   };
-  
+
   const handleCloseDniModal = () => {
     setShowDniModal(false);
     dniForm.reset();
     newQrClientForm.reset();
-    setEnteredDniOriginal(null); 
+    setEnteredDniOriginal(null);
   }
 
   const renderStatusIcon = (status: QrCodeStatusGenerated) => {
@@ -296,24 +296,42 @@ export default function HomePage() {
       toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
       return;
     }
-  
-    const businessName = "Pandora Lounge Bar"; 
-    const businessLogoUrl = "https://placehold.co/120x40.png"; 
-    const logoHeight = 30;
-    const logoWidth = 90; 
-    const padding = 25;
-    const qrSize = 160; 
-    const contentWidth = qrSize + 2 * padding;
-    
-    const headerHeight = 50; 
-    const businessNameFontSize = 18;
-    const titleFontSize = 16;
-    const userNameFontSize = 20;
-    const defaultTextFontSize = 12;
-    const smallTextFontSize = 10;
+
+    const businessName = "Pandora Lounge Bar";
+    const businessLogoUrl = "https://placehold.co/120x40.png"; // Placeholder for business logo
+
+    const canvasWidth = 320;
+    const padding = 20;
     const lineHeightMultiplier = 1.3;
-    let currentY = padding;
-  
+
+    const maxLogoHeight = 50;
+    const maxLogoWidth = canvasWidth - 2 * padding;
+
+    const headerColor = 'hsl(283, 44%, 53%)'; // Primary color
+    const headerTextColor = 'hsl(0, 0%, 98%)'; // Primary foreground (white)
+    const primaryTextColor = 'hsl(283, 44%, 53%)';
+    const defaultTextColor = 'hsl(0, 0%, 3.9%)';
+    const mutedTextColor = 'hsl(0, 0%, 45.1%)';
+    const canvasBackgroundColor = 'hsl(280, 13%, 96%)';
+
+    const businessNameFontSize = 14;
+    const promoTitleFontSize = 18;
+    const userNameFontSize = 22;
+    const dniFontSize = 13;
+    const defaultTextFontSize = 13;
+    const smallTextFontSize = 11;
+
+    const qrDisplaySize = 180;
+    const qrBorderColor = primaryTextColor;
+    const qrBorderWidth = 2;
+
+    const spacingAfterLogo = 5;
+    const spacingAfterBusinessName = 15;
+    const spacingAfterPromoTitle = 10;
+    const spacingAfterQr = 20;
+    const spacingAfterDni = 15;
+    const spacingAfterValidUntil = 10;
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -321,7 +339,6 @@ export default function HomePage() {
       return;
     }
 
-    // Helper function to draw wrapped text and return new Y position
     const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number, fontWeight: string, color: string, textAlign: CanvasTextAlign = 'center', fontName: string = 'Arial') => {
         ctx.font = `${fontWeight} ${fontSize}px ${fontName}`;
         ctx.fillStyle = color;
@@ -336,150 +353,169 @@ export default function HomePage() {
             const metrics = ctx.measureText(testLine);
             const testWidth = metrics.width;
             if (testWidth > maxWidth && n > 0) {
-                ctx.fillText(line, x, currentYPos);
+                ctx.fillText(line.trim(), x, currentYPos);
                 line = words[n] + ' ';
                 currentYPos += actualLineHeight;
             } else {
                 line = testLine;
             }
         }
-        ctx.fillText(line, x, currentYPos);
-        return currentYPos + actualLineHeight;
+        ctx.fillText(line.trim(), x, currentYPos);
+        return currentYPos + actualLineHeight; // Return the Y position after drawing this text block
     };
 
-    // --- Calculate total height ---
-    let estimatedHeight = padding; // Top padding
-
-    // Business Logo & Name Header Area
-    estimatedHeight += headerHeight + 10; // Header area height + spacing after
-    
-    // Promotion/Event Title
-    ctx.font = `bold ${titleFontSize}px Arial`; // Set font to measure
-    const titleMetrics = ctx.measureText(activePromotion.title);
-    const titleLines = Math.ceil(titleMetrics.width / (contentWidth - 2 * padding));
-    estimatedHeight += (titleLines * titleFontSize * lineHeightMultiplier) + 10; // Title + spacing after
-
-    // QR Image
-    estimatedHeight += qrSize + 15; // QR Size + spacing after
-
-    // User Name
-    estimatedHeight += (userNameFontSize * lineHeightMultiplier) + 5; // User name + spacing after DNI
-
-    // User DNI
-    estimatedHeight += (defaultTextFontSize * lineHeightMultiplier) + 15; // DNI + spacing after
-    
-    // Valid Until
-    estimatedHeight += (defaultTextFontSize * lineHeightMultiplier) + 10; // Valid until + spacing after
-    
-    // Terms and Conditions
-    if (activePromotion.termsAndConditions) {
-        ctx.font = `${smallTextFontSize}px Arial`; // Set font to measure
-        const termsWords = activePromotion.termsAndConditions.split(' ');
-        let termsLine = '';
-        let termsLineCount = 1;
-        for (const word of termsWords) {
-            const testLine = termsLine + word + ' ';
-            if (ctx.measureText(testLine).width > (contentWidth - 2 * padding) && termsLine !== '') {
-                termsLineCount++;
-                termsLine = word + ' ';
-            } else {
-                termsLine = testLine;
-            }
-        }
-        estimatedHeight += (termsLineCount * smallTextFontSize * lineHeightMultiplier) + 10;
-    }
-    estimatedHeight += padding; // Bottom padding
-  
-    canvas.width = contentWidth;
-    canvas.height = estimatedHeight;
-  
-    // --- Start Drawing ---
-    // Background color
-    ctx.fillStyle = 'hsl(280, 13%, 96%)'; // Lighter gray background
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Header background strip for Business Name
-    ctx.fillStyle = 'hsl(283, 44%, 53%)'; // Primary color
-    ctx.fillRect(0, 0, canvas.width, headerHeight);
-    currentY = 0; // Reset Y for header content
-
-    const drawBusinessInfo = new Promise<void>((resolve) => {
-        if (businessLogoUrl) {
-            const logoImg = new window.Image();
-            logoImg.crossOrigin = "anonymous";
-            logoImg.onload = () => {
-                const logoX = padding;
-                const logoY = (headerHeight - logoHeight) / 2;
-                ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-                
-                // Business Name (next to logo, vertically centered in header)
-                const businessNameX = logoX + logoWidth + 10;
-                drawWrappedText(businessName, businessNameX, (headerHeight / 2) + (businessNameFontSize / 3) , canvas.width - businessNameX - padding, businessNameFontSize, 'bold', 'white', 'left');
-                resolve();
-            };
-            logoImg.onerror = () => {
-                console.error("Failed to load business logo for canvas.");
-                 // Draw Business Name (centered if logo fails)
-                drawWrappedText(businessName, canvas.width / 2, (headerHeight / 2) + (businessNameFontSize / 3), canvas.width - 2 * padding, businessNameFontSize, 'bold', 'white', 'center');
-                resolve(); 
-            };
-            logoImg.src = `${businessLogoUrl}?text=${encodeURIComponent(businessName.substring(0,10))}`;
-        } else {
-             // Draw Business Name (centered if no logo)
-            drawWrappedText(businessName, canvas.width / 2, (headerHeight / 2) + (businessNameFontSize / 3) , canvas.width - 2 * padding, businessNameFontSize, 'bold', 'white', 'center');
-            resolve();
-        }
-    });
-  
-    await drawBusinessInfo;
-    currentY = headerHeight + 15; // Reset Y below header with spacing
-
-    // Promotion/Event Title
-    currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, titleFontSize, 'bold', 'hsl(283, 44%, 53%)'); // Primary color for title
-    currentY += 10;
-  
-    // QR Code Image
+    const businessLogoImg = new window.Image();
+    businessLogoImg.crossOrigin = "anonymous";
     const qrImg = new window.Image();
-    qrImg.crossOrigin = "anonymous"; 
-    qrImg.onload = () => {
-      const qrX = (canvas.width - qrSize) / 2;
-      ctx.drawImage(qrImg, qrX, currentY, qrSize, qrSize);
-      
-      // QR Border
-      ctx.strokeStyle = 'hsl(283, 44%, 53%)'; // Primary color border
-      ctx.lineWidth = 2;
-      ctx.strokeRect(qrX -1, currentY -1, qrSize + 2, qrSize + 2);
+    qrImg.crossOrigin = "anonymous";
 
-      currentY += qrSize + 15;
-  
-      // Client Name
-      currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY, canvas.width - 2 * padding, userNameFontSize, 'bold', 'hsl(283, 44%, 53%)'); // Primary color
-      
-      // Client DNI
-      currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY - (userNameFontSize * lineHeightMultiplier * 0.3) , canvas.width - 2 * padding, defaultTextFontSize, 'normal', 'hsl(0, 0%, 3.9%)'); // Foreground color
-      currentY += 15;
-  
-      // Promotion Valid Until
-      currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY, canvas.width - 2 * padding, defaultTextFontSize, 'normal', 'hsl(0, 0%, 45.1%)'); // Muted-foreground color
-      currentY += 10;
-      
-      // Terms and Conditions
-      if (activePromotion.termsAndConditions) {
-        currentY = drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding, smallTextFontSize, 'normal', 'hsl(0, 0%, 45.1%)'); // Muted-foreground color
-      }
-      
-      const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = `SocioVIP_QR_${activePromotion.type}_${qrData.code}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast({ title: "QR con Detalles Guardado", description: "La imagen con los detalles se ha descargado." });
+    qrImg.onload = () => {
+        businessLogoImg.onload = () => {
+            let actualLogoHeight = 0;
+            let actualLogoWidth = 0;
+            if (businessLogoImg.naturalWidth > 0 && businessLogoImg.naturalHeight > 0) {
+                const aspectRatio = businessLogoImg.naturalWidth / businessLogoImg.naturalHeight;
+                if (businessLogoImg.naturalHeight > maxLogoHeight) {
+                    actualLogoHeight = maxLogoHeight;
+                    actualLogoWidth = actualLogoHeight * aspectRatio;
+                } else {
+                    actualLogoHeight = businessLogoImg.naturalHeight;
+                    actualLogoWidth = businessLogoImg.naturalWidth;
+                }
+                if (actualLogoWidth > maxLogoWidth) {
+                    actualLogoWidth = maxLogoWidth;
+                    actualLogoHeight = actualLogoWidth / aspectRatio;
+                }
+            }
+
+            let calculatedHeight = padding; // Top padding for header
+
+            // Header Content Height
+            let headerContentHeight = actualLogoHeight; // Height for logo
+            headerContentHeight += spacingAfterLogo;
+            headerContentHeight += businessNameFontSize * lineHeightMultiplier; // Height for business name
+            const headerTotalHeight = padding + headerContentHeight + padding;
+            calculatedHeight = headerTotalHeight + spacingAfterBusinessName;
+
+            // Promotion Title
+            const tempCtx = document.createElement('canvas').getContext('2d')!;
+            tempCtx.font = `bold ${promoTitleFontSize}px Arial`;
+            const titleWords = activePromotion.title.split(' ');
+            let titleLine = '';
+            let titleLineCount = 1;
+            for (const word of titleWords) {
+                const testLine = titleLine + word + ' ';
+                if (tempCtx.measureText(testLine).width > (canvasWidth - 2 * padding) && titleLine !== '') {
+                    titleLineCount++;
+                    titleLine = word + ' ';
+                } else {
+                    titleLine = testLine;
+                }
+            }
+            calculatedHeight += (titleLineCount * promoTitleFontSize * lineHeightMultiplier);
+            calculatedHeight += spacingAfterPromoTitle;
+
+            // QR Image
+            calculatedHeight += qrDisplaySize + qrBorderWidth * 2;
+            calculatedHeight += spacingAfterQr;
+
+            // User Name
+            calculatedHeight += userNameFontSize * lineHeightMultiplier;
+            // DNI
+            calculatedHeight += dniFontSize * lineHeightMultiplier;
+            calculatedHeight += spacingAfterDni;
+
+            // Valid Until
+            calculatedHeight += defaultTextFontSize * lineHeightMultiplier;
+            calculatedHeight += spacingAfterValidUntil;
+
+            // Terms and Conditions
+            if (activePromotion.termsAndConditions) {
+                tempCtx.font = `normal ${smallTextFontSize}px Arial`;
+                const termsWords = activePromotion.termsAndConditions.split(' ');
+                let termsLine = '';
+                let termsLineCount = 1;
+                for (const word of termsWords) {
+                    const testLine = termsLine + word + ' ';
+                    if (tempCtx.measureText(testLine).width > (canvasWidth - 2 * padding - 10) && termsLine !== '') {
+                        termsLineCount++;
+                        termsLine = word + ' ';
+                    } else {
+                        termsLine = testLine;
+                    }
+                }
+                calculatedHeight += (termsLineCount * smallTextFontSize * lineHeightMultiplier);
+            }
+            calculatedHeight += padding;
+
+            canvas.width = canvasWidth;
+            canvas.height = Math.ceil(calculatedHeight);
+
+            ctx.fillStyle = canvasBackgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = headerColor;
+            ctx.fillRect(0, 0, canvas.width, headerTotalHeight);
+
+            let currentY = padding;
+
+            if (actualLogoWidth > 0 && actualLogoHeight > 0) {
+                const logoX = (canvasWidth - actualLogoWidth) / 2;
+                ctx.drawImage(businessLogoImg, logoX, currentY, actualLogoWidth, actualLogoHeight);
+                currentY += actualLogoHeight + spacingAfterLogo;
+            } else {
+                currentY += maxLogoHeight + spacingAfterLogo;
+            }
+
+            currentY = drawWrappedText(businessName, canvasWidth / 2, currentY, canvasWidth - 2 * padding, businessNameFontSize, 'normal', headerTextColor);
+            currentY = headerTotalHeight + spacingAfterBusinessName;
+
+            currentY = drawWrappedText(activePromotion.title, canvasWidth / 2, currentY, canvasWidth - 2 * padding, promoTitleFontSize, 'bold', primaryTextColor);
+            currentY += spacingAfterPromoTitle;
+
+            const qrX = (canvasWidth - qrDisplaySize) / 2;
+            const qrY = currentY;
+            ctx.drawImage(qrImg, qrX, qrY, qrDisplaySize, qrDisplaySize);
+            ctx.strokeStyle = qrBorderColor;
+            ctx.lineWidth = qrBorderWidth;
+            ctx.strokeRect(qrX - qrBorderWidth / 2, qrY - qrBorderWidth / 2, qrDisplaySize + qrBorderWidth, qrDisplaySize + qrBorderWidth);
+            currentY += qrDisplaySize + qrBorderWidth * 2 + spacingAfterQr;
+
+            currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding, userNameFontSize, 'bold', primaryTextColor);
+            currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding, dniFontSize, 'normal', defaultTextColor);
+            currentY += spacingAfterDni;
+
+            currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding, defaultTextFontSize, 'normal', mutedTextColor);
+            currentY += spacingAfterValidUntil;
+
+            if (activePromotion.termsAndConditions) {
+              drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding - 10, smallTextFontSize, 'normal', mutedTextColor, 'center');
+            }
+
+            const link = document.createElement('a');
+            const fileName = `SocioVIP_QR_${activePromotion.type}_${qrData.code}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast({ title: "QR con Detalles Guardado", description: "La imagen con los detalles se ha descargado." });
+        };
+        businessLogoImg.onerror = () => {
+            console.error("Failed to load business logo for canvas. Drawing without it.");
+            businessLogoImg.onload!();
+        };
+        businessLogoImg.src = `${businessLogoUrl}?text=${encodeURIComponent(businessName.substring(0,10))}&width=${maxLogoWidth}&height=${maxLogoHeight}`;
+
     };
     qrImg.onerror = () => {
       toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
     };
-    qrImg.src = generatedQrDataUrl;
+    if (generatedQrDataUrl) {
+      qrImg.src = generatedQrDataUrl;
+    } else {
+        toast({ title: "Error", description: "La imagen del QR aún no está lista.", variant: "destructive" });
+    }
   };
 
   const PromotionCodeForm = ({ promotion }: { promotion: PromotionDetails }) => {
@@ -530,11 +566,11 @@ export default function HomePage() {
           {MOCK_PROMOTIONS.map((promo) => (
             <Card key={promo.id} className="shadow-lg flex flex-col">
               <CardHeader className="p-0">
-                <Image 
-                  src={promo.imageUrl} 
-                  alt={promo.title} 
-                  width={600} 
-                  height={400} 
+                <Image
+                  src={promo.imageUrl}
+                  alt={promo.title}
+                  width={600}
+                  height={400}
                   className="rounded-t-lg object-cover aspect-[3/2]"
                   data-ai-hint={promo.aiHint}
                 />
@@ -568,8 +604,8 @@ export default function HomePage() {
                 <Image
                   src={generatedQrDataUrl}
                   alt="QR Code"
-                  width={180} 
-                  height={180} 
+                  width={180}
+                  height={180}
                   className="rounded-lg shadow-lg border-4 border-primary"
                   data-ai-hint="qr code"
                 />
@@ -584,19 +620,19 @@ export default function HomePage() {
                 <Download className="mr-2 h-5 w-5"/> Guardar QR con Detalles
               </Button>
             </div>
-            
+
             <div className="space-y-1 text-center">
               <h2 className="text-2xl font-semibold text-primary">{qrData.user.name} {qrData.user.surname}</h2>
               <p><strong className="font-medium">DNI/CE:</strong> {qrData.user.dni}</p>
             </div>
-            
+
             <div className="space-y-3 border-t pt-4">
               <h3 className="text-lg font-semibold text-primary flex items-center">
                 {activePromotion.type === 'event' ? <Ticket className="mr-2 h-5 w-5"/> : <Gift className="mr-2 h-5 w-5"/>}
                 {activePromotion.type === 'event' ? "Detalles del Evento" : "Detalles de la Promoción"}
               </h3>
               <p><strong className="font-medium">Título:</strong> {activePromotion.title}</p>
-              
+
               <p className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Válido hasta:</strong> {format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}</p>
               <p className="flex items-center">
                 {renderStatusIcon(qrData.status as QrCodeStatusGenerated)}
@@ -630,7 +666,7 @@ export default function HomePage() {
               {currentStepInModal === 'enterDni' ? "Verificación de Identidad" : "Completa tus Datos (Cliente QR)"}
             </DialogTitle>
             <DialogDescription>
-              {currentStepInModal === 'enterDni' 
+              {currentStepInModal === 'enterDni'
                 ? `Para: "${activePromotion?.title}". Ingresa tu DNI o Carnet de Extranjería.`
                 : "Es la primera vez que usas un código con este DNI. Por favor, completa tu información básica."}
             </DialogDescription>
@@ -737,7 +773,7 @@ export default function HomePage() {
                             locale={es}
                             captionLayout="dropdown-buttons"
                             fromYear={1900}
-                            toYear={new Date().getFullYear() - 10} 
+                            toYear={new Date().getFullYear() - 10}
                             disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1900-01-01")}
                             initialFocus
                           />
@@ -786,3 +822,4 @@ export default function HomePage() {
     </div>
   );
 }
+
