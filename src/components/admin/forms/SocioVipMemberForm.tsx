@@ -65,7 +65,19 @@ export function SocioVipMemberForm({
 
   const form = useForm<SocioVipMemberFormValues>({
     resolver: zodResolver(socioVipMemberFormSchema),
-    // Default values are set in useEffect
+    defaultValues: {
+      name: "",
+      surname: "",
+      dni: "",
+      phone: "",
+      dob: undefined,
+      email: "",
+      address: "",     // Initialize optional strings to ""
+      profession: "",  // Initialize optional strings to ""
+      preferences: "", // Initialize optional strings to ""
+      loyaltyPoints: 0,
+      membershipStatus: 'active', // Default for new members or if undefined
+    },
   });
 
   useEffect(() => {
@@ -81,7 +93,7 @@ export function SocioVipMemberForm({
         profession: member.profession || "",
         preferences: member.preferences?.join(', ') || "",
         loyaltyPoints: member.loyaltyPoints || 0,
-        membershipStatus: member.membershipStatus || undefined,
+        membershipStatus: member.membershipStatus || 'active',
       });
     } else if (!isEditing && initialData) {
       form.reset({
@@ -91,13 +103,13 @@ export function SocioVipMemberForm({
         phone: initialData.phone || "",
         dob: initialData.dob ? parseISO(initialData.dob) : undefined,
         email: initialData.email || "",
-        address: "", // Address, profession, preferences not usually pre-filled from QrClient/PlatformUser
+        address: "", 
         profession: "",
         preferences: "",
         loyaltyPoints: 0,
-        membershipStatus: 'active', // Default for new Socio VIP
+        membershipStatus: 'active', 
       });
-    } else if (!isEditing && !initialData) { // Fallback if DNI-first flow somehow skipped (should not happen)
+    } else if (!isEditing && !initialData) { 
         form.reset({
             dni: "", name: "", surname: "", phone: "", dob: undefined, email: "",
             address: "", profession: "", preferences: "", loyaltyPoints: 0, membershipStatus: 'active'
@@ -110,7 +122,7 @@ export function SocioVipMemberForm({
   };
 
   const shouldDisableDniField = isEditing || (!isEditing && !!initialData?.dni);
-  const showPrePopulatedAlert = !isEditing && initialData?.preExistingUserType;
+  const showPrePopulatedAlert = !isEditing && initialData?.existingUserType;
 
   return (
     <Form {...form}>
@@ -119,10 +131,10 @@ export function SocioVipMemberForm({
           <Alert variant="default" className="bg-blue-50 border-blue-200">
             <Info className="h-4 w-4 text-blue-600" />
             <AlertTitle className="text-blue-700">
-              DNI Encontrado como {initialData?.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'}
+              DNI Encontrado como {initialData?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'}
             </AlertTitle>
             <AlertDescription>
-              Este DNI pertenece a un {initialData?.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
+              Este DNI pertenece a un {initialData?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
               Se han pre-rellenado los datos conocidos. Por favor, complete la información para registrarlo como Socio VIP.
             </AlertDescription>
           </Alert>
@@ -308,3 +320,4 @@ export function SocioVipMemberForm({
     </Form>
   );
 }
+
