@@ -4,13 +4,13 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Star, PlusCircle, Download, Search, Edit, Trash2, Mail, Phone, Award, ShieldCheck, CalendarDays, Cake, Filter, Loader2 } from "lucide-react";
-import type { SocioVipMember, SocioVipMemberFormData } from "@/lib/types";
-import { format, getMonth } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Star, PlusCircle, Download, Search, Edit, Trash2, Mail, Phone, Award, ShieldCheck, CalendarDays, Cake, Filter, Loader2, AlertTriangle, Info } from "lucide-react";
+import type { SocioVipMember, SocioVipMemberFormData, QrClient, PlatformUser, InitialDataForSocioVipCreation } from "@/lib/types";
+import { format, getMonth, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -18,77 +18,59 @@ import { SocioVipMemberForm } from "@/components/admin/forms/SocioVipMemberForm"
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { MEMBERSHIP_STATUS_TRANSLATIONS, MEMBERSHIP_STATUS_COLORS, MESES_DEL_ANO_ES } from "@/lib/constants";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, query, where } from "firebase/firestore";
+import { Form, FormControl, FormField, FormItem, FormMessage as FormMessageHook } from "@/components/ui/form"; // Renamed to avoid conflict
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
-const apiClient = {
-  getSocioVipMembers: async (): Promise<SocioVipMember[]> => {
-    console.log("API CALL: apiClient.getSocioVipMembers");
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // return [
-    //   { id: "vip1", name: "Elena (API)", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12T12:00:00", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T00:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
-    // ];
-    return [];
-  },
-  createSocioVipMember: async (data: SocioVipMemberFormData): Promise<SocioVipMember> => {
-    console.log("API CALL: apiClient.createSocioVipMember", data);
-    await new Promise(resolve => setTimeout(resolve, 700));
-    const newMember: SocioVipMember = {
-      id: `vip${Date.now()}`,
-      name: data.name,
-      surname: data.surname,
-      dni: data.dni,
-      phone: data.phone,
-      dob: format(data.dob, "yyyy-MM-dd'T'HH:mm:ss"),
-      email: data.email,
-      address: data.address,
-      profession: data.profession,
-      preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
-      loyaltyPoints: data.loyaltyPoints,
-      membershipStatus: data.membershipStatus,
-      joinDate: new Date().toISOString(),
-      staticQrCodeUrl: `https://placehold.co/100x100.png?text=${data.name.substring(0,3).toUpperCase()}QR`
-    };
-    return newMember;
-  },
-  updateSocioVipMember: async (id: string, data: SocioVipMemberFormData, existingMember: SocioVipMember): Promise<SocioVipMember> => {
-    console.log("API CALL: apiClient.updateSocioVipMember", id, data);
-    await new Promise(resolve => setTimeout(resolve, 700));
-    return {
-      ...existingMember, // Preserve original fields like joinDate, staticQrCodeUrl
-      id,
-      name: data.name,
-      surname: data.surname,
-      dni: data.dni,
-      phone: data.phone,
-      dob: format(data.dob, "yyyy-MM-dd'T'HH:mm:ss"),
-      email: data.email,
-      address: data.address,
-      profession: data.profession,
-      preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
-      loyaltyPoints: data.loyaltyPoints,
-      membershipStatus: data.membershipStatus,
-    };
-  },
-  deleteSocioVipMember: async (id: string): Promise<void> => {
-    console.log("API CALL: apiClient.deleteSocioVipMember", id);
-    await new Promise(resolve => setTimeout(resolve, 700));
-  },
-};
+
+const DniEntrySchema = z.object({
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+});
+type DniEntryValues = z.infer<typeof DniEntrySchema>;
+
 
 export default function AdminSocioVipPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [birthdayMonthFilter, setBirthdayMonthFilter] = useState<string>("all");
   const [joinMonthFilter, setJoinMonthFilter] = useState<string>("all");
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  
   const [editingMember, setEditingMember] = useState<SocioVipMember | null>(null);
   const [members, setMembers] = useState<SocioVipMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const fetchSocioVipMembers = async () => {
+  // State for DNI-first creation flow
+  const [showDniEntryModal, setShowDniEntryModal] = useState(false);
+  const [dniForSocioVerification, setDniForSocioVerification] = useState("");
+  const [verifiedSocioDniResult, setVerifiedSocioDniResult] = useState<InitialDataForSocioVipCreation | null>(null);
+  
+  const [showCreateEditModal, setShowCreateEditModal] = useState(false); // Controls main form modal
+  
+  const [showDniIsAlreadySocioVipAlert, setShowDniIsAlreadySocioVipAlert] = useState(false);
+  const [existingSocioVipToEdit, setExistingSocioVipToEdit] = useState<SocioVipMember | null>(null);
+
+  const dniEntryForm = useForm<DniEntryValues>({
+    resolver: zodResolver(DniEntrySchema),
+    defaultValues: { dni: "" },
+  });
+
+  const fetchSocioVipMembers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedMembers = await apiClient.getSocioVipMembers();
+      const querySnapshot = await getDocs(collection(db, "socioVipMembers"));
+      const fetchedMembers: SocioVipMember[] = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : new Date(data.joinDate || Date.now()).toISOString(),
+          dob: data.dob instanceof Timestamp ? data.dob.toDate().toISOString() : new Date(data.dob || Date.now()).toISOString(),
+        } as SocioVipMember;
+      });
       setMembers(fetchedMembers);
     } catch (error) {
       console.error("Failed to fetch Socio VIP members:", error);
@@ -101,12 +83,11 @@ export default function AdminSocioVipPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchSocioVipMembers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchSocioVipMembers]);
 
   const filteredMembers = members.filter(member => {
     const searchMatch = (
@@ -117,10 +98,10 @@ export default function AdminSocioVipPage() {
     );
 
     const birthdayMatch = birthdayMonthFilter === "all" ||
-      (member.dob && getMonth(new Date(member.dob)) === parseInt(birthdayMonthFilter));
+      (member.dob && getMonth(parseISO(member.dob)) === parseInt(birthdayMonthFilter));
 
     const joinMatch = joinMonthFilter === "all" ||
-      (member.joinDate && getMonth(new Date(member.joinDate)) === parseInt(joinMonthFilter));
+      (member.joinDate && getMonth(parseISO(member.joinDate as string)) === parseInt(joinMonthFilter));
 
     return searchMatch && birthdayMatch && joinMatch;
   });
@@ -133,9 +114,9 @@ export default function AdminSocioVipPage() {
     const headers = ["ID", "Nombre", "Apellido", "Email", "Teléfono", "DNI", "Fec. Nac.", "Puntos", "Estado Membresía", "Fecha Ingreso", "Dirección", "Profesión", "Preferencias"];
     const rows = filteredMembers.map(mem => [
       mem.id, mem.name, mem.surname, mem.email, mem.phone, mem.dni,
-      mem.dob ? format(new Date(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
+      mem.dob ? format(parseISO(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.loyaltyPoints, MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus],
-      mem.joinDate ? format(new Date(mem.joinDate), "dd/MM/yyyy", { locale: es }) : "N/A",
+      mem.joinDate ? format(parseISO(mem.joinDate as string), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.address || "N/A", mem.profession || "N/A", mem.preferences?.join(', ') || "N/A"
     ]);
     let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
@@ -149,49 +130,143 @@ export default function AdminSocioVipPage() {
     toast({ title: "Exportación Exitosa", description: "Archivo CSV generado."});
   };
 
-  const handleCreateMember = async (data: SocioVipMemberFormData) => {
+  const checkDniAcrossCollections = async (dni: string, excludeSocioVipId?: string): Promise<InitialDataForSocioVipCreation | null> => {
+    // Check socioVipMembers first
+    const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dni));
+    const socioVipSnapshot = await getDocs(socioVipQuery);
+    if (!socioVipSnapshot.empty) {
+      const socioDoc = socioVipSnapshot.docs[0];
+      if (excludeSocioVipId && socioDoc.id === excludeSocioVipId) {
+        // DNI belongs to the Socio VIP being edited, not a conflict for this user
+      } else {
+        return { dni, existingUserType: 'SocioVipMember', ...socioDoc.data() as SocioVipMember };
+      }
+    }
+
+    // Check qrClients
+    const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
+    const qrClientSnapshot = await getDocs(qrClientQuery);
+    if (!qrClientSnapshot.empty) {
+      const data = qrClientSnapshot.docs[0].data() as QrClient;
+      return { dni, name: data.name, surname: data.surname, phone: data.phone, dob: data.dob, preExistingUserType: 'QrClient' };
+    }
+
+    // Check platformUsers
+    const platformUsersQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
+    const platformUsersSnapshot = await getDocs(platformUsersQuery);
+    if (!platformUsersSnapshot.empty) {
+      const data = platformUsersSnapshot.docs[0].data() as PlatformUser;
+      return { dni, name: data.name, email: data.email, preExistingUserType: 'PlatformUser' };
+    }
+    return { dni }; // DNI is new or only for types not relevant for conflict here
+  };
+
+  const handleOpenCreateSocioVipFlow = () => {
+    setEditingMember(null);
+    setVerifiedSocioDniResult(null);
+    dniEntryForm.reset({ dni: "" });
+    setShowDniIsAlreadySocioVipAlert(false);
+    setDniForSocioVerification("");
+    setShowDniEntryModal(true);
+  };
+
+  const handleSocioDniVerificationSubmit = async (values: DniEntryValues) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setDniForSocioVerification(values.dni);
+
+    const result = await checkDniAcrossCollections(values.dni);
+    setIsSubmitting(false);
+    
+    if (result?.existingUserType === 'SocioVipMember') {
+        setExistingSocioVipToEdit(result as SocioVipMember); // Cast needed as result is broader
+        setShowDniIsAlreadySocioVipAlert(true);
+        setShowDniEntryModal(false);
+    } else {
+        setVerifiedSocioDniResult(result || { dni: values.dni }); // Ensure verifiedSocioDniResult is set
+        setShowDniEntryModal(false);
+        setShowCreateEditModal(true); // Open main form for creating a new Socio VIP
+    }
+  };
+
+  const handleEditExistingSocioVip = () => {
+      setShowDniIsAlreadySocioVipAlert(false);
+      if (existingSocioVipToEdit) {
+          setEditingMember(existingSocioVipToEdit);
+          setVerifiedSocioDniResult(null); // Not creating, so clear this
+          setShowCreateEditModal(true); // Open main form in edit mode
+      }
+      setExistingSocioVipToEdit(null);
+  };
+
+
+  const handleCreateOrEditMember = async (data: SocioVipMemberFormData) => {
     setIsSubmitting(true);
     try {
-      // const newMember = await apiClient.createSocioVipMember(data);
-      await apiClient.createSocioVipMember(data); // Mock call
-      toast({ title: "Socio VIP Creado", description: `El socio "${data.name} ${data.surname}" ha sido programado para creación.` });
-      setShowCreateModal(false);
-      fetchSocioVipMembers(); // Re-fetch
+      if (editingMember) { // Editing existing member
+        if (data.dni !== editingMember.dni) { // DNI was changed
+            const dniCheckResult = await checkDniAcrossCollections(data.dni, editingMember.id);
+            if (dniCheckResult?.existingUserType === 'SocioVipMember') {
+                toast({ title: "Error de DNI", description: `El DNI ${data.dni} ya está registrado para otro Socio VIP.`, variant: "destructive" });
+                setIsSubmitting(false);
+                return;
+            }
+        }
+        const memberRef = doc(db, "socioVipMembers", editingMember.id);
+        const dobString = data.dob instanceof Date ? format(data.dob, "yyyy-MM-dd'T'HH:mm:ss") : editingMember.dob;
+        await updateDoc(memberRef, {
+          ...data,
+          dob: dobString,
+          preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
+          // joinDate and staticQrCodeUrl are not part of SocioVipMemberFormData, so they are not updated here
+        });
+        toast({ title: "Socio VIP Actualizado", description: `El socio "${data.name} ${data.surname}" ha sido actualizado.` });
+      } else { // Creating new member (DNI comes from verifiedSocioDniResult)
+        if (!verifiedSocioDniResult?.dni) {
+          toast({ title: "Error Interno", description: "No se pudo obtener el DNI verificado.", variant: "destructive"});
+          setIsSubmitting(false);
+          return;
+        }
+         // Final check, though UI flow (alert) should prevent this if DNI already is SocioVipMember
+        if (verifiedSocioDniResult.existingUserType === 'SocioVipMember') {
+            toast({ title: "Error", description: `El DNI ${verifiedSocioDniResult.dni} ya está registrado como Socio VIP. No se puede crear un nuevo perfil.`, variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+        }
+
+        const newMemberPayload = {
+          ...data,
+          dni: verifiedSocioDniResult.dni, // Use the verified DNI
+          joinDate: Timestamp.fromDate(new Date()),
+          dob: format(data.dob, "yyyy-MM-dd'T'HH:mm:ss"),
+          preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
+          staticQrCodeUrl: `https://placehold.co/100x100.png?text=${data.name.substring(0,3).toUpperCase()}QR` // Placeholder
+        };
+        const docRef = await addDoc(collection(db, "socioVipMembers"), newMemberPayload);
+        toast({ title: "Socio VIP Creado", description: `El socio "${data.name} ${data.surname}" ha sido creado con ID: ${docRef.id}.` });
+      }
+      setShowCreateEditModal(false);
+      setEditingMember(null);
+      setVerifiedSocioDniResult(null);
+      fetchSocioVipMembers();
     } catch (error) {
-      console.error("Failed to create Socio VIP member:", error);
-      toast({ title: "Error al Crear", description: "No se pudo crear el socio VIP.", variant: "destructive"});
+      console.error("Failed to create/update Socio VIP member:", error);
+      toast({ title: "Error al Guardar", description: "No se pudo guardar el Socio VIP.", variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEditMember = async (data: SocioVipMemberFormData) => {
-    if (!editingMember) return;
-    setIsSubmitting(true);
-    try {
-      // const updatedMember = await apiClient.updateSocioVipMember(editingMember.id, data, editingMember);
-      await apiClient.updateSocioVipMember(editingMember.id, data, editingMember); // Mock call
-      toast({ title: "Socio VIP Actualizado", description: `El socio "${data.name} ${data.surname}" ha sido programado para actualización.` });
-      setEditingMember(null);
-      fetchSocioVipMembers(); // Re-fetch
-    } catch (error) {
-      console.error("Failed to update Socio VIP member:", error);
-      toast({ title: "Error al Actualizar", description: "No se pudo actualizar el socio VIP.", variant: "destructive"});
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
   const handleDeleteMember = async (memberId: string, memberName?: string) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await apiClient.deleteSocioVipMember(memberId);
-      toast({ title: "Socio VIP Eliminado", description: `El socio "${memberName || 'seleccionado'}" ha sido programado para eliminación.`, variant: "destructive" });
-      fetchSocioVipMembers(); // Re-fetch
+      await deleteDoc(doc(db, "socioVipMembers", memberId));
+      toast({ title: "Socio VIP Eliminado", description: `El socio "${memberName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
+      fetchSocioVipMembers();
     } catch (error) {
       console.error("Failed to delete Socio VIP member:", error);
-      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el socio VIP.", variant: "destructive"});
+      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el Socio VIP.", variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
@@ -207,12 +282,12 @@ export default function AdminSocioVipPage() {
           <Button onClick={handleExport} variant="outline" disabled={isLoading || members.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
+          <Button onClick={handleOpenCreateSocioVipFlow} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Socio VIP
           </Button>
         </div>
       </div>
-      
+
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Socios VIP</CardTitle>
@@ -294,16 +369,20 @@ export default function AdminSocioVipPage() {
                       <TableCell className="hidden lg:table-cell">{member.email}</TableCell>
                       <TableCell className="hidden md:table-cell">{member.phone}</TableCell>
                       <TableCell className="hidden xl:table-cell">{member.dni}</TableCell>
-                      <TableCell>{member.dob ? format(new Date(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
+                      <TableCell>{member.dob ? format(parseISO(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
                       <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
                       <TableCell>
                         <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus]}>
                           {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus]}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell">{member.joinDate ? format(new Date(member.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{member.joinDate ? format(parseISO(member.joinDate as string), "P", { locale: es }) : "N/A"}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => setEditingMember(member)} disabled={isSubmitting}>
+                        <Button variant="ghost" size="icon" onClick={() => {
+                            setEditingMember(member);
+                            setVerifiedSocioDniResult(null); // Not verifying DNI when editing from list
+                            setShowCreateEditModal(true);
+                        }} disabled={isSubmitting}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Editar</span>
                         </Button>
@@ -348,39 +427,109 @@ export default function AdminSocioVipPage() {
           )}
         </CardContent>
       </Card>
-      
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+
+      {/* DNI Entry Modal for New Socio VIP Creation */}
+      <Dialog open={showDniEntryModal} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            dniEntryForm.reset();
+            setDniForSocioVerification("");
+          }
+          setShowDniEntryModal(isOpen);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Paso 1: Verificar DNI/CE del Socio VIP</DialogTitle>
+            <DialogDescription>
+              Ingresa el DNI o Carnet de Extranjería del nuevo Socio VIP para verificar su existencia.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...dniEntryForm}>
+            <form onSubmit={dniEntryForm.handleSubmit(handleSocioDniVerificationSubmit)} className="space-y-4 py-2">
+              <FormField
+                control={dniEntryForm.control}
+                name="dni"
+                render={({ field }) => (
+                  <FormItem>
+                    <Label>DNI / Carnet de Extranjería</Label>
+                    <FormControl>
+                      <Input placeholder="Número de documento" {...field} autoFocus disabled={isSubmitting}/>
+                    </FormControl>
+                    <FormMessageHook />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>
+                  Cancelar
+                </Button>
+                <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Main Socio VIP Creation/Editing Modal */}
+       <Dialog open={showCreateEditModal} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setEditingMember(null);
+          setVerifiedSocioDniResult(null);
+        }
+        setShowCreateEditModal(isOpen);
+      }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Crear Nuevo Socio VIP</DialogTitle>
-            <DialogDescription>Completa los detalles para registrar un nuevo Socio VIP.</DialogDescription>
+            <DialogTitle>
+              {editingMember
+                ? `Editar Socio VIP: ${editingMember.name} ${editingMember.surname}`
+                : "Paso 2: Completar Perfil de Socio VIP"
+              }
+            </DialogTitle>
+             <DialogDescription>
+              {editingMember
+                ? "Actualiza los detalles del Socio VIP."
+                : (verifiedSocioDniResult?.existingUserType === 'SocioVipMember' // Should be caught by alert
+                    ? "Este DNI ya es Socio VIP. No se puede crear un nuevo perfil aquí. Edite desde la lista principal."
+                    : "Completa los detalles para el perfil del Socio VIP.")
+              }
+            </DialogDescription>
           </DialogHeader>
           <SocioVipMemberForm
-            onSubmit={handleCreateMember} 
-            onCancel={() => setShowCreateModal(false)} 
+            member={editingMember || undefined}
+            initialData={!editingMember && verifiedSocioDniResult ? verifiedSocioDniResult : undefined}
+            onSubmit={handleCreateOrEditMember}
+            onCancel={() => { setShowCreateEditModal(false); setEditingMember(null); setVerifiedSocioDniResult(null);}}
             isSubmitting={isSubmitting}
+            disableSubmitOverride={!editingMember && !!verifiedSocioDniResult?.existingUserType && verifiedSocioDniResult.existingUserType === 'SocioVipMember'}
           />
         </DialogContent>
       </Dialog>
 
-      {editingMember && (
-         <Dialog open={!!editingMember} onOpenChange={() => setEditingMember(null)}>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Editar Socio VIP: {editingMember.name} {editingMember.surname}</DialogTitle>
-               <DialogDescription>Actualiza los detalles del Socio VIP.</DialogDescription>
-            </DialogHeader>
-            <SocioVipMemberForm
-              member={editingMember} 
-              onSubmit={handleEditMember} 
-              onCancel={() => setEditingMember(null)}
-              isSubmitting={isSubmitting}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Alert Dialog if DNI is already a Socio VIP Member */}
+      <AlertDialog open={showDniIsAlreadySocioVipAlert} onOpenChange={setShowDniIsAlreadySocioVipAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+                <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI ya Registrado como Socio VIP
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              El DNI <span className="font-semibold">{dniForSocioVerification}</span> ya está registrado como Socio VIP
+              (<span className="font-semibold">{existingSocioVipToEdit?.name} {existingSocioVipToEdit?.surname}</span>).
+              <br/><br/>
+              ¿Desea editar este perfil de Socio VIP existente?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDniIsAlreadySocioVipAlert(false); setExistingSocioVipToEdit(null); }}>No, Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleEditExistingSocioVip} className="bg-primary hover:bg-primary/90">
+                Sí, Editar Perfil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
-
-    

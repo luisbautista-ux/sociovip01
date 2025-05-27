@@ -1,6 +1,7 @@
 
 "use client";
 
+import React, { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -15,15 +16,16 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Info, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import type { SocioVipMember, SocioVipMemberFormData } from "@/lib/types";
+import type { SocioVipMember, SocioVipMemberFormData, InitialDataForSocioVipCreation } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 
 const socioVipMemberFormSchema = z.object({
@@ -44,36 +46,100 @@ type SocioVipMemberFormValues = z.infer<typeof socioVipMemberFormSchema>;
 
 interface SocioVipMemberFormProps {
   member?: SocioVipMember; // For editing
+  initialData?: InitialDataForSocioVipCreation; // For creation after DNI verification
   onSubmit: (data: SocioVipMemberFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+  disableSubmitOverride?: boolean;
 }
 
-export function SocioVipMemberForm({ member, onSubmit, onCancel, isSubmitting = false }: SocioVipMemberFormProps) {
+export function SocioVipMemberForm({
+  member,
+  initialData,
+  onSubmit,
+  onCancel,
+  isSubmitting = false,
+  disableSubmitOverride = false,
+}: SocioVipMemberFormProps) {
+  const isEditing = !!member;
+
   const form = useForm<SocioVipMemberFormValues>({
     resolver: zodResolver(socioVipMemberFormSchema),
-    defaultValues: {
-      name: member?.name || "",
-      surname: member?.surname || "",
-      dni: member?.dni || "",
-      phone: member?.phone || "",
-      dob: member?.dob ? new Date(member.dob) : undefined,
-      email: member?.email || "",
-      address: member?.address || "",
-      profession: member?.profession || "",
-      preferences: member?.preferences?.join(', ') || "",
-      loyaltyPoints: member?.loyaltyPoints || 0,
-      membershipStatus: member?.membershipStatus || undefined,
-    },
+    // Default values are set in useEffect
   });
+
+  useEffect(() => {
+    if (isEditing && member) {
+      form.reset({
+        name: member.name || "",
+        surname: member.surname || "",
+        dni: member.dni || "",
+        phone: member.phone || "",
+        dob: member.dob ? parseISO(member.dob) : undefined,
+        email: member.email || "",
+        address: member.address || "",
+        profession: member.profession || "",
+        preferences: member.preferences?.join(', ') || "",
+        loyaltyPoints: member.loyaltyPoints || 0,
+        membershipStatus: member.membershipStatus || undefined,
+      });
+    } else if (!isEditing && initialData) {
+      form.reset({
+        dni: initialData.dni,
+        name: initialData.name || "",
+        surname: initialData.surname || "",
+        phone: initialData.phone || "",
+        dob: initialData.dob ? parseISO(initialData.dob) : undefined,
+        email: initialData.email || "",
+        address: "", // Address, profession, preferences not usually pre-filled from QrClient/PlatformUser
+        profession: "",
+        preferences: "",
+        loyaltyPoints: 0,
+        membershipStatus: 'active', // Default for new Socio VIP
+      });
+    } else if (!isEditing && !initialData) { // Fallback if DNI-first flow somehow skipped (should not happen)
+        form.reset({
+            dni: "", name: "", surname: "", phone: "", dob: undefined, email: "",
+            address: "", profession: "", preferences: "", loyaltyPoints: 0, membershipStatus: 'active'
+        });
+    }
+  }, [member, initialData, isEditing, form]);
 
   const handleSubmit = (values: SocioVipMemberFormValues) => {
     onSubmit(values);
   };
 
+  const shouldDisableDniField = isEditing || (!isEditing && !!initialData?.dni);
+  const showPrePopulatedAlert = !isEditing && initialData?.preExistingUserType;
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        {showPrePopulatedAlert && (
+          <Alert variant="default" className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-700">
+              DNI Encontrado como {initialData?.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'}
+            </AlertTitle>
+            <AlertDescription>
+              Este DNI pertenece a un {initialData?.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
+              Se han pre-rellenado los datos conocidos. Por favor, complete la información para registrarlo como Socio VIP.
+            </AlertDescription>
+          </Alert>
+        )}
+        <FormField
+            control={form.control}
+            name="dni"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>DNI / Carnet de Extranjería</FormLabel>
+                <FormControl><Input placeholder="Documento de identidad" {...field} disabled={isSubmitting || shouldDisableDniField} /></FormControl>
+                {shouldDisableDniField && !isEditing && <FormDescription className="text-xs">El DNI ha sido verificado y no puede cambiarse en este paso.</FormDescription>}
+                {isEditing && <FormDescription className="text-xs">El DNI no puede ser modificado para socios existentes.</FormDescription>}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -101,17 +167,6 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel, isSubmitting = 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="dni"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>DNI / Carnet de Extranjería</FormLabel>
-                <FormControl><Input placeholder="Documento de identidad" {...field} disabled={isSubmitting} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
             name="phone"
             render={({ field }) => (
               <FormItem>
@@ -121,44 +176,44 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel, isSubmitting = 
               </FormItem>
             )}
           />
+          <FormField
+            control={form.control}
+            name="dob"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>Fecha de Nacimiento</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={"outline"}
+                        className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                        disabled={isSubmitting}
+                      >
+                        {field.value ? format(field.value, "d MMMM yyyy", { locale: es }) : <span>Selecciona una fecha</span>}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      locale={es}
+                      captionLayout="dropdown-buttons"
+                      fromYear={1920}
+                      toYear={new Date().getFullYear() - 18} // Must be at least 18
+                      disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18)) || date < new Date("1920-01-01")}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
-        <FormField
-          control={form.control}
-          name="dob"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Fecha de Nacimiento</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                      disabled={isSubmitting}
-                    >
-                      {field.value ? format(field.value, "d MMMM yyyy", { locale: es }) : <span>Selecciona una fecha</span>}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    locale={es}
-                    captionLayout="dropdown-buttons"
-                    fromYear={1920}
-                    toYear={new Date().getFullYear() - 18} // Must be at least 18
-                    disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18)) || date < new Date("1920-01-01")}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <FormField
           control={form.control}
           name="email"
@@ -222,7 +277,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel, isSubmitting = 
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Estado de Membresía</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona un estado" />
@@ -244,7 +299,7 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel, isSubmitting = 
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableSubmitOverride}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {member ? "Guardar Cambios" : "Crear Socio VIP"}
           </Button>
@@ -253,5 +308,3 @@ export function SocioVipMemberForm({ member, onSubmit, onCancel, isSubmitting = 
     </Form>
   );
 }
-
-    

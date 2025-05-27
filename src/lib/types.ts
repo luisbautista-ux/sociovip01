@@ -1,74 +1,85 @@
 
+// src/lib/types.ts
+import type { Timestamp } from "firebase/firestore";
+
 export interface PromotionDetails { // For public display
   id: string;
   title: string;
   description: string;
   validUntil: string; // Date string
   imageUrl: string;
-  promoCode: string; 
-  aiHint: string; 
-  type: 'promotion' | 'event'; 
+  promoCode: string;
+  aiHint: string;
+  type: 'promotion' | 'event';
   termsAndConditions?: string;
 }
 
-export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'expired'; 
+export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'expired';
 
 export interface QrClient {
   id: string; // Firestore document ID
-  dni: string; 
+  dni: string;
   name: string;
   surname: string;
   phone: string;
   dob: string; // Date of Birth, YYYY-MM-DD'T'HH:mm:ss
-  registrationDate: string; // ISO date string of first QR generation
+  registrationDate: Timestamp | string; // ISO date string or Timestamp
 }
 
 export interface QrCodeData {
   user: QrClient;
-  promotion: PromotionDetails; 
-  code: string; 
-  status: QrCodeStatusGenerated; 
+  promotion: PromotionDetails;
+  code: string;
+  status: QrCodeStatusGenerated;
 }
 
 export interface SocioVipMember {
   id: string; // Firestore document ID
-  dni: string; 
+  dni: string;
   name: string;
   surname: string;
   phone: string;
   dob: string; // YYYY-MM-DD'T'HH:mm:ss
-  email: string; 
+  email: string;
   address?: string;
   profession?: string;
-  preferences?: string[]; 
+  preferences?: string[];
   loyaltyPoints: number;
   membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
-  staticQrCodeUrl?: string; 
-  joinDate: string; // ISO date string
+  staticQrCodeUrl?: string;
+  joinDate: Timestamp | string; // ISO date string or Timestamp
+  // Firebase Auth UID if they have a platform login, optional
+  authUid?: string;
 }
 
 export interface AdminDashboardStats {
   totalBusinesses: number;
-  totalPlatformUsers: number; 
-  totalPromotionsActive: number; 
-  totalQrCodesGenerated: number; 
-  totalQrClients: number; 
-  totalSocioVipMembers: number; 
+  totalPlatformUsers: number;
+  totalPromotionsActive: number;
+  totalQrCodesGenerated: number;
+  totalQrClients: number;
+  totalSocioVipMembers: number;
 }
 
-export interface PromotionAnalyticsData { 
+export interface PromotionAnalyticsData {
   month: string;
-  promotionsCreated: number; 
+  promotionsCreated: number;
   qrCodesGenerated: number;
   qrCodesUtilized: number;
 }
 
+export interface RegisteredClient { // Used in AdminAnalyticsPage for mock data
+  date: string; // "dd MMM"
+  newRegistrations: number;
+}
+
+
 export interface Business {
   id: string; // Firestore document ID
   name: string;
-  contactEmail: string; 
-  joinDate: string; // ISO date string
-  activePromotions: number; 
+  contactEmail: string;
+  joinDate: Timestamp | string; // ISO date string or Timestamp
+  activePromotions: number;
 }
 
 export type PlatformUserRole = 'superadmin' | 'business_admin' | 'staff' | 'promoter' | 'host';
@@ -76,118 +87,118 @@ export type PlatformUserRole = 'superadmin' | 'business_admin' | 'staff' | 'prom
 export interface PlatformUser {
   id: string; // Firestore document ID
   uid: string; // Firebase Auth UID
-  dni: string; 
+  dni: string;
   name: string;
-  email: string; 
-  roles: PlatformUserRole[]; 
-  businessId?: string | null; 
-  lastLogin: string; // ISO date string
+  email: string;
+  roles: PlatformUserRole[];
+  businessId?: string | null;
+  lastLogin: Timestamp | string; // ISO date string or Timestamp
 }
 
 export type BusinessEntityType = 'promotion' | 'event' | 'survey';
 
 export interface GeneratedCode {
   id: string; // Sub-document ID or unique ID within an array
-  value: string; 
-  entityId: string; 
-  status: QrCodeStatusGenerated; 
-  generatedByName: string; 
-  generatedDate: string; 
-  redemptionDate?: string; 
-  redeemedByInfo?: { 
+  value: string;
+  entityId: string;
+  status: QrCodeStatusGenerated;
+  generatedByName: string;
+  generatedDate: string; // ISO date string
+  redemptionDate?: string; // ISO date string
+  redeemedByInfo?: {
     dni: string;
     name: string;
     phone?: string;
   };
-  observation?: string; 
+  observation?: string;
   isVipCandidate?: boolean;
 }
 
 export interface EventPromoterAssignment {
-  promoterProfileId: string; 
-  promoterName: string; 
-  promoterEmail?: string; 
-  commissionRate?: string; 
-  notes?: string; 
+  promoterProfileId: string;
+  promoterName: string;
+  promoterEmail?: string;
+  commissionRate?: string;
+  notes?: string;
 }
 
 export interface TicketType {
   id: string;
-  eventId: string; 
-  businessId: string; 
+  eventId: string;
+  businessId: string;
   name: string;
   cost: number;
   description?: string;
-  quantity?: number; 
+  quantity?: number;
 }
 
 export interface EventBox {
   id: string;
-  eventId: string; 
-  businessId: string; 
+  eventId: string;
+  businessId: string;
   name: string;
   cost: number;
   description?: string;
   status: 'available' | 'unavailable';
-  capacity?: number; 
-  sellerName?: string; 
-  ownerName?: string;  
-  ownerDni?: string;   
+  capacity?: number;
+  sellerName?: string;
+  ownerName?: string;
+  ownerDni?: string;
 }
 
-export interface BusinessManagedEntity { 
+export interface BusinessManagedEntity {
   id: string; // Firestore document ID
   businessId: string;
   type: BusinessEntityType;
   name: string;
   description: string;
-  startDate: string; 
-  endDate: string; 
-  usageLimit?: number; 
-  maxAttendance?: number; 
+  startDate: string; // ISO date string
+  endDate: string; // ISO date string
+  usageLimit?: number;
+  maxAttendance?: number;
   isActive: boolean;
-  imageUrl?: string; 
+  imageUrl?: string;
   aiHint?: string;
   termsAndConditions?: string;
-  generatedCodes?: GeneratedCode[]; 
+  generatedCodes?: GeneratedCode[];
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
-  assignedPromoters?: EventPromoterAssignment[]; 
+  assignedPromoters?: EventPromoterAssignment[];
 }
 
-export interface PromoterProfile { 
+export interface PromoterProfile {
   id: string; // Firestore document ID for global promoter profiles
   name: string;
   email: string;
   phone?: string;
-  dni?: string; 
+  dni?: string;
 }
 
-export interface BusinessPromoterLink { 
+export interface BusinessPromoterLink {
   id: string; // Firestore document ID
   businessId: string;
-  promoterProfileId: string; 
-  promoterName: string; 
-  promoterEmail: string; 
-  commissionRate?: string; 
+  promoterProfileId: string;
+  promoterName: string;
+  promoterEmail: string;
+  commissionRate?: string;
   isActive: boolean;
-  joinDate: string;
+  joinDate: Timestamp | string; // ISO date string or Timestamp
 }
 
 export type BusinessClientType = 'qr' | 'vip';
 
 export interface BusinessClientView {
-  id: string; 
+  id: string;
   clientType: BusinessClientType;
   name: string;
   surname: string;
   dni: string;
   phone?: string;
-  email?: string; 
-  relevantDate: string; 
+  email?: string;
+  relevantDate: string; // registrationDate for QrClient, joinDate for SocioVipMember
   isVip: boolean;
-  loyaltyPoints?: number; 
-  membershipStatus?: SocioVipMember['membershipStatus']; 
+  loyaltyPoints?: number;
+  membershipStatus?: SocioVipMember['membershipStatus'];
 }
 
 
@@ -198,28 +209,28 @@ export interface BusinessFormData {
 }
 
 export interface PlatformUserFormData {
-  dni: string; 
+  dni: string;
   name: string;
   email: string;
-  roles: PlatformUserRole[]; // Changed from single role to array
+  roles: PlatformUserRole[];
   businessId?: string;
 }
 
 export interface SocioVipMemberFormData {
-  dni: string; 
+  dni: string;
   name: string;
   surname: string;
   phone: string;
-  dob: Date;
+  dob: Date; // Date object from form, will be converted to string for storage
   email: string;
   address?: string;
   profession?: string;
-  preferences?: string; 
+  preferences?: string;
   loyaltyPoints: number;
   membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
 }
 
-export interface NewQrClientFormData { 
+export interface NewQrClientFormData {
   dni: string;
   name: string;
   surname: string;
@@ -244,31 +255,31 @@ export interface BusinessEventFormData {
   description: string;
   startDate: Date;
   endDate: Date;
-  maxAttendance?: number; 
+  maxAttendance?: number;
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
   termsAndConditions?: string;
 }
 
-export interface BusinessPromoterFormData { 
+export interface BusinessPromoterFormData {
   promoterName: string;
   promoterEmail: string;
   promoterPhone?: string;
-  promoterDni?: string; 
-  commissionRate?: string; 
+  promoterDni?: string;
+  commissionRate?: string;
 }
 
 export interface PromoterCommissionEntry {
     id: string;
     businessName: string;
-    entityName: string; 
+    entityName: string;
     entityType: 'promotion' | 'event';
     codesRedeemedByPromoter: number;
-    commissionRate: string; 
+    commissionRate: string;
     commissionEarned: number;
     paymentStatus: 'Pendiente' | 'Pagado';
-    period: string; 
+    period: string;
 }
 
 export interface TicketTypeFormData {
@@ -299,20 +310,31 @@ export interface BatchBoxFormData {
   prefix: string;
   fromNumber: number;
   toNumber: number;
-  cost: number; 
-  capacity?: number; 
-  description?: string; 
-  status: 'available' | 'unavailable'; 
+  cost: number;
+  capacity?: number;
+  description?: string;
+  status: 'available' | 'unavailable';
 }
-    
+
 // For DNI verification flow in Admin Users
 export interface InitialDataForPlatformUserCreation {
   dni: string;
-  name?: string; 
-  email?: string; 
-  existingUserType?: 'QrClient' | 'SocioVipMember' | 'PlatformUser'; // Added PlatformUser
-  existingUserIsOtherType?: boolean;
-  existingUserIsPlatformUser?: boolean;
-  existingPlatformUser?: PlatformUser; // Full PlatformUser data
+  name?: string;
+  email?: string;
+  existingUserIsOtherType?: boolean; // True if DNI exists as QrClient or SocioVipMember
+  existingUserIsPlatformUser?: boolean; // True if DNI already has a PlatformUser profile
+  existingPlatformUser?: PlatformUser; // Full PlatformUser data if it exists
   existingPlatformUserRoles?: PlatformUserRole[]; // Roles if DNI is PlatformUser
+}
+
+export interface InitialDataForSocioVipCreation {
+  dni: string;
+  name?: string;
+  surname?: string;
+  phone?: string;
+  dob?: string; // ISO string, e.g., "1990-05-15T12:00:00"
+  email?: string;
+  // Indicates if the DNI was found as a QrClient or PlatformUser
+  // (but not yet as a SocioVipMember, as that case is handled by an alert)
+  preExistingUserType?: 'QrClient' | 'PlatformUser';
 }
