@@ -17,17 +17,19 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from "firebase/firestore";
 
 const roleTranslations: Record<PlatformUser['role'], string> = {
   superadmin: "Super Admin",
   business_admin: "Admin Negocio",
   staff: "Staff Negocio",
+  promoter: "Promotor",
+  host: "Anfitrión",
 };
 
 export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateEditModal, setShowCreateEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +48,7 @@ export default function AdminUsersPage() {
         return {
           id: docSnap.id,
           name: data.name,
-          contactEmail: data.contactEmail,
+          contactEmail: data.contactEmail, // Keep other fields for potential future use
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : new Date(data.joinDate).toISOString(),
           activePromotions: data.activePromotions || 0,
         };
@@ -56,7 +58,7 @@ export default function AdminUsersPage() {
       console.error("Failed to fetch businesses for form:", error);
       toast({
         title: "Error al Cargar Negocios",
-        description: "No se pudieron obtener los negocios para el formulario.",
+        description: "No se pudieron obtener los negocios para el formulario de usuarios.",
         variant: "destructive",
       });
       setAvailableBusinesses([]);
@@ -73,11 +75,12 @@ export default function AdminUsersPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
+          uid: data.uid || docSnap.id, // Fallback to doc.id if uid not present (older data)
           name: data.name,
           email: data.email,
           role: data.role,
           businessId: data.businessId,
-          lastLogin: data.lastLogin instanceof Timestamp ? data.lastLogin.toDate().toISOString() : new Date(data.lastLogin).toISOString(),
+          lastLogin: data.lastLogin instanceof Timestamp ? data.lastLogin.toDate().toISOString() : new Date().toISOString(), // Default if missing
         };
       });
       setPlatformUsers(fetchedUsers);
@@ -100,8 +103,8 @@ export default function AdminUsersPage() {
   }, [fetchPlatformUsers, fetchBusinessesForForm]);
 
   const filteredUsers = platformUsers.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
   
   const handleExport = () => {
@@ -109,14 +112,15 @@ export default function AdminUsersPage() {
       toast({ title: "Sin Datos", description: "No hay usuarios para exportar.", variant: "destructive" });
       return;
     }
-    const headers = ["ID", "Nombre", "Email", "Rol", "ID Negocio", "Último Acceso"];
+    const headers = ["ID", "UID", "Nombre", "Email", "Rol", "ID Negocio Asociado", "Último Acceso"];
     const rows = filteredUsers.map(user => [
       user.id,
+      user.uid,
       user.name,
       user.email,
-      roleTranslations[user.role],
+      roleTranslations[user.role] || user.role,
       user.businessId || "N/A",
-      format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", { locale: es })
+      user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"
     ]);
     let csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
@@ -134,15 +138,30 @@ export default function AdminUsersPage() {
     setIsSubmitting(true);
     try {
       const newUserPayload: any = {
-        ...data,
-        lastLogin: Timestamp.fromDate(new Date()),
+        // uid will be set by Firebase Auth trigger or needs to be manually linked
+        // For now, let's assume it's for users created by admin and not linked to Auth yet
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        lastLogin: serverTimestamp(), // Use serverTimestamp for new users
+        // businessId will be conditionally added
       };
-      if (data.role === 'superadmin' && newUserPayload.businessId) {
-        delete newUserPayload.businessId; // Superadmin shouldn't have businessId
+
+      if (['superadmin', 'promoter'].includes(data.role)) {
+        newUserPayload.businessId = null; // Explicitly null for these roles
+      } else if (data.businessId) { // For business_admin, staff, host
+        newUserPayload.businessId = data.businessId;
+      } else {
+        // This case should be caught by form validation, but as a safeguard:
+        toast({ title: "Error de Validación", description: "Se requiere un negocio para este rol.", variant: "destructive"});
+        setIsSubmitting(false);
+        return;
       }
+
       await addDoc(collection(db, "platformUsers"), newUserPayload);
       toast({ title: "Usuario Creado", description: `El usuario "${data.name}" ha sido creado.` });
-      setShowCreateModal(false);
+      setShowCreateEditModal(false);
+      setEditingUser(null);
       fetchPlatformUsers();
     } catch (error) {
       console.error("Failed to create user:", error);
@@ -157,12 +176,25 @@ export default function AdminUsersPage() {
     setIsSubmitting(true);
     try {
       const userRef = doc(db, "platformUsers", editingUser.id);
-      const updatedUserPayload: any = { ...data };
-       if (data.role === 'superadmin' && updatedUserPayload.businessId) {
-        updatedUserPayload.businessId = null; // or delete updatedUserPayload.businessId;
+      const updatedUserPayload: Partial<PlatformUser> = {
+        name: data.name,
+        // Email is not editable through this form for existing users as it's tied to Auth usually
+        role: data.role,
+      };
+
+      if (['superadmin', 'promoter'].includes(data.role)) {
+        updatedUserPayload.businessId = null;
+      } else if (data.businessId) {
+        updatedUserPayload.businessId = data.businessId;
+      } else {
+         toast({ title: "Error de Validación", description: "Se requiere un negocio para este rol.", variant: "destructive"});
+        setIsSubmitting(false);
+        return;
       }
+
       await updateDoc(userRef, updatedUserPayload);
       toast({ title: "Usuario Actualizado", description: `El usuario "${data.name}" ha sido actualizado.` });
+      setShowCreateEditModal(false);
       setEditingUser(null);
       fetchPlatformUsers();
     } catch (error) {
@@ -174,6 +206,7 @@ export default function AdminUsersPage() {
   };
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
+    // Prevent deletion of superadmin if it's the only one or the current user, etc. (add logic if needed)
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
@@ -188,9 +221,18 @@ export default function AdminUsersPage() {
     }
   };
 
-  const getBusinessName = (businessId?: string) => {
-    if (!businessId) return "N/A (Super Admin)";
-    return availableBusinesses.find(b => b.id === businessId)?.name || "Negocio Desconocido";
+  const getBusinessName = (user: PlatformUser): string => {
+    if (user.role === 'superadmin') return "N/A (Super Admin)";
+    if (user.role === 'promoter') return "N/A (Promotor Global)";
+    
+    if (!user.businessId && (user.role === 'business_admin' || user.role === 'staff' || user.role === 'host')) {
+      return "Error: Negocio No Asignado";
+    }
+    if (user.businessId) {
+      const business = availableBusinesses.find(b => b.id === user.businessId);
+      return business?.name || "ID Negocio: " + user.businessId.substring(0,6) + "..."; // Show part of ID if name not found
+    }
+    return "N/A";
   };
 
   return (
@@ -203,7 +245,7 @@ export default function AdminUsersPage() {
            <Button onClick={handleExport} variant="outline" disabled={isLoading || platformUsers.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={() => { setEditingUser(null); setShowCreateModal(true); }} className="bg-primary hover:bg-primary/90" disabled={isLoading || isLoadingBusinesses}>
+          <Button onClick={() => { setEditingUser(null); setShowCreateEditModal(true); }} className="bg-primary hover:bg-primary/90" disabled={isLoading || isLoadingBusinesses}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Usuario
           </Button>
         </div>
@@ -212,7 +254,7 @@ export default function AdminUsersPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Usuarios</CardTitle>
-          <CardDescription>Administradores de negocios y staff que utilizan la plataforma.</CardDescription>
+          <CardDescription>Administradores, staff, promotores y anfitriones de la plataforma.</CardDescription>
            <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -255,46 +297,45 @@ export default function AdminUsersPage() {
                       <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={user.role === 'superadmin' ? 'default' : (user.role === 'business_admin' ? 'secondary' : 'outline')}>
-                          {roleTranslations[user.role]}
+                          {roleTranslations[user.role] || user.role}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell">{getBusinessName(user.businessId)}</TableCell>
-                      <TableCell>{format(new Date(user.lastLogin), "P p", { locale: es })}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{getBusinessName(user)}</TableCell>
+                      <TableCell>{user.lastLogin ? format(new Date(user.lastLogin), "P p", { locale: es }) : "N/A"}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => {setEditingUser(user); setShowCreateModal(false); /* ensure edit mode */ }} disabled={isSubmitting}>
+                        <Button variant="ghost" size="icon" onClick={() => {setEditingUser(user); setShowCreateEditModal(true);}} disabled={isSubmitting}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Editar</span>
                         </Button>
-                        {user.role !== 'superadmin' && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Eliminar</span>
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario 
-                                  <span className="font-semibold"> {user.name}</span>.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteUser(user.id, user.name)}
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  disabled={isSubmitting}
-                                >
-                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+                        {/* Consider disabling delete for superadmin if it's the current user or the only one */}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Eliminar</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario 
+                                <span className="font-semibold"> {user.name}</span>.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteUser(user.id, user.name)}
+                                className="bg-destructive hover:bg-destructive/90"
+                                disabled={isSubmitting}
+                              >
+                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   ))
@@ -309,13 +350,11 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
       
-       <Dialog open={showCreateModal || !!editingUser} onOpenChange={(isOpen) => {
+       <Dialog open={showCreateEditModal} onOpenChange={(isOpen) => {
         if (!isOpen) {
-          setShowCreateModal(false);
           setEditingUser(null);
-        } else if (!editingUser) { 
-            setShowCreateModal(true);
         }
+        setShowCreateEditModal(isOpen);
       }}>
         <DialogContent>
           <DialogHeader>
@@ -326,7 +365,7 @@ export default function AdminUsersPage() {
             user={editingUser || undefined}
             businesses={availableBusinesses}
             onSubmit={editingUser ? handleEditUser : handleCreateUser}
-            onCancel={() => { setShowCreateModal(false); setEditingUser(null);}}
+            onCancel={() => { setShowCreateEditModal(false); setEditingUser(null);}}
             isSubmitting={isSubmitting}
           />
         </DialogContent>
@@ -334,5 +373,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-
-    

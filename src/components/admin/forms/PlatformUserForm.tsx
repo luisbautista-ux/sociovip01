@@ -22,10 +22,15 @@ import { Loader2 } from "lucide-react";
 const platformUserFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
-  role: z.enum(['superadmin', 'business_admin', 'staff'], { required_error: "Debes seleccionar un rol."}),
+  role: z.enum(['superadmin', 'business_admin', 'staff', 'promoter', 'host'], { required_error: "Debes seleccionar un rol."}),
   businessId: z.string().optional(),
-}).refine(data => data.role === 'superadmin' || (data.role !== 'superadmin' && data.businessId), {
-  message: "Debes seleccionar un negocio para roles de 'Admin Negocio' o 'Staff'.",
+}).refine(data => {
+  if (['business_admin', 'staff', 'host'].includes(data.role)) {
+    return !!data.businessId; // BusinessId es requerido para estos roles
+  }
+  return true; // No es requerido para superadmin o promoter
+}, {
+  message: "Debes seleccionar un negocio para roles de 'Admin Negocio', 'Staff' o 'Anfitrión'.",
   path: ["businessId"],
 });
 
@@ -53,12 +58,28 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
   const selectedRole = form.watch("role");
 
   const handleSubmit = (values: PlatformUserFormValues) => {
-    const dataToSubmit: PlatformUserFormData = { ...values };
-    if (values.role === 'superadmin') {
-      delete dataToSubmit.businessId; // Superadmin no necesita businessId
+    const dataToSubmit: PlatformUserFormData = { 
+      name: values.name,
+      email: values.email,
+      role: values.role,
+    };
+    if (['business_admin', 'staff', 'host'].includes(values.role)) {
+      dataToSubmit.businessId = values.businessId;
     }
+    // Para 'superadmin' y 'promoter', businessId no se envía o se puede establecer como null en el backend/server action.
+    // La lógica en la página padre se encargará de esto explícitamente antes de enviar a Firestore.
     onSubmit(dataToSubmit);
   };
+
+  // Actualizar el formulario si el usuario o los negocios cambian
+  React.useEffect(() => {
+    form.reset({
+      name: user?.name || "",
+      email: user?.email || "",
+      role: user?.role || undefined,
+      businessId: user?.businessId || undefined,
+    });
+  }, [user, form]);
 
   return (
     <Form {...form}>
@@ -83,9 +104,10 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting} />
+                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || !!user} />
               </FormControl>
-              <FormMessage />
+              {!!user && <FormMessage>El email no se puede cambiar para usuarios existentes.</FormMessage>}
+              {!user && <FormMessage />}
             </FormItem>
           )}
         />
@@ -95,7 +117,17 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
           render={({ field }) => (
             <FormItem>
               <FormLabel>Rol</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+              <Select 
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  // Si el nuevo rol no requiere businessId, limpiar el campo businessId
+                  if (['superadmin', 'promoter'].includes(value)) {
+                    form.setValue('businessId', undefined, { shouldValidate: true });
+                  }
+                }} 
+                defaultValue={field.value} 
+                disabled={isSubmitting}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona un rol" />
@@ -105,13 +137,15 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
                   <SelectItem value="superadmin">Super Admin</SelectItem>
                   <SelectItem value="business_admin">Admin Negocio</SelectItem>
                   <SelectItem value="staff">Staff Negocio</SelectItem>
+                  <SelectItem value="promoter">Promotor</SelectItem>
+                  <SelectItem value="host">Anfitrión</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
           )}
         />
-        {selectedRole && selectedRole !== 'superadmin' && (
+        {selectedRole && ['business_admin', 'staff', 'host'].includes(selectedRole) && (
           <FormField
             control={form.control}
             name="businessId"
@@ -128,6 +162,7 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
                     {businesses.map(biz => (
                       <SelectItem key={biz.id} value={biz.id}>{biz.name}</SelectItem>
                     ))}
+                    {businesses.length === 0 && <FormItem><FormLabel className="p-2 text-sm text-muted-foreground">No hay negocios disponibles. Crea uno primero.</FormLabel></FormItem>}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -148,5 +183,3 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
     </Form>
   );
 }
-
-    
