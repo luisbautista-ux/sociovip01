@@ -44,8 +44,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<PlatformUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [loadingProfile, setLoadingProfile] = useState(false); // Initialize to false, set to true before fetch
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false); // State to track client-side mount
   const router = useRouter();
+
+  useEffect(() => {
+    setHasMounted(true); // Component has mounted on the client
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -59,15 +64,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const userDocRef = doc(db, "platformUsers", user.uid);
           const userDocSnap = await getDoc(userDocRef);
           
-          console.log("AuthContext: User UID from Auth:", user.uid); // For debugging
+          console.log("AuthContext: User UID from Auth:", user.uid); 
           if (userDocSnap.exists()) {
             const profileDataFromDb = userDocSnap.data();
-            console.log("AuthContext: Profile data fetched from Firestore:", profileDataFromDb); // For debugging
+            console.log("AuthContext: Profile data fetched from Firestore:", profileDataFromDb);
+            
+            let rolesArray: PlatformUser['roles'] = [];
+            if (profileDataFromDb.roles && Array.isArray(profileDataFromDb.roles)) {
+              rolesArray = profileDataFromDb.roles;
+            } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') {
+              // Fallback for older data structure if 'role' was a string
+              rolesArray = [profileDataFromDb.role as PlatformUser['roles'][0]];
+            } else {
+              console.warn(`AuthContext: User profile for UID ${user.uid} has missing or invalid 'roles' field. Defaulting to empty roles.`);
+            }
+
             const profileData = { 
                 id: userDocSnap.id, 
                 uid: user.uid, 
-                // Ensure roles is an array, even if it's missing or not an array in DB
-                roles: Array.isArray(profileDataFromDb.roles) ? profileDataFromDb.roles : [],
+                roles: rolesArray,
                 ...profileDataFromDb 
             } as PlatformUser;
             setUserProfile(profileData);
@@ -83,7 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       } else {
         setUserProfile(null); 
-        setLoadingProfile(false); // Ensure loadingProfile is false if no user
+        setLoadingProfile(false);
       }
     });
     return () => unsubscribe();
@@ -92,7 +107,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      // Profile fetching is handled by onAuthStateChanged
       return userCredential;
     } catch (error) {
       return error as AuthError;
@@ -104,17 +118,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       if (userCredential.user) {
         const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
-        const newProfile: Partial<PlatformUser> & { roles: PlatformUser['roles'], email: string, uid: string, lastLogin: any } = {
+        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin'> & { lastLogin: any } = {
           uid: userCredential.user.uid,
           email: userCredential.user.email || "",
           name: userCredential.user.email?.split('@')[0] || "Super Admin",
           roles: ['superadmin'],
           dni: "", 
-          lastLogin: serverTimestamp(),
           businessId: null,
+          lastLogin: serverTimestamp(),
         };
         await setDoc(userDocRef, newProfile);
-        // After signup, onAuthStateChanged will trigger and load this new profile.
       }
       return userCredential;
     } catch (error) {
@@ -125,8 +138,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     try {
       await signOut(auth);
-      // currentUser and userProfile will be set to null by onAuthStateChanged listener
-      // No need to manually push to /login here if layouts handle redirection based on currentUser
       router.push("/login"); 
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
@@ -142,6 +153,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signup,
     logout,
   };
+
+  if (!hasMounted) {
+    return null; // Or a global loading spinner
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
