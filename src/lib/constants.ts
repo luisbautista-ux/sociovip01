@@ -35,12 +35,30 @@ export const MESES_DEL_ANO_ES = [
 
 export const ALL_PLATFORM_USER_ROLES: PlatformUserRole[] = ['superadmin', 'business_admin', 'staff', 'promoter', 'host'];
 
-export const PLATFORM_USER_ROLE_TRANSLATIONS: Record<PlatformUserRole, string> = {
+export const PLATFORM_USER_ROLE_TRANSLATIONS: Record<PlatformUserRole | 'QrClient' | 'SocioVipMember', string> = {
   superadmin: "Super Admin",
   business_admin: "Admin Negocio",
   staff: "Staff Negocio",
   promoter: "Promotor",
   host: "Anfitrión",
+  QrClient: "Cliente QR",
+  SocioVipMember: "Socio VIP",
 };
 
 export const ROLES_REQUIRING_BUSINESS_ID: PlatformUserRole[] = ['business_admin', 'staff', 'host'];
+
+export const BUSINESS_TYPES = [
+  "Comercio",
+  "Servicios",
+  "Manufactura",
+  "Agricultura",
+  "Bienes raíces",
+  "Turismo",
+  "Minera",
+  "Tecnología e informática",
+  "Finanzas",
+  "Energía",
+  "Construcción",
+  "Transporte y logística",
+  "Otro",
+] as const;

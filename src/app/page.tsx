@@ -20,16 +20,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import type { QrClient, PromotionDetails, QrCodeData, QrCodeStatusGenerated, NewQrClientFormData } from "@/lib/types";
+import type { QrClient, PromotionDetails, QrCodeData, NewQrClientFormData } from "@/lib/types";
 import Image from "next/image";
 import QRCode from 'qrcode';
 import { CheckCircle2, XCircle, BadgeCheck, Calendar as CalendarIcon, Ticket, User, Info, ScanLine, Sparkles, Download, Gift, Crown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { SocioVipLogo } from "@/components/icons";
+import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
+
 
 type PageViewState = "promotionsList" | "qrDisplay";
 type ModalStep = "enterDni" | "newQrClientForm";
@@ -97,11 +99,6 @@ const mockExistingQrClient: QrClient = {
   registrationDate: "2025-01-10T10:00:00Z"
 };
 
-const statusTranslations: { [key in QrCodeStatusGenerated]: string } = {
-  available: "Generado",
-  redeemed: "Utilizado",
-  expired: "Vencido",
-};
 
 export default function HomePage() {
   const [pageViewState, setPageViewState] = useState<PageViewState>("promotionsList");
@@ -195,7 +192,7 @@ export default function HomePage() {
       const newQrData: QrCodeData = {
         user: mockExistingQrClient,
         promotion: activePromotion,
-        code: validatedPromoCode, // This should be the unique generated code, not promoCode itself for real scenario
+        code: validatedPromoCode, 
         status: "available",
       };
       setQrData(newQrData);
@@ -204,7 +201,7 @@ export default function HomePage() {
       toast({ title: `¡Bienvenido de vuelta ${mockExistingQrClient.name}!`, description: "Tu QR ha sido generado." });
     } else {
       setCurrentStepInModal("newQrClientForm");
-      newQrClientForm.reset({ // Pre-fill DNI in the new client form
+      newQrClientForm.reset({ 
         dni: values.dni,
         name: "", surname: "", phone: "", dob: undefined,
       });
@@ -214,12 +211,11 @@ export default function HomePage() {
 
   const processNewQrClientRegistration = (qrClientData: QrClient) => {
     if (!activePromotion || !validatedPromoCode) return;
-    // TODO: Replace with actual API call to register new QrClient
 
     const newQrData: QrCodeData = {
       user: qrClientData,
       promotion: activePromotion,
-      code: validatedPromoCode, // This should be a unique generated code for this user & promo
+      code: validatedPromoCode, 
       status: "available",
     };
     setQrData(newQrData);
@@ -233,15 +229,14 @@ export default function HomePage() {
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
     setIsLoading(false);
 
-    // Check if the DNI entered in this form (which could have been changed) now matches an existing user
     if (values.dni === mockExistingQrClient.dni && values.dni !== enteredDniOriginal) {
-      setFormDataForDniWarning(values); // Store current form data
+      setFormDataForDniWarning(values); 
       setShowDniExistsWarningDialog(true);
-      return; // Stop further processing until user confirms in the dialog
+      return; 
     }
 
     const newQrClient: QrClient = {
-      id: `qrclient-${Date.now()}`, // Mock ID generation
+      id: `qrclient-${Date.now()}`, 
       name: values.name,
       surname: values.surname,
       phone: values.phone,
@@ -255,20 +250,18 @@ export default function HomePage() {
   const handleDniExistsConfirmation = (confirmed: boolean) => {
     setShowDniExistsWarningDialog(false);
     if (confirmed && formDataForDniWarning) {
-      // User confirmed it's their DNI, pre-fill with existing data
       newQrClientForm.reset({
         dni: mockExistingQrClient.dni,
         name: mockExistingQrClient.name,
         surname: mockExistingQrClient.surname,
         phone: mockExistingQrClient.phone,
-        dob: new Date(mockExistingQrClient.dob),
+        dob: typeof mockExistingQrClient.dob === 'string' ? parseISO(mockExistingQrClient.dob) : mockExistingQrClient.dob as Date,
       });
       toast({ title: "Datos Precargados", description: "Hemos rellenado el formulario con tus datos existentes. Revisa y confirma." });
     } else if (!confirmed && formDataForDniWarning) {
-       // User said "No", revert to the data they were trying to submit
        newQrClientForm.reset(formDataForDniWarning);
     }
-    setFormDataForDniWarning(null); // Clear temp data
+    setFormDataForDniWarning(null); 
   };
 
   const resetProcess = () => {
@@ -286,11 +279,11 @@ export default function HomePage() {
   const handleCloseDniModal = () => {
     setShowDniModal(false);
     dniForm.reset();
-    newQrClientForm.reset(); // Ensure new client form is also reset
-    setEnteredDniOriginal(null); // Clear the DNI that initiated the modal flow
+    newQrClientForm.reset(); 
+    setEnteredDniOriginal(null); 
   }
 
-  const renderStatusIcon = (status: QrCodeStatusGenerated) => {
+  const renderStatusIcon = (status: QrCodeData['status']) => {
     switch (status) {
       case "available": return <CheckCircle2 className="h-5 w-5 text-green-500" />;
       case "redeemed": return <BadgeCheck className="h-5 w-5 text-blue-500" />;
@@ -305,7 +298,7 @@ export default function HomePage() {
     }
 
     const businessName = "Pandora Lounge Bar"; 
-    const businessLogoUrl = "https://placehold.co/120x40.png?text=Pandora"; 
+    const businessLogoUrl = "https://placehold.co/120x40.png"; 
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -326,20 +319,26 @@ export default function HomePage() {
     const canvasBackgroundColor = 'hsl(280, 13%, 96%)';
 
     const maxLogoHeight = 50; 
-    const logoNameSpacing = 20; 
-    const headerBottomMargin = 40; 
+    const logoNameSpacing = 5; // Reduced space
+    const spacingAfterLogo = 20; // Increased space after logo block
+    const businessNameFontSize = 14;
+    const headerBottomMargin = 15; // Reduced margin after header block
+    
     const promoTitleFontSize = 18;
-    const qrSectionSpacing = 15; 
-    const userNameFontSize = 22;
-    const dniFontSize = 13;
-    const detailsTextFontSize = 13;
-    const smallTextFontSize = 10; 
+    const spacingAfterBusinessName = 40; // Increased space after business name block to promo title
 
     const qrDisplaySize = 180; 
     const qrBorderColor = primaryTextColor;
     const qrBorderWidth = 2;
+    const qrTopSpacing = 10; // Reduced space above QR
+    const qrBottomSpacing = 20; // Increased space below QR
 
-    const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number, fontWeight: string, color: string, textAlign: CanvasTextAlign = 'center', fontName: string = 'Arial') => {
+    const userNameFontSize = 22;
+    const dniFontSize = 13;
+    const detailsTextFontSize = 13;
+    const termsTextFontSize = 10; 
+
+    const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number, fontWeight: string, color: string, textAlign: CanvasTextAlign = 'center', fontName: string = 'Arial'): { endY: number, lines: number } => {
         ctx.font = `${fontWeight} ${fontSize}px ${fontName}`;
         ctx.fillStyle = color;
         ctx.textAlign = textAlign;
@@ -347,6 +346,7 @@ export default function HomePage() {
         let line = '';
         let currentYPos = y;
         const actualLineHeight = fontSize * lineHeightMultiplier;
+        let lineCount = 0;
 
         for (let n = 0; n < words.length; n++) {
             const testLine = line + words[n] + ' ';
@@ -356,12 +356,16 @@ export default function HomePage() {
                 ctx.fillText(line.trim(), x, currentYPos);
                 line = words[n] + ' ';
                 currentYPos += actualLineHeight;
+                lineCount++;
             } else {
                 line = testLine;
             }
         }
-        ctx.fillText(line.trim(), x, currentYPos);
-        return currentYPos + actualLineHeight; 
+        if (line.trim().length > 0) {
+            ctx.fillText(line.trim(), x, currentYPos);
+            lineCount++;
+        }
+        return { endY: currentYPos + (lineCount > 0 ? actualLineHeight : 0), lines: lineCount };
     };
 
     const businessLogoImg = new window.Image();
@@ -383,56 +387,31 @@ export default function HomePage() {
                 }
             }
             
-            const businessNameFontSize = 14;
-            ctx.font = `normal ${businessNameFontSize}px Arial`;
-            const businessNameHeight = businessNameFontSize * lineHeightMultiplier;
-            
-            const headerContentHeight = actualLogoHeight + (actualLogoHeight > 0 ? logoNameSpacing : 0) + businessNameHeight;
-            const headerBackgroundHeight = headerContentHeight + padding * 2 - 15;
-
+            const headerBackgroundHeight = padding + actualLogoHeight + (actualLogoHeight > 0 ? spacingAfterLogo : 0) + (businessNameFontSize * lineHeightMultiplier) + padding - 15;
 
             let calculatedHeight = headerBackgroundHeight;
-            calculatedHeight += headerBottomMargin;
+            calculatedHeight += spacingAfterBusinessName;
 
             const tempCtx = document.createElement('canvas').getContext('2d')!;
-            tempCtx.font = `bold ${promoTitleFontSize}px Arial`;
-            let lineCount = 1;
-            let currentLine = '';
-            activePromotion.title.split(' ').forEach(word => {
-                if (tempCtx.measureText(currentLine + word + ' ').width > canvasWidth - 2 * padding) {
-                    lineCount++;
-                    currentLine = word + ' ';
-                } else {
-                    currentLine += word + ' ';
-                }
-            });
-            calculatedHeight += (lineCount * promoTitleFontSize * lineHeightMultiplier);
-            calculatedHeight += qrSectionSpacing;
+            const promoTitleMetrics = drawWrappedText(activePromotion.title, 0, 0, canvasWidth - 2 * padding, promoTitleFontSize, 'bold', 'transparent', 'center');
+            calculatedHeight += (promoTitleMetrics.lines * promoTitleFontSize * lineHeightMultiplier);
+            calculatedHeight += qrTopSpacing;
 
             calculatedHeight += qrDisplaySize + qrBorderWidth * 2;
-            calculatedHeight += qrSectionSpacing + 5; // Increased space after QR
+            calculatedHeight += qrBottomSpacing; 
 
             calculatedHeight += userNameFontSize * lineHeightMultiplier;
             calculatedHeight += 5; 
             calculatedHeight += dniFontSize * lineHeightMultiplier;
             calculatedHeight += 15; 
 
-            calculatedHeight += detailsTextFontSize * lineHeightMultiplier; 
+            const validUntilMetrics = drawWrappedText("Válido hasta: ...", 0, 0, canvasWidth - 2 * padding, detailsTextFontSize, 'normal', 'transparent');
+            calculatedHeight += (validUntilMetrics.lines * detailsTextFontSize * lineHeightMultiplier);
             calculatedHeight += 10;
 
             if (activePromotion.termsAndConditions) {
-                tempCtx.font = `normal ${smallTextFontSize}px Arial`;
-                lineCount = 1;
-                currentLine = '';
-                activePromotion.termsAndConditions.split(' ').forEach(word => {
-                    if (tempCtx.measureText(currentLine + word + ' ').width > canvasWidth - 2 * padding - 10) {
-                        lineCount++;
-                        currentLine = word + ' ';
-                    } else {
-                        currentLine += word + ' ';
-                    }
-                });
-                calculatedHeight += (lineCount * smallTextFontSize * lineHeightMultiplier);
+                const termsMetrics = drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, 0, 0, canvasWidth - 2 * padding - 10, termsTextFontSize, 'normal', 'transparent');
+                calculatedHeight += (termsMetrics.lines * termsTextFontSize * lineHeightMultiplier);
             }
             calculatedHeight += padding;
 
@@ -450,17 +429,17 @@ export default function HomePage() {
             if (actualLogoWidth > 0 && actualLogoHeight > 0) {
                 const logoX = (canvas.width - actualLogoWidth) / 2;
                 ctx.drawImage(businessLogoImg, logoX, currentY, actualLogoWidth, actualLogoHeight);
-                currentY += actualLogoHeight + logoNameSpacing;
+                currentY += actualLogoHeight + spacingAfterLogo;
             } else {
-                currentY += maxLogoHeight + logoNameSpacing; 
+                currentY += maxLogoHeight + spacingAfterLogo; 
             }
-
-            currentY = drawWrappedText(businessName, canvas.width / 2, currentY, canvas.width - 2 * padding, businessNameFontSize, 'normal', headerTextColor, 'center');
             
-            currentY = headerBackgroundHeight + headerBottomMargin;
+            currentY = drawWrappedText(businessName, canvas.width / 2, currentY, canvas.width - 2 * padding, businessNameFontSize, 'normal', headerTextColor, 'center').endY;
+            
+            currentY = headerBackgroundHeight + spacingAfterBusinessName;
 
-            currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, promoTitleFontSize, 'bold', primaryTextColor, 'center');
-            currentY += qrSectionSpacing;
+            currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, promoTitleFontSize, 'bold', primaryTextColor, 'center').endY;
+            currentY += qrTopSpacing;
 
             const qrX = (canvas.width - qrDisplaySize) / 2;
             const qrY = currentY;
@@ -468,19 +447,18 @@ export default function HomePage() {
             ctx.strokeStyle = qrBorderColor;
             ctx.lineWidth = qrBorderWidth;
             ctx.strokeRect(qrX - qrBorderWidth / 2, qrY - qrBorderWidth / 2, qrDisplaySize + qrBorderWidth, qrDisplaySize + qrBorderWidth);
-            currentY += qrDisplaySize + qrBorderWidth * 2 + qrSectionSpacing + 5;
+            currentY += qrDisplaySize + qrBorderWidth * 2 + qrBottomSpacing;
 
-            currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY, canvas.width - 2 * padding, userNameFontSize, 'bold', primaryTextColor, 'center');
-            currentY += 5;
-
-            currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY, canvas.width - 2 * padding, dniFontSize, 'normal', defaultTextColor, 'center');
+            currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY, canvas.width - 2 * padding, userNameFontSize, 'bold', primaryTextColor, 'center').endY;
+            currentY += 5; 
+            currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY, canvas.width - 2 * padding, dniFontSize, 'normal', defaultTextColor, 'center').endY;
             currentY += 15;
 
-            currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY, canvas.width - 2 * padding, detailsTextFontSize, 'normal', mutedTextColor, 'center');
+            currentY = drawWrappedText(`Válido hasta: ${format(parseISO(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY, canvas.width - 2 * padding, detailsTextFontSize, 'normal', mutedTextColor, 'center').endY;
             currentY += 10;
 
             if (activePromotion.termsAndConditions) {
-              drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding - 10, smallTextFontSize, 'normal', mutedTextColor, 'center');
+              drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding - 10, termsTextFontSize, 'normal', mutedTextColor, 'center');
             }
 
             const link = document.createElement('a');
@@ -570,7 +548,7 @@ export default function HomePage() {
                 <CardTitle className="text-xl mb-1">{promo.title}</CardTitle>
                 <CardDescription className="text-sm mb-1">{promo.description}</CardDescription>
                 <p className="text-xs text-muted-foreground">
-                  Válido hasta: {format(new Date(promo.validUntil), "d MMMM yyyy", { locale: es })}
+                  Válido hasta: {format(parseISO(promo.validUntil), "d MMMM yyyy", { locale: es })}
                 </p>
               </CardContent>
               <CardFooter className="flex-col items-stretch">
@@ -624,10 +602,10 @@ export default function HomePage() {
               </h3>
               <p><strong className="font-medium">Título:</strong> {activePromotion.title}</p>
 
-              <p className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Válido hasta:</strong> {format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}</p>
+              <p className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Válido hasta:</strong> {format(parseISO(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}</p>
               <p className="flex items-center">
-                {renderStatusIcon(qrData.status as QrCodeStatusGenerated)}
-                <strong className="font-medium ml-2">Estado:</strong> <span className="ml-1">{statusTranslations[qrData.status as QrCodeStatusGenerated]}</span>
+                {renderStatusIcon(qrData.status)}
+                <strong className="font-medium ml-2">Estado:</strong> <span className="ml-1">{GENERATED_CODE_STATUS_TRANSLATIONS[qrData.status]}</span>
               </p>
               {activePromotion.termsAndConditions && (
                 <div className="text-xs text-muted-foreground pt-2">
@@ -673,7 +651,7 @@ export default function HomePage() {
                     <FormItem>
                       <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="Ingresa tu número de documento" {...field} className="text-center text-lg"/>
+                        <Input placeholder="Ingresa tu número de documento" {...field} maxLength={15} className="text-center text-lg"/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -699,7 +677,7 @@ export default function HomePage() {
                     <FormItem>
                       <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="Tu número de documento" {...field} />
+                        <Input placeholder="Tu número de documento" {...field} maxLength={15} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

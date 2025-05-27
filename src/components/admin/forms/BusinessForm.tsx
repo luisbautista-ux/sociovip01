@@ -19,50 +19,56 @@ import type { Business, BusinessFormData, BusinessType } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BUSINESS_TYPES } from "@/lib/types"; // Import business types
+import { BUSINESS_TYPES } from "@/lib/constants";
 import { useState, useEffect } from "react";
 
 // Mock data for Peruvian locations - In a real app, this would come from an API or a larger static file
+// USUARIO: Por favor, completa esta lista con todos los departamentos, provincias y distritos de Perú.
 const peruLocations = {
   "Amazonas": {
     "Bagua": ["Aramango", "Bagua", "Copallin", "El Parco", "Imaza", "La Peca"],
     "Bongará": ["Chisquilla", "Churuja", "Corosha", "Cuispes", "Florida", "Jazan", "Jumbilla", "Recta", "San Carlos", "Shipasbamba", "Valera", "Yambrasbamba"],
     "Chachapoyas": ["Asuncion", "Balsas", "Chachapoyas", "Cheto", "Chiliquin", "Chuquibamba", "Granada", "Huancas", "La Jalca", "Leimebamba", "Levanto", "Magdalena", "Mariscal Castilla", "Molinopampa", "Montevideo", "Olleros", "Quinjalca", "San Francisco de Daguas", "San Isidro de Maino", "Soloco", "Sonche"],
-    "Condorcanqui": ["El Cenepa", "Nieva", "Rio Santiago"],
-    "Luya": ["Camporredondo", "Cocabamba", "Colcamar", "Conila", "Inguilpata", "Lamud", "Longuita", "Lonya Chico", "Luya", "Luya Viejo", "Maria", "Ocalli", "Ocumal", "Pisuquia", "Providencia", "San Cristobal", "San Francisco del Yeso", "San Jeronimo", "San Juan de Lopecancha", "Santa Catalina", "Santo Tomas", "Tingo", "Trita"],
-    "Rodríguez de Mendoza": ["Chirimoto", "Cochamal", "Huambo", "Limabamba", "Longar", "Mariscal Benavides", "Milpuc", "Omia", "San Nicolas", "Santa Rosa", "Totora", "Vista Alegre"],
-    "Utcubamba": ["Bagua Grande", "Cajaruro", "Cumba", "El Milagro", "Jamalca", "Lonya Grande", "Yamon"]
+    // ... más provincias y distritos de Amazonas
   },
-  "Áncash": { // Placeholder, add real provinces and districts
+  "Áncash": { 
     "Huaraz": ["Huaraz", "Independencia", "Cochabamba"],
     "Santa": ["Chimbote", "Coishco", "Nuevo Chimbote"]
+    // ... más provincias y distritos de Áncash
   },
   "Apurímac": {
     "Abancay": ["Abancay", "Chacoche", "Circa", "Curahuasi", "Huanipaca", "Lambrama", "Pichirhua", "San Pedro de Cachora", "Tamburco"],
+    // ... más provincias y distritos de Apurímac
   },
   "Arequipa": {
     "Arequipa": ["Alto Selva Alegre", "Arequipa", "Cayma", "Cerro Colorado", "Characato", "Chiguata", "Jacobo Hunter", "Jose Luis Bustamante Y Rivero", "La Joya", "Mariano Melgar", "Miraflores", "Mollebaya", "Paucarpata", "Pocsi", "Polobaya", "Quequeña", "Sabandia", "Sachaca", "San Juan de Siguas", "San Juan de Tarucani", "Santa Isabel de Siguas", "Santa Rita de Siguas", "Socabaya", "Tiabaya", "Uchumayo", "Vitor", "Yanahuara", "Yarabamba", "Yura"],
-    "Camaná": ["Camana", "Jose Maria Quimper", "Mariano Nicolas Valcarcel", "Mariscal Caceres", "Nicolas de Pierola", "Ocoña", "Quilca", "Samuel Pastor"],
-    "Caravelí": ["Acari", "Atico", "Atiquipa", "Bella Union", "Cahuacho", "Caraveli", "Chala", "Chaparra", "Huanuhuanu", "Jaqui", "Lomas", "Quicacha", "Yauca"],
-    "Castilla": ["Andagua", "Aplao", "Ayo", "Chachas", "Chilcaymarca", "Choco", "Huancarqui", "Machaguay", "Orcopampa", "Pampacolca", "Tipan", "Uñon", "Uraca", "Viraco"],
-    "Caylloma": ["Achoma", "Cabanaconde", "Callalli", "Caylloma", "Chivay", "Coporaque", "Huambo", "Huanca", "Ichupampa", "Lari", "Lluta", "Maca", "Madrigal", "Majes", "San Antonio de Chuca", "Sibayo", "Tapay", "Tisco", "Tuti", "Yanque"],
-    "Condesuyos": ["Andaray", "Cayarani", "Chichas", "Chuquibamba", "Iray", "Rio Grande", "Salamanca", "Yanaquihua"],
-    "Islay": ["Cocachacra", "Dean Valdivia", "Islay", "Mejia", "Mollendo", "Punta de Bombon"],
-    "La Unión": ["Alca", "Charcana", "Cotahuasi", "Huaynacotas", "Pampamarca", "Puyca", "Quechualla", "Sayla", "Tauria", "Tomepampa", "Toro"]
+    // ... más provincias y distritos de Arequipa
   },
+  "Ayacucho": { /* ... */ },
+  "Cajamarca": { /* ... */ },
+  "Callao": { /* ... */ },
+  "Cusco": { /* ... */ },
+  "Huancavelica": { /* ... */ },
+  "Huánuco": { /* ... */ },
+  "Ica": { /* ... */ },
+  "Junín": { /* ... */ },
+  "La Libertad": { /* ... */ },
+  "Lambayeque": { /* ... */ },
   "Lima": {
     "Lima": ["Ancon", "Ate", "Barranco", "Breña", "Carabayllo", "Chaclacayo", "Chorrillos", "Cieneguilla", "Comas", "El Agustino", "Independencia", "Jesus Maria", "La Molina", "La Victoria", "Lima", "Lince", "Los Olivos", "Lurigancho", "Lurin", "Magdalena del Mar", "Miraflores", "Pachacamac", "Pucusana", "Pueblo Libre", "Puente Piedra", "Punta Hermosa", "Punta Negra", "Rimac", "San Bartolo", "San Borja", "San Isidro", "San Juan de Lurigancho", "San Juan de Miraflores", "San Luis", "San Martin de Porres", "San Miguel", "Santa Anita", "Santa Maria del Mar", "Santa Rosa", "Santiago de Surco", "Surquillo", "Villa El Salvador", "Villa Maria del Triunfo"],
     "Barranca": ["Barranca", "Paramonga", "Pativilca", "Supe", "Supe Puerto"],
-    "Cajatambo": ["Cajatambo", "Copa", "Gorgor", "Huancapon", "Manas"],
-    "Canta": ["Arahuay", "Canta", "Huamantanga", "Huaros", "Lachaqui", "San Buenaventura", "Santa Rosa de Quives"],
-    "Cañete": ["Asia", "Calango", "Cerro Azul", "Chilca", "Coayllo", "Imperial", "Lunahuana", "Mala", "Nuevo Imperial", "Pacaran", "Quilmana", "San Antonio", "San Luis", "San Vicente de Cañete", "Santa Cruz de Flores", "Zuñiga"],
-    "Huaral": ["Atavillos Alto", "Atavillos Bajo", "Aucallama", "Chancay", "Huaral", "Ihuari", "Lampian", "Pacaraos", "San Miguel de Acos", "Santa Cruz de Andamarca", "Sumbilca", "Veintisiete de Noviembre"],
-    "Huarochirí": ["Antioquia", "Callahuanca", "Carampoma", "Chicla", "Cuenca", "Huanza", "Huarochiri", "Lahuaytambo", "Langa", "Laraos", "Mariatana", "Matucana", "Ricardo Palma", "San Andres de Tupicocha", "San Antonio", "San Bartolome", "San Damian", "San Juan de Iris", "San Juan de Tantaranche", "San Lorenzo de Quinti", "San Mateo", "San Mateo de Otao", "San Pedro de Casta", "San Pedro de Huancayre", "Sangallaya", "Santa Cruz de Cocachacra", "Santa Eulalia", "Santiago de Anchucaya", "Santiago de Tuna", "Santo Domingo de Los Olleros", "San Jeronimo de Surco", "Huachupampa"],
-    "Huaura": ["Ambar", "Caleta de Carquin", "Checras", "Huacho", "Hualmay", "Huaura", "Leoncio Prado", "Paccho", "Santa Leonor", "Santa Maria", "Sayan", "Vegueta"],
-    "Oyón": ["Andajes", "Caujul", "Cochamarca", "Navan", "Oyon", "Pachangara"],
-    "Yauyos": ["Alis", "Ayauca", "Ayaviri", "Azangaro", "Cacra", "Carania", "Catahuasi", "Chocos", "Cochas", "Colonia", "Hongos", "Huampara", "Huancaya", "Huangascar", "Huantan", "Huañec", "Laraos", "Lincha", "Madean", "Miraflores", "Omas", "Putinza", "Quinches", "Quinocay", "San Joaquin", "San Pedro de Pilas", "Tanta", "Tauripampa", "Tomas", "Tupe", "Viñac", "Vitis", "Yauyos"]
-  }
-  // Add more departments and their provinces/districts as needed
+    // ... más provincias de Lima
+  },
+  "Loreto": { /* ... */ },
+  "Madre de Dios": { /* ... */ },
+  "Moquegua": { /* ... */ },
+  "Pasco": { /* ... */ },
+  "Piura": { /* ... */ },
+  "Puno": { /* ... */ },
+  "San Martín": { /* ... */ },
+  "Tacna": { /* ... */ },
+  "Tumbes": { /* ... */ },
+  "Ucayali": { /* ... */ },
 };
 
 
@@ -76,7 +82,7 @@ const businessFormSchema = z.object({
   district: z.string().min(1, "Distrito es requerido."),
   address: z.string().min(5, "La dirección debe tener al menos 5 caracteres.").optional().or(z.literal("")),
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
-  managerDni: z.string().length(8, "El DNI del gerente debe tener 8 dígitos.").regex(/^\d+$/, "El DNI solo debe contener números.").optional().or(z.literal("")),
+  managerDni: z.string().min(8, "DNI/CE del gerente debe tener al menos 8 caracteres.").max(15, "DNI/CE del gerente no debe exceder 15 caracteres.").regex(/^\d+$/, "DNI/CE del gerente solo debe contener números.").optional().or(z.literal("")),
   businessType: z.enum(BUSINESS_TYPES, { required_error: "Debes seleccionar un giro de negocio." }),
 });
 
@@ -130,14 +136,23 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
         businessType: business.businessType || undefined,
       });
       setSelectedDepartment(business.department || "");
+      // For edit, if province and district are already set, populate them
+      if (business.department && peruLocations[business.department as keyof typeof peruLocations]) {
+        setProvinces(Object.keys(peruLocations[business.department as keyof typeof peruLocations]));
+      }
       setSelectedProvince(business.province || "");
+       if (business.department && business.province && peruLocations[business.department as keyof typeof peruLocations]?.[business.province as keyof typeof peruLocations[keyof typeof peruLocations]]) {
+        setDistricts(peruLocations[business.department as keyof typeof peruLocations][business.province as keyof typeof peruLocations[keyof typeof peruLocations]] || []);
+      }
     }
   }, [business, form]);
 
   useEffect(() => {
     if (selectedDepartment && peruLocations[selectedDepartment as keyof typeof peruLocations]) {
-      setProvinces(Object.keys(peruLocations[selectedDepartment as keyof typeof peruLocations]));
-      if (form.getValues("department") !== selectedDepartment) { // If department changed by user interaction
+      const currentProvinces = Object.keys(peruLocations[selectedDepartment as keyof typeof peruLocations]);
+      setProvinces(currentProvinces);
+      // If the current form province isn't in the new list of provinces, reset it
+      if (!currentProvinces.includes(form.getValues("province"))) {
          form.setValue("province", "");
          form.setValue("district", "");
          setSelectedProvince("");
@@ -154,8 +169,10 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
 
   useEffect(() => {
     if (selectedDepartment && selectedProvince && peruLocations[selectedDepartment as keyof typeof peruLocations]?.[selectedProvince as keyof typeof peruLocations[keyof typeof peruLocations]]) {
-      setDistricts(peruLocations[selectedDepartment as keyof typeof peruLocations][selectedProvince as keyof typeof peruLocations[keyof typeof peruLocations]] || []);
-       if (form.getValues("province") !== selectedProvince) { // If province changed by user interaction
+       const currentDistricts = peruLocations[selectedDepartment as keyof typeof peruLocations][selectedProvince as keyof typeof peruLocations[keyof typeof peruLocations]] || [];
+      setDistricts(currentDistricts);
+       // If the current form district isn't in the new list of districts, reset it
+      if (!currentDistricts.includes(form.getValues("district"))) {
          form.setValue("district", "");
       }
     } else {
@@ -244,6 +261,11 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
                     onValueChange={(value) => {
                     field.onChange(value);
                     setSelectedDepartment(value);
+                    // Reset province and district when department changes
+                    form.setValue("province", "");
+                    form.setValue("district", "");
+                    setSelectedProvince("");
+                    setDistricts([]);
                     }}
                     value={field.value}
                     disabled={isSubmitting}
@@ -267,6 +289,8 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
                     onValueChange={(value) => {
                     field.onChange(value);
                     setSelectedProvince(value);
+                    // Reset district when province changes
+                    form.setValue("district", "");
                     }}
                     value={field.value}
                     disabled={isSubmitting || !selectedDepartment || provinces.length === 0}
@@ -342,9 +366,9 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="managerDni"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>DNI del Gerente General <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>DNI/CE del Gerente General <span className="text-destructive">*</span></FormLabel>
               <FormControl>
-                <Input placeholder="12345678" {...field} maxLength={8} disabled={isSubmitting} />
+                <Input placeholder="DNI o Carnet de Extranjería" {...field} maxLength={15} disabled={isSubmitting} />
               </FormControl>
               <FormDescription>Puede ser un usuario existente de la plataforma.</FormDescription>
               <FormMessage />

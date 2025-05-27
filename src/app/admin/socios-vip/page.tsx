@@ -65,7 +65,18 @@ export default function AdminSocioVipPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          ...data,
+          name: data.name,
+          surname: data.surname,
+          dni: data.dni,
+          phone: data.phone,
+          email: data.email,
+          address: data.address,
+          profession: data.profession,
+          preferences: Array.isArray(data.preferences) ? data.preferences : [],
+          loyaltyPoints: data.loyaltyPoints || 0,
+          membershipStatus: data.membershipStatus || 'inactive',
+          staticQrCodeUrl: data.staticQrCodeUrl,
+          authUid: data.authUid,
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate ? parseISO(data.joinDate as string).toISOString() : new Date().toISOString()),
           dob: data.dob instanceof Timestamp ? data.dob.toDate().toISOString() : (data.dob ? parseISO(data.dob as string).toISOString() : new Date().toISOString()),
         } as SocioVipMember;
@@ -110,7 +121,7 @@ export default function AdminSocioVipPage() {
       toast({ title: "Sin Datos", description: "No hay socios para exportar.", variant: "destructive" });
       return;
     }
-    const headers = ["ID", "Nombre", "Apellido", "Email", "Teléfono", "DNI", "Fec. Nac.", "Puntos", "Estado Membresía", "Fecha Ingreso", "Dirección", "Profesión", "Preferencias"];
+    const headers = ["ID", "Nombre", "Apellido", "Email", "Teléfono", "DNI/CE", "Fec. Nac.", "Puntos", "Estado Membresía", "Fecha Ingreso", "Dirección", "Profesión", "Preferencias"];
     const rows = filteredMembers.map(mem => [
       mem.id, mem.name, mem.surname, mem.email, mem.phone, mem.dni,
       mem.dob ? format(parseISO(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
@@ -132,43 +143,44 @@ export default function AdminSocioVipPage() {
   const checkDniAcrossCollections = async (dni: string, excludeSocioVipId?: string): Promise<InitialDataForSocioVipCreation> => {
     let result: InitialDataForSocioVipCreation = { dni };
 
-    // Check socioVipMembers first (highest precedence for this flow)
+    // Check socioVipMembers first
     const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dni));
     const socioVipSnapshot = await getDocs(socioVipQuery);
     if (!socioVipSnapshot.empty) {
       const socioDoc = socioVipSnapshot.docs[0];
-      // If editing, and DNI belongs to the Socio VIP being edited, it's not a conflict for creating this user.
       if (excludeSocioVipId && socioDoc.id === excludeSocioVipId) {
-         // This means we are editing this specific socio, and their DNI hasn't changed to conflict with another SocioVIP.
-         // We still want to know if this DNI might be a QrClient or PlatformUser for pre-filling if those profiles are *more* complete.
+        // Editing this specific socio, DNI not conflicting with *another* SocioVIP.
+        // Continue to check other collections for pre-fill.
       } else {
         result.existingSocioVipProfile = { id: socioDoc.id, ...socioDoc.data()} as SocioVipMember;
-        return result; // DNI is already a Socio VIP, stop here.
+        // If DNI is already another SocioVIP, we might still want to know if it's a QrClient or PlatformUser for additional context
+        // but the primary conflict is that it's already a SocioVIP.
       }
     }
 
-    // Check qrClients if not already a Socio VIP or if we are editing the current socio
-    const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
-    const qrClientSnapshot = await getDocs(qrClientQuery);
-    if (!qrClientSnapshot.empty) {
-      const data = qrClientSnapshot.docs[0].data() as QrClient;
-      result.preExistingUserType = 'QrClient';
-      result.name = data.name;
-      result.surname = data.surname;
-      result.phone = data.phone;
-      result.dob = data.dob instanceof Timestamp ? data.dob.toDate().toISOString() : data.dob as string;
-      // If we found QrClient, we don't need to check PlatformUser unless we want to merge/prioritize PlatformUser's email
-    }
+    // If DNI is already a Socio VIP (and not the one being edited), no need to check QrClient or PlatformUser for pre-fill for *creation*
+    // as the main action will be to alert the user or offer to edit the existing SocioVIP.
+    // However, if it's the DNI of the socio being edited, or if no SocioVIP was found yet, check others.
+    if (!result.existingSocioVipProfile || (excludeSocioVipId && result.existingSocioVipProfile?.id === excludeSocioVipId)) {
+        const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
+        const qrClientSnapshot = await getDocs(qrClientQuery);
+        if (!qrClientSnapshot.empty) {
+          const data = qrClientSnapshot.docs[0].data() as QrClient;
+          result.existingUserType = 'QrClient';
+          result.name = data.name;
+          result.surname = data.surname;
+          result.phone = data.phone;
+          result.dob = data.dob instanceof Timestamp ? data.dob.toDate().toISOString() : data.dob as string;
+        }
 
-    // Check platformUsers (primarily for email if not found in QrClient)
-    // This check is less critical for SocioVIP creation if QrClient data is preferred for prefill.
-    const platformUsersQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
-    const platformUsersSnapshot = await getDocs(platformUsersQuery);
-    if (!platformUsersSnapshot.empty) {
-      const data = platformUsersSnapshot.docs[0].data() as PlatformUser;
-      if (!result.preExistingUserType) result.preExistingUserType = 'PlatformUser'; // Mark if this is the first pre-existing type found
-      if (!result.name) result.name = data.name; // Prefer QrClient name if available
-      if (!result.email) result.email = data.email; // PlatformUser is more likely to have an email
+        const platformUsersQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
+        const platformUsersSnapshot = await getDocs(platformUsersQuery);
+        if (!platformUsersSnapshot.empty) {
+          const data = platformUsersSnapshot.docs[0].data() as PlatformUser;
+          if (!result.existingUserType) result.existingUserType = 'PlatformUser';
+          if (!result.name) result.name = data.name; // Name from PlatformUser might be full name
+          if (!result.email) result.email = data.email;
+        }
     }
     return result;
   };
@@ -198,7 +210,7 @@ export default function AdminSocioVipPage() {
     } else {
         setVerifiedSocioDniResult(result || { dni: values.dni }); 
         setShowDniEntryModal(false);
-        setEditingMember(null); // Ensure we are in creation mode
+        setEditingMember(null); 
         setShowCreateEditModal(true); 
     }
   };
@@ -220,8 +232,8 @@ export default function AdminSocioVipPage() {
       if (editingMember) { 
         if (data.dni !== editingMember.dni) { 
             const dniCheckResult = await checkDniAcrossCollections(data.dni, editingMember.id);
-            if (dniCheckResult?.existingSocioVipProfile) { // Check only for other SocioVip profiles
-                toast({ title: "Error de DNI", description: `El DNI ${data.dni} ya está registrado para otro Socio VIP.`, variant: "destructive" });
+            if (dniCheckResult?.existingSocioVipProfile) { 
+                toast({ title: "Error de DNI", description: `El DNI/CE ${data.dni} ya está registrado para otro Socio VIP.`, variant: "destructive" });
                 setIsSubmitting(false);
                 return;
             }
@@ -229,20 +241,20 @@ export default function AdminSocioVipPage() {
         const memberRef = doc(db, "socioVipMembers", editingMember.id);
         await updateDoc(memberRef, {
           ...data,
-          dob: data.dob instanceof Date ? Timestamp.fromDate(data.dob) : editingMember.dob,
+          dob: data.dob instanceof Date ? Timestamp.fromDate(data.dob) : (editingMember.dob ? Timestamp.fromDate(parseISO(editingMember.dob as string)) : null),
           preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
-          // joinDate and staticQrCodeUrl are not part of SocioVipMemberFormData, managed separately
+          // joinDate and staticQrCodeUrl are not part of SocioVipMemberFormData, managed separately or if needed
         });
         toast({ title: "Socio VIP Actualizado", description: `El socio "${data.name} ${data.surname}" ha sido actualizado.` });
       } else { 
         if (!verifiedSocioDniResult?.dni) {
-          toast({ title: "Error Interno", description: "No se pudo obtener el DNI verificado.", variant: "destructive"});
+          toast({ title: "Error Interno", description: "No se pudo obtener el DNI/CE verificado.", variant: "destructive"});
           setIsSubmitting(false);
           return;
         }
-        // Final check via DNI flow should have caught this, but as a safeguard:
-        if (verifiedSocioDniResult.existingSocioVipProfile) {
-            toast({ title: "Error", description: `El DNI ${verifiedSocioDniResult.dni} ya está registrado como Socio VIP. No se puede crear un nuevo perfil.`, variant: "destructive" });
+        
+        if (verifiedSocioDniResult.existingSocioVipProfile) { // Double check from verification flow
+            toast({ title: "Error", description: `El DNI/CE ${verifiedSocioDniResult.dni} ya está registrado como Socio VIP. No se puede crear un nuevo perfil.`, variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
@@ -312,7 +324,7 @@ export default function AdminSocioVipPage() {
               <Input
                 id="search-members"
                 type="search"
-                placeholder="Buscar por nombre, email, DNI..."
+                placeholder="Buscar por nombre, email, DNI/CE..."
                 className="pl-8 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -366,7 +378,7 @@ export default function AdminSocioVipPage() {
                   <TableHead>Nombre Completo</TableHead>
                   <TableHead className="hidden lg:table-cell"><Mail className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Email</TableHead>
                   <TableHead className="hidden md:table-cell"><Phone className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Teléfono</TableHead>
-                  <TableHead className="hidden xl:table-cell">DNI <span className="text-destructive">*</span></TableHead>
+                  <TableHead className="hidden xl:table-cell">DNI/CE <span className="text-destructive">*</span></TableHead>
                   <TableHead><Cake className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Fec. Nac. <span className="text-destructive">*</span></TableHead>
                   <TableHead className="text-center"><Award className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Puntos</TableHead>
                   <TableHead><ShieldCheck className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Estado Membresía</TableHead>
@@ -464,7 +476,7 @@ export default function AdminSocioVipPage() {
                   <FormItem>
                     <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="Número de documento" {...field} autoFocus disabled={isSubmitting}/>
+                      <Input placeholder="Número de documento" {...field} maxLength={15} autoFocus disabled={isSubmitting}/>
                     </FormControl>
                     <FormMessageHook />
                   </FormItem>
@@ -475,7 +487,7 @@ export default function AdminSocioVipPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI/CE"}
                 </Button>
               </UIDialogFooter>
             </form>
@@ -502,7 +514,7 @@ export default function AdminSocioVipPage() {
               {editingMember
                 ? "Actualiza los detalles del Socio VIP."
                 : (verifiedSocioDniResult?.existingSocioVipProfile 
-                    ? "Este DNI ya es Socio VIP. No se puede crear un nuevo perfil aquí. Edite desde la lista principal."
+                    ? "Este DNI/CE ya es Socio VIP. No se puede crear un nuevo perfil aquí. Edite desde la lista principal."
                     : "Completa los detalles para el perfil del Socio VIP.")
               }
             </UIDialogDescription>
@@ -522,10 +534,10 @@ export default function AdminSocioVipPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center">
-                <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI ya Registrado como Socio VIP
+                <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI/CE ya Registrado como Socio VIP
             </AlertDialogTitle>
             <AlertDialogDescription>
-              El DNI <span className="font-semibold">{dniForSocioVerification}</span> ya está registrado como Socio VIP
+              El DNI/CE <span className="font-semibold">{dniForSocioVerification}</span> ya está registrado como Socio VIP
               (<span className="font-semibold">{existingSocioVipToEdit?.name} {existingSocioVipToEdit?.surname}</span>).
               <br/><br/>
               ¿Desea editar este perfil de Socio VIP existente?

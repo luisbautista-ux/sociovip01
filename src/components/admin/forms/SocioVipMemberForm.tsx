@@ -89,7 +89,7 @@ export function SocioVipMemberForm({
         surname: member.surname || "",
         dni: member.dni || "",
         phone: member.phone || "",
-        dob: member.dob ? parseISO(member.dob) : undefined,
+        dob: member.dob ? (typeof member.dob === 'string' ? parseISO(member.dob) : member.dob instanceof Date ? member.dob : undefined) : undefined,
         email: member.email || "",
         address: member.address || "",
         profession: member.profession || "",
@@ -124,19 +124,20 @@ export function SocioVipMemberForm({
   };
 
   const shouldDisableDniField = isEditing || (!isEditing && !!initialData?.dni);
-  const showPrePopulatedAlert = !isEditing && initialData?.preExistingUserType;
+  const isPrePopulatedFromOtherSource = !isEditing && initialData?.existingUserType;
+
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-        {showPrePopulatedAlert && (
-          <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-700">
-              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialData?.preExistingUserType as PlatformUserRole] || initialData?.preExistingUserType}
+        {isPrePopulatedFromOtherSource && (
+           <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertTitle className="text-blue-700 dark:text-blue-300">
+              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialData?.existingUserType as PlatformUserRole] || initialData?.existingUserType}
             </AlertTitle>
-            <AlertDescription>
-              Este DNI pertenece a un {initialData?.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
+            <AlertDescription className="text-blue-600 dark:text-blue-400">
+              Este DNI pertenece a un {initialData?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
               Se han pre-rellenado los datos conocidos. Por favor, complete la información para registrarlo como Socio VIP.
             </AlertDescription>
           </Alert>
@@ -147,7 +148,7 @@ export function SocioVipMemberForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input placeholder="Ingrese el documento de identidad" {...field} disabled={isSubmitting || shouldDisableDniField} /></FormControl>
+                <FormControl><Input placeholder="Ingrese el documento de identidad" {...field} maxLength={15} disabled={isSubmitting || shouldDisableDniField} /></FormControl>
                 {shouldDisableDniField && !isEditing && <FormDescription className="text-xs">El DNI ha sido verificado y no puede cambiarse en este paso.</FormDescription>}
                 {isEditing && <FormDescription className="text-xs">El DNI no puede ser modificado para socios existentes.</FormDescription>}
                 <FormMessage />
@@ -267,7 +268,7 @@ export function SocioVipMemberForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Preferencias (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Ej: Viajes, Cocina, Música Rock (separadas por comas)" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Ej: Viajes, Cocina, Música Rock (separadas por comas)" {...field} rows={2} disabled={isSubmitting} /></FormControl>
               <FormDescription>Separa las preferencias por comas.</FormDescription>
               <FormMessage />
             </FormItem>

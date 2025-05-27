@@ -1,6 +1,7 @@
 
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
+import type { BUSINESS_TYPES } from "./constants"; // Import BUSINESS_TYPES
 
 export interface PromotionDetails { // For public display
   id: string;
@@ -33,22 +34,7 @@ export interface QrCodeData {
   status: QrCodeStatusGenerated;
 }
 
-export const BUSINESS_TYPES = [
-  "Comercio",
-  "Servicios",
-  "Manufactura",
-  "Agricultura",
-  "Bienes raíces",
-  "Turismo",
-  "Minera",
-  "Tecnología e informática",
-  "Finanzas",
-  "Energía",
-  "Construcción",
-  "Transporte y logística",
-  "Otro",
-] as const;
-
+// BUSINESS_TYPES is now imported from constants.ts
 export type BusinessType = typeof BUSINESS_TYPES[number];
 
 
@@ -72,7 +58,7 @@ export interface Business {
 export type PlatformUserRole = 'superadmin' | 'business_admin' | 'staff' | 'promoter' | 'host';
 
 export interface PlatformUser {
-  id: string; // Firestore document ID
+  id: string; // Firestore document ID (matches uid after creation from admin panel)
   uid: string; // Firebase Auth UID
   dni: string;
   name: string;
@@ -97,7 +83,7 @@ export interface SocioVipMember {
   membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
   staticQrCodeUrl?: string;
   joinDate: Timestamp | string; // ISO date string or Timestamp
-  authUid?: string;
+  authUid?: string; // If SocioVIP has a separate auth account
 }
 
 
@@ -151,7 +137,7 @@ export interface EventPromoterAssignment {
 
 export interface TicketType {
   id: string;
-  eventId: string;
+  eventId: string; // Now mandatory
   businessId: string;
   name: string;
   cost: number;
@@ -161,7 +147,7 @@ export interface TicketType {
 
 export interface EventBox {
   id: string;
-  eventId: string;
+  eventId: string; // Now mandatory
   businessId: string;
   name: string;
   cost: number;
@@ -188,12 +174,13 @@ export interface BusinessManagedEntity {
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
+  // Event specific
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
   assignedPromoters?: EventPromoterAssignment[];
 }
 
-export interface PromoterProfile {
+export interface PromoterProfile { // Global promoter profile
   id: string; // Firestore document ID for global promoter profiles
   name: string;
   email: string;
@@ -201,7 +188,7 @@ export interface PromoterProfile {
   dni?: string;
 }
 
-export interface BusinessPromoterLink {
+export interface BusinessPromoterLink { // Link between a business and a global promoter
   id: string; // Firestore document ID
   businessId: string;
   promoterProfileId: string;
@@ -249,7 +236,7 @@ export interface PlatformUserFormData {
   name: string;
   email: string;
   roles: PlatformUserRole[];
-  businessId?: string;
+  businessId?: string | null; // Allow null for superadmin/promoter
 }
 
 export interface SocioVipMemberFormData {
@@ -302,8 +289,8 @@ export interface BusinessPromoterFormData {
   promoterName: string;
   promoterEmail: string;
   promoterPhone?: string;
-  promoterDni?: string; // DNI of the promoter profile
-  commissionRate?: string; // Commission specific to this business link
+  promoterDni?: string; 
+  commissionRate?: string; 
 }
 
 export interface PromoterCommissionEntry {
@@ -336,12 +323,6 @@ export interface EventBoxFormData {
   ownerDni?: string;
 }
 
-export interface EventPromoterAssignmentFormData {
-    promoterProfileId: string;
-    commissionRate?: string;
-    notes?: string;
-}
-
 export interface BatchBoxFormData {
   prefix: string;
   fromNumber: number;
@@ -357,13 +338,13 @@ export interface InitialDataForPlatformUserCreation {
   dni: string;
   name?: string;
   email?: string;
-  existingUserIsPlatformUser?: boolean;
-  existingPlatformUser?: PlatformUser; // Full PlatformUser data if it exists
+  existingUserIsPlatformUser?: boolean; // True if DNI exists in platformUsers
+  existingPlatformUser?: PlatformUser;
   existingPlatformUserRoles?: PlatformUserRole[];
-  // To indicate if DNI was found as QrClient or SocioVip (but not PlatformUser)
-  preExistingUserType?: 'QrClient' | 'SocioVipMember'; 
+  preExistingUserType?: 'QrClient' | 'SocioVipMember'; // If DNI exists in these but not platformUsers
 }
 
+// For DNI verification in Admin SocioVIP
 export interface InitialDataForSocioVipCreation {
   dni: string;
   name?: string;
@@ -371,7 +352,6 @@ export interface InitialDataForSocioVipCreation {
   phone?: string;
   dob?: string; // ISO string, e.g., "1990-05-15T12:00:00"
   email?: string;
-  preExistingUserType?: 'QrClient' | 'PlatformUser';
-  // If the DNI already corresponds to an existing SocioVipMember (for edit flow)
-  existingSocioVipProfile?: SocioVipMember;
+  existingUserType?: 'QrClient' | 'PlatformUser';
+  existingSocioVipProfile?: SocioVipMember; // If DNI already a SocioVIP
 }

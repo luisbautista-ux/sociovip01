@@ -31,8 +31,8 @@ const platformUserFormSchema = z.object({
   roles: z.array(z.enum(ALL_PLATFORM_USER_ROLES)).min(1, { message: "Debes seleccionar al menos un rol."}),
   businessId: z.string().optional(),
 }).refine(data => {
-  const requiresBusinessId = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-  if (requiresBusinessId) {
+  const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+  if (rolesThatNeedBusiness.length > 0) {
     return !!data.businessId && data.businessId.length > 0; 
   }
   return true; 
@@ -47,7 +47,7 @@ interface PlatformUserFormProps {
   user?: PlatformUser; 
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData) => Promise<void>; 
+  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>; 
   onCancel: () => void;
   isSubmitting?: boolean;
   disableSubmitOverride?: boolean; 
@@ -68,17 +68,18 @@ export function PlatformUserForm({
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(platformUserFormSchema),
     defaultValues: {
-      dni:  "",
-      name: "",
-      email: "",
-      roles: [],
-      businessId: undefined,
+      dni:  initialDataForCreation?.dni || user?.dni || "",
+      name: initialDataForCreation?.name || user?.name || "",
+      email: initialDataForCreation?.email || user?.email || "",
+      roles: initialDataForCreation?.existingPlatformUserRoles || user?.roles || [],
+      businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || undefined,
     },
   });
 
-  const watchedRoles = form.watch("roles", user?.roles || initialDataForCreation?.existingPlatformUserRoles || []);
+  const watchedRoles = form.watch("roles");
   
   const showBusinessIdField = React.useMemo(() => {
+    if (!watchedRoles || watchedRoles.length === 0) return false;
     return watchedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
   }, [watchedRoles]);
 
@@ -106,33 +107,32 @@ export function PlatformUserForm({
 
   React.useEffect(() => {
     if (!showBusinessIdField && form.getValues('businessId')) {
-      form.setValue('businessId', undefined); // Do not trigger validation here if just clearing
+      form.setValue('businessId', undefined, { shouldValidate: true });
     }
   }, [showBusinessIdField, form]);
 
   const handleSubmit = async (values: PlatformUserFormValues) => {
     const dataToSubmit: PlatformUserFormData = { 
-      dni: values.dni.trim(),
-      name: values.name,
-      email: values.email,
-      roles: values.roles,
+      ...values, // Includes DNI, name, email, roles
       businessId: showBusinessIdField ? values.businessId : undefined,
     };
-    await onSubmit(dataToSubmit);
+    await onSubmit(dataToSubmit, isEditing);
   };
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);
-  const showPrePopulatedAlert = !isEditing && initialDataForCreation?.existingUserType && initialDataForCreation.existingUserType !== 'PlatformUser';
+  const isPrePopulatedFromOtherSource = !isEditing && initialDataForCreation?.userType && initialDataForCreation.userType !== 'PlatformUser';
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-3">
-        {showPrePopulatedAlert && (
-          <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-700">DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation?.existingUserType as PlatformUserRole] || initialDataForCreation?.existingUserType}</AlertTitle>
-            <AlertDescription>
-              Este DNI pertenece a un {initialDataForCreation?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Socio VIP'} existente.
+        {isPrePopulatedFromOtherSource && (
+          <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertTitle className="text-blue-700 dark:text-blue-300">
+              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation?.userType as PlatformUserRole] || initialDataForCreation?.userType}
+            </AlertTitle>
+            <AlertDescription className="text-blue-600 dark:text-blue-400">
+              Este DNI pertenece a un {initialDataForCreation?.userType === 'QrClient' ? 'Cliente QR' : 'Socio VIP'} existente.
               Se han pre-rellenado los datos conocidos. Por favor, complete y asigne roles de plataforma.
             </AlertDescription>
           </Alert>
@@ -147,6 +147,7 @@ export function PlatformUserForm({
                 <Input 
                   placeholder="Ingrese el número de documento" 
                   {...field} 
+                  maxLength={15}
                   disabled={isSubmitting || shouldDisableDni} 
                 />
               </FormControl>
@@ -205,17 +206,22 @@ export function PlatformUserForm({
                           } else {
                             newRoles = currentRoles.filter((value) => value !== roleValue);
                           }
-                          field.onChange(newRoles);
-                          // If "superadmin" is selected, ensure no other roles are selected
+                          
                           if (roleValue === 'superadmin' && checked) {
-                            field.onChange(['superadmin']);
+                            newRoles = ['superadmin']; // Superadmin is exclusive
+                          } else if (roleValue !== 'superadmin' && checked && newRoles.includes('superadmin')) {
+                            newRoles = newRoles.filter(r => r !== 'superadmin'); // Remove superadmin if other role is selected
+                          } else if (roleValue === 'superadmin' && !checked && newRoles.includes('superadmin')) {
+                            // If unchecking superadmin, it's already handled by filter
+                          } else if (newRoles.includes('superadmin') && newRoles.length > 1) {
+                             // If superadmin is already there and another is added, ensure superadmin is removed
+                             newRoles = newRoles.filter(r => r !== 'superadmin');
                           }
-                          // If another role is selected and "superadmin" was previously selected, deselect "superadmin"
-                          if (roleValue !== 'superadmin' && checked && newRoles.includes('superadmin') && newRoles.length > 1) {
-                             field.onChange(newRoles.filter(r => r !== 'superadmin'));
-                          }
+
+
+                          field.onChange(newRoles);
                         }}
-                        disabled={isSubmitting || (roleValue !== 'superadmin' && watchedRoles.includes('superadmin'))}
+                        disabled={isSubmitting || (roleValue !== 'superadmin' && watchedRoles?.includes('superadmin'))}
                       />
                     </FormControl>
                     <FormLabel className="font-normal text-sm">
@@ -227,7 +233,7 @@ export function PlatformUserForm({
             ))}
           </div>
           <FormDescription className="text-xs">
-            Si selecciona "Super Admin", no podrá seleccionar otros roles.
+            Si selecciona "Super Admin", los otros roles se deseleccionarán.
           </FormDescription>
           <FormMessage>{form.formState.errors.roles?.message}</FormMessage>
         </FormItem>
