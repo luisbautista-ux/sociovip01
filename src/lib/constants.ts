@@ -1,6 +1,6 @@
 
 // src/lib/constants.ts
-import type { GeneratedCode, SocioVipMember } from "./types";
+import type { GeneratedCode, SocioVipMember, PlatformUserRole } from "./types";
 
 export const GENERATED_CODE_STATUS_TRANSLATIONS: Record<GeneratedCode['status'], string> = {
   available: "Disponible",
@@ -9,7 +9,7 @@ export const GENERATED_CODE_STATUS_TRANSLATIONS: Record<GeneratedCode['status'],
 };
 
 export const GENERATED_CODE_STATUS_COLORS: Record<GeneratedCode['status'], "default" | "secondary" | "destructive" | "outline"> = {
-    available: "default", // Or "success" if you have a success variant
+    available: "default", 
     redeemed: "secondary",
     expired: "destructive",
 };
@@ -22,9 +22,9 @@ export const MEMBERSHIP_STATUS_TRANSLATIONS: Record<SocioVipMember['membershipSt
 };
 
 export const MEMBERSHIP_STATUS_COLORS: Record<SocioVipMember['membershipStatus'], "default" | "secondary" | "destructive" | "outline"> = {
-    active: "default", // Or "success"
+    active: "default", 
     inactive: "secondary",
-    pending_payment: "outline", // Or "warning"
+    pending_payment: "outline", 
     cancelled: "destructive",
 };
 
@@ -32,3 +32,15 @@ export const MESES_DEL_ANO_ES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
+
+export const ALL_PLATFORM_USER_ROLES: PlatformUserRole[] = ['superadmin', 'business_admin', 'staff', 'promoter', 'host'];
+
+export const PLATFORM_USER_ROLE_TRANSLATIONS: Record<PlatformUserRole, string> = {
+  superadmin: "Super Admin",
+  business_admin: "Admin Negocio",
+  staff: "Staff Negocio",
+  promoter: "Promotor",
+  host: "Anfitrión",
+};
+
+export const ROLES_REQUIRING_BUSINESS_ID: PlatformUserRole[] = ['business_admin', 'staff', 'host'];

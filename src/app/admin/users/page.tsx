@@ -19,23 +19,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, writeBatch, getDoc } from "firebase/firestore";
 
-const roleTranslations: Record<PlatformUserRole, string> = {
-  superadmin: "Super Admin",
-  business_admin: "Admin Negocio",
-  staff: "Staff Negocio",
-  promoter: "Promotor",
-  host: "Anfitrión",
-};
-
+// This schema is only for the DNI entry modal
 const DniEntrySchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 type DniEntryValues = z.infer<typeof DniEntrySchema>;
+
 
 export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -49,14 +44,16 @@ export default function AdminUsersPage() {
   const [availableBusinesses, setAvailableBusinesses] = useState<Business[]>([]);
   const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(true);
 
+  // State for DNI-first creation flow
   const [showDniEntryModal, setShowDniEntryModal] = useState(false);
-  const [dniForVerification, setDniForVerification] = useState(""); 
-  const [isVerifyingDni, setIsVerifyingDni] = useState(false); 
-
+  const [dniForVerification, setDniForVerification] = useState(""); // For displaying in alert
+  
+  // Stores the result of DNI check: DNI string, existing user data (if any), and its type
   const [verifiedDniResult, setVerifiedDniResult] = useState<InitialDataForPlatformUserCreation | null>(null);
   
   const [showCreateEditUserModal, setShowCreateEditUserModal] = useState(false);
   
+  // State for alert if DNI is already a Platform User
   const [showDniIsPlatformUserAlert, setShowDniIsPlatformUserAlert] = useState(false);
   const [existingPlatformUserRoles, setExistingPlatformUserRoles] = useState<PlatformUserRole[]>([]);
 
@@ -103,15 +100,15 @@ export default function AdminUsersPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          uid: data.uid || docSnap.id, 
+          uid: data.uid || docSnap.id, // Fallback for old data or if uid isn't explicitly set to doc id
           dni: data.dni || "N/A",
           name: data.name || "Nombre no disponible",
           email: data.email,
-          roles: Array.isArray(data.roles) ? data.roles : (data.role ? [data.role] : []),
-          businessId: data.businessId,
+          roles: Array.isArray(data.roles) ? data.roles : (data.role ? [data.role] : []), // Handle old 'role' field
+          businessId: data.businessId || null,
           lastLogin: data.lastLogin instanceof Timestamp 
             ? data.lastLogin.toDate().toISOString() 
-            : (data.lastLogin ? new Date(data.lastLogin).toISOString() : new Date(Date.now() - Math.random() * 10000000000).toISOString()), // Mock last login if missing
+            : (data.lastLogin ? new Date(data.lastLogin).toISOString() : new Date(Date.now() - Math.random() * 10000000000).toISOString()), // Mock last login
         };
       });
       setPlatformUsers(fetchedUsers);
@@ -119,7 +116,7 @@ export default function AdminUsersPage() {
       console.error("Failed to fetch platform users:", error);
       toast({
         title: "Error al Cargar Usuarios",
-        description: "No se pudieron obtener los datos de los usuarios.",
+        description: "No se pudieron obtener los datos de los usuarios de plataforma.",
         variant: "destructive",
       });
       setPlatformUsers([]);
@@ -151,7 +148,7 @@ export default function AdminUsersPage() {
       user.dni,
       user.name,
       user.email,
-      user.roles.map(r => roleTranslations[r] || r).join(', ') || "N/A",
+      user.roles.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r] || r).join(', ') || "N/A",
       user.businessId || "N/A",
       user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"
     ]);
@@ -167,105 +164,112 @@ export default function AdminUsersPage() {
     document.body.removeChild(link);
   };
 
-  const checkDniExists = async (
-    dni: string, 
-    excludeUserId?: string // Optional: user ID to exclude from the check (for edits)
-  ): Promise<InitialDataForPlatformUserCreation | null> => {
-    
-    let platformUserQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
-    const platformUsersSnapshot = await getDocs(platformUserQuery);
+  // Function to check if DNI exists across relevant collections
+  // Returns data for pre-filling or alerting
+  const checkDniExists = async (dni: string, excludeUserId?: string): Promise<InitialDataForPlatformUserCreation | null> => {
+    if (!dni) return { dni: "" }; // Should be caught by form validation, but good to be safe
 
+    // Check platformUsers
+    const platformUsersQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
+    const platformUsersSnapshot = await getDocs(platformUsersQuery);
     if (!platformUsersSnapshot.empty) {
-      const platformUserDoc = platformUsersSnapshot.docs[0];
-      if (excludeUserId && platformUserDoc.id === excludeUserId) {
-        // DNI belongs to the user being edited, not a conflict for *this specific user* yet
-      } else {
-        const data = platformUserDoc.data();
-        return { 
-          dni: dni,
-          existingUserIsPlatformUser: true,
-          existingUserType: 'PlatformUser',
-          existingPlatformUser: { id: platformUserDoc.id, ...data } as PlatformUser,
-          existingPlatformUserRoles: Array.isArray(data.roles) ? data.roles : (data.role ? [data.role] : []),
-        };
-      }
+        const platformUserDoc = platformUsersSnapshot.docs[0];
+        // If we are editing, and the found DNI belongs to the user being edited, it's not a "conflict" for this user.
+        if (excludeUserId && platformUserDoc.id === excludeUserId) {
+            // Continue checking other collections or return null if no other user has this DNI
+        } else {
+            const data = platformUserDoc.data() as PlatformUser; // Assume type
+            return {
+                dni: dni,
+                existingUserIsPlatformUser: true,
+                existingUserType: 'PlatformUser',
+                existingPlatformUser: { id: platformUserDoc.id, ...data },
+                existingPlatformUserRoles: data.roles || [],
+            };
+        }
     }
 
+    // Check socioVipMembers
     const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dni));
     const socioVipSnapshot = await getDocs(socioVipQuery);
     if (!socioVipSnapshot.empty) {
-      const data = socioVipSnapshot.docs[0].data();
-      return { 
-          dni: dni,
-          existingUserIsOtherType: true,
-          existingUserType: 'SocioVipMember',
-          name: data.name,
-          email: data.email,
-      };
+        const data = socioVipSnapshot.docs[0].data() as SocioVipMember;
+        return {
+            dni: dni,
+            existingUserIsOtherType: true,
+            existingUserType: 'SocioVipMember',
+            name: data.name,
+            email: data.email,
+            // Can add more fields from SocioVipMember if needed for pre-fill
+        };
     }
 
+    // Check qrClients
     const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
     const qrClientSnapshot = await getDocs(qrClientQuery);
     if (!qrClientSnapshot.empty) {
-      const data = qrClientSnapshot.docs[0].data();
-      return { 
-        dni: dni,
-        existingUserIsOtherType: true,
-        existingUserType: 'QrClient', 
-        name: data.name,
-        // QrClients don't have email in the current model
-      };
+        const data = qrClientSnapshot.docs[0].data() as QrClient;
+        return {
+            dni: dni,
+            existingUserIsOtherType: true,
+            existingUserType: 'QrClient',
+            name: `${data.name} ${data.surname}`, 
+            // QrClients don't have email in current model, phone and dob could be added if needed
+        };
     }
-    return { dni: dni }; // DNI is new or only for other types not yet checked
+    return { dni: dni }; // DNI is new or only for other types not yet checked (or belongs to user being edited)
   };
 
 
   const handleOpenCreateUserFlow = () => {
     setEditingUser(null);
-    setVerifiedDniResult(null);
-    dniEntryForm.reset({ dni: "" });
-    setShowDniIsPlatformUserAlert(false);
-    setDniForVerification(""); 
-    setShowDniEntryModal(true);
+    setVerifiedDniResult(null); // Reset verified DNI result
+    dniEntryForm.reset({ dni: "" }); // Reset DNI form
+    setShowDniIsPlatformUserAlert(false); // Reset alert
+    setDniForVerification(""); // Clear DNI for alert display
+    setShowDniEntryModal(true); // Show DNI entry modal
   };
 
   const handleDniVerificationSubmit = async (values: DniEntryValues) => {
-    setIsVerifyingDni(true);
-    setDniForVerification(values.dni); 
+    if (isSubmitting) return;
+    setIsSubmitting(true); // Use general isSubmitting for this step as well
+    setDniForVerification(values.dni); // Store DNI for display in alert, if needed
+    
     const result = await checkDniExists(values.dni);
-    setIsVerifyingDni(false);
+    setIsSubmitting(false);
     setVerifiedDniResult(result || { dni: values.dni }); // Ensure verifiedDniResult is always set
 
     if (result?.existingUserIsPlatformUser && result?.existingPlatformUser) {
       setExistingPlatformUserRoles(result.existingPlatformUserRoles || []);
-      setShowDniIsPlatformUserAlert(true);
-      setShowDniEntryModal(false); 
+      setShowDniIsPlatformUserAlert(true); // Show alert that DNI is already a PlatformUser
+      setShowDniEntryModal(false); // Close DNI entry modal
     } else {
-      setShowDniEntryModal(false);
-      setShowCreateEditUserModal(true); 
+      // DNI is new, or exists as QrClient/SocioVIP (but not PlatformUser)
+      setShowDniEntryModal(false); // Close DNI entry modal
+      setShowCreateEditUserModal(true); // Open main form for creating a new PlatformUser profile
     }
   };
   
   const handleEditExistingPlatformUser = () => {
-      setShowDniIsPlatformUserAlert(false);
+      setShowDniIsPlatformUserAlert(false); // Close the alert
       if (verifiedDniResult?.existingPlatformUser) {
+          // Set editingUser to the existing platform user's data
           setEditingUser(verifiedDniResult.existingPlatformUser);
-          // verifiedDniResult will be used by PlatformUserForm for initialData, if needed.
-          // For editing, user prop takes precedence.
-          setShowCreateEditUserModal(true);
+          // verifiedDniResult might still be useful for the form if it needs to know DNI was verified
+          setShowCreateEditUserModal(true); // Open main form in edit mode
       }
   };
 
 
-  const handleCreateOrEditUser = async (data: PlatformUserFormData) => {
+  const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditingOperation: boolean) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
+
     try {
-      if (editingUser) { // Editing existing user
-        const userRef = doc(db, "platformUsers", editingUser.id);
-        
-        // DNI check if it was changed (currently DNI is not editable in form for existing users)
+      if (isEditingOperation && editingUser) { // Editing existing user
+        // DNI check if it was changed (currently DNI is disabled on edit form)
         if (data.dni !== editingUser.dni) {
-          const dniCheckResult = await checkDniExists(data.dni, editingUser.id);
+          const dniCheckResult = await checkDniExists(data.dni, editingUser.id); // exclude current user
           if (dniCheckResult?.existingUserIsPlatformUser) {
              toast({ title: "Error de DNI", description: `El DNI ${data.dni} ya está registrado para otro usuario de plataforma.`, variant: "destructive" });
              setIsSubmitting(false);
@@ -273,12 +277,14 @@ export default function AdminUsersPage() {
           }
         }
 
-        const updatedUserPayload: Partial<PlatformUser> & { roles: PlatformUserRole[] } = {
-          dni: data.dni, // Keep DNI, even if form doesn't allow edit, it's part of the data
+        const userRef = doc(db, "platformUsers", editingUser.id);
+        const updatedUserPayload: Partial<PlatformUser> = {
+          dni: data.dni, // DNI is part of form data, even if disabled for edit
           name: data.name,
-          email: data.email, // Email is also not editable in form for existing users
+          email: data.email, // Email also disabled for edit if exists
           roles: data.roles,
           businessId: (data.roles.some(r => ROLES_REQUIRING_BUSINESS_ID.includes(r))) ? data.businessId : null,
+          // lastLogin will be updated by Firebase Auth typically, or serverTimestamp on specific actions
         };
         
         await updateDoc(userRef, updatedUserPayload);
@@ -290,35 +296,37 @@ export default function AdminUsersPage() {
           setIsSubmitting(false);
           return;
         }
-        // Final check, though UI flow should prevent this if DNI already is PlatformUser
+        // Final check, though UI flow (showDniIsPlatformUserAlert) should prevent this if DNI already is PlatformUser
         if (verifiedDniResult.existingUserIsPlatformUser) {
             toast({ title: "Error", description: `El DNI ${verifiedDniResult.dni} ya está registrado como Usuario de Plataforma. No se puede crear un nuevo perfil.`, variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
 
-        const newUserPayload: Omit<PlatformUser, 'id' | 'lastLogin' | 'uid'> & { lastLogin: any } = {
+        const newUserPayload: Omit<PlatformUser, 'id' | 'uid' | 'lastLogin'> & { lastLogin: any } = {
           dni: verifiedDniResult.dni,
           name: data.name,
           email: data.email,
           roles: data.roles, 
-          lastLogin: serverTimestamp(),
+          lastLogin: serverTimestamp(), // Set lastLogin on creation
           businessId: (data.roles.some(r => ROLES_REQUIRING_BUSINESS_ID.includes(r))) ? data.businessId : null,
         };
         
-        // UID will be added manually or by a backend process after Firebase Auth user creation
+        // The UID will be added manually by the superadmin after creating the Firebase Auth account
+        // or by a backend process if Admin SDK is used for Auth user creation.
+        // The document ID will be auto-generated by Firestore.
         const docRef = await addDoc(collection(db, "platformUsers"), newUserPayload);
         toast({ 
           title: "Perfil de Usuario Creado en Firestore", 
-          description: `El perfil para "${data.name}" (DNI: ${newUserPayload.dni}) ha sido creado con ID: ${docRef.id}. \nIMPORTANTE: Recuerda crear su cuenta en Firebase Authentication y añadir el UID (User ID de Auth) a este perfil de Firestore para que pueda iniciar sesión.` ,
+          description: `El perfil para "${data.name}" (DNI: ${newUserPayload.dni}) ha sido creado. IMPORTANTE: Este perfil necesita ser vinculado a una cuenta de Firebase Authentication con un UID para que el usuario pueda iniciar sesión. El ID del documento Firestore es: ${docRef.id}.` ,
           duration: 10000,
         });
       }
       
       setShowCreateEditUserModal(false);
       setEditingUser(null);
-      setVerifiedDniResult(null); 
-      fetchPlatformUsers();
+      setVerifiedDniResult(null); // Clear verified DNI after successful operation
+      fetchPlatformUsers(); // Refresh the list
 
     } catch (error) {
       console.error("Failed to create/update user:", error);
@@ -329,6 +337,7 @@ export default function AdminUsersPage() {
   };
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       await deleteDoc(doc(db, "platformUsers", userId));
@@ -421,7 +430,7 @@ export default function AdminUsersPage() {
                       <TableCell>
                         {user.roles && user.roles.map(role => (
                             <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
-                                {roleTranslations[role] || role}
+                                {PLATFORM_USER_ROLE_TRANSLATIONS[role] || role}
                             </Badge>
                         ))}
                       </TableCell>
@@ -430,7 +439,7 @@ export default function AdminUsersPage() {
                       <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="icon" onClick={() => {
                             setEditingUser(user); 
-                            setVerifiedDniResult(null); 
+                            setVerifiedDniResult(null); // Not verifying DNI when editing an existing user via this button
                             setShowCreateEditUserModal(true);
                         }} disabled={isSubmitting}>
                           <Edit className="h-4 w-4" />
@@ -478,10 +487,11 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
       
+      {/* DNI Entry Modal for New User Creation */}
       <Dialog open={showDniEntryModal} onOpenChange={(isOpen) => {
           if (!isOpen) {
             dniEntryForm.reset();
-            setDniForVerification("");
+            setDniForVerification(""); // Clear DNI for verification when modal closes
           }
           setShowDniEntryModal(isOpen);
       }}>
@@ -501,18 +511,18 @@ export default function AdminUsersPage() {
                   <FormItem>
                     <FormLabel>DNI / Carnet de Extranjería</FormLabel>
                     <FormControl>
-                      <Input placeholder="Número de documento" {...field} autoFocus disabled={isVerifyingDni}/>
+                      <Input placeholder="Número de documento" {...field} autoFocus disabled={isSubmitting}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <DialogFooter className="pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isVerifyingDni}>
+                <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isVerifyingDni}>
-                  {isVerifyingDni ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
+                <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
                 </Button>
               </DialogFooter>
             </form>
@@ -520,8 +530,10 @@ export default function AdminUsersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Main User Creation/Editing Modal */}
        <Dialog open={showCreateEditUserModal} onOpenChange={(isOpen) => {
         if (!isOpen) {
+          // Reset states when closing this modal
           setEditingUser(null);
           setVerifiedDniResult(null); 
         }
@@ -529,32 +541,43 @@ export default function AdminUsersPage() {
       }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil de Usuario de Plataforma"}</DialogTitle>
+            <DialogTitle>
+              {editingUser 
+                ? `Editar Usuario: ${editingUser.name}` 
+                : "Paso 2: Completar Perfil de Usuario de Plataforma"
+              }
+            </DialogTitle>
             <DialogDescription>
-              {editingUser ? "Actualiza los detalles del perfil del usuario." : 
-              (verifiedDniResult?.existingUserIsPlatformUser ? "Este DNI ya es un Usuario de Plataforma. No se puede crear un nuevo perfil." : // This case is handled by the alert dialog now
-              "Completa los detalles para el perfil del usuario en Firestore. La cuenta de Firebase Authentication debe crearse/vincularse por separado, asegurando que el UID coincida.")}
+              {editingUser 
+                ? "Actualiza los detalles del perfil del usuario." 
+                : (verifiedDniResult?.existingUserIsPlatformUser 
+                    ? "Este DNI ya es un Usuario de Plataforma. No se puede crear un nuevo perfil aquí. Edite desde la lista principal." // Should be caught by alert
+                    : "Completa los detalles para el perfil del usuario en Firestore. La cuenta de Firebase Authentication debe crearse/vincularse por separado.")
+              }
             </DialogDescription>
           </DialogHeader>
           <PlatformUserForm 
-            user={editingUser || undefined}
+            user={editingUser || undefined} // Pass current editing user or undefined for new
             initialDataForCreation={!editingUser && verifiedDniResult ? verifiedDniResult : undefined}
             businesses={availableBusinesses}
-            onSubmit={(data) => handleCreateOrEditUser(data)}
+            onSubmit={(data) => handleCreateOrEditUser(data, !!editingUser)} // Pass isEditing flag
             onCancel={() => { setShowCreateEditUserModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}
+            // Disable form submit if DNI is already a platform user and we are in creation flow
+            disableSubmitOverride={!editingUser && !!verifiedDniResult?.existingUserIsPlatformUser}
           />
         </DialogContent>
       </Dialog>
 
+      {/* Alert Dialog if DNI is already a Platform User */}
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center">
-                <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI ya Registrado en Plataforma
+                <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI ya Registrado como Usuario de Plataforma
             </AlertDialogTitle>
             <AlertDialogDescription>
-              El DNI <span className="font-semibold">{dniForVerification}</span> ya está registrado en la Plataforma con el/los rol(es) de: <span className="font-semibold">{(existingPlatformUserRoles || []).map(r => roleTranslations[r] || r).join(', ')}</span>.
+              El DNI <span className="font-semibold">{dniForVerification}</span> ya está registrado en la Plataforma con el/los rol(es) de: <span className="font-semibold">{(existingPlatformUserRoles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r] || r).join(', ')}</span>.
               <br/><br/>
               ¿Desea editar este perfil de usuario existente?
             </AlertDialogDescription>
@@ -571,4 +594,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-    
