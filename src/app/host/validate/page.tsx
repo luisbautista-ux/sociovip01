@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
+import { isEntityCurrentlyActivatable } from "@/lib/utils";
+import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
 
 // Mock data - In a real app, this would be fetched for the host's associated business.
 // This is a mutable copy for the Anfitrion page to simulate updates.
@@ -62,8 +64,8 @@ let mockHostPromotions: BusinessManagedEntity[] = [
     type: "promotion",
     name: "Promo Cumpleañero Mes (INACTIVA ANFITRION)",
     description: "Si cumples años este mes, tu postre es gratis.",
-    startDate: "2024-01-01T12:00:00",
-    endDate: "2024-12-31T12:00:00",
+    startDate: "2024-01-01T12:00:00", // Past date
+    endDate: "2024-12-31T12:00:00",   // Past date
     isActive: false,
     imageUrl: "https://placehold.co/300x200.png",
     aiHint: "birthday cake",
@@ -80,7 +82,7 @@ let mockHostEvents: BusinessManagedEntity[] = [
     description: "Saca la estrella que llevas dentro. Premios para los mejores.",
     startDate: "2025-08-15T12:00:00",
     endDate: "2025-08-15T12:00:00",
-    maxAttendance: 5,
+    maxAttendance: 5, // Low for testing aforo
     isActive: true,
     imageUrl: "https://placehold.co/300x200.png",
     aiHint: "karaoke night",
@@ -90,20 +92,14 @@ let mockHostEvents: BusinessManagedEntity[] = [
         { id: "codeEvt1-3", entityId: "evt1", value: "SINGER003", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:06:00Z"},
         { id: "codeEvt1-4", entityId: "evt1", value: "VOCALSTAR", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:07:00Z"},
         { id: "codeEvt1-5", entityId: "evt1", value: "MICNIGHT5", status: "available", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:08:00Z"},
-        { id: "codeEvt1-6", entityId: "evt1", value: "EVENTSIX6", status: "expired", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:09:00Z"},
+        { id: "codeEvt1-6", entityId: "evt1", value: "EVENTSIX6", status: "expired", generatedByName: "Admin Negocio", generatedDate: "2025-08-01T10:09:00Z"}, // Expired implies it can't be redeemed
     ]
   },
 ];
 
 
-const hostBusinessId = "biz1";
-const businessName = "Pandora Lounge Bar"; // Mock
-
-const statusTranslations: Record<GeneratedCode['status'], string> = {
-  available: "Disponible para Canje/Uso",
-  redeemed: "YA CANJEADO/UTILIZADO",
-  expired: "VENCIDO",
-};
+const hostBusinessId = "biz1"; // Mock business ID for the host
+const businessName = "Pandora Lounge Bar"; // Mock business name for display
 
 const QR_READER_ELEMENT_ID = "qr-reader-host";
 
@@ -118,27 +114,23 @@ export default function HostValidateQrPage() {
 
   const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
 
-  const [isScannerActive, setIsScannerActive] = useState(false);
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const [isScannerActive, setIsScannerActive] = useState(false);
+
+
+  const refreshActiveEntities = () => {
+    // Combine and filter promotions and events for the current business that are active and valid today
+    const allEntities = [...mockHostPromotions, ...mockHostEvents];
+    const filtered = allEntities.filter(entity => 
+        entity.businessId === hostBusinessId && isEntityCurrentlyActivatable(entity)
+    );
+    setActiveBusinessEntities(filtered);
+  };
 
   useEffect(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    // Use the mutable mock data for this page
-    const allEntities = [...mockHostPromotions, ...mockHostEvents];
-    const filtered = allEntities.filter(entity => {
-      const entityStartDateObj = new Date(entity.startDate);
-      const entityEndDateObj = new Date(entity.endDate);
-      const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
-      const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
-
-      return entity.businessId === hostBusinessId &&
-             entity.isActive &&
-             today >= effectiveStartDate &&
-             today <= effectiveEndDate;
-    });
-    setActiveBusinessEntities(filtered);
-  }, [foundCode]); // Re-filter if foundCode changes (e.g., after redemption affects counts)
+    refreshActiveEntities();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Initial load
 
   const startScanner = async () => {
     const qrReaderElement = document.getElementById(QR_READER_ELEMENT_ID);
@@ -146,29 +138,29 @@ export default function HostValidateQrPage() {
         toast({ title: "Error de Configuración", description: "Elemento para el escáner no encontrado.", variant: "destructive" });
         return;
     }
-     qrReaderElement.innerHTML = ""; // Clear previous content
+     qrReaderElement.innerHTML = ""; 
 
     if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
         await html5QrCodeRef.current.stop().catch(console.error);
     }
 
-    const newScannerInstance = new Html5Qrcode(QR_READER_ELEMENT_ID, {
-        verbose: false // Reduce console logs from the library
-    });
+    const newScannerInstance = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
     html5QrCodeRef.current = newScannerInstance;
 
     const qrCodeSuccessCallback = (decodedText: string, decodedResult: Html5QrcodeResult) => {
       setScannedCodeValue(decodedText.toUpperCase());
-      handleSearchCode(decodedText.toUpperCase());
-      stopScanner();
+      handleSearchCode(decodedText.toUpperCase()); // Automatically search after scan
+      stopScanner(); // Stop scanner after successful scan
       toast({ title: "QR Escaneado", description: `Código: ${decodedText}` });
     };
 
     const qrCodeErrorCallback = (errorMessage: string, error: Html5QrcodeError) => {
       // console.warn(`QR Code no detectado, error: ${errorMessage}`);
+      // Errors are frequent, only log if necessary or show a subtle message
     };
 
     try {
+      // Try starting with environment camera first
       await newScannerInstance.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
@@ -178,6 +170,7 @@ export default function HostValidateQrPage() {
       setIsScannerActive(true);
     } catch (err: any) {
       console.error("Error al iniciar scanner (environment):", err);
+      // Fallback to any available camera if environment facing fails
       try {
         const cameras = await Html5Qrcode.getCameras();
         if (cameras && cameras.length) {
@@ -195,7 +188,7 @@ export default function HostValidateQrPage() {
       } catch (fallbackErr: any) {
         console.error("Error al iniciar scanner (fallback):", fallbackErr);
         let message = "No se pudo iniciar el escáner de QR.";
-        if (fallbackErr.name === "NotAllowedError") {
+        if (fallbackErr.name === "NotAllowedError") { // Standard DOMException name for permission issues
             message = "Permiso de cámara denegado. Por favor, habilita el acceso a la cámara en tu navegador.";
         }
         toast({ title: "Error de Escáner", description: message, variant: "destructive" });
@@ -215,10 +208,11 @@ export default function HostValidateQrPage() {
     setIsScannerActive(false);
     const qrReaderElement = document.getElementById(QR_READER_ELEMENT_ID);
     if (qrReaderElement) {
-      qrReaderElement.innerHTML = "";
+      qrReaderElement.innerHTML = ""; // Clear the video feed
     }
   };
 
+  // Cleanup scanner on component unmount
   useEffect(() => {
     return () => {
       if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
@@ -232,44 +226,53 @@ export default function HostValidateQrPage() {
     if (isScannerActive) {
       stopScanner();
     } else {
+      // Reset search state before starting scanner
       setSearchPerformed(false);
       setFoundEntity(null);
       setFoundCode(null);
-      setScannedCodeValue("");
+      setScannedCodeValue(""); // Clear manual input field
       startScanner();
     }
   };
 
   const handleSearchCode = (codeToSearchParam?: string) => {
     const currentCodeValue = (codeToSearchParam || scannedCodeValue).trim().toUpperCase();
-    if (currentCodeValue.length === 0 && !codeToSearchParam) {
+    
+    // Removed length validation to allow searching for any code (though typically 9 chars)
+    if (currentCodeValue.length === 0 && !codeToSearchParam) { // Don't search if input is empty unless called with param
         setSearchPerformed(false);
         setFoundEntity(null);
         setFoundCode(null);
         return;
     }
-    if (currentCodeValue.length !== 9) {
+     if (currentCodeValue.length !== 9) {
       toast({ title: "Código Inválido", description: "El código debe tener 9 caracteres alfanuméricos.", variant: "destructive" });
       return;
     }
 
+
     setIsLoading(true);
-    setSearchPerformed(false);
+    setSearchPerformed(false); // Reset search performed flag
     setFoundEntity(null);
     setFoundCode(null);
-    setIsVipCandidate(false);
+    setIsVipCandidate(false); // Reset VIP candidate switch
 
+    // Simulate API call
     setTimeout(() => {
       let entityMatch: BusinessManagedEntity | null = null;
       let codeMatch: GeneratedCode | null = null;
-      const allEntities = [...mockHostPromotions, ...mockHostEvents]; // Search in all host's entities
+      
+      // Search in both promotions and events associated with the host's business
+      const allEntitiesForHost = [...mockHostPromotions, ...mockHostEvents].filter(
+        e => e.businessId === hostBusinessId
+      );
 
-      for (const entity of allEntities) {
+      for (const entity of allEntitiesForHost) {
         const code = entity.generatedCodes?.find(c => c.value.toUpperCase() === currentCodeValue);
         if (code) {
           entityMatch = entity;
           codeMatch = code;
-          setIsVipCandidate(code.isVipCandidate || false);
+          setIsVipCandidate(code.isVipCandidate || false); // Pre-fill VIP candidate if already marked
           break;
         }
       }
@@ -277,61 +280,52 @@ export default function HostValidateQrPage() {
       setFoundEntity(entityMatch);
       setFoundCode(codeMatch);
       setIsLoading(false);
-      setSearchPerformed(true);
-    }, 500);
+      setSearchPerformed(true); // Set search performed after attempt
+    }, 500); 
   };
 
   const handleValidateAndRedeem = () => {
     if (!foundEntity || !foundCode) return;
 
     // Find the entity in the original mutable mock arrays
-    let targetEntityInMock: BusinessManagedEntity | undefined;
+    let targetArray: BusinessManagedEntity[] | undefined;
     if (foundEntity.type === 'promotion') {
-        targetEntityInMock = mockHostPromotions.find(p => p.id === foundEntity.id);
+        targetArray = mockHostPromotions;
     } else {
-        targetEntityInMock = mockHostEvents.find(e => e.id === foundEntity.id);
+        targetArray = mockHostEvents;
     }
+    
+    if (targetArray) {
+        const entityIndex = targetArray.findIndex(e => e.id === foundEntity.id);
+        if (entityIndex > -1 && targetArray[entityIndex].generatedCodes) {
+            const codeIndex = targetArray[entityIndex].generatedCodes!.findIndex(c => c.id === foundCode.id);
+            if (codeIndex > -1) {
+                // Update the code in the mutable mock array
+                targetArray[entityIndex].generatedCodes![codeIndex] = {
+                    ...targetArray[entityIndex].generatedCodes![codeIndex],
+                    status: 'redeemed',
+                    redemptionDate: new Date().toISOString(),
+                    isVipCandidate: isVipCandidate,
+                    redeemedByInfo: targetArray[entityIndex].generatedCodes![codeIndex].redeemedByInfo || { dni: "VALIDADO_ANFITRION", name: "Anfitrión" } 
+                };
 
-    if (targetEntityInMock && targetEntityInMock.generatedCodes) {
-        const codeIndex = targetEntityInMock.generatedCodes.findIndex(c => c.id === foundCode.id);
-        if (codeIndex > -1) {
-            // Update the code in the mutable mock array
-            targetEntityInMock.generatedCodes[codeIndex] = {
-                ...targetEntityInMock.generatedCodes[codeIndex],
-                status: 'redeemed',
-                redemptionDate: new Date().toISOString(),
-                isVipCandidate: isVipCandidate,
-                redeemedByInfo: targetEntityInMock.generatedCodes[codeIndex].redeemedByInfo || { dni: "VALIDADO_ANFITRION", name: "Anfitrión" }
-            };
+                // Update local state for immediate UI feedback
+                setFoundCode(targetArray[entityIndex].generatedCodes![codeIndex]);
+                refreshActiveEntities(); // Re-filter active entities to update counts
 
-            // Update local state for immediate UI feedback
-            setFoundCode(targetEntityInMock.generatedCodes[codeIndex]);
-
-            // Trigger a re-evaluation of activeBusinessEntities to update counts
-             const now = new Date();
-             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-             const allEntitiesUpdated = [...mockHostPromotions, ...mockHostEvents];
-             const filteredUpdated = allEntitiesUpdated.filter(entity => {
-                const entityStartDateObj = new Date(entity.startDate);
-                const entityEndDateObj = new Date(entity.endDate);
-                const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
-                const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
-                return entity.businessId === hostBusinessId && entity.isActive && today >= effectiveStartDate && today <= effectiveEndDate;
-            });
-            setActiveBusinessEntities(filteredUpdated);
-
-
-            toast({ title: "¡QR Validado y Canjeado!", description: `Código ${foundCode.value} para "${foundEntity.name}" marcado como utilizado. ${isVipCandidate ? 'Cliente marcado como Potencial VIP.' : ''}`, className: "bg-green-500 text-white" });
+                toast({ title: "¡QR Validado y Canjeado!", description: `Código ${foundCode.value} para "${foundEntity.name}" marcado como utilizado. ${isVipCandidate ? 'Cliente marcado como Potencial VIP.' : ''}`, className: "bg-green-500 text-white" });
+            } else {
+                 toast({ title: "Error Interno", description: "No se pudo actualizar el código.", variant: "destructive" });
+            }
         } else {
-             toast({ title: "Error Interno", description: "No se pudo actualizar el código.", variant: "destructive" });
+           toast({ title: "Error Interno", description: "No se encontró la entidad para actualizar.", variant: "destructive" });
         }
-    } else {
-        toast({ title: "Error Interno", description: "No se encontró la entidad para actualizar.", variant: "destructive" });
     }
   };
 
   const handleVipCandidateToggle = (checked: boolean) => {
     setIsVipCandidate(checked);
+    // Optionally provide immediate feedback via toast if the code is available
     if (foundCode && foundCode.status === 'available') {
         toast({
             title: "Perfil de Cliente",
@@ -341,26 +335,29 @@ export default function HostValidateQrPage() {
   };
 
 
-  const isCodeRedeemable = () => {
+  // Determine if the found code is redeemable
+  const isCodeCurrentlyRedeemable = () => {
     if (!foundEntity || !foundCode) return false;
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    // Check if the entity itself is active and within its valid date range
+    if (!isEntityCurrentlyActivatable(foundEntity)) return false;
 
-    const entityStartDateObj = new Date(foundEntity.startDate);
-    const entityEndDateObj = new Date(foundEntity.endDate);
-    const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
-    const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
-
-    const entityActiveAndCurrent = foundEntity.isActive && today >= effectiveStartDate && today <= effectiveEndDate;
-
-    if (!entityActiveAndCurrent) return false;
+    // Check if the code's status is 'available'
     if (foundCode.status !== 'available') return false;
 
+    // For events, check max attendance
     if (foundEntity.type === 'event' && foundEntity.maxAttendance && foundEntity.maxAttendance > 0) {
       const redeemedCount = foundEntity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
-      if (redeemedCount >= foundEntity.maxAttendance) return false;
+      if (redeemedCount >= foundEntity.maxAttendance) return false; // Event is full
     }
-    return true;
+    
+    // For promotions, check usage limit if applicable
+    if (foundEntity.type === 'promotion' && foundEntity.usageLimit && foundEntity.usageLimit > 0) {
+        const redeemedCount = foundEntity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
+        if (redeemedCount >= foundEntity.usageLimit) return false; // Promotion limit reached
+    }
+
+    return true; // All checks passed
   };
 
   const getEventAttendance = (event: BusinessManagedEntity) => {
@@ -406,7 +403,7 @@ export default function HostValidateQrPage() {
             type="text"
             value={scannedCodeValue}
             onChange={(e) => setScannedCodeValue(e.target.value.toUpperCase())}
-            placeholder="ABC123XYZ"
+            placeholder="ABC123XYZ (9 caracteres)"
             maxLength={9}
             className="text-lg flex-grow tracking-wider"
             disabled={isLoading || isScannerActive}
@@ -432,21 +429,24 @@ export default function HostValidateQrPage() {
             )}
             {foundCode && foundEntity && (
               <div className="space-y-4">
-                 <Alert variant={isCodeRedeemable() ? "default" : (foundCode.status === 'redeemed' ? "default" : "destructive")}
-                       className={isCodeRedeemable() ? "bg-green-50 border-green-300" : (foundCode.status === 'redeemed' ? "bg-blue-50 border-blue-300" : "")}>
-                  {isCodeRedeemable() ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : (foundCode.status === 'redeemed' ? <Info className="h-5 w-5 text-blue-600" /> : <XCircle className="h-5 w-5 text-red-600" />) }
-                  <AlertTitle className={isCodeRedeemable() ? "text-green-700" : (foundCode.status === 'redeemed' ? "text-blue-700" : "text-red-700")}>
-                    {isCodeRedeemable() ? "Código Válido y Disponible para Canje" : `Estado: ${statusTranslations[foundCode.status]}`}
+                 <Alert variant={isCodeCurrentlyRedeemable() ? "default" : (foundCode.status === 'redeemed' ? "default" : "destructive")}
+                       className={isCodeCurrentlyRedeemable() ? "bg-green-50 border-green-300" : (foundCode.status === 'redeemed' ? "bg-blue-50 border-blue-300" : "")}>
+                  {isCodeCurrentlyRedeemable() ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : (foundCode.status === 'redeemed' ? <Info className="h-5 w-5 text-blue-600" /> : <XCircle className="h-5 w-5 text-red-600" />) }
+                  <AlertTitle className={isCodeCurrentlyRedeemable() ? "text-green-700" : (foundCode.status === 'redeemed' ? "text-blue-700" : "text-red-700")}>
+                    {isCodeCurrentlyRedeemable() ? "Código Válido y Disponible para Canje" : `Estado: ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCode.status]}`}
                   </AlertTitle>
                   <AlertDescription>
-                    {!isCodeRedeemable() && foundEntity.isActive && new Date(foundEntity.startDate) <= new Date() && new Date(foundEntity.endDate) >= new Date() && foundCode.status === 'available' && foundEntity.type === 'event' && foundEntity.maxAttendance && (foundEntity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0) >= foundEntity.maxAttendance && (
-                        "El evento ha alcanzado su aforo máximo."
-                    )}
-                    {!isCodeRedeemable() && foundEntity.isActive && (new Date(foundEntity.startDate) > new Date() || new Date(foundEntity.endDate) < new Date()) && (
+                    {!isCodeCurrentlyRedeemable() && foundEntity.isActive && (new Date(foundEntity.startDate) > new Date() || new Date(new Date(foundEntity.endDate).setHours(23,59,59,999)) < new Date()) && (
                         `La promoción/evento "${foundEntity.name}" no está vigente (Vigencia: ${format(new Date(foundEntity.startDate), "P", {locale: es})} - ${format(new Date(foundEntity.endDate), "P", {locale: es})}).`
                     )}
-                     {!isCodeRedeemable() && !foundEntity.isActive && (
+                     {!isCodeCurrentlyRedeemable() && !foundEntity.isActive && (
                         `La promoción/evento "${foundEntity.name}" está actualmente INACTIVA.`
+                    )}
+                    {!isCodeCurrentlyRedeemable() && foundCode.status === 'available' && isEntityCurrentlyActivatable(foundEntity) && foundEntity.type === 'event' && foundEntity.maxAttendance && (foundEntity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0) >= foundEntity.maxAttendance && (
+                        "El evento ha alcanzado su aforo máximo."
+                    )}
+                     {!isCodeCurrentlyRedeemable() && foundCode.status === 'available' && isEntityCurrentlyActivatable(foundEntity) && foundEntity.type === 'promotion' && foundEntity.usageLimit && (foundEntity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0) >= foundEntity.usageLimit && (
+                        "La promoción ha alcanzado su límite de canjes."
                     )}
                   </AlertDescription>
                 </Alert>
@@ -457,7 +457,7 @@ export default function HostValidateQrPage() {
                   <div><CalendarDays className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Vigencia:</strong> {format(new Date(foundEntity.startDate), "P", { locale: es })} - {format(new Date(foundEntity.endDate), "P", { locale: es })}</div>
                   <div><Ticket className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Tipo:</strong> {foundEntity.type === "promotion" ? "Promoción" : "Evento"}</div>
                   {foundEntity.type === 'event' && <div><Users className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>{getEventAttendance(foundEntity)}</strong></div>}
-                  <div><Clock className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Código Creado:</strong> {format(new Date(foundCode.generatedDate), "Pp", { locale: es })} por {foundCode.generatedByName}</div>
+                  <div><Clock className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Código Creado:</strong> {foundCode.generatedDate ? format(new Date(foundCode.generatedDate), "Pp", { locale: es }) : "N/A"} por {foundCode.generatedByName}</div>
                   {foundCode.redeemedByInfo && (
                      <div><User className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Canjeado por:</strong> {foundCode.redeemedByInfo.name} {foundCode.redeemedByInfo.dni !== "VALIDADO_ANFITRION" ? `(DNI: ${foundCode.redeemedByInfo.dni})` : ""}</div>
                   )}
@@ -467,7 +467,7 @@ export default function HostValidateQrPage() {
                 </div>
                 {foundCode.observation && <p className="text-sm italic"><Info className="inline mr-1 h-4 w-4"/> Observación del código: {foundCode.observation}</p>}
 
-                {isCodeRedeemable() && (
+                {isCodeCurrentlyRedeemable() && (
                   <div className="flex items-center space-x-2 pt-4 border-t mt-4">
                     <Switch
                       id="vip-candidate-toggle"
@@ -484,7 +484,7 @@ export default function HostValidateQrPage() {
               </div>
             )}
           </CardContent>
-          {foundCode && foundEntity && isCodeRedeemable() && (
+          {foundCode && foundEntity && isCodeCurrentlyRedeemable() && (
             <CardFooter>
               <Button onClick={handleValidateAndRedeem} className="w-full bg-green-600 hover:bg-green-700 text-white">
                 <CheckCircle2 className="mr-2 h-5 w-5" /> Validar y Marcar como Canjeado/Asistió
@@ -517,7 +517,7 @@ export default function HostValidateQrPage() {
                   </AccordionTrigger>
                   <AccordionContent className="space-y-1 text-sm pl-8">
                     <p>{entity.description}</p>
-                    <p><strong>Vigencia:</strong> {format(new Date(entity.startDate), "P", { locale: es })} - {format(new Date(entity.endDate), "P", { locale: es })}</p>
+                    <p><strong>Vigencia:</strong> {entity.startDate ? format(new Date(entity.startDate), "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(new Date(entity.endDate), "P", { locale: es }) : 'N/A'}</p>
                     {entity.type === 'event' && <p><strong>{getEventAttendance(entity)}</strong></p>}
                     {entity.type === 'promotion' && entity.usageLimit && entity.usageLimit > 0 && <p><strong>Límite de canjes:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0} / {entity.usageLimit}</p>}
                     <p><strong>Códigos disponibles:</strong> {entity.generatedCodes?.filter(c => c.status === 'available').length || 0}</p>
@@ -531,6 +531,3 @@ export default function HostValidateQrPage() {
     </div>
   );
 }
-    
-
-    

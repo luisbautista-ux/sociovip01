@@ -15,30 +15,19 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-
-const statusTranslations: Record<GeneratedCode['status'], string> = {
-  available: "Disponible",
-  redeemed: "Canjeado/Utilizado",
-  expired: "Vencido",
-};
-
-const statusColors: Record<GeneratedCode['status'], "default" | "secondary" | "destructive" | "outline"> = {
-    available: "default",
-    redeemed: "secondary",
-    expired: "destructive",
-};
+import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from "@/lib/constants";
 
 interface ProcessedCodeItem {
   isBatch: boolean;
-  id: string;
-  batchId?: string;
+  id: string; // Unique key for React list
+  batchId?: string; // Identifier for the batch, used for AccordionItem value
   observation?: string;
   generatedDate?: string;
   codesInBatch?: GeneratedCode[];
   singleCode?: GeneratedCode;
 }
 
-function groupAndSortCodes(codesToSort: GeneratedCode[]): ProcessedCodeItem[] {
+function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedCodeItem[] {
   if (!codesToSort || codesToSort.length === 0) return [];
 
   const sortedCodes = [...codesToSort].sort(
@@ -51,9 +40,10 @@ function groupAndSortCodes(codesToSort: GeneratedCode[]): ProcessedCodeItem[] {
     const currentCode = sortedCodes[i];
     const currentBatch: GeneratedCode[] = [currentCode];
     let j = i + 1;
+    // Group codes if they have the exact same generation date and observation
     while (
       j < sortedCodes.length &&
-      sortedCodes[j].generatedDate === currentCode.generatedDate &&
+      new Date(sortedCodes[j].generatedDate).getTime() === new Date(currentCode.generatedDate).getTime() &&
       (sortedCodes[j].observation || undefined) === (currentCode.observation || undefined)
     ) {
       currentBatch.push(sortedCodes[j]);
@@ -61,20 +51,21 @@ function groupAndSortCodes(codesToSort: GeneratedCode[]): ProcessedCodeItem[] {
     }
 
     if (currentBatch.length > 1) {
-      const batchKey = `${currentCode.generatedDate}-${currentCode.observation || 'no-obs'}-${i}`;
+      const batchKey = `${new Date(currentCode.generatedDate).toISOString()}-${currentCode.observation || 'no-obs'}-${i}`;
       processedItems.push({
         isBatch: true,
-        id: batchKey,
-        batchId: batchKey,
+        id: batchKey, // Unique ID for the batch item itself
+        batchId: batchKey, // ID for AccordionItem value
         observation: currentCode.observation,
         generatedDate: currentCode.generatedDate,
         codesInBatch: currentBatch,
       });
-      i = j;
+      i = j; // Move index past the processed batch
     } else {
+      // Single code, not part of a batch of more than 1
       processedItems.push({
         isBatch: false,
-        id: currentCode.id,
+        id: currentCode.id, // Use the code's own ID
         singleCode: currentCode,
       });
       i++;
@@ -87,7 +78,7 @@ function groupAndSortCodes(codesToSort: GeneratedCode[]): ProcessedCodeItem[] {
 interface ManageCodesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  entity: BusinessManagedEntity;
+  entity: BusinessManagedEntity | null; // Allow entity to be null initially
   onCodesUpdated: (entityId: string, updatedCodes: GeneratedCode[]) => void;
   onRequestCreateNewCodes: () => void;
 }
@@ -113,6 +104,7 @@ export function ManageCodesDialog({
   const processedAndGroupedCodes = useMemo(() => groupAndSortCodes(internalCodes), [internalCodes]);
 
   const handleDeleteCode = (codeId: string) => {
+    if (!entity) return;
     const codeToDelete = internalCodes.find(c => c.id === codeId);
     if (codeToDelete && codeToDelete.status === 'redeemed') {
         toast({
@@ -140,7 +132,7 @@ export function ManageCodesDialog({
   const handleCopyAllAvailableCodes = async () => {
     const availableCodes = internalCodes.filter(c => c.status === 'available').map(c => c.value).join('\n');
     if (!availableCodes) {
-      toast({ title: "Sin Códigos Disponibles", description: "No hay códigos disponibles para copiar.", variant: "default" });
+      toast({ title: "Sin Códigos Disponibles", description: "No hay códigos disponibles para copiar." });
       return;
     }
     try {
@@ -152,7 +144,7 @@ export function ManageCodesDialog({
     }
   };
 
-  const handleCopyBatchCodes = async (batchCodes: GeneratedCode[]) => {
+  const handleCopyBatchCodes = async (batchCodes: GeneratedCode[] | undefined) => {
     if (!batchCodes || batchCodes.length === 0) return;
     const codesToCopy = batchCodes.map(c => c.value).join('\n');
     try {
@@ -164,7 +156,7 @@ export function ManageCodesDialog({
   };
 
 
-  if (!entity) return null;
+  if (!entity) return null; // Return null if entity is not yet available
 
   const renderCodeRow = (code: GeneratedCode, isInsideBatch = false) => (
     <TableRow key={code.id} className={cn(isInsideBatch ? "bg-muted/20 hover:bg-muted/40" : "", "text-xs")}>
@@ -184,10 +176,10 @@ export function ManageCodesDialog({
       </TableCell>
       <TableCell className="py-1.5 px-2">{code.generatedByName}</TableCell>
       <TableCell className="py-1.5 px-2">
-          <Badge variant={statusColors[code.status]} className="text-xs">{statusTranslations[code.status]}</Badge>
+          <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status]} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status]}</Badge>
       </TableCell>
       <TableCell className="py-1.5 px-2 max-w-[150px] truncate" title={code.observation}>{code.observation || "N/A"}</TableCell>
-      <TableCell className="py-1.5 px-2">{format(new Date(code.generatedDate), "dd/MM/yy HH:mm", { locale: es })}</TableCell>
+      <TableCell className="py-1.5 px-2">{code.generatedDate ? format(new Date(code.generatedDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}</TableCell>
       <TableCell className="py-1.5 px-2">
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
       </TableCell>
@@ -204,7 +196,7 @@ export function ManageCodesDialog({
                   <AlertDialogHeader>
                       <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                       <AlertDialogDescription>
-                      Esta acción no se puede deshacer. Esto eliminará permanentemente el código
+                      Esta acción no se puede deshacer. Esto eliminará permanentemente el código:
                       <span className="font-semibold font-mono"> {code.value}</span>.
                       </AlertDialogDescription>
                   </AlertDialogHeader>
@@ -229,11 +221,11 @@ export function ManageCodesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl">
+      <DialogContent className="sm:max-w-5xl"> {/* Increased width */}
         <DialogHeader>
           <DialogTitle>Códigos para: {entity.name}</DialogTitle>
           <DialogDescription>
-            Visualiza y gestiona los códigos existentes. Los códigos se muestran ordenados por fecha de creación (más recientes primero) y agrupados si se crearon juntos.
+            Visualiza y gestiona los códigos existentes. Se ordenan por fecha de creación (más recientes primero) y se agrupan si se crearon juntos con la misma observación.
           </DialogDescription>
         </DialogHeader>
 
@@ -266,45 +258,57 @@ export function ManageCodesDialog({
               </TableHeader>
               <TableBody>
                 {/* Render single code items first */}
-                {singleCodeItems.map(item => renderCodeRow(item.singleCode!))}
+                {singleCodeItems.map(item => item.singleCode && renderCodeRow(item.singleCode))}
 
                 {/* Then render batched items if any */}
                 {batchCodeItems.length > 0 && (
                   <Accordion type="multiple" className="w-full">
                     {batchCodeItems.map((item) => (
-                        <AccordionItem value={item.batchId!} key={item.id} className="border-b-0">
-                           <TableRow className="border-b hover:bg-transparent data-[state=open]:bg-muted/30">
-                             <TableCell colSpan={7} className="p-0">
-                                <AccordionTrigger className="py-2.5 px-4 text-sm hover:no-underline justify-start group">
-                                  <ChevronDown className="h-4 w-4 mr-2 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                                  Lote de {item.codesInBatch!.length} códigos
-                                  ({format(new Date(item.generatedDate!), "P p", { locale: es })})
-                                  {item.observation ? <span className="ml-2 text-muted-foreground text-xs truncate" title={item.observation}> - Obs: {item.observation}</span> : ""}
-                                </AccordionTrigger>
-                             </TableCell>
-                           </TableRow>
-                          <AccordionContent asChild>
-                             <tr className="w-full">
-                                <td colSpan={7} className="p-0">
-                                  <div className="pl-6 pr-2 pb-2 border-l-2 border-primary ml-5 mr-1 space-y-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="mt-2 text-xs h-auto py-1 px-2"
-                                        onClick={() => handleCopyBatchCodes(item.codesInBatch!)}
-                                      >
-                                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Códigos del Lote ({item.codesInBatch!.length})
-                                      </Button>
-                                      <Table>
-                                        <TableBody>
-                                          {item.codesInBatch!.map(code => renderCodeRow(code, true))}
-                                        </TableBody>
-                                      </Table>
-                                  </div>
-                                </td>
-                            </tr>
-                          </AccordionContent>
-                        </AccordionItem>
+                        item.codesInBatch && item.codesInBatch.length > 0 && (
+                            <AccordionItem value={item.batchId!} key={item.id} className="border-b-0">
+                                {/* This TableRow is a direct child of AccordionItem which is a div, this might cause issues.
+                                Let's make AccordionTrigger a full-width cell or handle it differently.
+                                A better approach is to have AccordionItem contain the TableRow for the trigger,
+                                and AccordionContent contain the Table for the codes.
+                                However, for simplicity within a single TableBody, this is tricky.
+                                The provided solution of splitting table might be the cleanest.
+                                Let's try to make the trigger span across cells.
+                                */}
+                                <tr className="border-b hover:bg-transparent data-[state=open]:bg-muted/30">
+                                    <td colSpan={7} className="p-0">
+                                        <AccordionTrigger className="py-2.5 px-4 text-sm hover:no-underline justify-start group w-full">
+                                        <div className="flex items-center"> {/* Wrapper to ensure items are in a row */}
+                                            <ChevronDown className="h-4 w-4 mr-2 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                            Lote de {item.codesInBatch.length} códigos
+                                            {item.generatedDate && ` (${format(new Date(item.generatedDate), "P p", { locale: es })})`}
+                                            {item.observation && <span className="ml-2 text-muted-foreground text-xs truncate" title={item.observation}> - Obs: {item.observation}</span>}
+                                        </div>
+                                        </AccordionTrigger>
+                                    </td>
+                                </tr>
+                                <AccordionContent asChild>
+                                    <tr className="w-full">
+                                        <td colSpan={7} className="p-0 bg-muted/10"> {/* Apply bg to the cell for the content */}
+                                        <div className="pl-6 pr-2 py-2 border-l-2 border-primary ml-5 mr-1 space-y-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-xs h-auto py-1 px-2"
+                                                onClick={() => handleCopyBatchCodes(item.codesInBatch)}
+                                            >
+                                                <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Códigos del Lote ({item.codesInBatch!.length})
+                                            </Button>
+                                            <Table>
+                                                <TableBody>
+                                                {item.codesInBatch.map(code => renderCodeRow(code, true))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                        </td>
+                                    </tr>
+                                </AccordionContent>
+                            </AccordionItem>
+                        )
                       )
                     )}
                   </Accordion>
@@ -313,7 +317,7 @@ export function ManageCodesDialog({
             </Table>
           </ScrollArea>
         ) : (
-          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md">
+          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
             <ClipboardList className="h-12 w-12 mb-2"/>
             <p>No hay códigos generados para esta entidad aún.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>

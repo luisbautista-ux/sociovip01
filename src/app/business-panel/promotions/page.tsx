@@ -10,7 +10,7 @@ import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } 
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -19,6 +19,7 @@ import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDial
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { isEntityCurrentlyActivatable } from "@/lib/utils";
 
 // Mock data for business promotions - In a real app, this would be fetched for the logged-in business
 let mockBusinessPromotions: BusinessManagedEntity[] = [
@@ -72,26 +73,6 @@ let mockBusinessPromotions: BusinessManagedEntity[] = [
   },
 ];
 
-const isEntityCurrentlyActivatable = (entity: BusinessManagedEntity): boolean => {
-  if (!entity.isActive) { 
-    return false; 
-  }
-  
-  const now = new Date();
-  const entityStartDateObj = new Date(entity.startDate);
-  const entityEndDateObj = new Date(entity.endDate);
-
-  if (isNaN(entityStartDateObj.getTime()) || isNaN(entityEndDateObj.getTime())) {
-    return false; 
-  }
-
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
-  const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
-  
-  return today >= effectiveStartDate && today <= effectiveEndDate;
-};
-
 
 export default function BusinessPromotionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -114,7 +95,7 @@ export default function BusinessPromotionsPage() {
   ).sort((a, b) => {
       if (a.isActive && !b.isActive) return -1;
       if (!a.isActive && b.isActive) return 1;
-      return a.name.localeCompare(b.name);
+      return (a.name || "").localeCompare(b.name || "");
   });
 
   const handleOpenCreateEditModal = (promotion: BusinessManagedEntity | null, duplicate = false) => {
@@ -123,7 +104,7 @@ export default function BusinessPromotionsPage() {
       setEditingPromotion({
         ...promotion,
         id: `bp${Date.now()}`, 
-        name: `${promotion.name} (Copia)`,
+        name: `${promotion.name || 'Promoción'} (Copia)`,
         generatedCodes: [], 
       });
     } else {
@@ -135,7 +116,8 @@ export default function BusinessPromotionsPage() {
   const handleFormSubmit = (data: BusinessPromotionFormData) => {
     if (editingPromotion && !isDuplicating) { 
       const updatedPromotion: BusinessManagedEntity = {
-        ...editingPromotion,
+        ...(editingPromotion as BusinessManagedEntity), // Ensure all BusinessManagedEntity fields are spread
+        type: "promotion", // Ensure type is set
         name: data.name,
         description: data.description,
         termsAndConditions: data.termsAndConditions,
@@ -151,7 +133,7 @@ export default function BusinessPromotionsPage() {
     } else { 
       const newPromotion: BusinessManagedEntity = {
         id: editingPromotion?.id || `bp${Date.now()}`, 
-        businessId: "biz1", 
+        businessId: "biz1", // This should come from logged-in user context
         type: "promotion",
         name: data.name,
         description: data.description,
@@ -224,7 +206,7 @@ export default function BusinessPromotionsPage() {
     let promotionNameForToast = "";
     let newStatusForToast = false;
 
-    const updateStatusInPromotion = (promoToUpdate: BusinessManagedEntity | null): BusinessManagedEntity | null => {
+    const updateStatusLogic = (promoToUpdate: BusinessManagedEntity | null): BusinessManagedEntity | null => {
       if (!promoToUpdate || promoToUpdate.id !== promotionId) return promoToUpdate;
       
       promotionNameForToast = promoToUpdate.name;
@@ -235,18 +217,19 @@ export default function BusinessPromotionsPage() {
     
     setPromotions(prevPromotions =>
       prevPromotions.map(promo =>
-        promo.id === promotionId ? updateStatusInPromotion(promo) as BusinessManagedEntity : promo
+        promo.id === promotionId ? updateStatusLogic(promo) as BusinessManagedEntity : promo
       )
     );
         
-    setTimeout(() => {
-        if (promotionNameForToast) {
-          toast({
-            title: "Estado Actualizado",
-            description: `La promoción "${promotionNameForToast}" ahora está ${newStatusForToast ? "Activa" : "Inactiva"}.`
-          });
-        }
-    }, 0);
+    // Call toast after state updates are queued
+    if (promotionNameForToast) {
+       setTimeout(() => { // Ensures toast is called after render cycle
+        toast({
+          title: "Estado Actualizado",
+          description: `La promoción "${promotionNameForToast}" ahora está ${newStatusForToast ? "Activa" : "Inactiva"}.`
+        });
+      }, 0);
+    }
   };
 
 
@@ -294,7 +277,7 @@ export default function BusinessPromotionsPage() {
                   <TableRow key={promo.id}>
                     <TableCell className="font-medium">{promo.name}</TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {format(new Date(promo.startDate), "P", { locale: es })} - {format(new Date(promo.endDate), "P", { locale: es })}
+                      {promo.startDate ? format(new Date(promo.startDate), "P", { locale: es }) : 'N/A'} - {promo.endDate ? format(new Date(promo.endDate), "P", { locale: es }) : 'N/A'}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-center">{getRedemptionCount(promo)}</TableCell>
                     <TableCell className="text-center">
@@ -315,10 +298,10 @@ export default function BusinessPromotionsPage() {
                         </div>
                     </TableCell>
                     <TableCell className="space-x-1">
-                      <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(promo)} disabled={!isEntityCurrentlyActivatable(promo)}>
+                      <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(promo)} disabled={!isEntityCurrentlyActivatable(promo)} className="bg-accent hover:bg-accent/90 text-accent-foreground px-2 py-1 h-auto">
                         <QrCode className="h-3 w-3 mr-1" /> Crear
                       </Button>
-                      <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(promo)}>
+                      <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(promo)} className="px-2 py-1 h-auto">
                         <ListChecks className="h-3 w-3 mr-1" /> Ver ({promo.generatedCodes?.length || 0})
                       </Button>
                     </TableCell>
@@ -379,7 +362,7 @@ export default function BusinessPromotionsPage() {
       }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{isDuplicating ? `Duplicar Promoción: ${editingPromotion?.name?.replace(' (Copia)','')}` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</DialogTitle>
+            <DialogTitle>{isDuplicating ? `Duplicar Promoción: ${editingPromotion?.name?.replace(' (Copia)','') || 'Nueva Promoción'}` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</DialogTitle>
             <DialogDescription>
               {isDuplicating ? "Creando una copia. Ajusta los detalles necesarios." : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
             </DialogDescription>
@@ -439,5 +422,3 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
-
-    

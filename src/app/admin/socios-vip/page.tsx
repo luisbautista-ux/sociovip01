@@ -17,32 +17,14 @@ import { Label } from "@/components/ui/label";
 import { SocioVipMemberForm } from "@/components/admin/forms/SocioVipMemberForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { MEMBERSHIP_STATUS_TRANSLATIONS, MEMBERSHIP_STATUS_COLORS, MESES_DEL_ANO_ES } from "@/lib/constants";
 
 // Mock Data - make it mutable for updates
 let mockSocioVipMembers: SocioVipMember[] = [
   { id: "vip1", name: "Elena", surname: "Rodriguez", email: "elena.vip@example.com", phone: "+51999888777", dob: "1988-03-12T12:00:00", dni: "26789012", loyaltyPoints: 1500, membershipStatus: "active", joinDate: "2023-01-20T00:00:00Z", address: "Av. El Sol 456, Cusco", profession: "Arquitecta", preferences: ["Viajes", "Fotografía", "Comida Gourmet"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ELENAQR" },
   { id: "vip2", name: "Roberto", surname: "Chavez", email: "roberto.vip@example.com", phone: "+51911222333", dob: "1975-09-05T12:00:00", dni: "09876543", loyaltyPoints: 850, membershipStatus: "inactive", joinDate: "2022-11-10T00:00:00Z", address: "Calle Luna 123, Arequipa", profession: "Empresario", preferences: ["Vinos", "Golf"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=ROBERTOQR"  },
-  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2024-06-01T00:00:00Z", preferences: ["Yoga", "Lectura"] },
-  { id: "vip4", name: "Luis", surname: "Gomez", email: "luis.vip@example.com", phone: "+51922333444", dob: "1990-03-25T12:00:00", dni: "45678901", loyaltyPoints: 500, membershipStatus: "active", joinDate: "2024-03-15T00:00:00Z", address: "Jr. Los Pinos 789, Lima", profession: "Doctor", preferences: ["Deportes", "Tecnología"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=LUISQR"  },
-];
-
-const membershipStatusTranslations: Record<SocioVipMember['membershipStatus'], string> = {
-  active: "Activa",
-  inactive: "Inactiva",
-  pending_payment: "Pendiente Pago",
-  cancelled: "Cancelada",
-};
-
-const membershipStatusColors: Record<SocioVipMember['membershipStatus'], "default" | "secondary" | "destructive" | "outline"> = {
-    active: "default",
-    inactive: "secondary",
-    pending_payment: "outline",
-    cancelled: "destructive",
-};
-
-const mesesDelAno = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  { id: "vip3", name: "Isabel", surname: "Flores", email: "isabel.vip@example.com", phone: "+51955666777", dob: "1992-07-22T12:00:00", dni: "34567890", loyaltyPoints: 2200, membershipStatus: "pending_payment", joinDate: "2025-06-01T12:00:00Z", preferences: ["Yoga", "Lectura"] },
+  { id: "vip4", name: "Luis", surname: "Gomez", email: "luis.vip@example.com", phone: "+51922333444", dob: "1990-03-25T12:00:00", dni: "45678901", loyaltyPoints: 500, membershipStatus: "active", joinDate: "2025-03-15T12:00:00Z", address: "Jr. Los Pinos 789, Lima", profession: "Doctor", preferences: ["Deportes", "Tecnología"], staticQrCodeUrl: "https://placehold.co/100x100.png?text=LUISQR"  },
 ];
 
 export default function AdminSocioVipPage() {
@@ -75,9 +57,9 @@ export default function AdminSocioVipPage() {
     const headers = ["ID", "Nombre", "Apellido", "Email", "Teléfono", "DNI", "Fec. Nac.", "Puntos", "Estado Membresía", "Fecha Ingreso", "Dirección", "Profesión", "Preferencias"];
     const rows = filteredMembers.map(mem => [
       mem.id, mem.name, mem.surname, mem.email, mem.phone, mem.dni,
-      format(new Date(mem.dob), "dd/MM/yyyy", { locale: es }),
-      mem.loyaltyPoints, membershipStatusTranslations[mem.membershipStatus],
-      format(new Date(mem.joinDate), "dd/MM/yyyy", { locale: es }),
+      mem.dob ? format(new Date(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
+      mem.loyaltyPoints, MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus],
+      mem.joinDate ? format(new Date(mem.joinDate), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.address || "N/A", mem.profession || "N/A", mem.preferences?.join(', ') || "N/A"
     ]);
     let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
@@ -88,6 +70,7 @@ export default function AdminSocioVipPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    toast({ title: "Exportación Exitosa", description: "Archivo CSV generado."});
   };
 
   const handleCreateMember = (data: SocioVipMemberFormData) => {
@@ -179,7 +162,7 @@ export default function AdminSocioVipPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los meses</SelectItem>
-                  {mesesDelAno.map((mes, index) => (
+                  {MESES_DEL_ANO_ES.map((mes, index) => (
                     <SelectItem key={index} value={index.toString()}>{mes}</SelectItem>
                   ))}
                 </SelectContent>
@@ -193,7 +176,7 @@ export default function AdminSocioVipPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los meses</SelectItem>
-                  {mesesDelAno.map((mes, index) => (
+                  {MESES_DEL_ANO_ES.map((mes, index) => (
                     <SelectItem key={index} value={index.toString()}>{mes}</SelectItem>
                   ))}
                 </SelectContent>
@@ -209,7 +192,7 @@ export default function AdminSocioVipPage() {
                 <TableHead className="hidden lg:table-cell"><Mail className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Email</TableHead>
                 <TableHead className="hidden md:table-cell"><Phone className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Teléfono</TableHead>
                 <TableHead className="hidden xl:table-cell">DNI</TableHead>
-                <TableHead><Cake className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Fecha Nac.</TableHead>
+                <TableHead><Cake className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Fec. Nac.</TableHead>
                 <TableHead className="text-center"><Award className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Puntos</TableHead>
                 <TableHead><ShieldCheck className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Estado Membresía</TableHead>
                 <TableHead className="hidden lg:table-cell"><CalendarDays className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Fecha Ingreso</TableHead>
@@ -224,14 +207,14 @@ export default function AdminSocioVipPage() {
                     <TableCell className="hidden lg:table-cell">{member.email}</TableCell>
                     <TableCell className="hidden md:table-cell">{member.phone}</TableCell>
                     <TableCell className="hidden xl:table-cell">{member.dni}</TableCell>
-                    <TableCell>{format(new Date(member.dob), "P", { locale: es })}</TableCell>
+                    <TableCell>{member.dob ? format(new Date(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
                     <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
                     <TableCell>
-                      <Badge variant={membershipStatusColors[member.membershipStatus]}>
-                        {membershipStatusTranslations[member.membershipStatus]}
+                      <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus]}>
+                        {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus]}
                       </Badge>
                     </TableCell>
-                    <TableCell className="hidden lg:table-cell">{format(new Date(member.joinDate), "P", { locale: es })}</TableCell>
+                    <TableCell className="hidden lg:table-cell">{member.joinDate ? format(new Date(member.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="ghost" size="icon" onClick={() => setEditingMember(member)}>
                         <Edit className="h-4 w-4" />
