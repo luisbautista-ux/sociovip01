@@ -1,24 +1,19 @@
 
-"use client"; // Required because we're using a hook (useAuth)
+"use client"; 
 
-import type { Metadata } from "next";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
-
-// export const metadata: Metadata = { // Metadata cannot be exported from client components
-//   title: "Admin Panel - SocioVIP",
-//   description: "Panel de administración para SocioVIP.",
-// };
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // Added for unauthorized message
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, loadingAuth } = useAuth();
+  const { currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -27,7 +22,7 @@ export default function AdminLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth) {
+  if (loadingAuth || loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -37,11 +32,32 @@ export default function AdminLayout({
   }
 
   if (!currentUser) {
-    // This case should ideally be handled by the redirect, but it's a fallback.
-    // Or, you could show a "Not Authorized" message before redirect completes.
+    // This case is mainly a fallback if redirect hasn't happened yet
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
          <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
+      </div>
+    );
+  }
+
+  // After auth and profile are loaded, check role
+  if (!userProfile || !userProfile.roles || !userProfile.roles.includes('superadmin')) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-destructive">Acceso Denegado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              No tienes los permisos necesarios para acceder a esta sección (Super Administrador).
+              Si crees que esto es un error, por favor contacta al soporte.
+            </CardDescription>
+            <Button onClick={() => router.push('/')} className="mt-6">
+              Ir a la Página Principal
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

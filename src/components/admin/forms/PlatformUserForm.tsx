@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription, // Added FormDescription here
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -19,9 +19,10 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMember } from "@/lib/types";
+import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMember, PlatformUserRole } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 
+// Schema now expects a single role from the form, which will be wrapped in an array on save for new users
 const platformUserFormSchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -42,18 +43,20 @@ type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
 
 export interface InitialDataForPlatformUserCreation {
   dni: string;
-  name?: string;
-  email?: string;
+  name?: string; // From QrClient or SocioVipMember
+  email?: string; // From SocioVipMember
   existingUserType?: 'QrClient' | 'SocioVipMember';
-  isPlatformUser?: boolean; // Added to indicate if the DNI already belongs to a PlatformUser
-  existingUserRole?: PlatformUser['role']; // Added to show the role if it's a PlatformUser
+  existingUserIsOtherType?: boolean; // Flag if DNI was found as QrClient or SocioVipMember
+  existingUserIsPlatformUser?: boolean; // Flag if DNI was found as PlatformUser
+  existingPlatformUser?: PlatformUser; // Full PlatformUser data if DNI is already a PlatformUser
+  existingPlatformUserRoles?: PlatformUserRole[];
 }
 
 interface PlatformUserFormProps {
-  user?: PlatformUser; // For editing
+  user?: PlatformUser; // For editing an existing PlatformUser
   initialDataForCreation?: InitialDataForPlatformUserCreation; // For creation after DNI verification
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>;
+  onSubmit: (data: PlatformUserFormData) => Promise<void>; // isEditing flag removed, form determines via `user` prop
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -71,57 +74,55 @@ export function PlatformUserForm({
 
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(platformUserFormSchema),
-    // Default values are primarily set by useEffect
+    // Default values will be set by useEffect
   });
 
   const selectedRole = form.watch("role");
 
-  // Update form defaults when props change
   React.useEffect(() => {
     if (isEditing && user) {
       form.reset({
         dni: user.dni || "",
         name: user.name || "",
         email: user.email || "",
-        role: user.role || undefined,
+        role: user.roles?.[0] || undefined, // Use the first role for single select, or undefined
         businessId: user.businessId || undefined,
       });
     } else if (!isEditing && initialDataForCreation) {
       form.reset({
-        dni: initialDataForCreation.dni,
+        dni: initialDataForCreation.dni, // DNI is pre-filled and disabled
         name: initialDataForCreation.name || "",
         email: initialDataForCreation.email || "",
-        role: undefined, // Role needs to be selected by admin
+        role: undefined, 
         businessId: undefined,
       });
     } else if (!isEditing && !initialDataForCreation) {
-        form.reset({ 
-            dni: "", name: "", email: "", role: undefined, businessId: undefined 
-        });
+        // Should not happen if DNI-first flow is enforced, but good fallback
+        form.reset({ dni: "", name: "", email: "", role: undefined, businessId: undefined });
     }
   }, [user, initialDataForCreation, isEditing, form]);
 
 
   const handleSubmit = async (values: PlatformUserFormValues) => {
+    // The dataToSubmit structure matches PlatformUserFormData (single role from form)
+    // The backend/Server Action will handle putting this into a roles array.
     const dataToSubmit: PlatformUserFormData = { 
       dni: values.dni.trim(),
       name: values.name,
       email: values.email,
-      role: values.role,
+      role: values.role, // Pass the single selected role
     };
     if (['business_admin', 'staff', 'host'].includes(values.role)) {
       dataToSubmit.businessId = values.businessId;
     } else {
-      dataToSubmit.businessId = undefined; // Explicitly set to undefined or null
+      dataToSubmit.businessId = undefined; 
     }
-    await onSubmit(dataToSubmit, isEditing);
+    await onSubmit(dataToSubmit);
   };
 
-  const shouldDisableDni = !isEditing && !!initialDataForCreation?.dni;
-  const showPrePopulatedAlert = !isEditing && initialDataForCreation?.existingUserType && !initialDataForCreation?.isPlatformUser;
-
-  // Disable form submission if we are in create mode and the DNI already belongs to a PlatformUser
-  const disableFormSubmission = !isEditing && !!initialDataForCreation?.isPlatformUser;
+  // DNI field is disabled if we are creating a new user (after DNI verification step) or editing an existing user
+  const shouldDisableDni = (!isEditing && !!initialDataForCreation?.dni) || isEditing;
+  const showPrePopulatedAlert = !isEditing && initialDataForCreation?.existingUserIsOtherType;
 
   return (
     <Form {...form}>
@@ -129,7 +130,7 @@ export function PlatformUserForm({
         {showPrePopulatedAlert && (
           <Alert variant="default" className="bg-blue-50 border-blue-200">
             <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-700">DNI Encontrado</AlertTitle>
+            <AlertTitle className="text-blue-700">DNI Encontrado como {initialDataForCreation?.existingUserType}</AlertTitle>
             <AlertDescription>
               Este DNI pertenece a un {initialDataForCreation?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Socio VIP'} existente.
               Se han pre-rellenado los datos conocidos. Por favor, complete y asigne un rol de plataforma.
@@ -149,7 +150,7 @@ export function PlatformUserForm({
                   disabled={isSubmitting || shouldDisableDni} 
                 />
               </FormControl>
-              {shouldDisableDni && <FormDescription className="text-xs">El DNI ha sido verificado y no puede cambiarse en este paso.</FormDescription>}
+              {shouldDisableDni && <FormDescription className="text-xs">El DNI ha sido verificado y no puede cambiarse en este paso (o al editar).</FormDescription>}
               <FormMessage />
             </FormItem>
           )}
@@ -161,7 +162,7 @@ export function PlatformUserForm({
             <FormItem>
               <FormLabel>Nombre Completo</FormLabel>
               <FormControl>
-                <Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting || disableFormSubmission} />
+                <Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -174,9 +175,9 @@ export function PlatformUserForm({
             <FormItem>
               <FormLabel>Email (para inicio de sesión)</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || (isEditing && !!user?.email) || disableFormSubmission} />
+                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || (isEditing && !!user?.email)} />
               </FormControl>
-              {isEditing && !!user?.email && <FormDescription className="text-xs">El email no se puede cambiar para usuarios existentes con un email ya asignado.</FormDescription>}
+              {isEditing && !!user?.email && <FormDescription className="text-xs">El email no se puede cambiar para usuarios existentes.</FormDescription>}
               <FormMessage />
             </FormItem>
           )}
@@ -186,7 +187,7 @@ export function PlatformUserForm({
           name="role"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Rol</FormLabel>
+              <FormLabel>Rol Principal de Plataforma</FormLabel>
               <Select 
                 onValueChange={(value) => {
                   field.onChange(value);
@@ -195,7 +196,7 @@ export function PlatformUserForm({
                   }
                 }} 
                 defaultValue={field.value} 
-                disabled={isSubmitting || disableFormSubmission}
+                disabled={isSubmitting}
               >
                 <FormControl>
                   <SelectTrigger>
@@ -210,6 +211,7 @@ export function PlatformUserForm({
                   <SelectItem value="host">Anfitrión</SelectItem>
                 </SelectContent>
               </Select>
+              <FormDescription className="text-xs">La gestión de múltiples roles se habilitará en futuras actualizaciones.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -223,8 +225,8 @@ export function PlatformUserForm({
                 <FormLabel>Negocio Asociado</FormLabel>
                 <Select 
                     onValueChange={field.onChange} 
-                    value={field.value || ""} // Ensure value is not undefined for Select
-                    disabled={isSubmitting || disableFormSubmission}
+                    value={field.value || ""} 
+                    disabled={isSubmitting}
                 >
                   <FormControl>
                     <SelectTrigger>
@@ -233,7 +235,7 @@ export function PlatformUserForm({
                   </FormControl>
                   <SelectContent>
                     {businesses.length === 0 ? (
-                         <FormItem><FormLabel className="p-2 text-sm text-muted-foreground">No hay negocios disponibles. Crea uno primero.</FormLabel></FormItem>
+                         <FormItem><FormLabel className="p-2 text-sm text-muted-foreground">No hay negocios disponibles.</FormLabel></FormItem>
                     ) : (
                         businesses.map(biz => (
                             <SelectItem key={biz.id} value={biz.id}>{biz.name}</SelectItem>
@@ -250,9 +252,9 @@ export function PlatformUserForm({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableFormSubmission}>
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? "Guardar Cambios" : "Crear Usuario de Plataforma"}
+            {isEditing ? "Guardar Cambios" : "Crear Perfil de Usuario"}
           </Button>
         </DialogFooter>
       </form>

@@ -1,13 +1,17 @@
 
 "use client"; 
 
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { BarChart2, Gift, ListChecks, LogOut, QrCode, Settings, UserCircle, DollarSign } from "lucide-react";
+import { BarChart2, Gift, ListChecks, LogOut, Settings, UserCircle, DollarSign, Menu } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons"; 
 import { cn } from "@/lib/utils";
-import { usePathname } from "next/navigation"; 
+import { usePathname, useRouter } from "next/navigation"; 
+import { useAuth } from "@/context/AuthContext";
+import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 
 const navItems = [
@@ -18,12 +22,13 @@ const navItems = [
 ];
 
 
-function PromoterSidebar() {
+function PromoterSidebarNav({ closeSheet }: { closeSheet?: () => void }) {
   const pathname = usePathname(); 
-  const promoterName = "Promotor Ejemplo"; // Mocked
+  const { userProfile } = useAuth();
+  const promoterName = userProfile?.name || "Promotor";
 
   return (
-    <aside className="w-60 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
+    <>
       <div className="p-4 border-b border-border flex items-center space-x-2">
         <UserCircle className="h-8 w-8 text-primary" />
         <div>
@@ -40,12 +45,21 @@ function PromoterSidebar() {
               "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
               pathname?.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
             )}
+            onClick={closeSheet} // Close sheet on navigation
           >
             <item.icon className="h-5 w-5" />
             <span>{item.label}</span>
           </Link>
         ))}
       </nav>
+    </>
+  );
+}
+
+function PromoterSidebar() {
+  return (
+    <aside className="w-60 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
+      <PromoterSidebarNav />
       <div className="p-4 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">© {new Date().getFullYear()} SocioVIP Promotor</p>
       </div>
@@ -59,8 +73,52 @@ export default function PromoterLayout({
 }: {
   children: React.ReactNode;
 }) {
-   // Mocked user info
-  const promoterUserName = "Promotor de Pandora";
+  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
+  const router = useRouter();
+  const [isSheetOpen, setIsSheetOpen] = React.useState(false);
+
+  useEffect(() => {
+    if (!loadingAuth && !currentUser) {
+      router.push("/login");
+    }
+  }, [currentUser, loadingAuth, router]);
+
+  if (loadingAuth || loadingProfile) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Cargando panel de promotor...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+         <p className="text-lg text-muted-foreground">Redirigiendo...</p>
+      </div>
+    );
+  }
+  
+  if (!userProfile || !userProfile.roles || !userProfile.roles.includes('promoter')) {
+     return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-destructive">Acceso Denegado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              No tienes los permisos necesarios para acceder al Panel de Promotor.
+            </CardDescription>
+            <Button onClick={() => router.push('/')} className="mt-6">
+              Ir a la Página Principal
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -70,24 +128,32 @@ export default function PromoterLayout({
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
           <div className="md:hidden">
-             <Button size="icon" variant="outline">
-                <ListChecks className="h-5 w-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
+             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetTrigger asChild>
+                    <Button size="icon" variant="outline">
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">Toggle Menu</span>
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-60 bg-card">
+                    <PromoterSidebarNav closeSheet={() => setIsSheetOpen(false)} />
+                     <div className="p-4 border-t border-border">
+                        <p className="text-xs text-muted-foreground text-center">© {new Date().getFullYear()} SocioVIP Promotor</p>
+                    </div>
+                </SheetContent>
+            </Sheet>
           </div>
           <div className="flex items-center gap-2">
             <SocioVipLogo className="h-7 w-7 text-primary" />
-            <h1 className="text-xl font-semibold text-primary">Panel Promotor SocioVIP</h1>
+            <h1 className="text-xl font-semibold text-primary">Panel Promotor</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
-              {promoterUserName}
+              {userProfile?.name || "Promotor"}
             </span>
-            <Button variant="outline" size="icon" asChild>
-              <Link href="/"> 
+            <Button variant="outline" size="icon" onClick={logout}>
                 <LogOut className="h-4 w-4" />
                 <span className="sr-only">Cerrar Sesión</span>
-              </Link>
             </Button>
           </div>
         </header>

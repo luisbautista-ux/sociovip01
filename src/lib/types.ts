@@ -63,21 +63,6 @@ export interface PromotionAnalyticsData {
   qrCodesUtilized: number;
 }
 
-export interface RegisteredClient { // This type might be deprecated in favor of QrClient or SocioVipMember directly
-  id: string;
-  name: string;
-  surname: string;
-  phone: string;
-  dob: string; 
-  dni: string; 
-  registrationDate: string; 
-  // Fields previously from UserData that are more VIP specific
-  address?: string;
-  profession?: string;
-  preferences?: string[];
-  loyaltyPoints?: number; 
-}
-
 export interface Business {
   id: string; // Firestore document ID
   name: string;
@@ -86,14 +71,16 @@ export interface Business {
   activePromotions: number; 
 }
 
+export type PlatformUserRole = 'superadmin' | 'business_admin' | 'staff' | 'promoter' | 'host';
+
 export interface PlatformUser {
   id: string; // Firestore document ID (this is separate from auth uid)
-  uid?: string; // Firebase Auth UID - this is the critical link to the auth user
-  dni: string; // NEW: Mandatory DNI/CE
+  uid: string; // Firebase Auth UID - this is the critical link to the auth user
+  dni: string; 
   name: string;
   email: string; 
-  role: 'superadmin' | 'business_admin' | 'staff' | 'promoter' | 'host';
-  businessId?: string | null; // Nullable if role doesn't require it (superadmin, promoter)
+  roles: PlatformUserRole[]; // Changed from role to roles (array)
+  businessId?: string | null; 
   lastLogin: string; // ISO date string
 }
 
@@ -211,10 +198,10 @@ export interface BusinessFormData {
 }
 
 export interface PlatformUserFormData {
-  dni: string; // NEW: Mandatory DNI/CE
+  dni: string; 
   name: string;
   email: string;
-  role: PlatformUser['role'];
+  role: PlatformUserRole; // The form will handle one role at a time for now
   businessId?: string;
 }
 
@@ -317,5 +304,4 @@ export interface BatchBoxFormData {
   description?: string; 
   status: 'available' | 'unavailable'; 
 }
-
     
