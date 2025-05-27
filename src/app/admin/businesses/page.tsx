@@ -9,58 +9,16 @@ import { Building, PlusCircle, Download, Search, Edit, Trash2, Loader2 } from "l
 import type { Business, BusinessFormData } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-// Mock API client (replace with actual API calls later)
-const apiClient = {
-  getBusinesses: async (): Promise<Business[]> => {
-    console.log("API CALL: apiClient.getBusinesses");
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // In a real scenario, this would fetch from your backend.
-    // For now, returning an empty array or a predefined mock list for testing loaded state.
-    // Example with a few items to see the table populated after loading:
-    // return [
-    //   { id: "biz1", name: "Pandora Lounge Bar (API)", contactEmail: "contacto@pandora.com", joinDate: "2023-01-15T12:00:00Z", activePromotions: 3 },
-    //   { id: "biz2", name: "El Rincón Bohemio (API)", contactEmail: "info@rinconbohemio.pe", joinDate: "2023-03-22T12:00:00Z", activePromotions: 5 },
-    // ];
-    return []; // Start with an empty list after loading
-  },
-  createBusiness: async (data: BusinessFormData): Promise<Business> => {
-    console.log("API CALL: apiClient.createBusiness", data);
-    await new Promise(resolve => setTimeout(resolve, 700));
-    const newBusiness: Business = {
-      id: `biz${Date.now()}`,
-      ...data,
-      joinDate: new Date().toISOString(),
-      activePromotions: 0,
-    };
-    // In a real app, the backend would return the created business, possibly with an ID from the DB.
-    return newBusiness;
-  },
-  updateBusiness: async (id: string, data: BusinessFormData): Promise<Business> => {
-    console.log("API CALL: apiClient.updateBusiness", id, data);
-    await new Promise(resolve => setTimeout(resolve, 700));
-    // This is a mock update. The actual update would happen on the server.
-    // For the frontend, we often get the updated object back or just a success status.
-    return {
-      id,
-      ...data,
-      joinDate: new Date().toISOString(), // Placeholder, original joinDate should be preserved
-      activePromotions: Math.floor(Math.random() * 5), // Placeholder
-    };
-  },
-  deleteBusiness: async (id: string): Promise<void> => {
-    console.log("API CALL: apiClient.deleteBusiness", id);
-    await new Promise(resolve => setTimeout(resolve, 700));
-    // No return value needed for delete, or perhaps a success status.
-  },
-};
+import { db } from "@/lib/firebase"; // Import Firestore instance
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 
+// No more mock apiClient, direct Firebase calls or via Server Actions later
 
 export default function AdminBusinessesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -68,13 +26,24 @@ export default function AdminBusinessesPage() {
   const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false); // For form submissions
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const fetchBusinesses = async () => {
+  const fetchBusinesses = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedBusinesses = await apiClient.getBusinesses();
+      const querySnapshot = await getDocs(collection(db, "businesses"));
+      const fetchedBusinesses: Business[] = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name,
+          contactEmail: data.contactEmail,
+          // Convert Firestore Timestamp to ISO string for joinDate if it exists
+          joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : new Date().toISOString(),
+          activePromotions: data.activePromotions || 0,
+        };
+      });
       setBusinesses(fetchedBusinesses);
     } catch (error) {
       console.error("Failed to fetch businesses:", error);
@@ -83,16 +52,15 @@ export default function AdminBusinessesPage() {
         description: "No se pudieron obtener los datos de los negocios. Intenta de nuevo.",
         variant: "destructive",
       });
-      setBusinesses([]); // Set to empty on error
+      setBusinesses([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchBusinesses();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchBusinesses]);
 
 
   const filteredBusinesses = businesses.filter(biz =>
@@ -128,12 +96,15 @@ export default function AdminBusinessesPage() {
   const handleCreateBusiness = async (data: BusinessFormData) => {
     setIsSubmitting(true);
     try {
-      // const newBusiness = await apiClient.createBusiness(data); // Real API call
-      // For mock, we simulate and then refetch or add locally for immediate UI update
-      await apiClient.createBusiness(data);
-      toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido programado para creación.` });
+      const newBusinessData = {
+        ...data,
+        joinDate: Timestamp.fromDate(new Date()), // Store as Firestore Timestamp
+        activePromotions: 0,
+      };
+      const docRef = await addDoc(collection(db, "businesses"), newBusinessData);
+      toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${docRef.id}.` });
       setShowCreateModal(false);
-      fetchBusinesses(); // Re-fetch the list from "server"
+      fetchBusinesses(); // Re-fetch the list
     } catch (error) {
       console.error("Failed to create business:", error);
       toast({ title: "Error al Crear", description: "No se pudo crear el negocio.", variant: "destructive"});
@@ -146,9 +117,14 @@ export default function AdminBusinessesPage() {
     if (!editingBusiness) return;
     setIsSubmitting(true);
     try {
-      // const updatedBusiness = await apiClient.updateBusiness(editingBusiness.id, data); // Real API call
-      await apiClient.updateBusiness(editingBusiness.id, data);
-      toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido programado para actualización.` });
+      const businessRef = doc(db, "businesses", editingBusiness.id);
+      // We only update fields present in BusinessFormData
+      await updateDoc(businessRef, {
+        name: data.name,
+        contactEmail: data.contactEmail,
+        // joinDate and activePromotions are not part of BusinessFormData, so they are not updated here
+      });
+      toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
       setEditingBusiness(null);
       fetchBusinesses(); // Re-fetch
     } catch (error) {
@@ -160,12 +136,11 @@ export default function AdminBusinessesPage() {
   };
   
   const handleDeleteBusiness = async (businessId: string, businessName?: string) => {
-    // To prevent accidental rapid clicks if delete also triggers a fetch
     if (isSubmitting) return; 
     setIsSubmitting(true);
     try {
-      await apiClient.deleteBusiness(businessId);
-      toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido programado para eliminación.`, variant: "destructive" });
+      await deleteDoc(doc(db, "businesses", businessId));
+      toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
       fetchBusinesses(); // Re-fetch
     } catch (error) {
       console.error("Failed to delete business:", error);
@@ -174,7 +149,6 @@ export default function AdminBusinessesPage() {
       setIsSubmitting(false);
     }
   };
-
 
   return (
     <div className="space-y-6">
@@ -186,7 +160,7 @@ export default function AdminBusinessesPage() {
           <Button onClick={handleExport} variant="outline" disabled={isLoading || businesses.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
+          <Button onClick={() => { setEditingBusiness(null); setShowCreateModal(true);}} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Negocio
           </Button>
         </div>
@@ -214,7 +188,7 @@ export default function AdminBusinessesPage() {
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <p className="ml-4 text-lg text-muted-foreground">Cargando negocios...</p>
             </div>
-          ) : filteredBusinesses.length === 0 && !searchTerm ? (
+          ) : businesses.length === 0 && !searchTerm ? (
             <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
               No hay negocios registrados. Haz clic en "Crear Negocio" para empezar.
             </p>
@@ -235,7 +209,7 @@ export default function AdminBusinessesPage() {
                     <TableRow key={biz.id}>
                       <TableCell className="font-medium">{biz.name}</TableCell>
                       <TableCell className="hidden md:table-cell">{biz.contactEmail}</TableCell>
-                      <TableCell>{format(new Date(biz.joinDate), "P", { locale: es })}</TableCell>
+                      <TableCell>{biz.joinDate ? format(new Date(biz.joinDate), "P", { locale: es }) : 'N/A'}</TableCell>
                       <TableCell className="text-center">{biz.activePromotions}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="icon" onClick={() => setEditingBusiness(biz)} disabled={isSubmitting}>
@@ -284,37 +258,30 @@ export default function AdminBusinessesPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+      <Dialog open={showCreateModal || !!editingBusiness} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setShowCreateModal(false);
+          setEditingBusiness(null);
+        } else if (!editingBusiness) { // Only set showCreateModal if not editing
+            setShowCreateModal(true);
+        }
+        // If editingBusiness is set, the dialog remains open via `!!editingBusiness`
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear Nuevo Negocio</DialogTitle>
-            <DialogDescription>Completa los detalles para registrar un nuevo negocio.</DialogDescription>
+            <DialogTitle>{editingBusiness ? `Editar Negocio: ${editingBusiness.name}` : "Crear Nuevo Negocio"}</DialogTitle>
+            <DialogDescription>{editingBusiness ? "Actualiza los detalles del negocio." : "Completa los detalles para registrar un nuevo negocio."}</DialogDescription>
           </DialogHeader>
           <BusinessForm 
-            onSubmit={handleCreateBusiness} 
-            onCancel={() => setShowCreateModal(false)}
+            business={editingBusiness || undefined} // Pass undefined if creating
+            onSubmit={editingBusiness ? handleEditBusiness : handleCreateBusiness} 
+            onCancel={() => { setShowCreateModal(false); setEditingBusiness(null);}}
             isSubmitting={isSubmitting}
           />
         </DialogContent>
       </Dialog>
-
-      {editingBusiness && (
-         <Dialog open={!!editingBusiness} onOpenChange={() => setEditingBusiness(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Negocio: {editingBusiness.name}</DialogTitle>
-               <DialogDescription>Actualiza los detalles del negocio.</DialogDescription>
-            </DialogHeader>
-            <BusinessForm 
-              business={editingBusiness} 
-              onSubmit={handleEditBusiness} 
-              onCancel={() => setEditingBusiness(null)}
-              isSubmitting={isSubmitting}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
 
+    
