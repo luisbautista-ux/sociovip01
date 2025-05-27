@@ -19,10 +19,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarShadcn } from "@/components/ui/calendar"; // Renamed to avoid conflict
 import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessEventFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -33,7 +33,7 @@ const eventFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
-  maxAttendance: z.coerce.number().int().min(0).optional().or(z.literal(undefined)), // Allow 0 for unlimited
+  // maxAttendance is no longer a direct form input here, it's calculated
   isActive: z.boolean().default(true),
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
   aiHint: z.string().optional(),
@@ -42,14 +42,15 @@ const eventFormSchema = z.object({
   path: ["endDate"],
 });
 
-type EventFormValues = z.infer<typeof eventFormSchema>;
+// This type is for what the form itself manages and submits
+type EventFormValues = Omit<BusinessEventFormData, 'maxAttendance'>;
+
 
 interface BusinessEventFormProps {
   event?: BusinessManagedEntity; 
-  onSubmit: (data: BusinessEventFormData) => void;
+  onSubmit: (data: EventFormValues) => void;
   onCancel?: () => void; 
   isSubmitting?: boolean;
-  submitButtonText?: string;
 }
 
 export function BusinessEventForm({ 
@@ -57,7 +58,6 @@ export function BusinessEventForm({
   onSubmit, 
   onCancel, 
   isSubmitting = false,
-  submitButtonText 
 }: BusinessEventFormProps) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
@@ -65,9 +65,8 @@ export function BusinessEventForm({
       name: event?.name || "",
       description: event?.description || "",
       termsAndConditions: event?.termsAndConditions || "",
-      startDate: event?.startDate ? new Date(event.startDate) : new Date(),
-      endDate: event?.endDate ? new Date(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
-      maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
+      startDate: event?.startDate ? parseISO(event.startDate) : new Date(),
+      endDate: event?.endDate ? parseISO(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
       aiHint: event?.aiHint || "",
@@ -75,26 +74,23 @@ export function BusinessEventForm({
   });
 
   React.useEffect(() => {
-    form.reset({
-      name: event?.name || "",
-      description: event?.description || "",
-      termsAndConditions: event?.termsAndConditions || "",
-      startDate: event?.startDate ? new Date(event.startDate) : new Date(),
-      endDate: event?.endDate ? new Date(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
-      maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
-      isActive: event?.isActive === undefined ? true : event.isActive,
-      imageUrl: event?.imageUrl || "",
-      aiHint: event?.aiHint || "",
-    });
+    if (event) {
+        form.reset({
+        name: event.name || "",
+        description: event.description || "",
+        termsAndConditions: event.termsAndConditions || "",
+        startDate: event.startDate ? parseISO(event.startDate) : new Date(),
+        endDate: event.endDate ? parseISO(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
+        isActive: event.isActive === undefined ? true : event.isActive,
+        imageUrl: event.imageUrl || "",
+        aiHint: event.aiHint || "",
+        });
+    }
   }, [event, form]);
 
 
   const handleSubmit = (values: EventFormValues) => {
-    const dataToSubmit: BusinessEventFormData = {
-        ...values,
-        maxAttendance: values.maxAttendance === undefined || values.maxAttendance === null || values.maxAttendance < 0 ? 0 : values.maxAttendance,
-    };
-    onSubmit(dataToSubmit); 
+    onSubmit(values); 
   };
 
   return (
@@ -150,7 +146,7 @@ export function BusinessEventForm({
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus />
+                    <CalendarShadcn mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
@@ -173,7 +169,7 @@ export function BusinessEventForm({
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={{ before: form.getValues("startDate") }} locale={es} initialFocus />
+                    <CalendarShadcn mode="single" selected={field.value} onSelect={field.onChange} disabled={{ before: form.getValues("startDate") }} locale={es} initialFocus />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
@@ -181,18 +177,17 @@ export function BusinessEventForm({
             )}
           />
         </div>
-        <FormField
-          control={form.control}
-          name="maxAttendance"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Aforo Máximo (Opcional)</FormLabel>
-              <FormControl><Input type="number" placeholder="Ej: 150 (0 para ilimitado)" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} disabled={isSubmitting} /></FormControl>
-               <FormDescription>Dejar en 0 o vacío para aforo ilimitado.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        
+        <div>
+          <FormLabel>Aforo Máximo (Calculado)</FormLabel>
+          <p className="text-sm font-medium mt-1">
+            {event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance < 0 ? '0 (o Ilimitado si no hay entradas con cantidad)' : event.maxAttendance}
+          </p>
+          <FormDescription className="text-xs">
+            Se calcula sumando las cantidades de los tipos de entrada definidos.
+          </FormDescription>
+        </div>
+
         <FormField
           control={form.control}
           name="imageUrl"
@@ -234,10 +229,10 @@ export function BusinessEventForm({
           )}
         />
         <DialogFooter className="pt-6">
-          {onCancel && <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button> }
+          {/* The main save/cancel buttons are in the parent Dialog managing tabs */}
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {submitButtonText || (event ? "Guardar Cambios en Detalles" : "Crear Evento")}
+             Actualizar Detalles del Evento
           </Button>
         </DialogFooter>
       </form>
