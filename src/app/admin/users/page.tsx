@@ -22,12 +22,21 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormM
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, writeBatch, getDoc, setDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, writeBatch, getDoc, setDoc, DocumentData } from "firebase/firestore";
 
 const DniEntrySchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 type DniEntryValues = z.infer<typeof DniEntrySchema>;
+
+interface CheckDniResult {
+  exists: boolean;
+  userType?: 'PlatformUser' | 'SocioVipMember' | 'QrClient';
+  platformUserRoles?: PlatformUserRole[];
+  platformUserData?: PlatformUser;
+  socioVipData?: SocioVipMember;
+  qrClientData?: QrClient;
+}
 
 
 export default function AdminUsersPage() {
@@ -68,16 +77,16 @@ export default function AdminUsersPage() {
           name: data.name,
           contactEmail: data.contactEmail, 
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : new Date(data.joinDate?.seconds * 1000 || Date.now()).toISOString(),
-          activePromotions: data.activePromotions || 0,
-          ruc: data.ruc,
-          razonSocial: data.razonSocial,
-          department: data.department,
-          province: data.province,
-          district: data.district,
-          address: data.address,
-          managerName: data.managerName,
-          managerDni: data.managerDni,
-          businessType: data.businessType,
+          activePromotions: data.activePromotions || 0, // Campo mantenido por compatibilidad, podría eliminarse
+          ruc: data.ruc || "",
+          razonSocial: data.razonSocial || "",
+          department: data.department || "",
+          province: data.province || "",
+          district: data.district || "",
+          address: data.address || "",
+          managerName: data.managerName || "",
+          managerDni: data.managerDni || "",
+          businessType: data.businessType || undefined,
         };
       });
       setAvailableBusinesses(fetchedBusinesses);
@@ -104,13 +113,13 @@ export default function AdminUsersPage() {
         let rolesArray: PlatformUserRole[] = [];
         if (data.roles && Array.isArray(data.roles)) {
             rolesArray = data.roles as PlatformUserRole[];
-        } else if (data.role && typeof data.role === 'string') { // Legacy support for single role string
+        } else if (data.role && typeof data.role === 'string') { 
             rolesArray = [data.role as PlatformUserRole];
         }
 
         return {
-          id: docSnap.id, // This is the Firestore document ID, which should be the same as uid after correct setup
-          uid: data.uid || docSnap.id, // Firebase Auth UID
+          id: docSnap.id,
+          uid: data.uid || docSnap.id, 
           dni: data.dni || "N/A",
           name: data.name || "Nombre no disponible",
           email: data.email,
@@ -118,15 +127,15 @@ export default function AdminUsersPage() {
           businessId: data.businessId || null,
           lastLogin: data.lastLogin instanceof Timestamp 
             ? data.lastLogin.toDate().toISOString() 
-            : (data.lastLogin ? (typeof data.lastLogin === 'string' ? parseISO(data.lastLogin).toISOString() : new Date(data.lastLogin?.seconds * 1000 || Date.now() - Math.random() * 10000000000).toISOString()) : new Date(Date.now() - Math.random() * 10000000000).toISOString()),
+            : (data.lastLogin ? (typeof data.lastLogin === 'string' ? parseISO(data.lastLogin).toISOString() : new Date(data.lastLogin?.seconds * 1000 || Date.now()).toISOString()) : new Date().toISOString()),
         };
       });
       setPlatformUsers(fetchedUsers);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fetch platform users:", error);
       toast({
         title: "Error al Cargar Usuarios",
-        description: "No se pudieron obtener los datos de los usuarios de plataforma.",
+        description: "No se pudieron obtener los datos de los usuarios de plataforma. Error: " + error.message,
         variant: "destructive",
       });
       setPlatformUsers([]);
@@ -158,7 +167,7 @@ export default function AdminUsersPage() {
       user.dni,
       user.name,
       user.email,
-      user.roles.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r] || r).join(', ') || "N/A",
+      user.roles.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ') || "N/A",
       user.businessId || "N/A",
       user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"
     ]);
@@ -174,47 +183,50 @@ export default function AdminUsersPage() {
     document.body.removeChild(link);
   };
   
-const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCreation> => {
-    let result: InitialDataForPlatformUserCreation = { dni, existingUserIsPlatformUser: false, existingPlatformUserRoles: [] };
+const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
+    let result: CheckDniResult = { exists: false };
+
+    if (!dniToVerify || typeof dniToVerify !== 'string' || dniToVerify.trim() === '') {
+      console.error("checkDniExists: DNI a verificar es inválido.", dniToVerify);
+      return result; // Devuelve 'no existe' si el DNI es inválido para la consulta
+    }
 
     // 1. Check platformUsers
-    const platformUsersQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
+    const platformUsersQuery = query(collection(db, "platformUsers"), where("dni", "==", dniToVerify));
     const platformUsersSnapshot = await getDocs(platformUsersQuery);
     if (!platformUsersSnapshot.empty) {
         const docData = platformUsersSnapshot.docs[0].data() as PlatformUser;
         const docId = platformUsersSnapshot.docs[0].id;
+        result.exists = true;
         result.userType = 'PlatformUser';
-        result.existingPlatformUser = { id: docId, ...docData, uid: docData.uid || docId }; // Ensure uid is present
-        result.existingPlatformUserRoles = docData.roles || [];
-        result.existingUserIsPlatformUser = true;
-        result.name = docData.name;
-        result.email = docData.email;
-        return result; // DNI already exists as a PlatformUser, primary finding
+        result.platformUserData = { id: docId, uid: docData.uid || docId, ...docData };
+        result.platformUserRoles = docData.roles || [];
+        return result; 
     }
 
     // 2. If not PlatformUser, check SocioVipMember
-    const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dni));
+    const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dniToVerify));
     const socioVipSnapshot = await getDocs(socioVipQuery);
     if (!socioVipSnapshot.empty) {
-      const data = socioVipSnapshot.docs[0].data() as SocioVipMember;
+      const docData = socioVipSnapshot.docs[0].data() as SocioVipMember;
+      result.exists = true;
       result.userType = 'SocioVipMember';
-      result.name = `${data.name} ${data.surname}`;
-      result.email = data.email; // SocioVIP members have an email
+      result.socioVipData = { id: socioVipSnapshot.docs[0].id, ...docData };
       return result;
     }
 
     // 3. If not PlatformUser or SocioVipMember, check QrClient
-    const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
+    const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dniToVerify));
     const qrClientSnapshot = await getDocs(qrClientQuery);
     if (!qrClientSnapshot.empty) {
-      const data = qrClientSnapshot.docs[0].data() as QrClient;
+      const docData = qrClientSnapshot.docs[0].data() as QrClient;
+      result.exists = true;
       result.userType = 'QrClient';
-      result.name = `${data.name} ${data.surname}`;
-      // QrClients might not have an email, so result.email will remain undefined if not set by SocioVIP
+      result.qrClientData = { id: qrClientSnapshot.docs[0].id, ...docData };
       return result;
     }
     
-    return result; // DNI is new or only exists in non-platform collections without being a platform user
+    return result; 
   };
 
 
@@ -231,38 +243,64 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
 
   const handleDniVerificationSubmit = async (values: DniEntryValues) => {
     if (isSubmitting) return;
-    setIsSubmitting(true); 
-    setDniForVerification(values.dni); 
     
-    const result = await checkDniExists(values.dni);
+    const dniToVerifyCleaned = values.dni.trim();
+    if (!dniToVerifyCleaned) {
+        toast({ title: "DNI Requerido", description: "Por favor, ingresa un DNI/CE válido.", variant: "destructive"});
+        return;
+    }
+
+    setIsSubmitting(true); 
+    setDniForVerification(dniToVerifyCleaned); 
+    
+    const result = await checkDniExists(dniToVerifyCleaned);
     setIsSubmitting(false);
     
-    if (result?.existingUserIsPlatformUser && result?.existingPlatformUser) {
-      setExistingPlatformUserToEdit(result.existingPlatformUser);
-      setExistingPlatformUserRoles(result.existingPlatformUserRoles || []);
-      setVerifiedDniResult(result); 
-      setShowDniIsPlatformUserAlert(true); 
-      setShowDniEntryModal(false); 
-    } else {
-      setVerifiedDniResult(result || { dni: values.dni, existingUserIsPlatformUser: false, existingPlatformUserRoles: [] });
-      setEditingUser(null); 
-      setShowDniEntryModal(false); 
-      setShowCreateEditModal(true); 
+    let initialData: InitialDataForPlatformUserCreation = { dni: dniToVerifyCleaned };
+
+    if (result.exists) {
+        if (result.userType === 'PlatformUser' && result.platformUserData) {
+            setExistingPlatformUserToEdit(result.platformUserData);
+            setExistingPlatformUserRoles(result.platformUserRoles || []);
+            initialData.existingPlatformUser = result.platformUserData;
+            initialData.existingPlatformUserRoles = result.platformUserRoles || [];
+            setShowDniIsPlatformUserAlert(true); 
+            setShowDniEntryModal(false); 
+            return; // Detener aquí, el admin decidirá en la alerta si edita
+        } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
+            initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
+            initialData.email = result.socioVipData.email;
+            initialData.preExistingUserType = 'SocioVipMember';
+        } else if (result.userType === 'QrClient' && result.qrClientData) {
+            initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
+            // QrClients no tienen email por defecto en el tipo
+            initialData.preExistingUserType = 'QrClient';
+        }
     }
+    
+    setVerifiedDniResult(initialData);
+    setEditingUser(null); 
+    setShowDniEntryModal(false); 
+    setShowCreateEditModal(true); 
   };
   
   const handleEditExistingPlatformUser = () => {
       setShowDniIsPlatformUserAlert(false); 
       if (existingPlatformUserToEdit) {
           setEditingUser(existingPlatformUserToEdit);
-          // verifiedDniResult is already set from the check
+          // verifiedDniResult ya contiene los datos del PlatformUser si se detectó en la verificación
+          setVerifiedDniResult({ 
+            dni: existingPlatformUserToEdit.dni,
+            existingPlatformUser: existingPlatformUserToEdit,
+            existingPlatformUserRoles: existingPlatformUserToEdit.roles
+          });
           setShowCreateEditModal(true); 
       }
       setExistingPlatformUserToEdit(null);
       setExistingPlatformUserRoles([]);
   };
 
-  const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditingUser: boolean) => {
+  const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -271,42 +309,45 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
       : data.businessId;
 
     try {
-      if (isEditingUser && editingUser) { // Editing existing user
-        const userRef = doc(db, "platformUsers", editingUser.uid); // Use uid as document ID
+      if (isEditing && editingUser) { 
+        const userRef = doc(db, "platformUsers", editingUser.uid); 
         
-        // Check if DNI is being changed and if the new DNI already exists for another user
         if (data.dni !== editingUser.dni) {
             const dniCheck = await checkDniExists(data.dni);
-            if (dniCheck.existingUserIsPlatformUser && dniCheck.existingPlatformUser?.uid !== editingUser.uid) {
+            if (dniCheck.exists && dniCheck.platformUserData?.uid !== editingUser.uid) {
                  toast({ title: "Error de DNI", description: `El DNI ${data.dni} ya está registrado para otro Usuario de Plataforma.`, variant: "destructive" });
                  setIsSubmitting(false);
                  return;
             }
         }
 
-        const userPayload: Partial<Omit<PlatformUser, 'id' | 'lastLogin'>> = { // id is doc id, lastLogin updated by server/triggers
+        const userPayload: Partial<Omit<PlatformUser, 'id' | 'lastLogin'>> = { 
           name: data.name,
-          // email: data.email, // Email (auth identifier) should ideally not be changed here unless auth also changes
           roles: data.roles,
           businessId: finalBusinessId,
           dni: data.dni,
+          // email no se actualiza desde aquí si ya está ligado a Auth
         };
         await updateDoc(userRef, userPayload);
         toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
-      } else { // Create new user
+      } else { 
         if (!data.uid || data.uid.trim() === "") {
             toast({ title: "Error", description: "El UID de Firebase Authentication es obligatorio para crear un nuevo usuario.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
 
-        // DNI uniqueness should have been handled by the DNI-first flow, but an extra check is fine.
-        // The more critical check here is that this UID isn't already in use as a document ID for platformUsers.
-        // Firestore's setDoc with a specific ID will overwrite if it exists, or create if it doesn't.
+        const dniForCreation = verifiedDniResult?.dni || data.dni; 
+        const dniCheck = await checkDniExists(dniForCreation);
+        if (dniCheck.exists && dniCheck.userType === 'PlatformUser') {
+           toast({ title: "Error", description: `El DNI ${dniForCreation} ya está registrado como Usuario de Plataforma. No se puede crear un duplicado.`, variant: "destructive" });
+           setIsSubmitting(false);
+           return;
+        }
 
-        const newUserPayload: Omit<PlatformUser, 'id'> & { lastLogin: any } = { // id will be data.uid
+        const newUserPayload: Omit<PlatformUser, 'id'> & { lastLogin: any } = { 
           uid: data.uid,
-          dni: data.dni,
+          dni: dniForCreation,
           name: data.name,
           email: data.email,
           roles: data.roles,
@@ -331,6 +372,8 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
       let description = "No se pudo guardar el usuario.";
       if (error.code === 'permission-denied') {
         description = "Error de permisos. Verifica las reglas de Firestore."
+      } else if (error.message.includes("Function where() called with invalid data")) {
+        description = "Error interno: datos inválidos para la consulta. Revisa el DNI.";
       }
       toast({ title: "Error al Guardar", description, variant: "destructive"});
     } finally {
@@ -338,13 +381,12 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
     }
   };
 
-  const handleDeleteUser = async (userIdToDelete: string, userUid: string, userName?: string) => {
-    // Note: userIdToDelete is the Firestore document ID, which should be the same as userUid
+  const handleDeleteUser = async (user: PlatformUser) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await deleteDoc(doc(db, "platformUsers", userIdToDelete));
-      toast({ title: "Perfil de Usuario Eliminado", description: `El perfil del usuario "${userName || 'seleccionado'}" ha sido eliminado de Firestore. UID: ${userUid}. Esto no elimina la cuenta de Firebase Authentication.`, variant: "destructive", duration: 10000 });
+      await deleteDoc(doc(db, "platformUsers", user.uid)); // Asumimos que user.uid es el ID del documento
+      toast({ title: "Perfil de Usuario Eliminado", description: `El perfil del usuario "${user.name}" ha sido eliminado.`, variant: "destructive", duration: 7000 });
       fetchPlatformUsers();
     } catch (error) {
       console.error("Failed to delete user:", error);
@@ -358,9 +400,9 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
     if (user.roles.includes('superadmin')) return "N/A (Super Admin)";
     if (user.roles.includes('promoter')) return "N/A (Promotor Global)";
     
-    const rolesThatRequireBusiness = user.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+    const rolesThatNeedBusiness = user.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
 
-    if (rolesThatRequireBusiness.length > 0 && !user.businessId) {
+    if (rolesThatNeedBusiness.length > 0 && !user.businessId) {
         return "Error: Negocio No Asignado";
     }
     if (user.businessId) {
@@ -436,7 +478,7 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
                         <TableCell>
                           {user.roles && user.roles.map(role => (
                               <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
-                                  {PLATFORM_USER_ROLE_TRANSLATIONS[role] || role}
+                                  {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
                               </Badge>
                           ))}
                         </TableCell>
@@ -445,7 +487,7 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => {
                               setEditingUser(user); 
-                              setVerifiedDniResult(null); 
+                              setVerifiedDniResult(null); // No es necesario para editar directamente
                               setShowCreateEditModal(true);
                           }} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />
@@ -469,7 +511,7 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
                               <AlertDialogFooter>
                                 <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => handleDeleteUser(user.id, user.uid, user.name)}
+                                  onClick={() => handleDeleteUser(user)}
                                   className="bg-destructive hover:bg-destructive/90"
                                   disabled={isSubmitting}
                                 >
@@ -512,7 +554,7 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
             </UIDialogDescription>
           </UIDialogHeader>
           <Form {...dniEntryForm}>
-            <form onSubmit={dniEntryForm.handleSubmit((data) => handleDniVerificationSubmit(data.dni))} className="space-y-4 py-2">
+            <form onSubmit={dniEntryForm.handleSubmit(handleDniVerificationSubmit)} className="space-y-4 py-2">
               <FormField
                 control={dniEntryForm.control}
                 name="dni"
@@ -557,8 +599,8 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
             <UIDialogDescription>
               {editingUser 
                 ? "Actualiza los detalles del perfil del usuario." 
-                : (verifiedDniResult?.existingUserIsPlatformUser
-                    ? "Este DNI ya está registrado como Usuario de Plataforma. No se puede crear un nuevo perfil aquí. Edite desde la lista principal si tiene los permisos."
+                : (verifiedDniResult?.existingPlatformUser
+                    ? "Este DNI ya está registrado como Usuario de Plataforma. No se puede crear un nuevo perfil aquí. Edite desde la lista principal si tiene los permisos, o cierre este diálogo y edite el perfil que se mostró en la alerta."
                     : "Completa los detalles para el perfil del usuario en Firestore. La cuenta de Firebase Authentication debe crearse/vincularse por separado (anotar el UID de Auth).")
               }
             </UIDialogDescription>
@@ -570,7 +612,7 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
             onSubmit={handleCreateOrEditUser}
             onCancel={() => { setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}
-            disableSubmitOverride={!editingUser && !!(verifiedDniResult?.existingUserIsPlatformUser)}
+            disableSubmitOverride={!editingUser && !!(verifiedDniResult?.existingPlatformUser)}
           />
         </UIDialogContent>
       </UIDialog>
@@ -582,7 +624,7 @@ const checkDniExists = async (dni: string): Promise<InitialDataForPlatformUserCr
                 <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI ya Registrado como Usuario de Plataforma
             </UIAlertDialogTitle>
             <AlertDialogDescription>
-              El DNI <span className="font-semibold">{dniForVerification}</span> ya está registrado en la Plataforma con el/los rol(es) de: <span className="font-semibold">{(existingPlatformUserRoles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r] || r).join(', ')}</span>.
+              El DNI <span className="font-semibold">{dniForVerification}</span> ya está registrado en la Plataforma con el/los rol(es) de: <span className="font-semibold">{(existingPlatformUserRoles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
               <br/><br/>
               ¿Desea editar este perfil de usuario existente?
             </AlertDialogDescription>
