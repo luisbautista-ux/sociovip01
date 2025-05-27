@@ -10,8 +10,18 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; 
-
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function HostLayout({
   children,
@@ -20,12 +30,11 @@ export default function HostLayout({
 }) {
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
-  const [isSheetOpen, setIsSheetOpen] = useState(false); 
-
-  const businessName = userProfile?.businessId && userProfile.name 
-    ? `${userProfile.name} (Anfitrión)` // This might need adjustment based on actual business name source
-    : "Anfitrión SocioVIP"; 
-  const hostUserName = userProfile?.name || "Anfitrión";
+  
+  // Get business name from associated business - requires fetching business details
+  // For now, using a placeholder or deriving from user profile if possible.
+  const businessDisplayName = userProfile?.businessId ? `Negocio ID: ${userProfile.businessId.substring(0,6)}...` : "SocioVIP Anfitrión";
+  const hostUserName = userProfile?.name || currentUser?.email || "Anfitrión";
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -43,13 +52,13 @@ export default function HostLayout({
   }
 
   if (!currentUser) {
-     return (
+    return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-         <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
+        <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
       </div>
     );
   }
-  
+
   if (loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -61,27 +70,27 @@ export default function HostLayout({
 
   if (!userProfile) {
     return (
-     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-       <Card className="w-full max-w-md text-center">
-         <CardHeader>
-           <CardTitle className="text-2xl text-destructive">Error de Perfil</CardTitle>
-         </CardHeader>
-         <CardContent>
-           <CardDescription>
-             No se encontró un perfil de usuario en la base de datos para tu cuenta (UID: {currentUser.uid}).
-             Este perfil es necesario para acceder al panel de anfitrión.
-           </CardDescription>
-           <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
-             Cerrar Sesión e Ir a Login
-           </Button>
-         </CardContent>
-       </Card>
-     </div>
-   );
- }
-  
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-2xl text-destructive">Error de Perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CardDescription>
+              No se encontró un perfil de usuario en la base de datos para tu cuenta (UID: {currentUser.uid}).
+              Asegúrate de que este UID esté correctamente vinculado a un perfil en la colección 'platformUsers'.
+            </CardDescription>
+            <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
+              Cerrar Sesión e Ir a Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('host')) {
-     return (
+    return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
@@ -89,7 +98,7 @@ export default function HostLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder al Panel de Anfitrión. 
+              No tienes los permisos necesarios para acceder al Panel de Anfitrión.
               Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
@@ -100,10 +109,10 @@ export default function HostLayout({
       </div>
     );
   }
-  
+
   if (!userProfile.businessId && userProfile.roles.includes('host')) {
     return (
-       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle className="text-2xl text-destructive">Configuración Incompleta</CardTitle>
@@ -124,34 +133,36 @@ export default function HostLayout({
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
-        {/* Mobile Menu Trigger (if Host panel grows to need a sidebar) */}
-        {/* 
-        <div className="md:hidden">
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetTrigger asChild>
-              <Button size="icon" variant="outline">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-60 bg-card">
-              <p className="p-4">Host Menu (Future)</p>
-            </SheetContent>
-          </Sheet>
-        </div> 
-        */}
         <div className="flex items-center gap-2">
           <SocioVipLogo className="h-7 w-7 text-primary" />
-          <h1 className="text-xl font-semibold text-primary">{businessName}</h1>
+          <h1 className="text-xl font-semibold text-primary">{businessDisplayName}</h1>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {hostUserName}
           </span>
-          <Button variant="outline" size="icon" onClick={logout} title="Cerrar Sesión">
-              <LogOut className="h-4 w-4" />
-              <span className="sr-only">Cerrar Sesión</span>
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="outline" size="icon" title="Cerrar Sesión">
+                    <LogOut className="h-4 w-4" />
+                    <span className="sr-only">Cerrar Sesión</span>
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>¿Cerrar Sesión?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    ¿Estás seguro de que quieres cerrar tu sesión de Anfitrión?
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">
+                    Sí, Cerrar Sesión
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </header>
       <main className="flex-1 p-4 sm:p-6 overflow-auto">
