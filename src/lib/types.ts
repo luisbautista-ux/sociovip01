@@ -74,12 +74,12 @@ export interface Business {
 export type PlatformUserRole = 'superadmin' | 'business_admin' | 'staff' | 'promoter' | 'host';
 
 export interface PlatformUser {
-  id: string; // Firestore document ID (this is separate from auth uid)
-  uid: string; // Firebase Auth UID - this is the critical link to the auth user
+  id: string; // Firestore document ID
+  uid: string; // Firebase Auth UID
   dni: string; 
   name: string;
   email: string; 
-  roles: PlatformUserRole[]; // Changed from role to roles (array)
+  roles: PlatformUserRole[]; 
   businessId?: string | null; 
   lastLogin: string; // ISO date string
 }
@@ -160,15 +160,15 @@ export interface PromoterProfile {
   name: string;
   email: string;
   phone?: string;
-  dni?: string; // Might be good to add DNI here too for consistency
+  dni?: string; 
 }
 
 export interface BusinessPromoterLink { 
   id: string; // Firestore document ID
   businessId: string;
-  promoterProfileId: string; // Links to PromoterProfile
-  promoterName: string; // Denormalized for easy display
-  promoterEmail: string; // Denormalized for easy display
+  promoterProfileId: string; 
+  promoterName: string; 
+  promoterEmail: string; 
   commissionRate?: string; 
   isActive: boolean;
   joinDate: string;
@@ -201,7 +201,7 @@ export interface PlatformUserFormData {
   dni: string; 
   name: string;
   email: string;
-  role: PlatformUserRole; // The form will handle one role at a time for now
+  roles: PlatformUserRole[]; // Changed from single role to array
   businessId?: string;
 }
 
@@ -255,7 +255,7 @@ export interface BusinessPromoterFormData {
   promoterName: string;
   promoterEmail: string;
   promoterPhone?: string;
-  promoterDni?: string; // Add DNI for linking/creating promoter profile
+  promoterDni?: string; 
   commissionRate?: string; 
 }
 
@@ -305,3 +305,14 @@ export interface BatchBoxFormData {
   status: 'available' | 'unavailable'; 
 }
     
+// For DNI verification flow in Admin Users
+export interface InitialDataForPlatformUserCreation {
+  dni: string;
+  name?: string; 
+  email?: string; 
+  existingUserType?: 'QrClient' | 'SocioVipMember' | 'PlatformUser'; // Added PlatformUser
+  existingUserIsOtherType?: boolean;
+  existingUserIsPlatformUser?: boolean;
+  existingPlatformUser?: PlatformUser; // Full PlatformUser data
+  existingPlatformUserRoles?: PlatformUserRole[]; // Roles if DNI is PlatformUser
+}
