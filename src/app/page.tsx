@@ -60,6 +60,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     promoCode: "VALIDNEW1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "cocktails party",
+    type: "promotion",
     termsAndConditions: "Válido para cocktails seleccionados. No acumulable con otras promociones. Máximo 2 promociones por mesa."
   },
   { 
@@ -70,6 +71,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     promoCode: "VALIDEXT1", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "vip club",
+    type: "promotion",
     termsAndConditions: "Presentar este QR en puerta. Aforo limitado. Dress code: Elegante."
   },
   { 
@@ -80,6 +82,7 @@ const MOCK_PROMOTIONS: PromotionDetails[] = [
     promoCode: "SALSACOOL", 
     imageUrl: "https://placehold.co/600x400.png",
     aiHint: "salsa dancing",
+    type: "promotion",
     termsAndConditions: "Un mojito gratis por persona al presentar este QR y pagar entrada al evento de salsa."
   },
 ];
@@ -91,7 +94,7 @@ const mockExistingQrClient: QrClient = {
   phone: "+51987654321",
   dob: "1990-05-15T12:00:00", 
   dni: "12345678",
-  registrationDate: "2024-01-10T10:00:00Z"
+  registrationDate: "2025-01-10T10:00:00Z"
 };
 
 const statusTranslations: { [key in QrCodeStatusGenerated]: string } = {
@@ -172,7 +175,7 @@ export default function HomePage() {
       setCurrentStepInModal("enterDni");
       dniForm.reset(); 
       setShowDniModal(true);
-      toast({ title: "Código Válido", description: `Para "${promotion.title}". Ingresa tu DNI.` });
+      toast({ title: "Código Válido", description: `Para la promoción: "${promotion.title}". Ingresa tu DNI.` });
     } else {
       toast({ title: "Error", description: "El código ingresado no es válido para esta promoción.", variant: "destructive" });
     }
@@ -191,7 +194,7 @@ export default function HomePage() {
         user: mockExistingQrClient,
         promotion: activePromotion,
         code: validatedPromoCode,
-        status: "available", 
+        status: "generated", 
       };
       setQrData(newQrData);
       setShowDniModal(false);
@@ -213,7 +216,7 @@ export default function HomePage() {
       user: qrClientData,
       promotion: activePromotion,
       code: validatedPromoCode,
-      status: "available",
+      status: "generated",
     };
     setQrData(newQrData);
     setShowDniModal(false);
@@ -293,24 +296,23 @@ export default function HomePage() {
       toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
       return;
     }
-
+  
     const businessName = "Pandora Lounge Bar"; 
-    const businessLogoUrl = "https://placehold.co/100x30.png"; 
+    const businessLogoUrl = "https://placehold.co/100x30.png"; // Placeholder logo
     const logoHeight = 30;
     const logoWidth = 100;
     const padding = 20;
-    const qrSize = 200; // Slightly smaller QR to make space
+    const qrSize = 180; // Slightly smaller QR to make space for text
     const titleLineHeight = 20;
     const textLineHeight = 18;
     const smallLineHeight = 14;
     let currentY = padding;
-
+  
     const canvas = document.createElement('canvas');
     
-    // Estimate height
     let estimatedHeight = padding; 
     if (businessLogoUrl) estimatedHeight += logoHeight + 5; 
-    estimatedHeight += titleLineHeight + 10; // Business Name
+    estimatedHeight += titleLineHeight + 5; // Business Name
     estimatedHeight += titleLineHeight + 10; // Promotion Title
     estimatedHeight += qrSize + 10; // QR Image
     estimatedHeight += 24 + 5; // User name (larger font)
@@ -339,19 +341,19 @@ export default function HomePage() {
         estimatedHeight += 10; 
     }
     estimatedHeight += padding; 
-
+  
     canvas.width = qrSize + 2 * padding;
     canvas.height = estimatedHeight;
-
+  
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       toast({ title: "Error", description: "No se pudo generar la imagen.", variant: "destructive" });
       return;
     }
-
+  
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+  
     const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number, font: string, color: string, textAlign: CanvasTextAlign = 'center') => {
         ctx.font = font;
         ctx.fillStyle = color;
@@ -394,44 +396,30 @@ export default function HomePage() {
             resolve();
         }
     });
-
+  
     await drawBusinessInfo;
-
+  
     // Business Name
-    ctx.font = 'bold 16px Arial';
-    ctx.fillStyle = '#333'; 
-    ctx.textAlign = 'center';
     currentY = drawWrappedText(businessName, canvas.width / 2, currentY, canvas.width - 2 * padding, titleLineHeight, 'bold 16px Arial', '#333');
     currentY += 5;
 
-    // Promotion Title
-    ctx.font = 'bold 14px Arial';
-    ctx.fillStyle = 'black';
-    currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, textLineHeight, 'bold 14px Arial', 'black');
+    // Promotion/Event Title
+    currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, titleLineHeight, 'bold 14px Arial', 'black');
     currentY += 10;
-
-
+  
     // QR Code Image
     const qrImg = new window.Image();
     qrImg.crossOrigin = "anonymous"; 
     qrImg.onload = () => {
       ctx.drawImage(qrImg, padding, currentY, qrSize, qrSize);
       currentY += qrSize + 10;
-
+  
       // Client Name and DNI
-      ctx.font = 'bold 20px Arial';
-      ctx.fillStyle = 'hsl(var(--primary))'; 
-      ctx.textAlign = 'center';
       currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY, canvas.width - 2 * padding, 24, 'bold 20px Arial', 'hsl(var(--primary))');
-      
-      ctx.font = '12px Arial';
-      ctx.fillStyle = 'black';
       currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY, canvas.width - 2 * padding, textLineHeight, '12px Arial', 'black');
       currentY += 10; 
-
+  
       // Promotion Valid Until
-      ctx.font = '12px Arial';
-      ctx.fillStyle = '#555';
       currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY, canvas.width - 2 * padding, textLineHeight, '12px Arial', '#555');
       currentY += 10;
       
@@ -442,7 +430,7 @@ export default function HomePage() {
       
       const link = document.createElement('a');
       link.href = canvas.toDataURL('image/png');
-      link.download = `SocioVIP_QR_Detalles_${qrData.code}.png`;
+      link.download = `SocioVIP_QR_${activePromotion.type}_${qrData.code}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -530,7 +518,9 @@ export default function HomePage() {
         <Card className="w-full max-w-md shadow-2xl">
           <CardHeader className="bg-primary text-primary-foreground rounded-t-lg">
             <CardTitle className="text-3xl text-center">¡Bienvenido!</CardTitle>
-            <CardDescription className="text-center text-primary-foreground/80">Tu QR para "{activePromotion.title}" está listo.</CardDescription>
+            <CardDescription className="text-center text-primary-foreground/80">
+              Tu QR para "{activePromotion.title}" está listo.
+            </CardDescription>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
             <div className="flex justify-center">
@@ -538,13 +528,13 @@ export default function HomePage() {
                 <Image
                   src={generatedQrDataUrl}
                   alt="QR Code"
-                  width={200} // Adjusted size
-                  height={200} // Adjusted size
+                  width={180} 
+                  height={180} 
                   className="rounded-lg shadow-lg border-4 border-primary"
                   data-ai-hint="qr code"
                 />
               ) : (
-                <div className="w-[200px] h-[200px] flex items-center justify-center border-4 border-dashed border-primary rounded-lg bg-muted">
+                <div className="w-[180px] h-[180px] flex items-center justify-center border-4 border-dashed border-primary rounded-lg bg-muted">
                   <p className="text-muted-foreground">Generando QR...</p>
                 </div>
               )}
@@ -558,13 +548,15 @@ export default function HomePage() {
             <div className="space-y-1 text-center">
               <h2 className="text-2xl font-semibold text-primary">{qrData.user.name} {qrData.user.surname}</h2>
               <p><strong className="font-medium">DNI/CE:</strong> {qrData.user.dni}</p>
-              <p className="flex items-center justify-center"><Gift className="mr-2 h-4 w-4 text-muted-foreground"/> {format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}</p>
             </div>
             
             <div className="space-y-3 border-t pt-4">
-              <h3 className="text-lg font-semibold text-primary flex items-center"><Ticket className="mr-2 h-5 w-5"/> Detalles de la Promoción</h3>
+              <h3 className="text-lg font-semibold text-primary flex items-center">
+                {activePromotion.type === 'event' ? <Ticket className="mr-2 h-5 w-5"/> : <Gift className="mr-2 h-5 w-5"/>}
+                {activePromotion.type === 'event' ? "Detalles del Evento" : "Detalles de la Promoción"}
+              </h3>
               <p><strong className="font-medium">Título:</strong> {activePromotion.title}</p>
-              <p><strong className="font-medium">Descripción:</strong> {activePromotion.description}</p>
+              
               <p className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Válido hasta:</strong> {format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}</p>
               <p className="flex items-center">
                 {renderStatusIcon(qrData.status as QrCodeStatusGenerated)}
@@ -580,12 +572,12 @@ export default function HomePage() {
 
             <div className="text-sm text-muted-foreground p-3 bg-secondary rounded-md flex items-start">
               <Info className="h-5 w-5 mr-2 mt-0.5 shrink-0"/>
-              <span>Presenta este QR en el establecimiento para validar tu promoción. Recuerda que este código es personal e intransferible.</span>
+              <span>Presenta este QR en el establecimiento para {activePromotion.type === 'event' ? "validar tu entrada" : "validar tu promoción"}. Recuerda que este código es personal e intransferible.</span>
             </div>
           </CardContent>
           <CardFooter className="flex-col space-y-3">
             <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" onClick={resetProcess}>
-              Ver Otras Promociones
+              Ver Otros Eventos y Promociones
             </Button>
           </CardFooter>
         </Card>
@@ -599,7 +591,7 @@ export default function HomePage() {
             </DialogTitle>
             <DialogDescription>
               {currentStepInModal === 'enterDni' 
-                ? `Para la promoción: "${activePromotion?.title}". Ingresa tu DNI o Carnet de Extranjería.`
+                ? `Para: "${activePromotion?.title}". Ingresa tu DNI o Carnet de Extranjería.`
                 : "Es la primera vez que usas un código con este DNI. Por favor, completa tu información básica."}
             </DialogDescription>
           </DialogHeader>

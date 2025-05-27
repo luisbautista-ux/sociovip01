@@ -8,6 +8,7 @@ export interface PromotionDetails { // For public display
   imageUrl: string;
   promoCode: string; // Unique code for this promotion, might be optional if QR is direct
   aiHint: string; // Hint for placeholder image
+  type: 'promotion' | 'event'; // To distinguish between promotion and event
   termsAndConditions?: string;
 }
 
@@ -27,7 +28,7 @@ export interface QrClient {
 // Data for the QR code itself, linking a QrClient to a Promotion (public page QR data)
 export interface QrCodeData {
   user: QrClient;
-  promotion: PromotionDetails; // The public view of the promotion
+  promotion: PromotionDetails; // The public view of the promotion/event
   code: string; // Validated promoCode used or a generated unique code for public flow
   status: 'generated' | 'utilized' | 'expired'; // Status for public flow QR
 }
@@ -117,14 +118,38 @@ export interface EventPromoterAssignment {
   notes?: string; // Event/Promotion specific notes for this promoter
 }
 
+export interface TicketType {
+  id: string;
+  businessId: string; 
+  eventId: string; 
+  name: string;
+  cost: number;
+  description?: string;
+  quantity?: number; // Max available for this type
+}
+
+export interface EventBox {
+  id: string;
+  businessId: string; 
+  eventId: string; 
+  name: string;
+  cost: number;
+  description?: string;
+  status: 'available' | 'unavailable';
+  capacity?: number; // How many people fit
+  sellerName?: string; 
+  ownerName?: string;  
+  ownerDni?: string;   
+}
+
 export interface BusinessManagedEntity { // Promotions, Events, Surveys created by a Business
   id: string;
   businessId: string;
   type: BusinessEntityType;
   name: string;
   description: string;
-  startDate: string; // ISO Date string e.g. "2024-08-01T12:00:00"
-  endDate: string; // ISO Date string e.g. "2024-12-31T12:00:00"
+  startDate: string; // ISO Date string e.g. "2025-08-01T12:00:00"
+  endDate: string; // ISO Date string e.g. "2025-12-31T12:00:00"
   usageLimit?: number; // Max number of times it can be used/redeemed (for promotions)
   maxAttendance?: number; // Max attendance for events
   isActive: boolean;
@@ -152,31 +177,6 @@ export interface BusinessPromoterLink { // How a Business links to a Promoter (G
   isActive: boolean;
   joinDate: string;
   promoterProfile?: PromoterProfile; 
-}
-
-
-export interface TicketType {
-  id: string;
-  businessId: string; 
-  eventId: string; 
-  name: string;
-  cost: number;
-  description?: string;
-  quantity?: number; // Max available for this type
-}
-
-export interface EventBox {
-  id: string;
-  businessId: string; 
-  eventId: string; 
-  name: string;
-  cost: number;
-  description?: string;
-  status: 'available' | 'unavailable';
-  capacity?: number; // How many people fit
-  sellerName?: string; 
-  ownerName?: string;  
-  ownerDni?: string;   
 }
 
 // Business Panel Client View Type
@@ -273,7 +273,7 @@ export interface PromoterCommissionEntry {
     commissionRate: string; // e.g. "S/ 2.50 por código" or "5% de venta"
     commissionEarned: number;
     paymentStatus: 'Pendiente' | 'Pagado';
-    period: string; // e.g. "Agosto 2024"
+    period: string; // e.g. "Agosto 2025"
 }
 
 // Form data for TicketType
