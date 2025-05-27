@@ -10,54 +10,14 @@ import type { PlatformUser, PlatformUserFormData, Business } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-// Mock businesses for the form selector - in a real app, this would be fetched
-const mockBusinessesForForm: Business[] = [
-  { id: "biz1", name: "Pandora Lounge Bar", contactEmail: "contacto@pandora.com", joinDate: "2023-01-15T00:00:00Z", activePromotions: 3 },
-  { id: "biz2", name: "El Rincón Bohemio", contactEmail: "info@rinconbohemio.pe", joinDate: "2023-03-22T00:00:00Z", activePromotions: 5 },
-  { id: "biz3", name: "La Noche Estrellada Cafe", contactEmail: "reservas@lanoche.com", joinDate: "2023-05-10T00:00:00Z", activePromotions: 2 },
-];
-
-const apiClient = {
-  getPlatformUsers: async (): Promise<PlatformUser[]> => {
-    console.log("API CALL: apiClient.getPlatformUsers");
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // Example: return initial empty list or a few users
-    // return [
-    //   { id: "su1", name: "Admin Principal (API)", email: "superadmin@sociovip.app", role: "superadmin", lastLogin: "2024-07-20T10:00:00Z" },
-    // ];
-    return [];
-  },
-  createPlatformUser: async (data: PlatformUserFormData): Promise<PlatformUser> => {
-    console.log("API CALL: apiClient.createPlatformUser", data);
-    await new Promise(resolve => setTimeout(resolve, 700));
-    const newUser: PlatformUser = {
-      id: `user${Date.now()}`,
-      ...data,
-      lastLogin: new Date().toISOString(),
-    };
-    return newUser;
-  },
-  updatePlatformUser: async (id: string, data: PlatformUserFormData): Promise<PlatformUser> => {
-    console.log("API CALL: apiClient.updatePlatformUser", id, data);
-    await new Promise(resolve => setTimeout(resolve, 700));
-    return {
-      id,
-      ...data,
-      lastLogin: new Date().toISOString(), // Placeholder, should preserve original
-    };
-  },
-  deletePlatformUser: async (id: string): Promise<void> => {
-    console.log("API CALL: apiClient.deletePlatformUser", id);
-    await new Promise(resolve => setTimeout(resolve, 700));
-  },
-};
-
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
 
 const roleTranslations: Record<PlatformUser['role'], string> = {
   superadmin: "Super Admin",
@@ -74,31 +34,70 @@ export default function AdminUsersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // In a real app, fetch businesses if needed, or pass them down if already available globally
-  const [availableBusinesses, setAvailableBusinesses] = useState<Business[]>(mockBusinessesForForm);
+  const [availableBusinesses, setAvailableBusinesses] = useState<Business[]>([]);
+  const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(true);
 
-  const fetchPlatformUsers = async () => {
+  const fetchBusinessesForForm = useCallback(async () => {
+    setIsLoadingBusinesses(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, "businesses"));
+      const fetchedBusinesses: Business[] = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          name: data.name,
+          contactEmail: data.contactEmail,
+          joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : new Date(data.joinDate).toISOString(),
+          activePromotions: data.activePromotions || 0,
+        };
+      });
+      setAvailableBusinesses(fetchedBusinesses);
+    } catch (error) {
+      console.error("Failed to fetch businesses for form:", error);
+      toast({
+        title: "Error al Cargar Negocios",
+        description: "No se pudieron obtener los negocios para el formulario.",
+        variant: "destructive",
+      });
+      setAvailableBusinesses([]);
+    } finally {
+      setIsLoadingBusinesses(false);
+    }
+  }, [toast]);
+
+  const fetchPlatformUsers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const fetchedUsers = await apiClient.getPlatformUsers();
+      const querySnapshot = await getDocs(collection(db, "platformUsers"));
+      const fetchedUsers: PlatformUser[] = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          businessId: data.businessId,
+          lastLogin: data.lastLogin instanceof Timestamp ? data.lastLogin.toDate().toISOString() : new Date(data.lastLogin).toISOString(),
+        };
+      });
       setPlatformUsers(fetchedUsers);
     } catch (error) {
       console.error("Failed to fetch platform users:", error);
       toast({
         title: "Error al Cargar Usuarios",
-        description: "No se pudieron obtener los datos de los usuarios. Intenta de nuevo.",
+        description: "No se pudieron obtener los datos de los usuarios.",
         variant: "destructive",
       });
       setPlatformUsers([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchPlatformUsers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    fetchBusinessesForForm();
+  }, [fetchPlatformUsers, fetchBusinessesForForm]);
 
   const filteredUsers = platformUsers.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -134,11 +133,17 @@ export default function AdminUsersPage() {
   const handleCreateUser = async (data: PlatformUserFormData) => {
     setIsSubmitting(true);
     try {
-      // const newUser = await apiClient.createPlatformUser(data);
-      await apiClient.createPlatformUser(data); // Mock call
-      toast({ title: "Usuario Creado", description: `El usuario "${data.name}" ha sido programado para creación.` });
+      const newUserPayload: any = {
+        ...data,
+        lastLogin: Timestamp.fromDate(new Date()),
+      };
+      if (data.role === 'superadmin' && newUserPayload.businessId) {
+        delete newUserPayload.businessId; // Superadmin shouldn't have businessId
+      }
+      await addDoc(collection(db, "platformUsers"), newUserPayload);
+      toast({ title: "Usuario Creado", description: `El usuario "${data.name}" ha sido creado.` });
       setShowCreateModal(false);
-      fetchPlatformUsers(); // Re-fetch
+      fetchPlatformUsers();
     } catch (error) {
       console.error("Failed to create user:", error);
       toast({ title: "Error al Crear", description: "No se pudo crear el usuario.", variant: "destructive"});
@@ -151,11 +156,15 @@ export default function AdminUsersPage() {
     if (!editingUser) return;
     setIsSubmitting(true);
     try {
-      // const updatedUser = await apiClient.updatePlatformUser(editingUser.id, data);
-      await apiClient.updatePlatformUser(editingUser.id, data); // Mock call
-      toast({ title: "Usuario Actualizado", description: `El usuario "${data.name}" ha sido programado para actualización.` });
+      const userRef = doc(db, "platformUsers", editingUser.id);
+      const updatedUserPayload: any = { ...data };
+       if (data.role === 'superadmin' && updatedUserPayload.businessId) {
+        updatedUserPayload.businessId = null; // or delete updatedUserPayload.businessId;
+      }
+      await updateDoc(userRef, updatedUserPayload);
+      toast({ title: "Usuario Actualizado", description: `El usuario "${data.name}" ha sido actualizado.` });
       setEditingUser(null);
-      fetchPlatformUsers(); // Re-fetch
+      fetchPlatformUsers();
     } catch (error) {
       console.error("Failed to update user:", error);
       toast({ title: "Error al Actualizar", description: "No se pudo actualizar el usuario.", variant: "destructive"});
@@ -166,11 +175,11 @@ export default function AdminUsersPage() {
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
     if (isSubmitting) return;
-    setIsSubmitting(true); // Use general isSubmitting for delete action as well
+    setIsSubmitting(true);
     try {
-      await apiClient.deletePlatformUser(userId);
-      toast({ title: "Usuario Eliminado", description: `El usuario "${userName || 'seleccionado'}" ha sido programado para eliminación.`, variant: "destructive" });
-      fetchPlatformUsers(); // Re-fetch
+      await deleteDoc(doc(db, "platformUsers", userId));
+      toast({ title: "Usuario Eliminado", description: `El usuario "${userName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
+      fetchPlatformUsers();
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast({ title: "Error al Eliminar", description: "No se pudo eliminar el usuario.", variant: "destructive"});
@@ -184,7 +193,6 @@ export default function AdminUsersPage() {
     return availableBusinesses.find(b => b.id === businessId)?.name || "Negocio Desconocido";
   };
 
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
@@ -195,7 +203,7 @@ export default function AdminUsersPage() {
            <Button onClick={handleExport} variant="outline" disabled={isLoading || platformUsers.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
+          <Button onClick={() => { setEditingUser(null); setShowCreateModal(true); }} className="bg-primary hover:bg-primary/90" disabled={isLoading || isLoadingBusinesses}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Usuario
           </Button>
         </div>
@@ -218,12 +226,12 @@ export default function AdminUsersPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading || isLoadingBusinesses ? (
              <div className="flex justify-center items-center h-60">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="ml-4 text-lg text-muted-foreground">Cargando usuarios...</p>
+              <p className="ml-4 text-lg text-muted-foreground">Cargando datos...</p>
             </div>
-          ) : filteredUsers.length === 0 && !searchTerm ? (
+          ) : platformUsers.length === 0 && !searchTerm ? (
              <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
               No hay usuarios registrados. Haz clic en "Crear Usuario" para empezar.
             </p>
@@ -253,11 +261,11 @@ export default function AdminUsersPage() {
                       <TableCell className="hidden lg:table-cell">{getBusinessName(user.businessId)}</TableCell>
                       <TableCell>{format(new Date(user.lastLogin), "P p", { locale: es })}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => setEditingUser(user)} disabled={isSubmitting}>
+                        <Button variant="ghost" size="icon" onClick={() => {setEditingUser(user); setShowCreateModal(false); /* ensure edit mode */ }} disabled={isSubmitting}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Editar</span>
                         </Button>
-                        {user.role !== 'superadmin' && ( // Prevent deleting superadmin
+                        {user.role !== 'superadmin' && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
@@ -301,38 +309,28 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+       <Dialog open={showCreateModal || !!editingUser} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setShowCreateModal(false);
+          setEditingUser(null);
+        } else if (!editingUser) { 
+            setShowCreateModal(true);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear Nuevo Usuario</DialogTitle>
-            <DialogDescription>Completa los detalles para registrar un nuevo usuario de plataforma.</DialogDescription>
+            <DialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Crear Nuevo Usuario"}</DialogTitle>
+            <DialogDescription>{editingUser ? "Actualiza los detalles del usuario." : "Completa los detalles para registrar un nuevo usuario de plataforma."}</DialogDescription>
           </DialogHeader>
           <PlatformUserForm 
+            user={editingUser || undefined}
             businesses={availableBusinesses}
-            onSubmit={handleCreateUser}
-            onCancel={() => setShowCreateModal(false)}
+            onSubmit={editingUser ? handleEditUser : handleCreateUser}
+            onCancel={() => { setShowCreateModal(false); setEditingUser(null);}}
             isSubmitting={isSubmitting}
           />
         </DialogContent>
       </Dialog>
-
-      {editingUser && (
-        <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Usuario: {editingUser.name}</DialogTitle>
-              <DialogDescription>Actualiza los detalles del usuario.</DialogDescription>
-            </DialogHeader>
-            <PlatformUserForm 
-              user={editingUser}
-              businesses={availableBusinesses}
-              onSubmit={handleEditUser}
-              onCancel={() => setEditingUser(null)}
-              isSubmitting={isSubmitting}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
