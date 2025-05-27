@@ -1,7 +1,7 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { BusinessManagedEntity } from "./types";
+import type { BusinessManagedEntity, TicketType } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -18,7 +18,7 @@ export function isEntityCurrentlyActivatable(entity: BusinessManagedEntity | nul
     const entityEndDateObj = new Date(entity.endDate);
 
     if (isNaN(entityStartDateObj.getTime()) || isNaN(entityEndDateObj.getTime())) {
-      console.error("Invalid date string for entity:", entity.name, entity.startDate, entity.endDate);
+      console.error("Invalid date string for entity:", entity?.name, entity?.startDate, entity?.endDate);
       return false; 
     }
 
@@ -30,7 +30,19 @@ export function isEntityCurrentlyActivatable(entity: BusinessManagedEntity | nul
     
     return today >= effectiveStartDate && today <= effectiveEndDate;
   } catch (error) {
-    console.error("Error parsing dates for entity:", entity.name, error);
+    console.error("Error parsing dates for entity:", entity?.name, error);
     return false;
   }
+}
+
+export function calculateMaxAttendance(ticketTypes: TicketType[] | undefined): number {
+  if (!ticketTypes || ticketTypes.length === 0) {
+    return 0; 
+  }
+  return ticketTypes.reduce((sum, ticket) => {
+    if (ticket.quantity && typeof ticket.quantity === 'number' && ticket.quantity > 0) {
+      return sum + ticket.quantity;
+    }
+    return sum;
+  }, 0);
 }
