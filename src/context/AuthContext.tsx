@@ -2,7 +2,7 @@
 "use client";
 
 import type { User as FirebaseUser } from "firebase/auth";
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { auth, db } from "@/lib/firebase"; 
 import { 
   onAuthStateChanged, 
@@ -13,7 +13,7 @@ import {
 } from "firebase/auth";
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
-import type { PlatformUser } from "@/lib/types"; 
+import type { PlatformUser, PlatformUserRole } from "@/lib/types"; 
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"; 
 
 interface AuthContextType {
@@ -22,7 +22,7 @@ interface AuthContextType {
   loadingAuth: boolean; 
   loadingProfile: boolean; 
   login: (email: string, pass: string) => Promise<UserCredential | AuthError>;
-  signup: (email: string, pass: string) => Promise<UserCredential | AuthError>;
+  signup: (email: string, pass: string, name?: string) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
 }
 
@@ -43,28 +43,40 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<PlatformUser | null>(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [hasMounted, setHasMounted] = useState(false); // State to track client-side mount
-  const router = useRouter();
+  const [loadingAuth, setLoadingAuth] = useState(true); 
+  const [loadingProfile, setLoadingProfile] = useState(false); 
+  
+  const router = useRouter(); 
 
   useEffect(() => {
-    setHasMounted(true); // Component has mounted on the client
-  }, []);
+    if (!auth) { 
+      console.error("AuthContext: Firebase Auth service is not available. Cannot set up auth listener.");
+      setLoadingAuth(false);
+      setLoadingProfile(false);
+      setCurrentUser(null);
+      setUserProfile(null);
+      return;
+    }
 
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log("AuthContext: onAuthStateChanged triggered. User:", user ? user.uid : null);
       setCurrentUser(user);
-      setLoadingAuth(false); 
+      setLoadingAuth(false); // Auth state known, primary loading done.
 
       if (user) {
-        setLoadingProfile(true); 
+        if (!db) { 
+            console.error("AuthContext: Firestore DB service is not available. Cannot fetch profile.");
+            setLoadingProfile(false);
+            setUserProfile(null);
+            return;
+        }
+        setLoadingProfile(true);
         setUserProfile(null); 
         try {
           const userDocRef = doc(db, "platformUsers", user.uid);
           const userDocSnap = await getDoc(userDocRef);
           
-          console.log("AuthContext: User UID from Auth:", user.uid); 
+          console.log("AuthContext: Attempting to fetch profile for UID:", user.uid);
           if (userDocSnap.exists()) {
             const profileDataFromDb = userDocSnap.data();
             console.log("AuthContext: Profile data fetched from Firestore:", profileDataFromDb);
@@ -72,79 +84,86 @@ export function AuthProvider({ children }: AuthProviderProps) {
             let rolesArray: PlatformUser['roles'] = [];
             if (profileDataFromDb.roles && Array.isArray(profileDataFromDb.roles)) {
               rolesArray = profileDataFromDb.roles;
-            } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') {
-              // Fallback for older data structure if 'role' was a string
-              rolesArray = [profileDataFromDb.role as PlatformUser['roles'][0]];
+            } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') { 
+              rolesArray = [profileDataFromDb.role as PlatformUserRole];
             } else {
-              console.warn(`AuthContext: User profile for UID ${user.uid} has missing or invalid 'roles' field. Defaulting to empty roles.`);
+              console.warn(`AuthContext: User profile for UID ${user.uid} has missing or invalid 'roles' field. Defaulting to empty roles array.`);
             }
 
             const profileData = { 
                 id: userDocSnap.id, 
                 uid: user.uid, 
-                roles: rolesArray,
-                ...profileDataFromDb 
+                ...profileDataFromDb,
+                roles: rolesArray, 
             } as PlatformUser;
             setUserProfile(profileData);
           } else {
-            console.warn(`AuthContext: PROFILE NOT FOUND in Firestore for UID: ${user.uid}. This user might need a profile created in 'platformUsers' collection with their UID and roles.`);
+            console.warn(`AuthContext: PROFILE NOT FOUND in Firestore for UID: ${user.uid}.`);
             setUserProfile(null); 
           }
         } catch (error) {
           console.error("AuthContext: Error fetching user profile:", error);
           setUserProfile(null);
         } finally {
-          setLoadingProfile(false); 
+          setLoadingProfile(false);
         }
-      } else {
+      } else { 
         setUserProfile(null); 
-        setLoadingProfile(false);
+        setLoadingProfile(false); 
       }
     });
-    return () => unsubscribe();
-  }, []);
 
-  const login = async (email: string, pass: string): Promise<UserCredential | AuthError> => {
+    return () => {
+      console.log("AuthContext: Unsubscribing from onAuthStateChanged");
+      unsubscribe();
+    };
+  }, []); 
+
+  const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
+    if (!auth) return { code: "auth/internal-error", message: "Firebase Auth not initialized" } as AuthError;
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       return userCredential;
     } catch (error) {
       return error as AuthError;
     }
-  };
+  }, []);
 
-  const signup = async (email: string, pass: string): Promise<UserCredential | AuthError> => {
+  const signup = useCallback(async (email: string, pass: string, name?: string): Promise<UserCredential | AuthError> => {
+    if (!auth || !db) return { code: "auth/internal-error", message: "Firebase Auth/DB not initialized" } as AuthError;
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       if (userCredential.user) {
         const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
-        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin'> & { lastLogin: any } = {
+        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'dni'> & { lastLogin: any; businessId: string | null; dni: string; } = {
           uid: userCredential.user.uid,
           email: userCredential.user.email || "",
-          name: userCredential.user.email?.split('@')[0] || "Super Admin",
-          roles: ['superadmin'],
-          dni: "", 
+          name: name || userCredential.user.email?.split('@')[0] || "Super Admin", // Use provided name or derive
+          roles: ['superadmin'], 
+          dni: "", // DNI can be empty initially for superadmin, to be filled later if needed
           businessId: null,
           lastLogin: serverTimestamp(),
         };
         await setDoc(userDocRef, newProfile);
+        console.log("AuthContext: Superadmin profile created in Firestore for UID:", userCredential.user.uid);
       }
       return userCredential;
     } catch (error) {
       return error as AuthError;
     }
-  };
+  }, [router]); // router is a stable dependency from next/navigation
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
+    if (!auth) return;
     try {
       await signOut(auth);
       router.push("/login"); 
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
     }
-  };
+  }, [router]); // router is a stable dependency
 
-  const value = {
+  const value = useMemo(() => ({
     currentUser,
     userProfile,
     loadingAuth,
@@ -152,11 +171,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     signup,
     logout,
-  };
-
-  if (!hasMounted) {
-    return null; // Or a global loading spinner
-  }
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
