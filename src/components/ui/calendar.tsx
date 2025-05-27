@@ -3,10 +3,12 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker, DropdownProps, type ButtonProps as RDPButtonProps } from "react-day-picker"
+import { DayPicker, DropdownProps, type ButtonProps as RDPButtonProps, type CaptionProps, useDayPicker, useNavigation } from "react-day-picker"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 
 import { cn } from "@/lib/utils"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "./select"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -16,53 +18,121 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
-
-  // Custom NavigationButton component for react-day-picker
-  // This component renders a div styled as a button to avoid <button> inside <button>
   const CustomNavigationButton = React.forwardRef<
     HTMLDivElement, // Renders a div
-    RDPButtonProps & { name?: 'previous-month' | 'next-month' } // react-day-picker's ButtonProps + name
-  >(({ className: rdpBtnClassName, children, ...rdpProps }, ref) => {
-    const isPrevious = rdpProps.name === 'previous-month';
-    const isNext = rdpProps.name === 'next-month';
+    RDPButtonProps & { name: 'previous-month' | 'next-month' } // name is always provided by DayPicker for its nav buttons
+  >(({ name, disabled, onClick, ...restButtonProps }, ref) => {
+    const Icon = name === 'previous-month' ? ChevronLeft : ChevronRight;
+    const dayPickerClassNames = props.classNames || {};
 
     return (
       <div
         ref={ref}
         role="button"
-        tabIndex={rdpProps.disabled ? -1 : 0}
-        aria-label={rdpProps['aria-label']}
+        tabIndex={disabled ? -1 : 0}
+        aria-label={restButtonProps['aria-label']}
         className={cn(
-          // Base styles from shadcn's original nav_button approach
           "h-7 w-7 flex items-center justify-center rounded-md border border-input bg-transparent p-0 text-sm font-medium",
           "hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          rdpProps.disabled ? "pointer-events-none opacity-50" : "cursor-pointer",
-          // Apply specific shadcn classes for previous/next positioning if available in classNames prop
-          isPrevious && classNames?.nav_button_previous,
-          isNext && classNames?.nav_button_next,
-          rdpBtnClassName // Include any classes passed by react-day-picker itself
+          disabled ? "pointer-events-none opacity-50" : "cursor-pointer",
+          name === 'previous-month' && dayPickerClassNames.nav_button_previous,
+          name === 'next-month' && dayPickerClassNames.nav_button_next
         )}
-        onClick={(e) => {
-          if (!rdpProps.disabled && rdpProps.onClick) {
-            // Cast event type if necessary, though often direct pass-through works
-            rdpProps.onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
+        onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+          if (!disabled && onClick) {
+            onClick(e);
           }
         }}
-        onKeyDown={(e) => {
+        onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => {
           if (e.key === 'Enter' || e.key === ' ') {
-            if (!rdpProps.disabled && rdpProps.onClick) {
-              e.preventDefault(); // Prevent default spacebar scroll
-              rdpProps.onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
+            if (!disabled && onClick) {
+              e.preventDefault();
+              (onClick as any)(e); // onClick expects MouseEvent but KeyboardEvent works
             }
           }
         }}
       >
-        {children} {/* This will be the ChevronLeft or ChevronRight icon */}
+        <Icon className="h-4 w-4" />
       </div>
     );
   });
   CustomNavigationButton.displayName = "CustomNavigationButton";
+
+  // Custom Caption component to use Shadcn Select for month/year
+  function CustomCaption(captionProps: CaptionProps) {
+    const { goToMonth, nextMonth, previousMonth, currentMonth } = useNavigation();
+    const { fromYear, fromMonth, fromDate, toYear, toMonth, toDate } = useDayPicker();
+
+    const handleYearChange = (value: string) => {
+      const newDate = new Date(currentMonth);
+      newDate.setFullYear(parseInt(value, 10));
+      goToMonth(newDate);
+    };
+
+    const handleMonthChange = (value: string) => {
+      const newDate = new Date(currentMonth);
+      newDate.setMonth(parseInt(value, 10));
+      goToMonth(newDate);
+    };
+    
+    const years: {label: string, value: string}[] = [];
+    const S_fromYear = fromYear || fromDate?.getFullYear() || new Date().getFullYear() - 100;
+    const S_toYear = toYear || toDate?.getFullYear() || new Date().getFullYear() + 0;
+
+    for (let i = S_fromYear; i <= S_toYear; i++) {
+      years.push({ label: i.toString(), value: i.toString() });
+    }
+
+    const months = Array.from({ length: 12 }, (_, i) => ({
+        value: i.toString(),
+        label: format(new Date(2000, i, 1), "LLLL", { locale: es }),
+    }));
+
+
+    return (
+      <div className="flex justify-between items-center px-2 py-1.5">
+         <CustomNavigationButton name="previous-month" onClick={() => previousMonth && goToMonth(previousMonth)} disabled={!previousMonth} aria-label="Mes anterior" />
+        <div className="flex gap-1">
+            <Select
+                value={currentMonth.getMonth().toString()}
+                onValueChange={handleMonthChange}
+            >
+                <SelectTrigger className="h-7 w-auto px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
+                    <SelectValue>{format(currentMonth, "LLLL", { locale: es })}</SelectValue>
+                </SelectTrigger>
+                <SelectContent position="popper">
+                    <SelectGroup>
+                        {months.map((month) => (
+                            <SelectItem key={month.value} value={month.value}>
+                                {month.label}
+                            </SelectItem>
+                        ))}
+                    </SelectGroup>
+                </SelectContent>
+            </Select>
+            <Select
+                value={currentMonth.getFullYear().toString()}
+                onValueChange={handleYearChange}
+            >
+                <SelectTrigger className="h-7 w-auto px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
+                    <SelectValue>{currentMonth.getFullYear()}</SelectValue>
+                </SelectTrigger>
+                <SelectContent position="popper">
+                     <SelectGroup>
+                        {years.map((year) => (
+                            <SelectItem key={year.value} value={year.value}>
+                                {year.label}
+                            </SelectItem>
+                        ))}
+                    </SelectGroup>
+                </SelectContent>
+            </Select>
+        </div>
+        <CustomNavigationButton name="next-month" onClick={() => nextMonth && goToMonth(nextMonth)} disabled={!nextMonth} aria-label="Mes siguiente" />
+      </div>
+    );
+  }
 
 
   return (
@@ -72,12 +142,12 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
-        caption_dropdowns: "flex justify-center gap-1",
-        nav: "space-x-1 flex items-center",
-        nav_button_previous: "absolute left-1", // For positioning of CustomNavigationButton
-        nav_button_next: "absolute right-1",   // For positioning of CustomNavigationButton
+        // caption: "flex justify-center pt-1 relative items-center", // Default caption style, we use CustomCaption
+        // caption_label: "text-sm font-medium", // Handled by CustomCaption
+        // caption_dropdowns: "flex justify-center gap-1", // Handled by CustomCaption
+        // nav: "space-x-1 flex items-center", // Handled by CustomCaption
+        nav_button_previous: "absolute left-1", // Used by CustomNavigationButton for positioning
+        nav_button_next: "absolute right-1",   // Used by CustomNavigationButton for positioning
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
@@ -100,50 +170,13 @@ function Calendar({
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
-        ...classNames, // Allow overriding these default classNames
+        ...classNames, 
       }}
       components={{
-        NavigationButton: CustomNavigationButton, // Override the navigation button
-        Dropdown: ({ value, onChange, children: dropdownChildren, ...dropdownProps }: DropdownProps) => {
-          const options = React.Children.toArray(
-            dropdownChildren
-          ) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[]
-          const selected = options.find((child) => child.props.value === value)
-          const handleChange = (newValue: string) => {
-            const changeEvent = {
-              target: { value: newValue },
-            } as React.ChangeEvent<HTMLSelectElement>
-            onChange?.(changeEvent)
-          }
-          return (
-            <Select
-              value={value?.toString()}
-              onValueChange={(newValue) => {
-                handleChange(newValue)
-              }}
-              {...(dropdownProps as Omit<React.ComponentProps<typeof Select>, 'value' | 'onValueChange'>)}
-            >
-              <SelectTrigger className="h-7 w-auto px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
-                <SelectValue>{selected?.props?.children}</SelectValue>
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <div className="max-h-48 overflow-y-auto">
-                  {options.map((option, id: number) => (
-                    <SelectItem
-                      key={`${option.props.value}-${id}`}
-                      value={option.props.value?.toString() ?? ""}
-                    >
-                      {option.props.children}
-                    </SelectItem>
-                  ))}
-                </div>
-              </SelectContent>
-            </Select>
-          )
-        },
-        // Pass the icons as children to our CustomNavigationButton
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
+        // NavigationButton: CustomNavigationButton, // Navigation buttons are now part of CustomCaption
+        Caption: CustomCaption, // This replaces the default caption and navigation
+        // IconLeft and IconRight are no longer directly used by DayPicker if Caption is fully custom
+        // But our CustomNavigationButton uses them if needed.
       }}
       {...props}
     />
@@ -152,3 +185,5 @@ function Calendar({
 Calendar.displayName = "Calendar"
 
 export { Calendar }
+
+    
