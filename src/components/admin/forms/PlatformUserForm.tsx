@@ -24,12 +24,18 @@ import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, In
 import { DialogFooter } from "@/components/ui/dialog";
 import { ALL_PLATFORM_USER_ROLES, PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 
-const platformUserFormSchema = z.object({
+const platformUserFormSchemaBase = z.object({
+  uid: z.string().optional(), // UID de Firebase Auth, opcional aquí porque puede ser para edición
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   roles: z.array(z.enum(ALL_PLATFORM_USER_ROLES)).min(1, { message: "Debes seleccionar al menos un rol."}),
   businessId: z.string().optional(),
+});
+
+// Refine for creation: UID must be present and have 28 characters
+const platformUserFormSchemaCreate = platformUserFormSchemaBase.extend({
+  uid: z.string().length(28, { message: "El UID de Firebase Authentication no es válido." }),
 }).refine(data => {
   const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
   if (rolesThatNeedBusiness.length > 0) {
@@ -41,7 +47,20 @@ const platformUserFormSchema = z.object({
   path: ["businessId"], 
 });
 
-type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
+// Refine for editing: UID is not part of the form values to be validated for length as it's not editable
+const platformUserFormSchemaEdit = platformUserFormSchemaBase.omit({ uid: true }).refine(data => {
+  const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+  if (rolesThatNeedBusiness.length > 0) {
+    return !!data.businessId && data.businessId.length > 0; 
+  }
+  return true; 
+}, {
+  message: "Debes seleccionar un negocio para los roles que lo requieren (Admin Negocio, Staff, Anfitrión).",
+  path: ["businessId"], 
+});
+
+
+type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase>;
 
 interface PlatformUserFormProps {
   user?: PlatformUser; 
@@ -66,9 +85,10 @@ export function PlatformUserForm({
   const isEditing = !!user;
 
   const form = useForm<PlatformUserFormValues>({
-    resolver: zodResolver(platformUserFormSchema),
+    resolver: zodResolver(isEditing ? platformUserFormSchemaEdit : platformUserFormSchemaCreate),
     defaultValues: {
-      dni:  initialDataForCreation?.dni || user?.dni || "",
+      uid: user?.uid || "", // Cargar UID si se está editando, no se muestra pero es parte del defaultValues
+      dni: initialDataForCreation?.dni || user?.dni || "",
       name: initialDataForCreation?.name || user?.name || "",
       email: initialDataForCreation?.email || user?.email || "",
       roles: initialDataForCreation?.existingPlatformUserRoles || user?.roles || [],
@@ -86,6 +106,7 @@ export function PlatformUserForm({
   React.useEffect(() => {
     if (isEditing && user) {
       form.reset({
+        uid: user.uid || "", // Aunque no se valide en edit, es bueno tenerlo en el form state
         dni: user.dni || "",
         name: user.name || "",
         email: user.email || "",
@@ -94,26 +115,41 @@ export function PlatformUserForm({
       });
     } else if (!isEditing && initialDataForCreation) {
       form.reset({
+        uid: "", // UID estará vacío para que el admin lo ingrese
         dni: initialDataForCreation.dni,
         name: initialDataForCreation.name || "",
         email: initialDataForCreation.email || "",
         roles: initialDataForCreation.existingPlatformUserRoles || [],
         businessId: initialDataForCreation.existingPlatformUser?.businessId || undefined,
       });
-    } else if (!isEditing && !initialDataForCreation) {
-        form.reset({ dni: "", name: "", email: "", roles: [], businessId: undefined });
+    } else if (!isEditing && !initialDataForCreation) { // Caso de DNI completamente nuevo
+        form.reset({ 
+          uid: "", // UID vacío para ingreso
+          dni: initialDataForCreation?.dni || "", // DNI ya verificado
+          name: "", 
+          email: "", 
+          roles: [], 
+          businessId: undefined 
+        });
     }
   }, [user, initialDataForCreation, isEditing, form]);
 
   React.useEffect(() => {
+    // Limpiar businessId si los roles seleccionados no lo requieren
     if (!showBusinessIdField && form.getValues('businessId')) {
       form.setValue('businessId', undefined, { shouldValidate: true });
     }
   }, [showBusinessIdField, form]);
 
   const handleSubmit = async (values: PlatformUserFormValues) => {
+    // UID para creación viene directamente de values.uid
+    // UID para edición no está en values si usamos platformUserFormSchemaEdit, se usa user.uid
     const dataToSubmit: PlatformUserFormData = { 
-      ...values, // Includes DNI, name, email, roles
+      uid: isEditing ? user.uid : values.uid, // Usar user.uid para edición, values.uid para creación
+      dni: values.dni,
+      name: values.name,
+      email: values.email,
+      roles: values.roles,
       businessId: showBusinessIdField ? values.businessId : undefined,
     };
     await onSubmit(dataToSubmit, isEditing);
@@ -137,6 +173,28 @@ export function PlatformUserForm({
             </AlertDescription>
           </Alert>
         )}
+        {!isEditing && (
+          <FormField
+            control={form.control}
+            name="uid"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Firebase Auth UID <span className="text-destructive">*</span></FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="UID de Firebase Authentication"
+                    {...field}
+                    disabled={isSubmitting}
+                  />
+                </FormControl>
+                <FormDescription className="text-xs">
+                  Crea primero el usuario en Firebase Authentication (Consola) y pega su UID aquí.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="dni"
@@ -149,6 +207,7 @@ export function PlatformUserForm({
                   {...field} 
                   maxLength={15}
                   disabled={isSubmitting || shouldDisableDni} 
+                  className={ (isSubmitting || shouldDisableDni) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}
                 />
               </FormControl>
               {shouldDisableDni && !isEditing && <FormDescription className="text-xs">El DNI ha sido verificado y no puede cambiarse en este paso.</FormDescription>}
@@ -177,7 +236,9 @@ export function PlatformUserForm({
             <FormItem>
               <FormLabel>Email (para inicio de sesión) <span className="text-destructive">*</span></FormLabel>
               <FormControl>
-                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || (isEditing && !!user?.email)} />
+                <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || (isEditing && !!user?.email)} 
+                 className={ (isSubmitting || (isEditing && !!user?.email)) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}
+                />
               </FormControl>
               {isEditing && !!user?.email && <FormDescription className="text-xs">El email no se puede cambiar para usuarios existentes con un email ya asignado.</FormDescription>}
               <FormMessage />
@@ -206,22 +267,9 @@ export function PlatformUserForm({
                           } else {
                             newRoles = currentRoles.filter((value) => value !== roleValue);
                           }
-                          
-                          if (roleValue === 'superadmin' && checked) {
-                            newRoles = ['superadmin']; // Superadmin is exclusive
-                          } else if (roleValue !== 'superadmin' && checked && newRoles.includes('superadmin')) {
-                            newRoles = newRoles.filter(r => r !== 'superadmin'); // Remove superadmin if other role is selected
-                          } else if (roleValue === 'superadmin' && !checked && newRoles.includes('superadmin')) {
-                            // If unchecking superadmin, it's already handled by filter
-                          } else if (newRoles.includes('superadmin') && newRoles.length > 1) {
-                             // If superadmin is already there and another is added, ensure superadmin is removed
-                             newRoles = newRoles.filter(r => r !== 'superadmin');
-                          }
-
-
                           field.onChange(newRoles);
                         }}
-                        disabled={isSubmitting || (roleValue !== 'superadmin' && watchedRoles?.includes('superadmin'))}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormLabel className="font-normal text-sm">
@@ -232,10 +280,10 @@ export function PlatformUserForm({
               />
             ))}
           </div>
-          <FormDescription className="text-xs">
-            Si selecciona "Super Admin", los otros roles se deseleccionarán.
+           <FormDescription className="text-xs">
+            Selecciona uno o más roles para el usuario.
           </FormDescription>
-          <FormMessage>{form.formState.errors.roles?.message}</FormMessage>
+          <FormMessage />
         </FormItem>
 
         {showBusinessIdField && (
