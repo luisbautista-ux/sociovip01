@@ -294,8 +294,8 @@ export default function HomePage() {
       return;
     }
 
-    const businessName = "Pandora Lounge Bar"; // Mock business name
-    const businessLogoUrl = "https://placehold.co/100x30.png?text=Pandora+Logo"; // Mock logo URL
+    const businessName = "Pandora Lounge Bar"; 
+    const businessLogoUrl = "https://placehold.co/100x30.png"; 
     const logoHeight = 30;
     const logoWidth = 100;
     const padding = 20;
@@ -305,33 +305,19 @@ export default function HomePage() {
     let currentY = padding;
 
     const canvas = document.createElement('canvas');
-    // Calculate canvas height dynamically
-    let estimatedHeight = padding; // Top padding
+    let estimatedHeight = padding; 
 
-    // Logo
     if (businessLogoUrl) {
-        estimatedHeight += logoHeight + 10; // Logo height + space after
+        estimatedHeight += logoHeight + 10; 
     }
-    // Business Name
-    estimatedHeight += lineHeight + 10; // Business name + space after
+    estimatedHeight += lineHeight + 10; 
+    estimatedHeight += qrSize + 10; 
+    estimatedHeight += 24 + 5; // User name (larger font)
+    estimatedHeight += lineHeight + 10; // User DNI + space after
+    estimatedHeight += lineHeight + 5; // Promotion Title
+    estimatedHeight += lineHeight + 5; // Promotion Description
+    estimatedHeight += lineHeight + 10; // Promotion Valid Until
     
-    // QR Code
-    estimatedHeight += qrSize + 10; // QR size + space after
-
-    // User Name
-    estimatedHeight += 24 + 10; // User name (larger font) + space after
-    // Promotion Title
-    estimatedHeight += lineHeight + 5;
-    // Promotion Description
-    estimatedHeight += lineHeight + 5;
-    // Promotion Valid Until
-    estimatedHeight += lineHeight + 10;
-    // User DNI
-    estimatedHeight += lineHeight + 5;
-    // User DOB
-    estimatedHeight += lineHeight + 10;
-
-    // Terms and Conditions
     if (activePromotion.termsAndConditions) {
         const tempCtx = canvas.getContext('2d');
         if (tempCtx) {
@@ -342,18 +328,18 @@ export default function HomePage() {
                 const testLine = line + word + ' ';
                 const metrics = tempCtx.measureText(testLine);
                 const testWidth = metrics.width;
-                if (testWidth > (qrSize + padding * 2 - 2 * padding) && line !== '') { // qrSize + padding * 2 is approx content width
+                if (testWidth > (qrSize + padding * 2 - 2 * padding) && line !== '') { 
                     estimatedHeight += smallLineHeight;
                     line = word + ' ';
                 } else {
                     line = testLine;
                 }
             }
-            estimatedHeight += smallLineHeight; // For the last line
+            estimatedHeight += smallLineHeight; 
         }
-        estimatedHeight += 10; // Space after terms
+        estimatedHeight += 10; 
     }
-    estimatedHeight += padding; // Bottom padding
+    estimatedHeight += padding; 
 
     canvas.width = qrSize + 2 * padding;
     canvas.height = estimatedHeight;
@@ -364,36 +350,33 @@ export default function HomePage() {
       return;
     }
 
-    // Background
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Function to draw wrapped text
     const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number, font: string, color: string, textAlign: CanvasTextAlign = 'center') => {
         ctx.font = font;
         ctx.fillStyle = color;
         ctx.textAlign = textAlign;
         const words = text.split(' ');
         let line = '';
-        let currentY = y;
+        let currentYPos = y;
         for (let n = 0; n < words.length; n++) {
             const testLine = line + words[n] + ' ';
             const metrics = ctx.measureText(testLine);
             const testWidth = metrics.width;
             if (testWidth > maxWidth && n > 0) {
-                ctx.fillText(line, x, currentY);
+                ctx.fillText(line, x, currentYPos);
                 line = words[n] + ' ';
-                currentY += lineHeight;
+                currentYPos += lineHeight;
             } else {
                 line = testLine;
             }
         }
-        ctx.fillText(line, x, currentY);
-        return currentY + lineHeight; // Return new Y position
+        ctx.fillText(line, x, currentYPos);
+        return currentYPos + lineHeight; 
     };
     
-    // Load and draw Business Logo
-    const drawBusinessInfo = new Promise<void>((resolve, reject) => {
+    const drawBusinessInfo = new Promise<void>((resolve) => {
         if (businessLogoUrl) {
             const logoImg = new window.Image();
             logoImg.crossOrigin = "anonymous";
@@ -405,9 +388,9 @@ export default function HomePage() {
             };
             logoImg.onerror = () => {
                 console.error("Failed to load business logo for canvas.");
-                resolve(); // Continue without logo if it fails
+                resolve(); 
             };
-            logoImg.src = businessLogoUrl;
+            logoImg.src = `${businessLogoUrl}?text=${encodeURIComponent(businessName.substring(0,10))}`;
         } else {
             resolve();
         }
@@ -415,54 +398,41 @@ export default function HomePage() {
 
     await drawBusinessInfo;
 
-    // Business Name
     ctx.font = 'bold 16px Arial';
-    ctx.fillStyle = '#333'; // Darker color for business name
+    ctx.fillStyle = '#333'; 
     ctx.textAlign = 'center';
     ctx.fillText(businessName, canvas.width / 2, currentY);
     currentY += lineHeight + 10;
 
-    // QR Image
     const qrImg = new window.Image();
     qrImg.crossOrigin = "anonymous"; 
     qrImg.onload = () => {
       ctx.drawImage(qrImg, padding, currentY, qrSize, qrSize);
       currentY += qrSize + 10;
 
-      // User Name (Larger, Primary Color)
       ctx.font = 'bold 20px Arial';
-      ctx.fillStyle = 'hsl(var(--primary))'; // Use primary color
+      ctx.fillStyle = 'hsl(var(--primary))'; 
       ctx.textAlign = 'center';
       ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
-      currentY += 24 + 10; // Adjusted for larger font
+      currentY += 24 + 5; 
 
-      // Promotion Title
-      ctx.font = 'bold 14px Arial';
+      ctx.font = '12px Arial';
       ctx.fillStyle = 'black';
+      ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+      currentY += lineHeight + 10; 
+
+      ctx.font = 'bold 14px Arial';
       currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, lineHeight, 'bold 14px Arial', 'black');
       currentY += 5;
 
-      // Promotion Description
       ctx.font = '12px Arial';
       ctx.fillStyle = '#555';
       currentY = drawWrappedText(activePromotion.description, canvas.width / 2, currentY, canvas.width - 2 * padding, lineHeight, '12px Arial', '#555');
       currentY += 5;
 
-      // Valid Until
       ctx.fillText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
       currentY += lineHeight + 10;
-
-      // User DNI
-      ctx.font = '12px Arial';
-      ctx.fillStyle = 'black';
-      ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
-      currentY += lineHeight + 5;
       
-      // User DOB
-      ctx.fillText(`Fecha Nac.: ${format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
-      currentY += lineHeight + 10;
-
-      // Terms and Conditions
       if (activePromotion.termsAndConditions) {
         currentY = drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding, smallLineHeight, '10px Arial', '#777');
       }
