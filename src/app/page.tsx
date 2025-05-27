@@ -297,45 +297,8 @@ export default function HomePage() {
       return;
     }
 
-    const businessName = "Pandora Lounge Bar";
-    const businessLogoUrl = "https://placehold.co/120x40.png"; 
-
-    const canvasWidth = 320; 
-    const padding = 20;
-    const lineHeightMultiplier = 1.3;
-
-    const maxLogoHeight = 50; 
-    const maxLogoWidth = canvasWidth - 2 * padding;
-
-    // Theme Colors
-    const headerColor = 'hsl(283, 44%, 53%)'; 
-    const headerTextColor = 'hsl(0, 0%, 98%)'; 
-    const primaryTextColor = 'hsl(283, 44%, 53%)';
-    const defaultTextColor = 'hsl(0, 0%, 3.9%)';
-    const mutedTextColor = 'hsl(0, 0%, 45.1%)';
-    const canvasBackgroundColor = 'hsl(280, 13%, 96%)'; // Light gray
-
-    // Font Sizes
-    const logoFontSize = 16; // Not used for image logo, but for placeholder text
-    const businessNameFontSize = 14;
-    const promoTitleFontSize = 18;
-    const userNameFontSize = 22;
-    const dniFontSize = 13;
-    const defaultTextFontSize = 13;
-    const smallTextFontSize = 11;
-
-    // QR and Layout
-    const qrDisplaySize = 180;
-    const qrBorderColor = primaryTextColor;
-    const qrBorderWidth = 2;
-
-    const spacingAfterLogo = 10; // Increased
-    const spacingAfterBusinessName = 10; // Space after business name, before promo title block
-    const spacingAfterPromoTitle = 15; // Space after promo title, before QR
-    const spacingBeforeQr = 15; // Space before QR (effectively after promo title)
-    const spacingAfterQr = 20; // Space after QR, before user name
-    const spacingAfterDni = 15; // Space after DNI, before valid until
-    const spacingAfterValidUntil = 10; // Space after valid until, before terms
+    const businessName = "Pandora Lounge Bar"; // Mock
+    const businessLogoUrl = "https://placehold.co/120x40.png"; // Mock, e.g., SocioVIP logo or business logo
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -343,6 +306,46 @@ export default function HomePage() {
       toast({ title: "Error", description: "No se pudo generar la imagen.", variant: "destructive" });
       return;
     }
+
+    // --- Configuration ---
+    const canvasWidth = 320; // Increased width
+    const padding = 20;
+    const lineHeightMultiplier = 1.3;
+
+    // Theme Colors (from globals.css or SocioVIP proposal)
+    const headerColor = 'hsl(283, 44%, 53%)'; // Vibrant Purple (Primary)
+    const headerTextColor = 'hsl(0, 0%, 98%)';  // White (Primary Foreground)
+    const primaryTextColor = 'hsl(283, 44%, 53%)'; // Vibrant Purple
+    const defaultTextColor = 'hsl(0, 0%, 3.9%)';  // Dark Gray / Black
+    const mutedTextColor = 'hsl(0, 0%, 45.1%)';   // Medium Gray
+    const canvasBackgroundColor = 'hsl(280, 13%, 96%)'; // Light Gray EAE4EC (adjusting HSL)
+
+    // Font Sizes
+    const businessNameFontSize = 14;
+    const promoTitleFontSize = 18;
+    const userNameFontSize = 22;
+    const dniFontSize = 13;
+    const defaultTextFontSize = 13;
+    const smallTextFontSize = 10; // For terms
+
+    // QR and Layout
+    const qrDisplaySize = 180; // Slightly reduced to make space
+    const qrBorderColor = primaryTextColor;
+    const qrBorderWidth = 2;
+
+    // Logo
+    const maxLogoHeight = 50; // Increased height for logo
+    const maxLogoWidth = canvasWidth - 2 * padding;
+
+    // Spacing constants
+    let spacingAfterLogo = 20; // Space between logo and business name text
+    const spacingAfterBusinessName = 40; // Space after the entire header block (logo+biz name) and before promo title
+    const spacingAfterPromoTitle = 15; // Space after promo title, before QR
+    const spacingBeforeQr = 10; // Reduced space before QR
+    const spacingAfterQr = 20; // Space after QR, before user name
+    const spacingAfterUserName = 5; // Space after user name, before DNI
+    const spacingAfterDni = 15; // Space after DNI, before valid until
+    const spacingAfterValidUntil = 10; // Space after valid until, before terms
 
     const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number, fontWeight: string, color: string, textAlign: CanvasTextAlign = 'center', fontName: string = 'Arial') => {
         ctx.font = `${fontWeight} ${fontSize}px ${fontName}`;
@@ -366,7 +369,7 @@ export default function HomePage() {
             }
         }
         ctx.fillText(line.trim(), x, currentYPos);
-        return currentYPos + actualLineHeight; 
+        return currentYPos + actualLineHeight / lineHeightMultiplier; // Return baseline of the last line drawn
     };
 
     const businessLogoImg = new window.Image();
@@ -380,77 +383,75 @@ export default function HomePage() {
             let actualLogoWidth = 0;
             if (businessLogoImg.naturalWidth > 0 && businessLogoImg.naturalHeight > 0) {
                 const aspectRatio = businessLogoImg.naturalWidth / businessLogoImg.naturalHeight;
-                if (businessLogoImg.naturalHeight > maxLogoHeight) {
-                    actualLogoHeight = maxLogoHeight;
-                    actualLogoWidth = actualLogoHeight * aspectRatio;
-                } else {
-                    actualLogoHeight = businessLogoImg.naturalHeight;
-                    actualLogoWidth = businessLogoImg.naturalWidth;
-                }
+                actualLogoHeight = maxLogoHeight;
+                actualLogoWidth = actualLogoHeight * aspectRatio;
                 if (actualLogoWidth > maxLogoWidth) {
                     actualLogoWidth = maxLogoWidth;
                     actualLogoHeight = actualLogoWidth / aspectRatio;
                 }
             }
 
-            // Calculate approximate header height
-            let headerContentHeight = actualLogoHeight > 0 ? actualLogoHeight + spacingAfterLogo : 0;
-            headerContentHeight += businessNameFontSize * lineHeightMultiplier; 
-            const headerTotalHeight = padding + headerContentHeight + padding;
-
-            // Calculate total canvas height dynamically
-            let calculatedHeight = 0;
-            calculatedHeight += headerTotalHeight;
-            calculatedHeight += spacingAfterBusinessName; // Space after the entire header block
-
-            // Promotion Title height
-            const tempCtx = document.createElement('canvas').getContext('2d')!;
-            tempCtx.font = `bold ${promoTitleFontSize}px Arial`;
-            const titleWords = activePromotion.title.split(' ');
-            let titleLine = '';
-            let titleLineCount = 1;
-            for (const word of titleWords) {
-                const testLine = titleLine + word + ' ';
-                if (tempCtx.measureText(testLine).width > (canvasWidth - 2 * padding) && titleLine !== '') {
-                    titleLineCount++;
-                    titleLine = word + ' ';
-                } else {
-                    titleLine = testLine;
-                }
+            // Calculate height needed for header content (logo + space + business name)
+            let headerContentInternalHeight = actualLogoHeight;
+            if (actualLogoHeight > 0) {
+                headerContentInternalHeight += spacingAfterLogo; // User-requested space
             }
-            calculatedHeight += (titleLineCount * promoTitleFontSize * lineHeightMultiplier);
-            calculatedHeight += spacingAfterPromoTitle; // Space after promo title before QR
+            headerContentInternalHeight += (businessNameFontSize * lineHeightMultiplier); // Approximate height for business name
+
+            const fullContentHeaderHeight = padding + headerContentInternalHeight + padding;
+            const headerBackgroundDrawnHeight = fullContentHeaderHeight - 15;
+
+
+            // --- Calculate total canvas height dynamically ---
+            let calculatedHeight = headerBackgroundDrawnHeight; // Start with the (potentially reduced) header background height
+            calculatedHeight += spacingAfterBusinessName; // Space after the header block (user requested 40)
+
+            // Promotion/Event Title height
+            const tempCtx = document.createElement('canvas').getContext('2d')!; // For text measurement
+            tempCtx.font = `bold ${promoTitleFontSize}px Arial`;
+            let lineCount = 1;
+            let currentLine = '';
+            activePromotion.title.split(' ').forEach(word => {
+                if (tempCtx.measureText(currentLine + word + ' ').width > canvasWidth - 2 * padding) {
+                    lineCount++;
+                    currentLine = word + ' ';
+                } else {
+                    currentLine += word + ' ';
+                }
+            });
+            calculatedHeight += (lineCount * promoTitleFontSize * lineHeightMultiplier);
+            calculatedHeight += spacingBeforeQr; // Space before QR
 
             // QR Image height
             calculatedHeight += qrDisplaySize + qrBorderWidth * 2;
-            calculatedHeight += spacingAfterQr;
+            calculatedHeight += spacingAfterQr; // Space after QR
 
             // User Name height
             calculatedHeight += userNameFontSize * lineHeightMultiplier;
+            calculatedHeight += spacingAfterUserName; // Space after user name before DNI
+
             // DNI height
             calculatedHeight += dniFontSize * lineHeightMultiplier;
-            calculatedHeight += spacingAfterDni;
+            calculatedHeight += spacingAfterDni; // Space after DNI
 
             // Valid Until height
             calculatedHeight += defaultTextFontSize * lineHeightMultiplier;
-            calculatedHeight += spacingAfterValidUntil;
+            calculatedHeight += spacingAfterValidUntil; // Space after valid until
 
             // Terms and Conditions height
             if (activePromotion.termsAndConditions) {
                 tempCtx.font = `normal ${smallTextFontSize}px Arial`;
-                const termsWords = activePromotion.termsAndConditions.split(' ');
-                let termsLine = '';
-                let termsLineCount = 1;
-                for (const word of termsWords) {
-                    const testLine = termsLine + word + ' ';
-                    if (tempCtx.measureText(testLine).width > (canvasWidth - 2 * padding - 10) && termsLine !== '') {
-                        termsLineCount++;
-                        termsLine = word + ' ';
+                lineCount = 1;
+                currentLine = '';
+                activePromotion.termsAndConditions.split(' ').forEach(word => {
+                    if (tempCtx.measureText(currentLine + word + ' ').width > canvasWidth - 2 * padding - 10) { // Slightly less width for terms
+                        lineCount++;
+                        currentLine = word + ' ';
                     } else {
-                        termsLine = testLine;
+                        currentLine += word + ' ';
                     }
-                }
-                calculatedHeight += (termsLineCount * smallTextFontSize * lineHeightMultiplier);
+                });
+                calculatedHeight += (lineCount * smallTextFontSize * lineHeightMultiplier);
             }
             calculatedHeight += padding; // Bottom padding
 
@@ -463,53 +464,55 @@ export default function HomePage() {
 
             // Draw Header Background
             ctx.fillStyle = headerColor;
-            ctx.fillRect(0, 0, canvas.width, headerTotalHeight);
+            ctx.fillRect(0, 0, canvas.width, headerBackgroundDrawnHeight);
 
-            let currentY = padding;
+            let currentY = padding; // Reset Y for drawing content within the header
 
-            // Draw Logo
+            // Draw Logo (centered)
             if (actualLogoWidth > 0 && actualLogoHeight > 0) {
-                const logoX = (canvasWidth - actualLogoWidth) / 2;
+                const logoX = (canvas.width - actualLogoWidth) / 2;
                 ctx.drawImage(businessLogoImg, logoX, currentY, actualLogoWidth, actualLogoHeight);
                 currentY += actualLogoHeight;
             } else {
-                currentY += maxLogoHeight; // Placeholder space if no logo image
+                currentY += maxLogoHeight; // Reserve space even if logo fails
             }
-            currentY += spacingAfterLogo; // Space between logo and business name
+            currentY += spacingAfterLogo; // Space between logo and business name text
 
-            // Draw Business Name (below logo)
-            currentY = drawWrappedText(businessName, canvasWidth / 2, currentY, canvasWidth - 2 * padding, businessNameFontSize, 'normal', headerTextColor);
+            // Draw Business Name (below logo, centered)
+            currentY = drawWrappedText(businessName, canvas.width / 2, currentY, canvas.width - 2 * padding, businessNameFontSize, 'normal', headerTextColor, 'center');
             
             // currentY is now at the bottom of the business name text.
-            // The effective start for content below the header is headerTotalHeight + spacingAfterBusinessName.
-            currentY = headerTotalHeight + spacingAfterBusinessName; 
+            // Set currentY for content AFTER the header background block
+            currentY = headerBackgroundDrawnHeight + spacingAfterBusinessName;
 
-            // Draw Promotion/Event Title
-            currentY = drawWrappedText(activePromotion.title, canvasWidth / 2, currentY, canvasWidth - 2 * padding, promoTitleFontSize, 'bold', primaryTextColor);
-            currentY += spacingBeforeQr; // Use specific spacing before QR
+            // Draw Promotion/Event Title (Centered)
+            currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, promoTitleFontSize, 'bold', primaryTextColor, 'center');
+            currentY += spacingBeforeQr; // Add space before QR
 
-            // Draw QR Image
-            const qrX = (canvasWidth - qrDisplaySize) / 2;
-            const qrY = currentY;
+            // Draw QR Image (Centered)
+            const qrX = (canvas.width - qrDisplaySize) / 2;
+            const qrY = currentY; // currentY is already at the correct position after title and spacing
             ctx.drawImage(qrImg, qrX, qrY, qrDisplaySize, qrDisplaySize);
             ctx.strokeStyle = qrBorderColor;
             ctx.lineWidth = qrBorderWidth;
             ctx.strokeRect(qrX - qrBorderWidth / 2, qrY - qrBorderWidth / 2, qrDisplaySize + qrBorderWidth, qrDisplaySize + qrBorderWidth);
             currentY += qrDisplaySize + qrBorderWidth * 2 + spacingAfterQr;
 
-            // Draw User Name
-            currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding, userNameFontSize, 'bold', primaryTextColor);
-            // Draw DNI (below user name)
-            currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding, dniFontSize, 'normal', defaultTextColor);
+            // Draw User Name (Centered)
+            currentY = drawWrappedText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY, canvas.width - 2 * padding, userNameFontSize, 'bold', primaryTextColor, 'center');
+            currentY += spacingAfterUserName;
+
+            // Draw DNI (Centered, below user name)
+            currentY = drawWrappedText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY, canvas.width - 2 * padding, dniFontSize, 'normal', defaultTextColor, 'center');
             currentY += spacingAfterDni;
 
-            // Draw Valid Until
-            currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding, defaultTextFontSize, 'normal', mutedTextColor);
+            // Draw Valid Until (Centered)
+            currentY = drawWrappedText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY, canvas.width - 2 * padding, defaultTextFontSize, 'normal', mutedTextColor, 'center');
             currentY += spacingAfterValidUntil;
 
-            // Draw Terms and Conditions
+            // Draw Terms and Conditions (Centered)
             if (activePromotion.termsAndConditions) {
-              drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvasWidth / 2, currentY, canvasWidth - 2 * padding - 10, smallTextFontSize, 'normal', mutedTextColor, 'center');
+              drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding - 10, smallTextFontSize, 'normal', mutedTextColor, 'center');
             }
 
             const link = document.createElement('a');
@@ -523,15 +526,9 @@ export default function HomePage() {
         };
         businessLogoImg.onerror = () => {
             console.error("Failed to load business logo for canvas. Drawing without it.");
-            // Attempt to draw placeholder text if logo fails
-            ctx.font = `bold ${logoFontSize}px Arial`;
-            ctx.fillStyle = headerTextColor;
-            ctx.textAlign = 'center';
-            // This drawing part is tricky here, ideally should be inside businessLogoImg.onload's "else" path
-            // For now, just proceed with onload logic which will leave a gap if image fails.
             businessLogoImg.onload!(); // Trigger onload logic even if image failed to load to continue canvas drawing
         };
-        businessLogoImg.src = `${businessLogoUrl}?text=${encodeURIComponent(businessName.substring(0,10))}&width=${maxLogoWidth}&height=${maxLogoHeight}`;
+        businessLogoImg.src = `${businessLogoUrl}?text=${encodeURIComponent(businessName.substring(0,10))}&width=${maxLogoWidth}&height=${maxLogoHeight}`; // Using placehold.co for mock logo
 
     };
     qrImg.onerror = () => {
