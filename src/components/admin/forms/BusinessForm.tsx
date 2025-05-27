@@ -22,68 +22,2329 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BUSINESS_TYPES } from "@/lib/constants";
 import { useState, useEffect } from "react";
 
-// Mock data for Peruvian locations - In a real app, this would come from an API or a larger static file
 // USUARIO: Por favor, completa esta lista con todos los departamentos, provincias y distritos de Perú.
+// La siguiente lista ha sido actualizada con los datos proporcionados por el usuario.
 const peruLocations = {
-  "Amazonas": {
-    "Bagua": ["Aramango", "Bagua", "Copallin", "El Parco", "Imaza", "La Peca"],
-    "Bongará": ["Chisquilla", "Churuja", "Corosha", "Cuispes", "Florida", "Jazan", "Jumbilla", "Recta", "San Carlos", "Shipasbamba", "Valera", "Yambrasbamba"],
-    "Chachapoyas": ["Asuncion", "Balsas", "Chachapoyas", "Cheto", "Chiliquin", "Chuquibamba", "Granada", "Huancas", "La Jalca", "Leimebamba", "Levanto", "Magdalena", "Mariscal Castilla", "Molinopampa", "Montevideo", "Olleros", "Quinjalca", "San Francisco de Daguas", "San Isidro de Maino", "Soloco", "Sonche"],
-    // ... más provincias y distritos de Amazonas
+  "AMAZONAS": {
+    "BAGUA": [
+      "ARAMANGO",
+      "BAGUA",
+      "COPALLIN",
+      "EL PARCO",
+      "IMAZA",
+      "LA PECA"
+    ],
+    "BONGARA": [
+      "CHISQUILLA",
+      "CHURUJA",
+      "COROSHA",
+      "CUISPES",
+      "FLORIDA",
+      "JAZAN",
+      "JUMBILLA",
+      "RECTA",
+      "SAN CARLOS",
+      "SHIPASBAMBA",
+      "VALERA",
+      "YAMBRASBAMBA"
+    ],
+    "CHACHAPOYAS": [
+      "ASUNCION",
+      "BALSAS",
+      "CHACHAPOYAS",
+      "CHETO",
+      "CHILIQUIN",
+      "CHUQUIBAMBA",
+      "GRANADA",
+      "HUANCAS",
+      "LA JALCA",
+      "LEIMEBAMBA",
+      "LEVANTO",
+      "MAGDALENA",
+      "MARISCAL CASTILLA",
+      "MOLINOPAMPA",
+      "MONTEVIDEO",
+      "OLLEROS",
+      "QUINJALCA",
+      "SAN FRANCISCO DE DAGUAS",
+      "SAN ISIDRO DE MAINO",
+      "SOLOCO",
+      "SONCHE"
+    ],
+    "CONDORCANQUI": [
+      "EL CENEPA",
+      "NIEVA",
+      "RIO SANTIAGO"
+    ],
+    "LUYA": [
+      "CAMPORREDONDO",
+      "COCABAMBA",
+      "COLCAMAR",
+      "CONILA",
+      "INGUILPATA",
+      "LAMUD",
+      "LONGUITA",
+      "LONYA CHICO",
+      "LUYA",
+      "LUYA VIEJO",
+      "MARIA",
+      "OCALLI",
+      "OCUMAL",
+      "PISUQUIA",
+      "PROVIDENCIA",
+      "SAN CRISTOBAL",
+      "SAN FRANCISCO DEL YESO",
+      "SAN JERONIMO",
+      "SAN JUAN DE LOPECANCHA",
+      "SANTA CATALINA",
+      "SANTO TOMAS",
+      "TRITA"
+    ],
+    "RODRIGUEZ DE MENDOZA": [
+      "CHIRIMOTO",
+      "COCHAMAL",
+      "HUAMBO",
+      "LIMABAMBA",
+      "LONGAR",
+      "MARISCAL BENAVIDES",
+      "MILPUC",
+      "OMIA",
+      "SAN NICOLAS",
+      "SANTA ROSA",
+      "TOTORA",
+      "VISTA ALEGRE"
+    ],
+    "UTCUBAMBA": [
+      "BAGUA GRANDE",
+      "CAJARURO",
+      "CUMBA",
+      "EL MILAGRO",
+      "JAMALCA",
+      "LONYA GRANDE",
+      "YAMON"
+    ]
   },
-  "Áncash": { 
-    "Huaraz": ["Huaraz", "Independencia", "Cochabamba"],
-    "Santa": ["Chimbote", "Coishco", "Nuevo Chimbote"]
-    // ... más provincias y distritos de Áncash
+  "ANCASH": {
+    "AIJA": [
+      "AIJA",
+      "CORIS",
+      "HUACLLAN",
+      "LA MERCED",
+      "SUCCHA"
+    ],
+    "ANTONIO RAYMONDI": [
+      "ACZO",
+      "CHACCHO",
+      "CHINGAS",
+      "LLAMELLIN",
+      "MIRGAS",
+      "SAN JUAN DE RONTOY"
+    ],
+    "ASUNCION": [
+      "ACOCHACA",
+      "CHACAS"
+    ],
+    "BOLOGNESI": [
+      "ABELARDO PARDO LEZAMETA",
+      "ANTONIO RAYMONDI",
+      "AQUIA",
+      "CAJACAY",
+      "CANIS",
+      "CHIQUIAN",
+      "COLQUIOC",
+      "HUALLANCA",
+      "HUASTA",
+      "LA PRIMAVERA",
+      "MANGAS",
+      "PACLLON",
+      "SAN MIGUEL DE CORPANQUI",
+      "TICLLOS"
+    ],
+    "CARHUAZ": [
+      "ACOPAMPA",
+      "AMASHCA",
+      "ANTA",
+      "ATAQUERO",
+      "CARHUAZ",
+      "MARCARA",
+      "PARIAHUANCA",
+      "SAN MIGUEL DE ACO",
+      "SHILLA",
+      "TINCO",
+      "YUNGAR"
+    ],
+    "CARLOS F. FITZCARRALD": [
+      "SAN LUIS",
+      "SAN NICOLAS",
+      "YAUYA"
+    ],
+    "CASMA": [
+      "BUENA VISTA ALTA",
+      "CASMA",
+      "COMANDANTE NOEL",
+      "YAUTAN"
+    ],
+    "CORONGO": [
+      "ACO",
+      "BAMBAS",
+      "CORONGO",
+      "CUSCA",
+      "LA PAMPA",
+      "YANAC",
+      "YUPAN"
+    ],
+    "HUARI": [
+      "ANRA",
+      "CAJAY",
+      "CHAVIN DE HUANTAR",
+      "HUACACHI",
+      "HUACCHIS",
+      "HUACHIS",
+      "HUANTAR",
+      "HUARI",
+      "MASIN",
+      "PAUCAS",
+      "PONTO",
+      "RAHUAPAMPA",
+      "RAPAYAN",
+      "SAN MARCOS",
+      "SAN PEDRO DE CHANA",
+      "UCO"
+    ],
+    "HUARMEY": [
+      "COCHAPETI",
+      "CULEBRAS",
+      "HUARMEY",
+      "HUAYAN",
+      "MALVAS"
+    ],
+    "HUARAZ": [
+      "COCHABAMBA",
+      "COLCABAMBA",
+      "HUANCHAY",
+      "HUARAZ",
+      "INDEPENDENCIA",
+      "JANGAS",
+      "LA LIBERTAD",
+      "OLLEROS",
+      "PAMPAS",
+      "PARIACOTO",
+      "PIRA",
+      "TARICA"
+    ],
+    "HUAYLAS": [
+      "CARAZ",
+      "HUALLANCA",
+      "HUATA",
+      "HUAYLAS",
+      "MATO",
+      "PAMPAROMAS",
+      "PUEBLO LIBRE",
+      "SANTA CRUZ",
+      "SANTO TORIBIO",
+      "YURACMARCA"
+    ],
+    "MARISCAL LUZURIAGA": [
+      "CASCA",
+      "ELEAZAR GUZMAN BARRON",
+      "FIDEL OLIVAS ESCUDERO",
+      "LLAMA",
+      "LLUMPA",
+      "LUCMA",
+      "MUSGA",
+      "PISCOBAMBA"
+    ],
+    "OCROS": [
+      "ACAS",
+      "CAJAMARQUILLA",
+      "CARHUAPAMPA",
+      "COCHAS",
+      "CONGAS",
+      "LLIPA",
+      "OCROS",
+      "SAN CRISTOBAL DE RAJAN",
+      "SAN PEDRO",
+      "SANTIAGO DE CHILCAS"
+    ],
+    "PALLASCA": [
+      "BOLOGNESI",
+      "CABANA",
+      "CONCHUCOS",
+      "HUACASCHUQUE",
+      "HUANDOVAL",
+      "LACABAMBA",
+      "LLAPO",
+      "PALLASCA",
+      "PAMPAS",
+      "SANTA ROSA",
+      "TAUCA"
+    ],
+    "POMABAMBA": [
+      "HUAYLLAN",
+      "PAROBAMBA",
+      "POMABAMBA",
+      "QUINUABAMBA"
+    ],
+    "RECUAY": [
+      "CATAC",
+      "COTAPARACO",
+      "HUAYLLAPAMPA",
+      "LLACLLIN",
+      "MARCA",
+      "PARARIN",
+      "RECUAY",
+      "TAPACOCHA",
+      "TICAPAMPA"
+    ],
+    "SANTA": [
+      "CACERES DEL PERU",
+      "CHIMBOTE",
+      "COISHCO",
+      "MACATE",
+      "MORO",
+      "NEPEÑA",
+      "NUEVO CHIMBOTE",
+      "SAMANCO",
+      "SANTA"
+    ],
+    "SIHUAS": [
+      "ACOBAMBA",
+      "ALFONSO UGARTE",
+      "CASHAPAMPA",
+      "CHINGALPO",
+      "HUAYLLABAMBA",
+      "QUICHES",
+      "RAGASH",
+      "SAN JUAN",
+      "SICSIBAMBA",
+      "SIHUAS"
+    ],
+    "YUNGAY": [
+      "CASCAPARA",
+      "MANCOS",
+      "MATACOTO",
+      "QUILLO",
+      "RANRAHIRCA",
+      "SHUPLUY",
+      "YANAMA",
+      "YUNGAY"
+    ]
   },
-  "Apurímac": {
-    "Abancay": ["Abancay", "Chacoche", "Circa", "Curahuasi", "Huanipaca", "Lambrama", "Pichirhua", "San Pedro de Cachora", "Tamburco"],
-    // ... más provincias y distritos de Apurímac
+  "APURIMAC": {
+    "ABANCAY": [
+      "ABANCAY",
+      "CHACOCHE",
+      "CIRCA",
+      "CURAHUASI",
+      "HUANIPACA",
+      "LAMBRAMA",
+      "PICHIRHUA",
+      "SAN PEDRO DE CACHORA",
+      "TAMBURCO"
+    ],
+    "ANDAHUAYLAS": [
+      "ANDAHUAYLAS",
+      "ANDARAPA",
+      "CHIARA",
+      "HUANCARAMA",
+      "HUANCARAY",
+      "HUAYANA",
+      "JOSE MARIA ARGUEDAS",
+      "KAQUIABAMBA",
+      "KISHUARA",
+      "PACOBAMBA",
+      "PACUCHA",
+      "PAMPACHIRI",
+      "POMACOCHA",
+      "SAN ANTONIO DE CACHI",
+      "SAN JERONIMO",
+      "SAN MIGUEL DE CHACCRAMPA",
+      "SANTA MARIA DE CHICMO",
+      "TALAVERA",
+      "TUMAY HUARACA",
+      "TURPO"
+    ],
+    "ANTABAMBA": [
+      "ANTABAMBA",
+      "EL ORO",
+      "HUAQUIRCA",
+      "JUAN ESPINOZA MEDRANO",
+      "OROPESA",
+      "PACHACONAS",
+      "SABAINO"
+    ],
+    "AYMARAES": [
+      "CAPAYA",
+      "CARAYBAMBA",
+      "CHALHUANCA",
+      "CHAPIMARCA",
+      "COLCABAMBA",
+      "COTARUSE",
+      "HUAYLLO",
+      "JUSTO APU SAHUARAURA",
+      "LUCRE",
+      "POCOHUANCA",
+      "SAN JUAN DE CHACÑA",
+      "SAÑAYCA",
+      "SORAYA",
+      "TAPAIRIHUA",
+      "TINTAY",
+      "TORAYA",
+      "YANACA"
+    ],
+    "CHINCHEROS": [
+      "ANCO-HUALLO",
+      "CHINCHEROS",
+      "COCHARCAS",
+      "HUACCANA",
+      "OCOBAMBA",
+      "ONGOY",
+      "RANRACANCHA",
+      "URANMARCA"
+    ],
+    "COTABAMBAS": [
+      "CHALLHUAHUACHO",
+      "COTABAMBAS",
+      "COYLLURQUI",
+      "HAQUIRA",
+      "MARA",
+      "TAMBOBAMBA"
+    ],
+    "GRAU": [
+      "CHUQUIBAMBILLA",
+      "CURASCO",
+      "CURPAHUASI",
+      "GAMARRA",
+      "HUAYLLATI",
+      "MAMARA",
+      "MICAELA BASTIDAS",
+      "PATAYPAMPA",
+      "PROGRESO",
+      "SAN ANTONIO",
+      "SANTA ROSA",
+      "TURPAY",
+      "VILCABAMBA",
+      "VIRUNDO"
+    ]
   },
-  "Arequipa": {
-    "Arequipa": ["Alto Selva Alegre", "Arequipa", "Cayma", "Cerro Colorado", "Characato", "Chiguata", "Jacobo Hunter", "Jose Luis Bustamante Y Rivero", "La Joya", "Mariano Melgar", "Miraflores", "Mollebaya", "Paucarpata", "Pocsi", "Polobaya", "Quequeña", "Sabandia", "Sachaca", "San Juan de Siguas", "San Juan de Tarucani", "Santa Isabel de Siguas", "Santa Rita de Siguas", "Socabaya", "Tiabaya", "Uchumayo", "Vitor", "Yanahuara", "Yarabamba", "Yura"],
-    // ... más provincias y distritos de Arequipa
+  "AREQUIPA": {
+    "AREQUIPA": [
+      "ALTO SELVA ALEGRE",
+      "AREQUIPA",
+      "CAYMA",
+      "CERRO COLORADO",
+      "CHARACATO",
+      "CHIGUATA",
+      "JACOBO HUNTER",
+      "JOSE LUIS BUSTAMANTE Y RIVERO",
+      "LA JOYA",
+      "MARIANO MELGAR",
+      "MIRAFLORES",
+      "MOLLEBAYA",
+      "PAUCARPATA",
+      "POCSI",
+      "POLOBAYA",
+      "QUEQUEÑA",
+      "SABANDIA",
+      "SACHACA",
+      "SAN JUAN DE SIGUAS",
+      "SAN JUAN DE TARUCANI",
+      "SANTA ISABEL DE SIGUAS",
+      "SANTA RITA DE SIGUAS",
+      "SOCABAYA",
+      "TIABAYA",
+      "UCHUMAYO",
+      "VITOR",
+      "YANAHUARA",
+      "YARABAMBA",
+      "YURA"
+    ],
+    "CAMANA": [
+      "CAMANA",
+      "JOSE MARIA QUIMPER",
+      "MARIANO NICOLAS VALCARCEL",
+      "MARISCAL CACERES",
+      "NICOLAS DE PIEROLA",
+      "OCOÑA",
+      "QUILCA",
+      "SAMUEL PASTOR"
+    ],
+    "CARAVELI": [
+      "ACARI",
+      "ATICO",
+      "ATIQUIPA",
+      "BELLA UNION",
+      "CAHUACHO",
+      "CARAVELI",
+      "CHALA",
+      "CHAPARRA",
+      "HUANUHUANU",
+      "JAQUI",
+      "LOMAS",
+      "QUICACHA",
+      "YAUCA"
+    ],
+    "CASTILLA": [
+      "ANDAGUA",
+      "APLAO",
+      "AYO",
+      "CHACHAS",
+      "CHILCAYMARCA",
+      "CHOCO",
+      "HUANCARQUI",
+      "MACHAGUAY",
+      "ORCOPAMPA",
+      "PAMPACOLCA",
+      "TIPAN",
+      "UÑON",
+      "URACA",
+      "VIRACO"
+    ],
+    "CAYLLOMA": [
+      "ACHOMA",
+      "CABANACONDE",
+      "CALLALLI",
+      "CAYLLOMA",
+      "CHIVAY",
+      "COPORAQUE",
+      "HUAMBO",
+      "HUANCA",
+      "ICHUPAMPA",
+      "LARI",
+      "LLUTA",
+      "MACA",
+      "MADRIGAL",
+      "MAJES",
+      "SAN ANTONIO DE CHUCA",
+      "SIBAYO",
+      "TAPAY",
+      "TISCO",
+      "TUTI",
+      "YANQUE"
+    ],
+    "CONDESUYOS": [
+      "ANDARAY",
+      "CAYARANI",
+      "CHICHAS",
+      "CHUQUIBAMBA",
+      "IRAY",
+      "RIO GRANDE",
+      "SALAMANCA",
+      "YANAQUIHUA"
+    ],
+    "ISLAY": [
+      "COCACHACRA",
+      "DEAN VALDIVIA",
+      "ISLAY",
+      "MEJIA",
+      "MOLLENDO",
+      "PUNTA DE BOMBON"
+    ],
+    "LA UNION": [
+      "ALCA",
+      "CHARCANA",
+      "COTAHUASI",
+      "HUAYNACOTAS",
+      "PAMPAMARCA",
+      "PUYCA",
+      "QUECHUALLA",
+      "SAYLA",
+      "TAURIA",
+      "TOMEPAMPA",
+      "TORO"
+    ]
   },
-  "Ayacucho": { /* ... */ },
-  "Cajamarca": { /* ... */ },
-  "Callao": { /* ... */ },
-  "Cusco": { /* ... */ },
-  "Huancavelica": { /* ... */ },
-  "Huánuco": { /* ... */ },
-  "Ica": { /* ... */ },
-  "Junín": { /* ... */ },
-  "La Libertad": { /* ... */ },
-  "Lambayeque": { /* ... */ },
-  "Lima": {
-    "Lima": ["Ancon", "Ate", "Barranco", "Breña", "Carabayllo", "Chaclacayo", "Chorrillos", "Cieneguilla", "Comas", "El Agustino", "Independencia", "Jesus Maria", "La Molina", "La Victoria", "Lima", "Lince", "Los Olivos", "Lurigancho", "Lurin", "Magdalena del Mar", "Miraflores", "Pachacamac", "Pucusana", "Pueblo Libre", "Puente Piedra", "Punta Hermosa", "Punta Negra", "Rimac", "San Bartolo", "San Borja", "San Isidro", "San Juan de Lurigancho", "San Juan de Miraflores", "San Luis", "San Martin de Porres", "San Miguel", "Santa Anita", "Santa Maria del Mar", "Santa Rosa", "Santiago de Surco", "Surquillo", "Villa El Salvador", "Villa Maria del Triunfo"],
-    "Barranca": ["Barranca", "Paramonga", "Pativilca", "Supe", "Supe Puerto"],
-    // ... más provincias de Lima
+  "AYACUCHO": {
+    "CANGALLO": [
+      "CANGALLO",
+      "CHUSCHI",
+      "LOS MOROCHUCOS",
+      "MARIA PARADO DE BELLIDO",
+      "PARAS",
+      "TOTOS"
+    ],
+    "HUAMANGA": [
+      "ACOCRO",
+      "ACOS VINCHOS",
+      "AYACUCHO",
+      "CARMEN ALTO",
+      "CHIARA",
+      "JESUS NAZARENO",
+      "OCROS",
+      "PACAYCASA",
+      "QUINUA",
+      "SAN JOSE DE TICLLAS",
+      "SAN JUAN BAUTISTA",
+      "SANTIAGO DE PISCHA",
+      "SOCOS",
+      "TAMBILLO",
+      "VINCHOS"
+    ],
+    "HUANCA SANCOS": [
+      "CARAPO",
+      "SACSAMARCA",
+      "SANCOS",
+      "SANTIAGO DE LUCANAMARCA"
+    ],
+    "HUANTA": [
+      "AYAHUANCO",
+      "HUAMANGUILLA",
+      "HUANTA",
+      "IGUAIN",
+      "LURICOCHA",
+      "SANTILLANA",
+      "SIVIA",
+      "CANAYRE",
+      "UCHURACCAY",
+      "PUCACOLPA"
+    ],
+    "LA MAR": [
+      "ANCO",
+      "AYNA",
+      "CHILCAS",
+      "CHUNGUI",
+      "LUIS CARRANZA",
+      "SAN MIGUEL",
+      "SANTA ROSA",
+      "TAMBO",
+      "SAMUGARI",
+      "ANCHIHUAY"
+    ],
+    "LUCANAS": [
+      "AUCARA",
+      "CABANA",
+      "CARMEN SALCEDO",
+      "CHAVIÑA",
+      "CHIPAO",
+      "HUAC-HUAS",
+      "LARAMATE",
+      "LEONCIO PRADO",
+      "LLAUTA",
+      "LUCANAS",
+      "OCAÑA",
+      "OTOCA",
+      "PUQUIO",
+      "SAISA",
+      "SAN CRISTOBAL",
+      "SAN JUAN",
+      "SAN PEDRO",
+      "SAN PEDRO DE PALCO",
+      "SANCOS",
+      "SANTA ANA DE HUAYCAHUACHO",
+      "SANTA LUCIA"
+    ],
+    "PARINACOCHAS": [
+      "CHUMPI",
+      "CORACORA",
+      "CORONEL CASTAÑEDA",
+      "PACAPAUSA",
+      "PULLO",
+      "PUYUSCA",
+      "SAN FRANCISCO DE RAVACAYCO",
+      "UPAHUACHO"
+    ],
+    "PAUCAR DEL SARA SARA": [
+      "COLTA",
+      "CORCULLA",
+      "LAMPA",
+      "MARCABAMBA",
+      "OYOLO",
+      "PARARCA",
+      "PAUSA",
+      "SAN JAVIER DEL ALPABAMBA",
+      "SAN JOSE DE USHUA",
+      "SARA SARA"
+    ],
+    "SUCRE": [
+      "BELEN",
+      "CHALCOS",
+      "CHILCAYOC",
+      "HUACAÑA",
+      "MORCOLLA",
+      "PAICO",
+      "QUEROBAMBA",
+      "SAN PEDRO DE LARCAY",
+      "SAN SALVADOR DE QUIJE",
+      "SANTIAGO DE PAUCARAY",
+      "SORAS"
+    ],
+    "VICTOR FAJARDO": [
+      "ALCAMENCA",
+      "APONGO",
+      "ASQUIPATA",
+      "CANARIA",
+      "CAYARA",
+      "COLCA",
+      "HUAMANQUIQUIA",
+      "HUANCAPI",
+      "HUANCARAYLLA",
+      "HUAYA",
+      "SARHUA",
+      "VILCANCHOS"
+    ],
+    "VILCAS HUAMAN": [
+      "ACCOMARCA",
+      "CARHUANCA",
+      "CONCEPCION",
+      "HUAMBALPA",
+      "INDEPENDENCIA",
+      "SAURAMA",
+      "VILCAS HUAMAN",
+      "VISCHONGO"
+    ]
   },
-  "Loreto": { /* ... */ },
-  "Madre de Dios": { /* ... */ },
-  "Moquegua": { /* ... */ },
-  "Pasco": { /* ... */ },
-  "Piura": { /* ... */ },
-  "Puno": { /* ... */ },
-  "San Martín": { /* ... */ },
-  "Tacna": { /* ... */ },
-  "Tumbes": { /* ... */ },
-  "Ucayali": { /* ... */ },
+  "CAJAMARCA": {
+    "CAJABAMBA": [
+      "CACHACHI",
+      "CAJABAMBA",
+      "CONDEBAMBA",
+      "SITACOCHA"
+    ],
+    "CAJAMARCA": [
+      "ASUNCION",
+      "CAJAMARCA",
+      "CHETILLA",
+      "COSPAN",
+      "ENCAÑADA",
+      "JESUS",
+      "LLACANORA",
+      "LOS BAÑOS DEL INCA",
+      "MAGDALENA",
+      "MATARA",
+      "NAMORA",
+      "SAN JUAN"
+    ],
+    "CELENDIN": [
+      "CELENDIN",
+      "CHUMUCH",
+      "CORTEGANA",
+      "HUASMIN",
+      "JORGE CHAVEZ",
+      "JOSE GALVEZ",
+      "MIGUEL IGLESIAS",
+      "OXAMARCA",
+      "SOROCHUCO",
+      "SUCRE",
+      "UTCO",
+      "LA LIBERTAD DE PALLAN"
+    ],
+    "CHOTA": [
+      "ANGUIA",
+      "CHADIN",
+      "CHALAMARCA",
+      "CHIGUIRIP",
+      "CHIMBAN",
+      "CHOROPAMPA",
+      "CHOTA",
+      "COCHABAMBA",
+      "CONCHAN",
+      "HUAMBOS",
+      "LAJAS",
+      "LLAMA",
+      "MIRACOSTA",
+      "PACCHA",
+      "PION",
+      "QUEROCOTO",
+      "SAN JUAN DE LICUPIS",
+      "TACABAMBA",
+      "TOCMOCHE"
+    ],
+    "CONTUMAZA": [
+      "CHILETE",
+      "CONTUMAZA",
+      "CUPISNIQUE",
+      "GUZMANGO",
+      "SAN BENITO",
+      "SANTA CRUZ DE TOLED",
+      "TANTARICA",
+      "YONAN"
+    ],
+    "CUTERVO": [
+      "CHOROS",
+      "CUTERVO",
+      "CUJILLO",
+      "LA RAMADA",
+      "PIMPINGOS",
+      "QUEROCOTILLO",
+      "SAN ANDRES DE CUTERVO",
+      "SAN JUAN DE CUTERVO",
+      "SAN LUIS DE LUCMA",
+      "SANTA CRUZ",
+      "SANTO DOMINGO DE LA CAPILLA",
+      "SANTO TOMAS",
+      "SOCOTA",
+      "TORIBIO CASANOVA"
+    ],
+    "HUALGAYOC": [
+      "BAMBAMARCA",
+      "CHUGUR",
+      "HUALGAYOC"
+    ],
+    "JAEN": [
+      "BELLAVISTA",
+      "CHONTALI",
+      "COLASAY",
+      "HUABAL",
+      "JAEN",
+      "LAS PIRIAS",
+      "POMAHUACA",
+      "PUCARA",
+      "SALLIQUE",
+      "SAN FELIPE",
+      "SAN JOSE DEL ALTO"
+    ],
+    "SAN IGNACIO": [
+      "CHIRINOS",
+      "HUARANGO",
+      "LA COIPA",
+      "NAMBALLE",
+      "SAN IGNACIO",
+      "SAN JOSE DE LOURDES",
+      "TABACONAS"
+    ],
+    "SAN MARCOS": [
+      "CHANCAY",
+      "EDUARDO VILLANUEVA",
+      "GREGORIO PITA",
+      "ICHOCAN",
+      "JOSE MANUEL QUIROZ",
+      "JOSE SABOGAL",
+      "PEDRO GALVEZ"
+    ],
+    "SAN MIGUEL": [
+      "BOLIVAR",
+      "CALQUIS",
+      "CATILLUC",
+      "EL PRADO",
+      "LA FLORIDA",
+      "LLAPA",
+      "NANCHOC",
+      "NIEPOS",
+      "SAN GREGORIO",
+      "SAN MIGUEL",
+      "SAN SILVESTRE DE CONCHAN",
+      "TONGOD",
+      "UNION AGUA BLANCA"
+    ],
+    "SAN PABLO": [
+      "SAN BERNARDINO",
+      "SAN LUIS",
+      "SAN PABLO",
+      "TUMBADEN"
+    ],
+    "SANTA CRUZ": [
+      "ANDABAMBA",
+      "CATACHE",
+      "CHANCAYBAÑOS",
+      "LA ESPERANZA",
+      "NINABAMBA",
+      "PULAN",
+      "SANTA CRUZ",
+      "SAUCEPAMPA",
+      "SEXI",
+      "UTICYACU",
+      "YAUYUCAN"
+    ]
+  },
+  "CALLAO": {
+    "CALLAO (PROV.CONST.)": [
+      "BELLAVISTA",
+      "CALLAO",
+      "CARMEN DE LA LEGUA REYNOSO",
+      "LA PERLA",
+      "LA PUNTA",
+      "VENTANILLLA",
+      "MI PERU"
+    ]
+  },
+  "CUSCO": {
+    "ACOMAYO": [
+      "ACOMAYO",
+      "ACOPIA",
+      "ACOS",
+      "MOSOC LLACTA",
+      "POMACANCHI",
+      "RONDOCAN",
+      "SANGARARA"
+    ],
+    "ANTA": [
+      "ANCAHUASI",
+      "ANTA",
+      "CACHIMAYO",
+      "CHINCHAYPUJIO",
+      "HUAROCONDO",
+      "LIMATAMBO",
+      "MOLLEPATA",
+      "PUCYURA",
+      "ZURITE"
+    ],
+    "CALCA": [
+      "CALCA",
+      "COYA",
+      "LAMAY",
+      "LARES",
+      "PISAC",
+      "SAN SALVADOR",
+      "TARAY",
+      "YANATILE"
+    ],
+    "CANAS": [
+      "CHECCA",
+      "KUNTURKANKI",
+      "LANGUI",
+      "LAYO",
+      "PAMPAMARCA",
+      "QUEHUE",
+      "TUPAC AMARU",
+      "YANAOCA"
+    ],
+    "CANCHIS": [
+      "CHECACUPE",
+      "COMBAPATA",
+      "MARANGANI",
+      "PITUMARCA",
+      "SAN PABLO",
+      "SAN PEDRO",
+      "SICUANI",
+      "TINTA"
+    ],
+    "CHUMBIVILCAS": [
+      "CAPACMARCA",
+      "CHAMACA",
+      "COLQUEMARCA",
+      "LIVITACA",
+      "LLUSCO",
+      "QUIÑOTA",
+      "SANTO TOMAS",
+      "VELILLE"
+    ],
+    "CUSCO": [
+      "CCORCA",
+      "CUSCO",
+      "POROY",
+      "SAN JERONIMO",
+      "SAN SEBASTIAN",
+      "SANTIAGO",
+      "SAYLLA",
+      "WANCHAQ"
+    ],
+    "ESPINAR": [
+      "ALTO PICHIGUA",
+      "CONDOROMA",
+      "COPORAQUE",
+      "ESPINAR",
+      "OCORURO",
+      "PALLPATA",
+      "PICHIGUA",
+      "SUYCKUTAMBO"
+    ],
+    "LA CONVENCION": [
+      "ECHARATE",
+      "HUAYOPATA",
+      "INKAWASI",
+      "MARANURA",
+      "OCOBAMBA",
+      "QUELLOUNO",
+      "QUIMBIRI",
+      "SANTA ANA",
+      "SANTA TERESA",
+      "VILCABAMBA",
+      "PICHARI",
+      "KIMBIRI",
+      "MEGANTONI",
+      "VILLA KINTIARINA",
+      "VILLA VIRGEN"
+    ],
+    "PARURO": [
+      "ACCHA",
+      "CCAPI",
+      "COLCHA",
+      "HUANOQUITE",
+      "OMACHA",
+      "PACCARITAMBO",
+      "PARURO",
+      "PILLPINTO",
+      "YAURISQUE"
+    ],
+    "PAUCARTAMBO": [
+      "CAICAY",
+      "CHALLABAMBA",
+      "COLQUEPATA",
+      "HUANCARANI",
+      "KOSÑIPATA",
+      "PAUCARTAMBO"
+    ],
+    "QUISPICANCHI": [
+      "ANDAHUAYLILLAS",
+      "CAMANTI",
+      "CCARHUAYO",
+      "CCATCA",
+      "CUSIPATA",
+      "HUARO",
+      "LUCRE",
+      "MARCAPATA",
+      "OCONGATE",
+      "OROPESA",
+      "QUIQUIJANA",
+      "URCOS"
+    ],
+    "URUBAMBA": [
+      "CHINCHERO",
+      "HUAYLLABAMBA",
+      "MACHUPICCHU",
+      "MARAS",
+      "OLLANTAYTAMBO",
+      "URUBAMBA",
+      "YUCAY"
+    ]
+  },
+  "HUANCAVELICA": {
+    "ACOBAMBA": [
+      "ACOBAMBA",
+      "ANDABAMBA",
+      "ANTA",
+      "CAJA",
+      "MARCAS",
+      "PAMACOCHA",
+      "PAUCARA",
+      "ROSARIO"
+    ],
+    "ANGARAES": [
+      "ANCHONGA",
+      "CALLANMARCA",
+      "CCOCHACCASA",
+      "CHINCHO",
+      "CONGALLA",
+      "HUANCA-HUANCA",
+      "HUAYLLAY GRANDE",
+      "JULCAMARCA",
+      "LIRCAY",
+      "SAN ANTONIO DE ANTAPARCO",
+      "SANTO TOMAS DE PATA",
+      "SECCLLA"
+    ],
+    "CASTROVIRREYNA": [
+      "ARMA",
+      "AURAHUA",
+      "CAPILLLAS",
+      "CASTROVIRREYNA",
+      "CHUPAMARCA",
+      "COCAS",
+      "HUACHOS",
+      "HUAMATAMBO",
+      "MOLLEPAMPA",
+      "SAN JUAN",
+      "SANTA ANA",
+      "TANTARA",
+      "TICRAPO"
+    ],
+    "CHURCAMPA": [
+      "ANCO",
+      "CHINCHIHUASI",
+      "CHURCAMPA",
+      "EL CARMEN",
+      "LA MERCED",
+      "LOCROJA",
+      "PAUCARBAMBA",
+      "SAN MIGUEL DE MAYOCC",
+      "SAN PEDRO DE CORIS"
+    ],
+    "HUANCAVELICA": [
+      "ACOBAMBILLA",
+      "ACORIA",
+      "ASCENSION",
+      "CONAYCA",
+      "CUENCA",
+      "HUACHOCOLPA",
+      "HUANCAVELICA",
+      "HUANDO",
+      "HUAYLLAHUARA",
+      "IZCUCHACA",
+      "LARIA",
+      "MANTA",
+      "MARISCAL CACERES",
+      "MOYA",
+      "NUEVO OCCORO",
+      "PALCA",
+      "PILCHACA",
+      "VILCA",
+      "YAULI"
+    ],
+    "HUAYTARA": [
+      "AYAVI",
+      "CORDOVA",
+      "HUAYACUNDO ARMA",
+      "HUAYTARA",
+      "LARAMARCA",
+      "OCOYO",
+      "PILPICHACA",
+      "QUERCO",
+      "QUITO-ARMA",
+      "SAN ANTONIO DE CUSICANCHA",
+      "SAN FRANCISCO DE SANGAYAICO",
+      "SAN ISIDRO",
+      "SANTIAGO DE CHOCORVOS",
+      "SANTIAGO DE QUIRAHUARA",
+      "SANTO DOMINGO DE CAPILLAS",
+      "TAMBO"
+    ],
+    "TAYACAJA": [
+      "ACOSTAMBO",
+      "ACRAQUIA",
+      "AHUAYCHA",
+      "COLCABAMBA",
+      "DANIEL HERNANDEZ",
+      "HUANDO",
+      "HUARIBAMBA",
+      "ÑAHUIMPUQUIO",
+      "PAMPAS",
+      "PAZOS",
+      "PICHOS",
+      "QUISHUAR",
+      "SALCABAMBA",
+      "SALCAHUASI",
+      "SAN MARCOS DE ROCCHAC",
+      "SURCUBAMBA",
+      "TINTAY PUNCU",
+      "ROBLE",
+      "ANDAYMARCA",
+      "LAMBRAS",
+      "COCHABAMBA",
+      "SANTIAGO DE TUCUMA"
+    ]
+  },
+  "HUANUCO": {
+    "AMBO": [
+      "AMBO",
+      "CAYNA",
+      "COLPAS",
+      "CONCHAMARCA",
+      "HUACAR",
+      "SAN FRANCISCO",
+      "SAN RAFAEL",
+      "TOMAY KICHWA"
+    ],
+    "DOS DE MAYO": [
+      "CHUQUIS",
+      "LA UNION",
+      "MARIAS",
+      "PACHAS",
+      "QUIVILLA",
+      "RIPAN",
+      "SHUNQUI",
+      "SILLAPATA",
+      "YANAS"
+    ],
+    "HUACAYBAMBA": [
+      "CANCHABAMBA",
+      "COCHABAMBA",
+      "HUACAYBAMBA",
+      "PINRA"
+    ],
+    "HUAMALIES": [
+      "ARANCAY",
+      "CHAVIN DE PARIARCA",
+      "JACAS GRANDE",
+      "JIRCAN",
+      "LLATA",
+      "MIRAFLORES",
+      "MONZON",
+      "PUNCHAO",
+      "PUÑOS",
+      "SINGA",
+      "TANTAMAYO"
+    ],
+    "HUANUCO": [
+      "AMARILIS",
+      "CHINCHAO",
+      "CHURUBAMBA",
+      "HUANUCO",
+      "MARGOS",
+      "PILLCO MARCA",
+      "QUISQUI",
+      "SAN FRANCISCO DE CAYRAN",
+      "SAN PEDRO DE CHAULAN",
+      "SANTA MARIA DEL VALLE",
+      "YARUMAYO",
+      "YACUS"
+    ],
+    "LAURICOCHA": [
+      "BAÑOS",
+      "JESUS",
+      "JIVIA",
+      "QUEROPALCA",
+      "RONDOS",
+      "SAN FRANCISCO DE ASIS",
+      "SAN MIGUEL DE CAURI"
+    ],
+    "LEONCIO PRADO": [
+      "DANIEL ALOMIAS ROBLES",
+      "HERMILIO VALDIZAN",
+      "JOSE CRESPO Y CASTILLO",
+      "LUYANDO",
+      "MARIANO DAMASO BERAUN",
+      "RUPA-RUPA",
+      "CASTILLO GRANDE",
+      "PUEBLO NUEVO",
+      "SANTO DOMINGO DE ANDA"
+    ],
+    "MARAÑON": [
+      "CHOLON",
+      "HUACRACHUCO",
+      "LA MORADA",
+      "SAN BUENAVENTURA",
+      "SANTA ROSA DE ALTO YANAJANCA"
+    ],
+    "PACHITEA": [
+      "CHAGLLA",
+      "MOLINO",
+      "PANAO",
+      "UMARI"
+    ],
+    "PUERTO INCA": [
+      "CODO DE POZUZO",
+      "HONORIA",
+      "PUERTO INCA",
+      "TOURNAVISTA",
+      "YUYAPICHIS"
+    ],
+    "YAROWILCA": [
+      "APARICIO POMARES",
+      "CAHUAC",
+      "CHACABAMBA",
+      "CHAVINILLO",
+      "CHORAS",
+      "JACAS CHICO",
+      "OBAS",
+      "PAMPAMARCA"
+    ]
+  },
+  "ICA": {
+    "CHINCHA": [
+      "ALTO LARAN",
+      "CHAVIN",
+      "CHINCHA ALTA",
+      "CHINCHA BAJA",
+      "EL CARMEN",
+      "GROCIO PRADO",
+      "PUEBLO NUEVO",
+      "SAN JUAN DE YANAC",
+      "SAN PEDRO DE HUACARPANA",
+      "SUNAMPE",
+      "TAMBO DE MORA"
+    ],
+    "ICA": [
+      "ICA",
+      "LA TINGUIÑA",
+      "LOS AQUIJES",
+      "OCUCAJE",
+      "PACHACUTEC",
+      "PARCONA",
+      "PUEBLO NUEVO",
+      "SALAS",
+      "SAN JOSE DE LOS MOLINOS",
+      "SAN JUAN BAUTISTA",
+      "SANTIGO",
+      "SUBTANJALLA",
+      "TATE",
+      "YAUCA DEL ROSARIO"
+    ],
+    "NAZCA": [
+      "CHANGUILLO",
+      "EL INGENIO",
+      "MARCONA",
+      "NAZCA",
+      "VISTA ALEGRE"
+    ],
+    "PALPA": [
+      "LLIPATA",
+      "PALPA",
+      "RIO GRANDE",
+      "SANTA CRUZ",
+      "TIBILLO"
+    ],
+    "PISCO": [
+      "HUANCANO",
+      "HUMAY",
+      "INDEPENDENCIA",
+      "PARACAS",
+      "PISCO",
+      "SAN ANDRES",
+      "SAN CLEMENTE",
+      "TUPAC AMARU INCA"
+    ]
+  },
+  "JUNIN": {
+    "CHANCHAMAYO": [
+      "CHANCHAMAYO",
+      "PERENE",
+      "PICHANAQUI",
+      "SAN LUIS DE SHUARO",
+      "SAN RAMON",
+      "VITOC"
+    ],
+    "CHUPACA": [
+      "3 DE DICIEMBRE",
+      "AHUAC",
+      "CHONGOS BAJO",
+      "CHUPACA",
+      "HUACHAC",
+      "HUAMANCACA CHICO",
+      "JARPA",
+      "SAN JUAN DE YSCOS",
+      "YANACANCHA"
+    ],
+    "CONCEPCION": [
+      "ACO",
+      "ANDAMARCA",
+      "CHAMBARA",
+      "COCHAS",
+      "COMAS",
+      "CONCEPCION",
+      "HEROINAS TOLEDO",
+      "MANZANARES",
+      "MARISCAL CASTILLA",
+      "MATAHUASI",
+      "MITO",
+      "NUEVE DE JULIO",
+      "ORCOTUNA",
+      "SAN JOSE DE QUERO",
+      "SANTA ROSA DE OCOPA"
+    ],
+    "HUANCAYO": [
+      "CARHUACALLANGA",
+      "CHACAPAMPA",
+      "CHICCHE",
+      "CHILCA",
+      "CHONGOS ALTO",
+      "CHUPURO",
+      "COLCA",
+      "CULLHUAS",
+      "EL TAMBO",
+      "HUACRAPUQUIO",
+      "HUALHUAS",
+      "HUANCAN",
+      "HUANCAYO",
+      "HUASICANCHA",
+      "HUAYUCACHI",
+      "INGENIO",
+      "PARIAHUANCA",
+      "PILCOMAYO",
+      "PUCARA",
+      "QUICHUAY",
+      "QUILCAS",
+      "SAN AGUSTIN",
+      "SAN JERONIMO DE TUNAN",
+      "SAÑO",
+      "SAPALLANGA",
+      "SICAYA",
+      "SONTO DOMINGO DE ACOBAMBA",
+      "VIQUES"
+    ],
+    "JAUJA": [
+      "ACOLLA",
+      "APATA",
+      "ATAURA",
+      "CANCHAYLLO",
+      "CURICACA",
+      "EL MANTARO",
+      "HUAMALI",
+      "HUARIPAMPA",
+      "HUERTAS",
+      "JANJAILLO",
+      "JAUJA",
+      "JULCAN",
+      "LEONOR ORDOÑEZ",
+      "LLOCLLAPAMPA",
+      "MARCO",
+      "MASMA",
+      "MASMA CHICCHE",
+      "MOLINOS",
+      "MONOBAMBA",
+      "MUQUI",
+      "MUQUIYAUYO",
+      "PACA",
+      "PACCHA",
+      "PANCAN",
+      "PARCO",
+      "POMACANCHA",
+      "RICRAN",
+      "SAN LORENZO",
+      "SAN PEDRO DE CHUNAN",
+      "SAUSA",
+      "SINCOS",
+      "TUNAN MARCA",
+      "YAULI",
+      "YAUYOS"
+    ],
+    "JUNIN": [
+      "CARHUAMAYO",
+      "JUNIN",
+      "ONDORES",
+      "ULCUMAYO"
+    ],
+    "SATIPO": [
+      "COVIRIALI",
+      "LLAYLLA",
+      "MAZAMARI",
+      "PAMPA HERMOSA",
+      "PANGOA",
+      "RIO NEGRO",
+      "RIO TAMBO",
+      "SATIPO",
+      "VIZCATAN DEL ENE"
+    ],
+    "TARMA": [
+      "ACOBAMBA",
+      "HUARICOLCA",
+      "HUASAHUASI",
+      "LA UNION",
+      "PALCA",
+      "PALCAMAYO",
+      "SAN PEDRO DE CAJAS",
+      "TAPO",
+      "TARMA"
+    ],
+    "YAULI": [
+      "CHACAPALCA",
+      "HUAY-HUAY",
+      "LA OROYA",
+      "MARCAPOMACOCHA",
+      "MOROCOCHA",
+      "PACCHA",
+      "SANTA BARBARA DE CARHUACAYAN",
+      "SANTA ROSA DE SACCO",
+      "SUITUCANCHA",
+      "YAULI"
+    ]
+  },
+  "LA LIBERTAD": {
+    "ASCOPE": [
+      "ASCOPE",
+      "CHICAMA",
+      "CHOCOPE",
+      "MAGDALENA DE CAO",
+      "PAIJAN",
+      "RAZURI",
+      "SANTIAGO DE CAO",
+      "CASA GRANDE"
+    ],
+    "BOLIVAR": [
+      "BAMBAMARCA",
+      "BOLIVAR",
+      "CONDORMARCA",
+      "LONGOTEA",
+      "UCHUMARCA",
+      "UCUNCHA"
+    ],
+    "CHEPEN": [
+      "CHEPEN",
+      "PACANGA",
+      "PUEBLO NUEVO"
+    ],
+    "GRAN CHIMU": [
+      "CASCAS",
+      "LUCMA",
+      "MARMOT",
+      "SAYAPULLO"
+    ],
+    "JULCAN": [
+      "CALAMARCA",
+      "CARABAMBA",
+      "HUASO",
+      "JULCAN"
+    ],
+    "OTUZCO": [
+      "AGALLPAMPA",
+      "CHARAT",
+      "HUARANCHAL",
+      "LA CUESTA",
+      "MACHE",
+      "OTUZCO",
+      "PARANDAY",
+      "SALPO",
+      "SINSICAP",
+      "USQUIL"
+    ],
+    "PACASMAYO": [
+      "GUADALUPE",
+      "JEQUETEPEQUE",
+      "PACASMAYO",
+      "SAN JOSE",
+      "SAN PEDRO DE LLOC"
+    ],
+    "PATAZ": [
+      "BULDIBUYO",
+      "CHILLIA",
+      "HUANCASPATA",
+      "HUAYLILLAS",
+      "HUAYO",
+      "ONGON",
+      "PARCOY",
+      "PATAZ",
+      "PIAS",
+      "SANTIAGO DE CHALLAS",
+      "TAURIJA",
+      "URPAY",
+      "CHILIA"
+    ],
+    "SANCHEZ CARRION": [
+      "CHUGAY",
+      "COCHORCO",
+      "CURGOS",
+      "HUAMACHUCO",
+      "MARCABAL",
+      "SANAGORAN",
+      "SARIN",
+      "SARTIMBAMBA"
+    ],
+    "SANTIAGO DE CHUCO": [
+      "ANGASMARCA",
+      "CACHICADAN",
+      "MOLLEBAMBA",
+      "MOLLEPATA",
+      "QUIRUVILCA",
+      "SANTA CRUZ DE CHUCA",
+      "SANTIAGO DE CHUCO",
+      "SITABAMBA"
+    ],
+    "TRUJILLO": [
+      "EL PORVENIR",
+      "FLORENCIA DE MORA",
+      "HUANCHACO",
+      "LA ESPERANZA",
+      "LAREDO",
+      "MOCHE",
+      "POROTO",
+      "SALAVERRY",
+      "SIMBAL",
+      "TRUJILLO",
+      "VICTOR LARCO HERRERA"
+    ],
+    "VIRU": [
+      "CHAO",
+      "GUADALUPITO",
+      "VIRU"
+    ]
+  },
+  "LAMBAYEQUE": {
+    "CHICLAYO": [
+      "CAYALTI",
+      "CHICLAYO",
+      "CHONGOYAPE",
+      "ETEN",
+      "ETEN PUERTO",
+      "JOSE LEONARDO ORTIZ",
+      "LA VICTORIA",
+      "LAGUNAS",
+      "MONSEFU",
+      "NUEVA ARICA",
+      "OYOTUN",
+      "PACORA",
+      "PATAPO",
+      "PICSI",
+      "PIMENTEL",
+      "POMALCA",
+      "PUCALA",
+      "REQUE",
+      "SANTA ROSA",
+      "SAÑA",
+      "TUMAN"
+    ],
+    "FERREÑAFE": [
+      "CANARIS",
+      "FERREÑAFE",
+      "INCAHUASI",
+      "MANUEL ANTONIO MESONES MURO",
+      "PITIPO",
+      "PUEBLO NUEVO"
+    ],
+    "LAMBAYEQUE": [
+      "CHOCHOPE",
+      "ILLIMO",
+      "JAYANCA",
+      "LAMBAYEQUE",
+      "MOCHUMI",
+      "MORROPE",
+      "MOTUPE",
+      "OLMOS",
+      "PACORA",
+      "SALAS",
+      "SAN JOSE",
+      "TUCUME"
+    ]
+  },
+  "LIMA": {
+    "BARRANCA": [
+      "BARRANCA",
+      "PARAMONGA",
+      "PATIVILCA",
+      "SUPE",
+      "SUPE PUERTO"
+    ],
+    "CAJATAMBO": [
+      "CAJATAMBO",
+      "COPA",
+      "GORGOR",
+      "HUANCAPON",
+      "MANAS"
+    ],
+    "CANTA": [
+      "ARAHUAY",
+      "CANTA",
+      "HUAMANTANGA",
+      "HUAROS",
+      "LACHAQUI",
+      "SAN BUENAVENTURA",
+      "SANTA ROSA DE QUIVES"
+    ],
+    "CAÑETE": [
+      "ASIA",
+      "CALANGO",
+      "CERRO AZUL",
+      "CHILCA",
+      "COAYLLO",
+      "IMPERIAL",
+      "LUNAHUANA",
+      "MALA",
+      "NUEVO IMPERIAL",
+      "PACARAN",
+      "QUILMANA",
+      "SAN ANTONIO",
+      "SAN LUIS",
+      "SAN VICENTE DE CAÑETE",
+      "SANTA CRUZ DE FLORES",
+      "ZUÑIGA"
+    ],
+    "HUARAL": [
+      "ATAVILLOS ALTO",
+      "ATAVILLOS BAJO",
+      "AUCALLAMA",
+      "CHANCAY",
+      "HUARAL",
+      "IHUARI",
+      "LAMPIAN",
+      "PACARAOS",
+      "SAN MIGUEL DE ACOS",
+      "SANTA CRUZ DE ANDAMARCA",
+      "SUMBILCA",
+      "VEINTISIETE DE NOVIEMBRE"
+    ],
+    "HUAROCHIRI": [
+      "ANTIOQUIA",
+      "CALLAHUANCA",
+      "CARAMPOMA",
+      "CHICLA",
+      "CUENCA",
+      "HUACHUPAMPA",
+      "HUANZA",
+      "HUAROCHIRI",
+      "LAHUAYTAMBO",
+      "LANGA",
+      "LARAOS",
+      "MARIATANA",
+      "MATUCANA",
+      "RICARDO PALMA",
+      "SAN ANDRES DE TUPICOCHA",
+      "SAN ANTONIO",
+      "SAN BARTOLOME",
+      "SAN DAMIAN",
+      "SAN JUAN DE IRIS",
+      "SAN JUAN DE TANTARANCHE",
+      "SAN LORENZO DE QUINTI",
+      "SAN MATEO",
+      "SAN MATEO DE OTAO",
+      "SAN PEDRO DE CASTA",
+      "SAN PEDRO DE HUANCAYRE",
+      "SANGALLAYA",
+      "SANTA CRUZ DE COCACHACRA",
+      "SANTA EULALIA",
+      "SANTIAGO DE ANCHUCAYA",
+      "SANTIAGO DE TUNA",
+      "SANTO DOMINGO DE LOS OLLEROS",
+      "SURCO"
+    ],
+    "HUAURA": [
+      "AMBAR",
+      "CALETA DE CARQUIN",
+      "CHECRAS",
+      "HUACHO",
+      "HUALMAY",
+      "HUAURA",
+      "LEONCIO PRADO",
+      "PACCHO",
+      "SANTA LEONOR",
+      "SANTA MARIA",
+      "SAYAN",
+      "VEGUETA"
+    ],
+    "LIMA": [
+      "ANCON",
+      "ATE",
+      "BARRANCO",
+      "BREÑA",
+      "CARABAYLLO",
+      "CHACLACAYO",
+      "CHORRILLOS",
+      "CIENEGUILLA",
+      "COMAS",
+      "EL AGUSTINO",
+      "INDEPENDENCIA",
+      "JESUS MARIA",
+      "LA MOLINA",
+      "LA VICTORIA",
+      "LIMA",
+      "LINCE",
+      "LOS OLIVOS",
+      "LURIGANCHO",
+      "LURIN",
+      "MAGDALENA DEL MAR",
+      "MAGDALENA VIEJA",
+      "MIRAFLORES",
+      "PACHACAMAC",
+      "PUCUSANA",
+      "PUEBLO LIBRE",
+      "PUENTE PIEDRA",
+      "PUNTA HERMOSA",
+      "PUNTA NEGRA",
+      "RIMAC",
+      "SAN BARTOLO",
+      "SAN BORJA",
+      "SAN ISIDRO",
+      "SAN JUAN DE LURIGANCHO",
+      "SAN JUAN DE MIRAFLORES",
+      "SAN LUIS",
+      "SAN MARTIN DE PORRES",
+      "SAN MIGUEL",
+      "SANTA ANITA",
+      "SANTA MARIA DEL MAR",
+      "SANTA ROSA",
+      "SANTIAGO DE SURCO",
+      "SURQUILLO",
+      "VILLA EL SALVADOR",
+      "VILLA MARIA DEL TRIUNFO"
+    ],
+    "OYON": [
+      "ANDAJES",
+      "CAUJUL",
+      "COCHAMARCA",
+      "NAVAN",
+      "OYON",
+      "PACHANGARA"
+    ],
+    "YAUYOS": [
+      "ALIS",
+      "AYAUCA",
+      "AYAVIRI",
+      "AZANGARO",
+      "CACRA",
+      "CARANIA",
+      "CATAHUASI",
+      "CHOCOS",
+      "COCHAS",
+      "COLONIA",
+      "HONGOS",
+      "HUAMPARA",
+      "HUANCAYA",
+      "HUANGASCAR",
+      "HUANTAN",
+      "HUAÑEC",
+      "LARAOS",
+      "LINCHA",
+      "MADEAN",
+      "MIRAFLORES",
+      "OMAS",
+      "PUTINZA",
+      "QUINCHES",
+      "QUINOCAY",
+      "SAN JOAQUIN",
+      "SAN PEDRO DE PILAS",
+      "TANTA",
+      "TAURIPAMPA",
+      "TOMAS",
+      "TUPE",
+      "VIÑAC",
+      "VITIS",
+      "YAUYOS"
+    ]
+  },
+  "LORETO": {
+    "ALTO AMAZONAS": [
+      "BALSAPUERTO",
+      "BARRANCA",
+      "CAHUAPANAS",
+      "JEBEROS",
+      "LAGUNAS",
+      "MANSERICHE",
+      "MORONA",
+      "PASTAZA",
+      "SANTA CRUZ",
+      "TENIENTE CESAR LOPEZ ROJAS",
+      "YURIMAGUAS"
+    ],
+    "DATEM DEL MARAÑON": [
+      "ANDOAS",
+      "BARRANCA",
+      "CAHUAPANAS",
+      "MANSERICHE",
+      "MORONA",
+      "PASTAZA"
+    ],
+    "LORETO": [
+      "NAUTA",
+      "PARINARI",
+      "TIGRE",
+      "TROMPETEROS",
+      "URARINAS"
+    ],
+    "MAYNAS": [
+      "ALTO NANAY",
+      "FERNANDO LORES",
+      "INDIANA",
+      "IQUITOS",
+      "LAS AMAZONAS",
+      "MAZAN",
+      "NAPO",
+      "PUNCHANA",
+      "PUTUMAYO",
+      "TORRES CAUSANA",
+      "BELEN",
+      "SAN JUAN BAUTISTA",
+      "YAQUERANA"
+    ],
+    "MCAL. RAMON CASTILLA": [
+      "PEBAS",
+      "RAMON CASTILLA",
+      "SAN PABLO",
+      "YAVARI"
+    ],
+    "REQUENA": [
+      "ALTO TAPICHE",
+      "CAPELO",
+      "EMILIO SAN MARTIN",
+      "JENARO HERRERA",
+      "MAQUIA",
+      "PUINAHUA",
+      "REQUENA",
+      "SAQUENA",
+      "SOPLIN",
+      "TAPICHE",
+      "YAQUERANA"
+    ],
+    "UCAYALI": [
+      "CONTAMANA",
+      "INAHUAYA",
+      "PADRE MARQUEZ",
+      "PAMPA HERMOSA",
+      "SARAYACU",
+      "VARGAS GUERRA"
+    ]
+  },
+  "MADRE DE DIOS": {
+    "MANU": [
+      "FITZCARRALD",
+      "HUEPETUHE",
+      "MADRE DE DIOS",
+      "MANU"
+    ],
+    "TAHUAMANU": [
+      "IBERIA",
+      "IÑAPARI",
+      "TAHUAMANU"
+    ],
+    "TAMBOPATA": [
+      "INAMBARI",
+      "LABERINTO",
+      "LAS PIEDRAS",
+      "TAMBOPATA"
+    ]
+  },
+  "MOQUEGUA": {
+    "GRAL. SANCHEZ CERRO": [
+      "CHOJATA",
+      "COALAQUE",
+      "ICHUÑA",
+      "LA CAPILLA",
+      "LLOQUE",
+      "MATALAQUE",
+      "OMATE",
+      "PUQUINA",
+      "QUINISTAQUILLAS",
+      "UBINAS",
+      "YUNGA"
+    ],
+    "ILO": [
+      "EL ALGARROBAL",
+      "ILO",
+      "PACOCHA"
+    ],
+    "MARISCAL NIETO": [
+      "CARUMAS",
+      "CUCHUMBAYA",
+      "MOQUEGUA",
+      "SAMEGUA",
+      "SAN CRISTOBAL",
+      "TORATA"
+    ]
+  },
+  "PASCO": {
+    "DANIEL ALCIDES CARRION": [
+      "CHACAYAN",
+      "GOYLLARISQUIZGA",
+      "PAUCAR",
+      "SAN PEDRO DE PILLAO",
+      "SANTA ANA DE TUSI",
+      "TAPUC",
+      "VILCABAMBA",
+      "YANAHUANCA"
+    ],
+    "OXAPAMPA": [
+      "CHONTABAMBA",
+      "CONSTITUCION",
+      "HUANCABAMBA",
+      "OXAPAMPA",
+      "PALCAZU",
+      "POZUZO",
+      "PUERTO BERMUDEZ",
+      "VILLA RICA"
+    ],
+    "PASCO": [
+      "CHAUPIMARCA",
+      "HUACHON",
+      "HUARIACA",
+      "HUAYLLAY",
+      "NINACACA",
+      "PALLANCHACRA",
+      "PAUCARTAMBO",
+      "SAN FRANCISCO DE ASIS DE YARUSYACAN",
+      "SIMON BOLIVAR",
+      "TICLACAYAN",
+      "TINYAHUARCO",
+      "VICCO",
+      "YANACANCHA"
+    ]
+  },
+  "PIURA": {
+    "AYABACA": [
+      "AYABACA",
+      "FRIAS",
+      "JILILI",
+      "LAGUNAS",
+      "MONTERO",
+      "PACAIPAMPA",
+      "PAIMAS",
+      "SAPILLICA",
+      "SICCHEZ",
+      "SUYO"
+    ],
+    "HUANCABAMBA": [
+      "CANCHAQUE",
+      "EL CARMEN DE LA FRONTERA",
+      "HUANCABAMBA",
+      "HUARMACA",
+      "LALAQUIZ",
+      "SAN MIGUEL DE EL FAIQUE",
+      "SONDOR",
+      "SONDORILLO"
+    ],
+    "MORROPON": [
+      "BUENOS AIRES",
+      "CHALACO",
+      "CHULUCANAS",
+      "LA MATANZA",
+      "MORROPON",
+      "SALITRAL",
+      "SAN JUAN DE BIGOTE",
+      "SANTA CATALINA DE MOSSA",
+      "SANTO DOMINGO",
+      "YAMANGO"
+    ],
+    "PAITA": [
+      "AMOTAPE",
+      "ARENAL",
+      "COLAN",
+      "LA HUACA",
+      "PAITA",
+      "TAMARINDO",
+      "VICHAYAL"
+    ],
+    "PIURA": [
+      "CASTILLA",
+      "CATACAOS",
+      "CURA MORI",
+      "EL TALLAN",
+      "LA ARENA",
+      "LA UNION",
+      "LAS LOMAS",
+      "PIURA",
+      "TAMBO GRANDE",
+      "VEINTISEIS DE OCTUBRE"
+    ],
+    "SECHURA": [
+      "BELLAVISTA DE LA UNION",
+      "BERNAL",
+      "CRISTO NOS VALGA",
+      "RINCONADA LLICUAR",
+      "SECHURA",
+      "VICE"
+    ],
+    "SULLANA": [
+      "BELLAVISTA",
+      "IGNACIO ESCUDERO",
+      "LANCONES",
+      "MARCAVELICA",
+      "MIGUEL CHECA",
+      "QUERECOTILLO",
+      "SALITRAL",
+      "SULLANA"
+    ],
+    "TALARA": [
+      "EL ALTO",
+      "LA BREA",
+      "LOBITOS",
+      "LOS ORGANOS",
+      "MANCORA",
+      "PARIÑAS"
+    ]
+  },
+  "PUNO": {
+    "AZANGARO": [
+      "ACHAYA",
+      "ARAPA",
+      "ASILLO",
+      "AZANGARO",
+      "CAMINACA",
+      "CHUPA",
+      "JOSE DOMINGO CHOQUEHUANCA",
+      "MUÑANI",
+      "POTONI",
+      "SAMAN",
+      "SAN ANTON",
+      "SAN JOSE",
+      "SAN JUAN DE SALINAS",
+      "SANTIAGO DE PUPUJA",
+      "TIRAPATA"
+    ],
+    "CARABAYA": [
+      "AJOYANI",
+      "AYAPATA",
+      "COASA",
+      "CORANI",
+      "CRUCERO",
+      "ITUATA",
+      "MACUSANI",
+      "OLLACHEA",
+      "SAN GABAN",
+      "USICAYOS"
+    ],
+    "CHUCUITO": [
+      "DESAGUADERO",
+      "HUACULLANI",
+      "JULI",
+      "KELLUYO",
+      "PISACOMA",
+      "POMATA",
+      "ZEPITA"
+    ],
+    "EL COLLAO": [
+      "CAPAZO",
+      "CONDURIRI",
+      "ILAVE",
+      "PILCUYO",
+      "SANTA ROSA"
+    ],
+    "HUANCANE": [
+      "COJATA",
+      "HUANCANE",
+      "HUATASANI",
+      "ICHUPALLA",
+      "PUSI",
+      "ROSASPATA",
+      "TARACO",
+      "VILQUE CHICO"
+    ],
+    "LAMPA": [
+      "CABANILLA",
+      "CALAPUJA",
+      "LAMPA",
+      "NICASIO",
+      "OCUVIRI",
+      "PALCA",
+      "PARATIA",
+      "PUCARA",
+      "SANTA LUCIA",
+      "VILAVILA"
+    ],
+    "MELGAR": [
+      "ANTAUTA",
+      "AYAVIRI",
+      "CUPI",
+      "LLALLI",
+      "MACARI",
+      "NUÑOA",
+      "ORURILLO",
+      "SANTA ROSA",
+      "UMACHIRI"
+    ],
+    "MOHO": [
+      "CONIMA",
+      "HUAYRAPATA",
+      "MOHO",
+      "TILALI"
+    ],
+    "PUNO": [
+      "ACORA",
+      "AMANTANI",
+      "ATUNCOLLA",
+      "CAPACHICA",
+      "CHUCUITO",
+      "COATA",
+      "HUATA",
+      "MAÑAZO",
+      "PAUCARCOLLA",
+      "PICHACANI",
+      "PLATERIA",
+      "PUNO",
+      "SAN ANTONIO",
+      "TIQUILLACA",
+      "VILQUE"
+    ],
+    "SAN ANTONIO DE PUTINA": [
+      "ANANEA",
+      "PEDRO VILCA APAZA",
+      "PUTINA",
+      "QUILCAPUNCU",
+      "SINA"
+    ],
+    "SAN ROMAN": [
+      "CABANA",
+      "CABANILLAS",
+      "CARACOTO",
+      "JULIACA",
+      "SAN MIGUEL"
+    ],
+    "SANDIA": [
+      "ALTO INAMBARI",
+      "CUYOCUYO",
+      "LIMBANI",
+      "PATAMBUCO",
+      "PHARA",
+      "QUIACA",
+      "SAN JUAN DEL ORO",
+      "SANDIA",
+      "YANAHUAYA",
+      "SAN PEDRO DE PUTINA PUNCO"
+    ],
+    "YUNGUYO": [
+      "ANAPIA",
+      "COPANI",
+      "CUTURAPI",
+      "OLLARAYA",
+      "TINICACHI",
+      "UNICACHI",
+      "YUNGUYO"
+    ]
+  },
+  "SAN MARTIN": {
+    "BELLAVISTA": [
+      "ALTO BIAVO",
+      "BAJO BIAVO",
+      "BELLAVISTA",
+      "HUALLAGA",
+      "SAN PABLO",
+      "SAN RAFAEL"
+    ],
+    "EL DORADO": [
+      "AGUA BLANCA",
+      "SAN JOSE DE SISA",
+      "SAN MARTIN",
+      "SANTA ROSA",
+      "SHATOJA"
+    ],
+    "HUALLAGA": [
+      "ALTO SAPOSOA",
+      "EL ESLABON",
+      "PISCOYACU",
+      "SACANCHE",
+      "SAPOSOA",
+      "TINGO DE SAPOA"
+    ],
+    "LAMAS": [
+      "ALONSO DE ALVARADO",
+      "BARRANQUITA",
+      "CAYNARACHI",
+      "CUÑUMBUQUI",
+      "LAMAS",
+      "PINTO RECODO",
+      "RUMISAPA",
+      "SAN ROQUE DE CUMBAZA",
+      "SHANAO",
+      "TABALOSOS",
+      "ZAPATERO"
+    ],
+    "MARISCAL CACERES": [
+      "CAMPANILLA",
+      "HUICUNGO",
+      "JUANJUI",
+      "PACHIZA",
+      "PAJARILLO"
+    ],
+    "MOYOBAMBA": [
+      "CALZADA",
+      "HABANA",
+      "JEPELACIO",
+      "MOYOBAMBA",
+      "SORITOR",
+      "YANTALO"
+    ],
+    "PICOTA": [
+      "BUENOS AIRES",
+      "CASPISAPA",
+      "PICOTA",
+      "PILLUANA",
+      "PUCACACA",
+      "SAN CRISTOBAL",
+      "SAN HILARION",
+      "SHAMBOYACU",
+      "TINGO DE PONASA",
+      "TRES UNIDOS"
+    ],
+    "RIOJA": [
+      "AWAJUN",
+      "ELIAS SOPLIN VARGAS",
+      "NUEVA CAJAMARCA",
+      "PARDO MIGUEL",
+      "POSIC",
+      "RIOJA",
+      "SAN FERNANDO",
+      "YORONGOS",
+      "YURACYACU"
+    ],
+    "SAN MARTIN": [
+      "ALBERTO LEVEAU",
+      "CACATACHI",
+      "CHAZUTA",
+      "CHIPURANA",
+      "EL PORVENIR",
+      "HUIMBAYOC",
+      "JUAN GUERRA",
+      "LA BANDA DE SHILCAYO",
+      "MORALES",
+      "PAPAPLAYA",
+      "SAN ANTONIO",
+      "SAUCE",
+      "SHAPAJA",
+      "TARAPOTO"
+    ],
+    "TOCACHE": [
+      "NUEVO PROGRESO",
+      "POLVORA",
+      "SHUNTE",
+      "TOCACHE",
+      "UCHIZA"
+    ]
+  },
+  "TACNA": {
+    "CANDARAVE": [
+      "CAIRANI",
+      "CAMILACA",
+      "CANDARAVE",
+      "CURIBAYA",
+      "HUANUARA",
+      "QUILAHUANI"
+    ],
+    "JORGE BASADRE": [
+      "ILABAYA",
+      "ITE",
+      "LOCUMBA"
+    ],
+    "TACNA": [
+      "ALTO DE LA ALIANZA",
+      "CALANA",
+      "CIUDAD NUEVA",
+      "CORONEL GREGORIO ALBARRACIN LANCHIPA",
+      "INCLAN",
+      "PACHIA",
+      "PALCA",
+      "POCOLLAY",
+      "SAMA",
+      "TACNA",
+      "LA YARADA LOS PALOS"
+    ],
+    "TARATA": [
+      "CHUCATAMANI",
+      "ESTIQUE",
+      "ESTIQUE-PAMPA",
+      "SITAJARA",
+      "SUSAPAYA",
+      "TARATA",
+      "TARUCACHI",
+      "TICACO"
+    ]
+  },
+  "TUMBES": {
+    "CONTRALMIRANTE VILLAR": [
+      "CASITAS",
+      "ZORRITOS",
+      "CANOAS DE PUNTA SAL"
+    ],
+    "TUMBES": [
+      "CORRALES",
+      "LA CRUZ",
+      "PAMPAS DE HOSPITAL",
+      "SAN JACINTO",
+      "SAN JUAN DE LA VIRGEN",
+      "TUMBES"
+    ],
+    "ZARUMILLA": [
+      "AGUAS VERDES",
+      "MATAPALO",
+      "PAPAYAL",
+      "ZARUMILLA"
+    ]
+  },
+  "UCAYALI": {
+    "ATALAYA": [
+      "RAIMONDI",
+      "SEPAHUA",
+      "TAHUANIA",
+      "YURUA"
+    ],
+    "CORONEL PORTILLO": [
+      "CALLERIA",
+      "CAMPOVERDE",
+      "IPARIA",
+      "MASISEA",
+      "NUEVA REQUENA",
+      "YARINACOCHA",
+      "MANANTAY"
+    ],
+    "PADRE ABAD": [
+      "CURIMANA",
+      "IRAZOLA",
+      "PADRE ABAD",
+      "NESHUYA",
+      "ALEXANDER VON HUMBOLDT"
+    ],
+    "PURUS": [
+      "PURUS"
+    ]
+  }
 };
 
 
 const businessFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre comercial debe tener al menos 3 caracteres." }),
-  contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }),
-  ruc: z.string().length(11, "El RUC debe tener 11 dígitos.").regex(/^\d+$/, "El RUC solo debe contener números.").optional().or(z.literal("")),
   razonSocial: z.string().min(3, "La razón social debe tener al menos 3 caracteres.").optional().or(z.literal("")),
+  ruc: z.string().length(11, "El RUC debe tener 11 dígitos.").regex(/^\d+$/, "El RUC solo debe contener números.").optional().or(z.literal("")),
+  businessType: z.enum(BUSINESS_TYPES, { required_error: "Debes seleccionar un giro de negocio." }),
   department: z.string().min(1, "Departamento es requerido."),
   province: z.string().min(1, "Provincia es requerida."),
   district: z.string().min(1, "Distrito es requerido."),
   address: z.string().min(5, "La dirección debe tener al menos 5 caracteres.").optional().or(z.literal("")),
+  contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }),
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
-  managerDni: z.string().min(8, "DNI/CE del gerente debe tener al menos 8 caracteres.").max(15, "DNI/CE del gerente no debe exceder 15 caracteres.").regex(/^\d+$/, "DNI/CE del gerente solo debe contener números.").optional().or(z.literal("")),
-  businessType: z.enum(BUSINESS_TYPES, { required_error: "Debes seleccionar un giro de negocio." }),
+  managerDni: z.string().min(8, "DNI/CE del gerente debe tener entre 8 y 15 caracteres.").max(15, "DNI/CE del gerente no debe exceder 15 caracteres.").regex(/^\d+$/, "DNI/CE del gerente solo debe contener números.").optional().or(z.literal("")),
 });
 
 type BusinessFormValues = z.infer<typeof businessFormSchema>;
@@ -121,6 +2382,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
   });
 
   useEffect(() => {
+    // Reset form when 'business' prop changes (e.g., when opening modal for editing)
     if (business) {
       form.reset({
         name: business.name || "",
@@ -136,25 +2398,45 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
         businessType: business.businessType || undefined,
       });
       setSelectedDepartment(business.department || "");
-      // For edit, if province and district are already set, populate them
+      // Pre-populate provinces if department is set
       if (business.department && peruLocations[business.department as keyof typeof peruLocations]) {
-        setProvinces(Object.keys(peruLocations[business.department as keyof typeof peruLocations]));
+        const currentProvinces = Object.keys(peruLocations[business.department as keyof typeof peruLocations]);
+        setProvinces(currentProvinces);
+        setSelectedProvince(business.province || "");
+        // Pre-populate districts if province is also set
+        if (business.province && peruLocations[business.department as keyof typeof peruLocations]?.[business.province as keyof typeof peruLocations[keyof typeof peruLocations]]) {
+          setDistricts(peruLocations[business.department as keyof typeof peruLocations][business.province as keyof typeof peruLocations[keyof typeof peruLocations]] || []);
+        } else {
+          setDistricts([]);
+        }
+      } else {
+        setProvinces([]);
+        setSelectedProvince("");
+        setDistricts([]);
       }
-      setSelectedProvince(business.province || "");
-       if (business.department && business.province && peruLocations[business.department as keyof typeof peruLocations]?.[business.province as keyof typeof peruLocations[keyof typeof peruLocations]]) {
-        setDistricts(peruLocations[business.department as keyof typeof peruLocations][business.province as keyof typeof peruLocations[keyof typeof peruLocations]] || []);
-      }
+    } else {
+      // Reset for new business creation
+      form.reset({
+        name: "", contactEmail: "", ruc: "", razonSocial: "",
+        department: "", province: "", district: "", address: "",
+        managerName: "", managerDni: "", businessType: undefined,
+      });
+      setSelectedDepartment("");
+      setProvinces([]);
+      setSelectedProvince("");
+      setDistricts([]);
     }
   }, [business, form]);
+
 
   useEffect(() => {
     if (selectedDepartment && peruLocations[selectedDepartment as keyof typeof peruLocations]) {
       const currentProvinces = Object.keys(peruLocations[selectedDepartment as keyof typeof peruLocations]);
       setProvinces(currentProvinces);
-      // If the current form province isn't in the new list of provinces, reset it
+      // If the current form province isn't in the new list of provinces (or department changed), reset it
       if (!currentProvinces.includes(form.getValues("province"))) {
          form.setValue("province", "");
-         form.setValue("district", "");
+         form.setValue("district", ""); // Also reset district
          setSelectedProvince("");
          setDistricts([]);
       }
@@ -165,13 +2447,14 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
       setSelectedProvince("");
       setDistricts([]);
     }
-  }, [selectedDepartment, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDepartment, form.getValues("province")]); // form.getValues("province") added to re-evaluate if province is externally changed
 
   useEffect(() => {
     if (selectedDepartment && selectedProvince && peruLocations[selectedDepartment as keyof typeof peruLocations]?.[selectedProvince as keyof typeof peruLocations[keyof typeof peruLocations]]) {
        const currentDistricts = peruLocations[selectedDepartment as keyof typeof peruLocations][selectedProvince as keyof typeof peruLocations[keyof typeof peruLocations]] || [];
       setDistricts(currentDistricts);
-       // If the current form district isn't in the new list of districts, reset it
+       // If the current form district isn't in the new list of districts (or province changed), reset it
       if (!currentDistricts.includes(form.getValues("district"))) {
          form.setValue("district", "");
       }
@@ -179,7 +2462,8 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
       setDistricts([]);
       form.setValue("district", "");
     }
-  }, [selectedDepartment, selectedProvince, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDepartment, selectedProvince, form.getValues("district")]); // form.getValues("district") added
 
   const handleSubmit = (values: BusinessFormValues) => {
     onSubmit(values);
@@ -206,7 +2490,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="razonSocial"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Razón Social <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>Razón Social</FormLabel>
               <FormControl>
                 <Input placeholder="Nombre legal de la empresa" {...field} disabled={isSubmitting} />
               </FormControl>
@@ -219,7 +2503,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="ruc"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>RUC <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>RUC</FormLabel>
               <FormControl>
                 <Input placeholder="12345678901" {...field} maxLength={11} disabled={isSubmitting} />
               </FormControl>
@@ -262,10 +2546,10 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
                     field.onChange(value);
                     setSelectedDepartment(value);
                     // Reset province and district when department changes
-                    form.setValue("province", "");
-                    form.setValue("district", "");
-                    setSelectedProvince("");
-                    setDistricts([]);
+                    form.setValue("province", "", { shouldValidate: true });
+                    form.setValue("district", "", { shouldValidate: true });
+                    setSelectedProvince(""); // Also clear internal state for province
+                    // setDistricts([]); // This will be handled by province useEffect
                     }}
                     value={field.value}
                     disabled={isSubmitting}
@@ -290,12 +2574,12 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
                     field.onChange(value);
                     setSelectedProvince(value);
                     // Reset district when province changes
-                    form.setValue("district", "");
+                    form.setValue("district", "", { shouldValidate: true });
                     }}
                     value={field.value}
                     disabled={isSubmitting || !selectedDepartment || provinces.length === 0}
                 >
-                    <FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : "Selecciona"} /></SelectTrigger></FormControl>
+                    <FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona")} /></SelectTrigger></FormControl>
                     <SelectContent>
                     {provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}
                     </SelectContent>
@@ -310,8 +2594,12 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
             render={({ field }) => (
                 <FormItem>
                 <FormLabel>Distrito <span className="text-destructive">*</span></FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || !selectedProvince || districts.length === 0}>
-                    <FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : "Selecciona"} /></SelectTrigger></FormControl>
+                <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value} 
+                    disabled={isSubmitting || !selectedProvince || districts.length === 0}
+                >
+                    <FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona")} /></SelectTrigger></FormControl>
                     <SelectContent>
                     {districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}
                     </SelectContent>
@@ -327,7 +2615,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="address"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Dirección del Negocio <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>Dirección del Negocio</FormLabel>
               <FormControl>
                 <Input placeholder="Ej: Av. Principal 123, Urb. Las Flores" {...field} disabled={isSubmitting} />
               </FormControl>
@@ -353,7 +2641,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="managerName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre del Gerente General <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>Nombre del Gerente General</FormLabel>
               <FormControl>
                 <Input placeholder="Nombre completo del gerente" {...field} disabled={isSubmitting} />
               </FormControl>
@@ -366,11 +2654,11 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           name="managerDni"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>DNI/CE del Gerente General <span className="text-destructive">*</span></FormLabel>
+              <FormLabel>DNI/CE del Gerente General</FormLabel>
               <FormControl>
                 <Input placeholder="DNI o Carnet de Extranjería" {...field} maxLength={15} disabled={isSubmitting} />
               </FormControl>
-              <FormDescription>Puede ser un usuario existente de la plataforma.</FormDescription>
+              <FormDescription className="text-xs">Puede ser un usuario existente de la plataforma.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
