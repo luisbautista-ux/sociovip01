@@ -1,6 +1,7 @@
 
 "use client";
 
+import * as React from "react"; // Added React import
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -66,8 +67,6 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
     if (['business_admin', 'staff', 'host'].includes(values.role)) {
       dataToSubmit.businessId = values.businessId;
     }
-    // Para 'superadmin' y 'promoter', businessId no se envía o se puede establecer como null en el backend/server action.
-    // La lógica en la página padre se encargará de esto explícitamente antes de enviar a Firestore.
     onSubmit(dataToSubmit);
   };
 
