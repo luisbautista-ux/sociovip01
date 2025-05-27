@@ -300,23 +300,23 @@ export default function HomePage() {
     const logoWidth = 100;
     const padding = 20;
     const qrSize = 250;
-    const lineHeight = 18;
+    const titleLineHeight = 20;
+    const textLineHeight = 18;
     const smallLineHeight = 14;
     let currentY = padding;
 
     const canvas = document.createElement('canvas');
+    
+    // Estimate height
     let estimatedHeight = padding; 
-
-    if (businessLogoUrl) {
-        estimatedHeight += logoHeight + 10; 
-    }
-    estimatedHeight += lineHeight + 10; 
-    estimatedHeight += qrSize + 10; 
+    if (businessLogoUrl) estimatedHeight += logoHeight + 5; 
+    estimatedHeight += titleLineHeight + 10; // Business Name
     estimatedHeight += 24 + 5; // User name (larger font)
-    estimatedHeight += lineHeight + 10; // User DNI + space after
-    estimatedHeight += lineHeight + 5; // Promotion Title
-    estimatedHeight += lineHeight + 5; // Promotion Description
-    estimatedHeight += lineHeight + 10; // Promotion Valid Until
+    estimatedHeight += textLineHeight + 10; // User DNI
+    estimatedHeight += qrSize + 10; // QR Image
+    estimatedHeight += textLineHeight + 5; // Promotion Title
+    // Description is removed
+    estimatedHeight += textLineHeight + 10; // Promotion Valid Until
     
     if (activePromotion.termsAndConditions) {
         const tempCtx = canvas.getContext('2d');
@@ -402,37 +402,39 @@ export default function HomePage() {
     ctx.fillStyle = '#333'; 
     ctx.textAlign = 'center';
     ctx.fillText(businessName, canvas.width / 2, currentY);
-    currentY += lineHeight + 10;
+    currentY += titleLineHeight + 10;
 
+    // Client Name and DNI
+    ctx.font = 'bold 20px Arial';
+    ctx.fillStyle = 'hsl(var(--primary))'; 
+    ctx.textAlign = 'center';
+    ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
+    currentY += 24 + 2; 
+
+    ctx.font = '12px Arial';
+    ctx.fillStyle = 'black';
+    ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+    currentY += textLineHeight + 10; 
+
+    // QR Code Image
     const qrImg = new window.Image();
     qrImg.crossOrigin = "anonymous"; 
     qrImg.onload = () => {
       ctx.drawImage(qrImg, padding, currentY, qrSize, qrSize);
       currentY += qrSize + 10;
 
-      ctx.font = 'bold 20px Arial';
-      ctx.fillStyle = 'hsl(var(--primary))'; 
-      ctx.textAlign = 'center';
-      ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
-      currentY += 24 + 5; 
-
-      ctx.font = '12px Arial';
-      ctx.fillStyle = 'black';
-      ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
-      currentY += lineHeight + 10; 
-
+      // Promotion Title
       ctx.font = 'bold 14px Arial';
-      currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, lineHeight, 'bold 14px Arial', 'black');
+      currentY = drawWrappedText(activePromotion.title, canvas.width / 2, currentY, canvas.width - 2 * padding, textLineHeight, 'bold 14px Arial', 'black');
       currentY += 5;
 
+      // Promotion Valid Until
       ctx.font = '12px Arial';
       ctx.fillStyle = '#555';
-      currentY = drawWrappedText(activePromotion.description, canvas.width / 2, currentY, canvas.width - 2 * padding, lineHeight, '12px Arial', '#555');
-      currentY += 5;
-
       ctx.fillText(`Válido hasta: ${format(new Date(activePromotion.validUntil), "d MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
-      currentY += lineHeight + 10;
+      currentY += textLineHeight + 10;
       
+      // Terms and Conditions
       if (activePromotion.termsAndConditions) {
         currentY = drawWrappedText(`Términos: ${activePromotion.termsAndConditions}`, canvas.width / 2, currentY, canvas.width - 2 * padding, smallLineHeight, '10px Arial', '#777');
       }
@@ -555,7 +557,7 @@ export default function HomePage() {
             <div className="space-y-3 text-center">
               <h2 className="text-2xl font-semibold text-primary">{qrData.user.name} {qrData.user.surname}</h2>
               <p><strong className="font-medium">DNI/CE:</strong> {qrData.user.dni}</p>
-              <p className="flex items-center justify-center"><Gift className="mr-2 h-4 w-4 text-muted-foreground"/> <strong className="font-medium">Cumpleaños:</strong> {format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}</p>
+              <p className="flex items-center justify-center"><Gift className="mr-2 h-4 w-4 text-muted-foreground"/> {format(new Date(qrData.user.dob), "d MMMM yyyy", { locale: es })}</p>
             </div>
             
             <div className="space-y-3 border-t pt-4">
