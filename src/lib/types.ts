@@ -1,199 +1,206 @@
 
-
 export interface PromotionDetails { // For public display
   id: string;
   title: string;
   description: string;
   validUntil: string; // Date string
   imageUrl: string;
-  promoCode: string; // Unique code for this promotion, might be optional if QR is direct
-  aiHint: string; // Hint for placeholder image
-  type: 'promotion' | 'event'; // To distinguish between promotion and event
+  promoCode: string; 
+  aiHint: string; 
+  type: 'promotion' | 'event'; 
   termsAndConditions?: string;
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'expired'; 
 
-// Represents a client who generates QR codes via promotional codes (public page flow)
 export interface QrClient {
-  id: string;
+  id: string; // Firestore document ID
+  dni: string; 
   name: string;
   surname: string;
   phone: string;
-  dob: string; // Date of Birth, YYYY-MM-DD T HH:mm:ss
-  dni: string; // Document ID
+  dob: string; // Date of Birth, YYYY-MM-DD'T'HH:mm:ss
   registrationDate: string; // ISO date string of first QR generation
 }
 
-// Data for the QR code itself, linking a QrClient to a Promotion (public page QR data)
 export interface QrCodeData {
   user: QrClient;
-  promotion: PromotionDetails; // The public view of the promotion/event
-  code: string; // Validated promoCode used or a generated unique code for public flow
-  status: 'generated' | 'utilized' | 'expired'; // Status for public flow QR
+  promotion: PromotionDetails; 
+  code: string; 
+  status: QrCodeStatusGenerated; 
 }
 
-// Represents a VIP Member with a detailed profile and membership
 export interface SocioVipMember {
-  id: string;
+  id: string; // Firestore document ID
+  dni: string; 
   name: string;
   surname: string;
   phone: string;
-  dob: string; // YYYY-MM-DD T HH:mm:ss
-  dni: string;
-  email: string; // For account login
+  dob: string; // YYYY-MM-DD'T'HH:mm:ss
+  email: string; 
   address?: string;
   profession?: string;
-  preferences?: string[]; // Array of preference strings
+  preferences?: string[]; 
   loyaltyPoints: number;
   membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
-  staticQrCodeUrl?: string; // URL to their static membership QR
+  staticQrCodeUrl?: string; 
   joinDate: string; // ISO date string
 }
 
-// Admin Panel Specific Types
 export interface AdminDashboardStats {
   totalBusinesses: number;
-  totalPlatformUsers: number; // Superadmins, Business Admins, Business Staff
-  totalPromotionsActive: number; // Count of active BusinessEntity type promotion
-  totalQrCodesGenerated: number; // All generated codes for promotions/events
-  totalQrClients: number; // Total QrClient records
-  totalSocioVipMembers: number; // Total SocioVipMember records
+  totalPlatformUsers: number; 
+  totalPromotionsActive: number; 
+  totalQrCodesGenerated: number; 
+  totalQrClients: number; 
+  totalSocioVipMembers: number; 
 }
 
-export interface PromotionAnalyticsData { // For SuperAdmin analytics overview
+export interface PromotionAnalyticsData { 
   month: string;
-  promotionsCreated: number; // New BusinessEntity type promotion
+  promotionsCreated: number; 
   qrCodesGenerated: number;
   qrCodesUtilized: number;
 }
 
-// Business Entity (as created by SuperAdmin for the platform)
+export interface RegisteredClient { // This type might be deprecated in favor of QrClient or SocioVipMember directly
+  id: string;
+  name: string;
+  surname: string;
+  phone: string;
+  dob: string; 
+  dni: string; 
+  registrationDate: string; 
+  // Fields previously from UserData that are more VIP specific
+  address?: string;
+  profession?: string;
+  preferences?: string[];
+  loyaltyPoints?: number; 
+}
+
 export interface Business {
-  id: string;
+  id: string; // Firestore document ID
   name: string;
-  contactEmail: string; // Email of the primary contact/owner for platform comms
-  joinDate: string;
-  activePromotions: number; // Potentially count of active BusinessEntity type promotion
+  contactEmail: string; 
+  joinDate: string; // ISO date string
+  activePromotions: number; 
 }
 
-// Users of the platform (SuperAdmins, Business Admins, Business Staff)
 export interface PlatformUser {
-  id: string;
+  id: string; // Firestore document ID (this is separate from auth uid)
+  uid?: string; // Firebase Auth UID - this is the critical link to the auth user
+  dni: string; // NEW: Mandatory DNI/CE
   name: string;
-  email: string; // Login email
-  role: 'superadmin' | 'business_admin' | 'business_staff';
-  businessId?: string; // Required if role is business_admin or business_staff
-  lastLogin: string;
+  email: string; 
+  role: 'superadmin' | 'business_admin' | 'staff' | 'promoter' | 'host';
+  businessId?: string | null; // Nullable if role doesn't require it (superadmin, promoter)
+  lastLogin: string; // ISO date string
 }
 
-
-// ---- Types for Business Panel ----
 export type BusinessEntityType = 'promotion' | 'event' | 'survey';
 
-// Represents a code generated by a business for one of its entities
 export interface GeneratedCode {
-  id: string;
-  value: string; // The actual 9-digit code string
-  entityId: string; // ID of BusinessManagedEntity (Promotion, Event, etc.)
-  status: QrCodeStatusGenerated; // 'available', 'redeemed', 'expired'
-  generatedByName: string; // Mock: "Business Admin" or specific staff name or promoter name
-  generatedDate: string; // ISO Date string
-  redemptionDate?: string; // ISO Date string, if redeemed
-  redeemedByInfo?: { // Info of the client who redeemed this specific code
+  id: string; // Sub-document ID or unique ID within an array
+  value: string; 
+  entityId: string; 
+  status: QrCodeStatusGenerated; 
+  generatedByName: string; 
+  generatedDate: string; 
+  redemptionDate?: string; 
+  redeemedByInfo?: { 
     dni: string;
     name: string;
-    phone?: string; // Optional, if captured during a simplified redemption
+    phone?: string;
   };
-  observation?: string; // Optional observation for the code
-  isVipCandidate?: boolean; // Marked by Host during redemption
+  observation?: string; 
+  isVipCandidate?: boolean;
 }
 
-// For assigning promoters to specific events/promotions with specific commission
 export interface EventPromoterAssignment {
-  promoterProfileId: string; // From global PromoterProfile list
-  promoterName: string; // For display convenience
-  promoterEmail?: string; // For display convenience
-  commissionRate?: string; // Event/Promotion specific commission
-  notes?: string; // Event/Promotion specific notes for this promoter
+  promoterProfileId: string; 
+  promoterName: string; 
+  promoterEmail?: string; 
+  commissionRate?: string; 
+  notes?: string; 
 }
 
 export interface TicketType {
   id: string;
-  businessId: string; 
   eventId: string; 
+  businessId: string; 
   name: string;
   cost: number;
   description?: string;
-  quantity?: number; // Max available for this type
+  quantity?: number; 
 }
 
 export interface EventBox {
   id: string;
-  businessId: string; 
   eventId: string; 
+  businessId: string; 
   name: string;
   cost: number;
   description?: string;
   status: 'available' | 'unavailable';
-  capacity?: number; // How many people fit
+  capacity?: number; 
   sellerName?: string; 
   ownerName?: string;  
   ownerDni?: string;   
 }
 
-export interface BusinessManagedEntity { // Promotions, Events, Surveys created by a Business
-  id: string;
+export interface BusinessManagedEntity { 
+  id: string; // Firestore document ID
   businessId: string;
   type: BusinessEntityType;
   name: string;
   description: string;
-  startDate: string; // ISO Date string e.g. "2025-08-01T12:00:00"
-  endDate: string; // ISO Date string e.g. "2025-12-31T12:00:00"
-  usageLimit?: number; // Max number of times it can be used/redeemed (for promotions)
-  maxAttendance?: number; // Max attendance for events
+  startDate: string; 
+  endDate: string; 
+  usageLimit?: number; 
+  maxAttendance?: number; 
   isActive: boolean;
-  imageUrl?: string; // Optional image for the entity
+  imageUrl?: string; 
   aiHint?: string;
   termsAndConditions?: string;
-  generatedCodes?: GeneratedCode[]; // Codes generated for this entity
+  generatedCodes?: GeneratedCode[]; 
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
-  assignedPromoters?: EventPromoterAssignment[]; // Promoters assigned to this specific event/promotion
+  assignedPromoters?: EventPromoterAssignment[]; 
 }
 
-export interface PromoterProfile { // Global profile for a promoter
-  id: string;
+export interface PromoterProfile { 
+  id: string; // Firestore document ID for global promoter profiles
   name: string;
   email: string;
   phone?: string;
+  dni?: string; // Might be good to add DNI here too for consistency
 }
 
-export interface BusinessPromoterLink { // How a Business links to a Promoter (Global Link)
-  id: string;
+export interface BusinessPromoterLink { 
+  id: string; // Firestore document ID
   businessId: string;
-  promoterProfileId: string;
-  commissionRate?: string; // e.g., "10%" or "S/5 por QR" - General commission with this business
+  promoterProfileId: string; // Links to PromoterProfile
+  promoterName: string; // Denormalized for easy display
+  promoterEmail: string; // Denormalized for easy display
+  commissionRate?: string; 
   isActive: boolean;
   joinDate: string;
-  promoterProfile?: PromoterProfile; 
 }
 
-// Business Panel Client View Type
 export type BusinessClientType = 'qr' | 'vip';
 
 export interface BusinessClientView {
-  id: string; // Unique ID for the view, can be QrClient.id or SocioVipMember.id
+  id: string; 
   clientType: BusinessClientType;
   name: string;
   surname: string;
   dni: string;
   phone?: string;
-  email?: string; // More common for VIP
-  relevantDate: string; // registrationDate for QrClient, joinDate for SocioVipMember
+  email?: string; 
+  relevantDate: string; 
   isVip: boolean;
-  loyaltyPoints?: number; // Specific to SocioVipMember
-  membershipStatus?: SocioVipMember['membershipStatus']; // Specific to SocioVipMember
+  loyaltyPoints?: number; 
+  membershipStatus?: SocioVipMember['membershipStatus']; 
 }
 
 
@@ -204,27 +211,28 @@ export interface BusinessFormData {
 }
 
 export interface PlatformUserFormData {
+  dni: string; // NEW: Mandatory DNI/CE
   name: string;
   email: string;
-  role: 'superadmin' | 'business_admin' | 'business_staff';
+  role: PlatformUser['role'];
   businessId?: string;
 }
 
 export interface SocioVipMemberFormData {
+  dni: string; 
   name: string;
   surname: string;
-  dni: string;
   phone: string;
   dob: Date;
   email: string;
   address?: string;
   profession?: string;
-  preferences?: string; // Comma-separated
+  preferences?: string; 
   loyaltyPoints: number;
   membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
 }
 
-export interface NewQrClientFormData { // From public page
+export interface NewQrClientFormData { 
   dni: string;
   name: string;
   surname: string;
@@ -249,34 +257,33 @@ export interface BusinessEventFormData {
   description: string;
   startDate: Date;
   endDate: Date;
-  maxAttendance?: number; // Specific to events
+  maxAttendance?: number; 
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
   termsAndConditions?: string;
 }
 
-export interface BusinessPromoterFormData { // For inviting/linking a promoter to the business globally
+export interface BusinessPromoterFormData { 
   promoterName: string;
   promoterEmail: string;
   promoterPhone?: string;
-  commissionRate?: string; // General commission with the business
+  promoterDni?: string; // Add DNI for linking/creating promoter profile
+  commissionRate?: string; 
 }
 
-// For Promoter Commissions Page
 export interface PromoterCommissionEntry {
     id: string;
     businessName: string;
-    entityName: string; // Promotion or Event name
+    entityName: string; 
     entityType: 'promotion' | 'event';
     codesRedeemedByPromoter: number;
-    commissionRate: string; // e.g. "S/ 2.50 por código" or "5% de venta"
+    commissionRate: string; 
     commissionEarned: number;
     paymentStatus: 'Pendiente' | 'Pagado';
-    period: string; // e.g. "Agosto 2025"
+    period: string; 
 }
 
-// Form data for TicketType
 export interface TicketTypeFormData {
   name: string;
   cost: number;
@@ -284,7 +291,6 @@ export interface TicketTypeFormData {
   quantity?: number;
 }
 
-// Form data for EventBox
 export interface EventBoxFormData {
   name: string;
   cost: number;
@@ -296,7 +302,6 @@ export interface EventBoxFormData {
   ownerDni?: string;
 }
 
-// Form data for assigning a promoter to an event
 export interface EventPromoterAssignmentFormData {
     promoterProfileId: string;
     commissionRate?: string;
@@ -307,9 +312,10 @@ export interface BatchBoxFormData {
   prefix: string;
   fromNumber: number;
   toNumber: number;
-  cost: number; // Cost per box
-  capacity?: number; // Capacity per box (optional)
-  description?: string; // Common description (optional)
-  status: 'available' | 'unavailable'; // Initial status for all boxes in batch
+  cost: number; 
+  capacity?: number; 
+  description?: string; 
+  status: 'available' | 'unavailable'; 
 }
 
+    

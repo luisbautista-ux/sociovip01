@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2 } from "lucide-react";
+import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, ShieldQuestion } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, Business } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 
 const roleTranslations: Record<PlatformUser['role'], string> = {
   superadmin: "Super Admin",
@@ -48,7 +48,7 @@ export default function AdminUsersPage() {
         return {
           id: docSnap.id,
           name: data.name,
-          contactEmail: data.contactEmail, // Keep other fields for potential future use
+          contactEmail: data.contactEmail, 
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : new Date(data.joinDate).toISOString(),
           activePromotions: data.activePromotions || 0,
         };
@@ -75,12 +75,13 @@ export default function AdminUsersPage() {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          uid: data.uid || docSnap.id, // Fallback to doc.id if uid not present (older data)
+          uid: data.uid || docSnap.id, 
+          dni: data.dni || "N/A", // Add DNI
           name: data.name,
           email: data.email,
           role: data.role,
           businessId: data.businessId,
-          lastLogin: data.lastLogin instanceof Timestamp ? data.lastLogin.toDate().toISOString() : new Date().toISOString(), // Default if missing
+          lastLogin: data.lastLogin instanceof Timestamp ? data.lastLogin.toDate().toISOString() : new Date(Date.now() - Math.random() * 10000000000).toISOString(), // Default if missing with random past date
         };
       });
       setPlatformUsers(fetchedUsers);
@@ -104,7 +105,8 @@ export default function AdminUsersPage() {
 
   const filteredUsers = platformUsers.filter(user =>
     (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+    (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (user.dni?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
   
   const handleExport = () => {
@@ -112,10 +114,11 @@ export default function AdminUsersPage() {
       toast({ title: "Sin Datos", description: "No hay usuarios para exportar.", variant: "destructive" });
       return;
     }
-    const headers = ["ID", "UID", "Nombre", "Email", "Rol", "ID Negocio Asociado", "Último Acceso"];
+    const headers = ["ID", "UID", "DNI/CE", "Nombre", "Email", "Rol", "ID Negocio Asociado", "Último Acceso"];
     const rows = filteredUsers.map(user => [
       user.id,
-      user.uid,
+      user.uid || "N/A",
+      user.dni,
       user.name,
       user.email,
       roleTranslations[user.role] || user.role,
@@ -134,80 +137,105 @@ export default function AdminUsersPage() {
     document.body.removeChild(link);
   };
 
-  const handleCreateUser = async (data: PlatformUserFormData) => {
+  // Simulated check for DNI existence across relevant collections
+  const checkDniExists = async (dni: string, excludeUserId?: string): Promise<{exists: boolean, type?: string, existingUserId?: string}> => {
+    const collectionsToSearch = [
+      { name: "platformUsers", type: "Usuario de Plataforma" },
+      { name: "socioVipMembers", type: "Socio VIP" },
+      { name: "qrClients", type: "Cliente QR" }
+    ];
+
+    for (const coll of collectionsToSearch) {
+      const q = query(collection(db, coll.name), where("dni", "==", dni));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        // If we are editing, make sure the found DNI is not from the user itself
+        if (excludeUserId && snapshot.docs.some(d => d.id === excludeUserId && coll.name === "platformUsers")) {
+            continue;
+        }
+        return { exists: true, type: coll.type, existingUserId: snapshot.docs[0].id };
+      }
+    }
+    return { exists: false };
+  };
+
+
+  const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
     setIsSubmitting(true);
     try {
-      const newUserPayload: any = {
-        // uid will be set by Firebase Auth trigger or needs to be manually linked
-        // For now, let's assume it's for users created by admin and not linked to Auth yet
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        lastLogin: serverTimestamp(), // Use serverTimestamp for new users
-        // businessId will be conditionally added
-      };
-
-      if (['superadmin', 'promoter'].includes(data.role)) {
-        newUserPayload.businessId = null; // Explicitly null for these roles
-      } else if (data.businessId) { // For business_admin, staff, host
-        newUserPayload.businessId = data.businessId;
-      } else {
-        // This case should be caught by form validation, but as a safeguard:
-        toast({ title: "Error de Validación", description: "Se requiere un negocio para este rol.", variant: "destructive"});
-        setIsSubmitting(false);
-        return;
+      // DNI Uniqueness Check (only for new users or if DNI changed on edit)
+      if (!isEditing || (isEditing && editingUser && data.dni !== editingUser.dni)) {
+        const dniCheckResult = await checkDniExists(data.dni, isEditing ? editingUser?.id : undefined);
+        if (dniCheckResult.exists) {
+          toast({
+            title: "DNI ya Registrado",
+            description: `El DNI ${data.dni} ya está registrado como ${dniCheckResult.type}. No se puede duplicar.`,
+            variant: "destructive",
+            duration: 5000,
+          });
+          setIsSubmitting(false);
+          return;
+        }
       }
 
-      await addDoc(collection(db, "platformUsers"), newUserPayload);
-      toast({ title: "Usuario Creado", description: `El usuario "${data.name}" ha sido creado.` });
+      if (isEditing && editingUser) { // Update existing user
+        const userRef = doc(db, "platformUsers", editingUser.id);
+        const updatedUserPayload: Partial<PlatformUser> = {
+          dni: data.dni, // DNI can be updated if changed (assuming policy allows)
+          name: data.name,
+          role: data.role,
+          // Email is not editable through this form after creation (linked to Auth UID usually)
+        };
+        if (['business_admin', 'staff', 'host'].includes(data.role)) {
+          updatedUserPayload.businessId = data.businessId;
+        } else {
+          updatedUserPayload.businessId = null; 
+        }
+        await updateDoc(userRef, updatedUserPayload);
+        toast({ title: "Usuario Actualizado", description: `El usuario "${data.name}" ha sido actualizado.` });
+      } else { // Create new user
+        // For creating a new PlatformUser, an Auth account should be created first
+        // (e.g., by SuperAdmin via Firebase Admin SDK, or by user via a generic signup).
+        // Then, this profile is created in Firestore, linking via Auth UID.
+        // For now, we are just creating the Firestore profile. UID needs to be manually added later.
+        const newUserPayload: Omit<PlatformUser, 'id' | 'lastLogin' | 'uid'> & { lastLogin: any, uid?: string } = {
+          dni: data.dni,
+          name: data.name,
+          email: data.email, // Email for new user
+          role: data.role,
+          lastLogin: serverTimestamp(),
+          // uid will be undefined here, needs to be linked post-Firebase Auth account creation
+        };
+        if (['business_admin', 'staff', 'host'].includes(data.role)) {
+          newUserPayload.businessId = data.businessId;
+        } else {
+          newUserPayload.businessId = null;
+        }
+        // The UID from Firebase Auth should be added to this document later for login to work.
+        // const docRef = 
+        await addDoc(collection(db, "platformUsers"), newUserPayload);
+        toast({ 
+          title: "Perfil de Usuario Creado en Firestore", 
+          description: `El perfil para "${data.name}" ha sido creado. Recuerda crear/vincular su cuenta de Firebase Authentication con el UID correspondiente.` 
+        });
+      }
+      
       setShowCreateEditModal(false);
       setEditingUser(null);
       fetchPlatformUsers();
+
     } catch (error) {
-      console.error("Failed to create user:", error);
-      toast({ title: "Error al Crear", description: "No se pudo crear el usuario.", variant: "destructive"});
+      console.error("Failed to create/update user:", error);
+      toast({ title: "Error al Guardar", description: "No se pudo guardar el usuario.", variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEditUser = async (data: PlatformUserFormData) => {
-    if (!editingUser) return;
-    setIsSubmitting(true);
-    try {
-      const userRef = doc(db, "platformUsers", editingUser.id);
-      const updatedUserPayload: Partial<PlatformUser> = {
-        name: data.name,
-        // Email is not editable through this form for existing users as it's tied to Auth usually
-        role: data.role,
-      };
-
-      if (['superadmin', 'promoter'].includes(data.role)) {
-        updatedUserPayload.businessId = null;
-      } else if (data.businessId) {
-        updatedUserPayload.businessId = data.businessId;
-      } else {
-         toast({ title: "Error de Validación", description: "Se requiere un negocio para este rol.", variant: "destructive"});
-        setIsSubmitting(false);
-        return;
-      }
-
-      await updateDoc(userRef, updatedUserPayload);
-      toast({ title: "Usuario Actualizado", description: `El usuario "${data.name}" ha sido actualizado.` });
-      setShowCreateEditModal(false);
-      setEditingUser(null);
-      fetchPlatformUsers();
-    } catch (error) {
-      console.error("Failed to update user:", error);
-      toast({ title: "Error al Actualizar", description: "No se pudo actualizar el usuario.", variant: "destructive"});
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
-    // Prevent deletion of superadmin if it's the only one or the current user, etc. (add logic if needed)
-    if (isSubmitting) return;
+    // Consider preventing deletion of the currently logged-in superadmin
+    // or if it's the last superadmin.
     setIsSubmitting(true);
     try {
       await deleteDoc(doc(db, "platformUsers", userId));
@@ -230,7 +258,7 @@ export default function AdminUsersPage() {
     }
     if (user.businessId) {
       const business = availableBusinesses.find(b => b.id === user.businessId);
-      return business?.name || "ID Negocio: " + user.businessId.substring(0,6) + "..."; // Show part of ID if name not found
+      return business?.name || `ID: ${user.businessId.substring(0,6)}... (No encontrado)`; 
     }
     return "N/A";
   };
@@ -259,7 +287,7 @@ export default function AdminUsersPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar por nombre o email..."
+              placeholder="Buscar por nombre, email, DNI..."
               className="pl-8 w-full sm:w-[300px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -282,6 +310,7 @@ export default function AdminUsersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
+                  <TableHead className="hidden sm:table-cell">DNI/CE</TableHead>
                   <TableHead className="hidden md:table-cell">Email</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead className="hidden lg:table-cell">Negocio Asociado</TableHead>
@@ -294,9 +323,10 @@ export default function AdminUsersPage() {
                   filteredUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{user.dni}</TableCell>
                       <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'superadmin' ? 'default' : (user.role === 'business_admin' ? 'secondary' : 'outline')}>
+                        <Badge variant={user.role === 'superadmin' ? 'default' : (['business_admin', 'host'].includes(user.role) ? 'secondary' : 'outline')}>
                           {roleTranslations[user.role] || user.role}
                         </Badge>
                       </TableCell>
@@ -307,7 +337,6 @@ export default function AdminUsersPage() {
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Editar</span>
                         </Button>
-                        {/* Consider disabling delete for superadmin if it's the current user or the only one */}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
@@ -319,8 +348,8 @@ export default function AdminUsersPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario 
-                                <span className="font-semibold"> {user.name}</span>.
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente el perfil del usuario 
+                                <span className="font-semibold"> {user.name}</span> de Firestore. No elimina la cuenta de Firebase Authentication.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -331,7 +360,7 @@ export default function AdminUsersPage() {
                                 disabled={isSubmitting}
                               >
                                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Eliminar
+                                Eliminar Perfil
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -341,7 +370,7 @@ export default function AdminUsersPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
+                    <TableCell colSpan={7} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -358,13 +387,16 @@ export default function AdminUsersPage() {
       }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Crear Nuevo Usuario"}</DialogTitle>
-            <DialogDescription>{editingUser ? "Actualiza los detalles del usuario." : "Completa los detalles para registrar un nuevo usuario de plataforma."}</DialogDescription>
+            <DialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Crear Nuevo Usuario de Plataforma"}</DialogTitle>
+            <DialogDescription>
+              {editingUser ? "Actualiza los detalles del perfil del usuario." : 
+              "Completa los detalles para el perfil del usuario en Firestore. La cuenta de Firebase Authentication debe crearse/vincularse por separado."}
+            </DialogDescription>
           </DialogHeader>
           <PlatformUserForm 
             user={editingUser || undefined}
             businesses={availableBusinesses}
-            onSubmit={editingUser ? handleEditUser : handleCreateUser}
+            onSubmit={handleCreateOrEditUser}
             onCancel={() => { setShowCreateEditModal(false); setEditingUser(null);}}
             isSubmitting={isSubmitting}
           />
@@ -373,3 +405,5 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+
+    

@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as React from "react"; // Added React import
+import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -21,15 +21,16 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 
 const platformUserFormSchema = z.object({
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   role: z.enum(['superadmin', 'business_admin', 'staff', 'promoter', 'host'], { required_error: "Debes seleccionar un rol."}),
   businessId: z.string().optional(),
 }).refine(data => {
   if (['business_admin', 'staff', 'host'].includes(data.role)) {
-    return !!data.businessId; // BusinessId es requerido para estos roles
+    return !!data.businessId; 
   }
-  return true; // No es requerido para superadmin o promoter
+  return true; 
 }, {
   message: "Debes seleccionar un negocio para roles de 'Admin Negocio', 'Staff' o 'Anfitrión'.",
   path: ["businessId"],
@@ -40,7 +41,7 @@ type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
 interface PlatformUserFormProps {
   user?: PlatformUser;
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData) => void;
+  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>; // onSubmit is now async
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -49,6 +50,7 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(platformUserFormSchema),
     defaultValues: {
+      dni: user?.dni || "",
       name: user?.name || "",
       email: user?.email || "",
       role: user?.role || undefined,
@@ -58,21 +60,24 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
 
   const selectedRole = form.watch("role");
 
-  const handleSubmit = (values: PlatformUserFormValues) => {
+  const handleSubmit = async (values: PlatformUserFormValues) => { // handleSubmit is now async
     const dataToSubmit: PlatformUserFormData = { 
+      dni: values.dni.trim(),
       name: values.name,
       email: values.email,
       role: values.role,
     };
     if (['business_admin', 'staff', 'host'].includes(values.role)) {
       dataToSubmit.businessId = values.businessId;
+    } else {
+      dataToSubmit.businessId = undefined; // Ensure businessId is not set for roles that don't need it
     }
-    onSubmit(dataToSubmit);
+    await onSubmit(dataToSubmit, !!user); // Pass isEditing flag
   };
 
-  // Actualizar el formulario si el usuario o los negocios cambian
   React.useEffect(() => {
     form.reset({
+      dni: user?.dni || "",
       name: user?.name || "",
       email: user?.email || "",
       role: user?.role || undefined,
@@ -83,6 +88,20 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="dni"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>DNI / Carnet de Extranjería</FormLabel>
+              <FormControl>
+                <Input placeholder="Número de documento" {...field} disabled={isSubmitting || !!user} />
+              </FormControl>
+              {!!user && <FormMessage>El DNI no se puede cambiar para usuarios existentes.</FormMessage>}
+              {!user && <FormMessage />}
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="name"
@@ -101,7 +120,7 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Email (para inicio de sesión)</FormLabel>
               <FormControl>
                 <Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || !!user} />
               </FormControl>
@@ -119,7 +138,6 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
               <Select 
                 onValueChange={(value) => {
                   field.onChange(value);
-                  // Si el nuevo rol no requiere businessId, limpiar el campo businessId
                   if (['superadmin', 'promoter'].includes(value)) {
                     form.setValue('businessId', undefined, { shouldValidate: true });
                   }
@@ -182,3 +200,5 @@ export function PlatformUserForm({ user, businesses, onSubmit, onCancel, isSubmi
     </Form>
   );
 }
+
+    
