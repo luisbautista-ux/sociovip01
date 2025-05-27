@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import type { Business, BusinessFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 const businessFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -28,9 +29,10 @@ interface BusinessFormProps {
   business?: Business;
   onSubmit: (data: BusinessFormData) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-export function BusinessForm({ business, onSubmit, onCancel }: BusinessFormProps) {
+export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = false }: BusinessFormProps) {
   const form = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
     defaultValues: {
@@ -53,7 +55,7 @@ export function BusinessForm({ business, onSubmit, onCancel }: BusinessFormProps
             <FormItem>
               <FormLabel>Nombre del Negocio</FormLabel>
               <FormControl>
-                <Input placeholder="Ej: Pandora Lounge Bar" {...field} />
+                <Input placeholder="Ej: Pandora Lounge Bar" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -66,17 +68,18 @@ export function BusinessForm({ business, onSubmit, onCancel }: BusinessFormProps
             <FormItem>
               <FormLabel>Email de Contacto</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="Ej: contacto@negocio.com" {...field} />
+                <Input type="email" placeholder="Ej: contacto@negocio.com" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {business ? "Guardar Cambios" : "Crear Negocio"}
           </Button>
         </DialogFooter>
@@ -84,3 +87,4 @@ export function BusinessForm({ business, onSubmit, onCancel }: BusinessFormProps
     </Form>
   );
 }
+

@@ -5,38 +5,106 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Building, PlusCircle, Download, Search, Edit, Trash2 } from "lucide-react";
+import { Building, PlusCircle, Download, Search, Edit, Trash2, Loader2 } from "lucide-react";
 import type { Business, BusinessFormData } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
+// Mock API client (replace with actual API calls later)
+const apiClient = {
+  getBusinesses: async (): Promise<Business[]> => {
+    console.log("API CALL: apiClient.getBusinesses");
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // In a real scenario, this would fetch from your backend.
+    // For now, returning an empty array or a predefined mock list for testing loaded state.
+    // Example with a few items to see the table populated after loading:
+    // return [
+    //   { id: "biz1", name: "Pandora Lounge Bar (API)", contactEmail: "contacto@pandora.com", joinDate: "2023-01-15T12:00:00Z", activePromotions: 3 },
+    //   { id: "biz2", name: "El Rincón Bohemio (API)", contactEmail: "info@rinconbohemio.pe", joinDate: "2023-03-22T12:00:00Z", activePromotions: 5 },
+    // ];
+    return []; // Start with an empty list after loading
+  },
+  createBusiness: async (data: BusinessFormData): Promise<Business> => {
+    console.log("API CALL: apiClient.createBusiness", data);
+    await new Promise(resolve => setTimeout(resolve, 700));
+    const newBusiness: Business = {
+      id: `biz${Date.now()}`,
+      ...data,
+      joinDate: new Date().toISOString(),
+      activePromotions: 0,
+    };
+    // In a real app, the backend would return the created business, possibly with an ID from the DB.
+    return newBusiness;
+  },
+  updateBusiness: async (id: string, data: BusinessFormData): Promise<Business> => {
+    console.log("API CALL: apiClient.updateBusiness", id, data);
+    await new Promise(resolve => setTimeout(resolve, 700));
+    // This is a mock update. The actual update would happen on the server.
+    // For the frontend, we often get the updated object back or just a success status.
+    return {
+      id,
+      ...data,
+      joinDate: new Date().toISOString(), // Placeholder, original joinDate should be preserved
+      activePromotions: Math.floor(Math.random() * 5), // Placeholder
+    };
+  },
+  deleteBusiness: async (id: string): Promise<void> => {
+    console.log("API CALL: apiClient.deleteBusiness", id);
+    await new Promise(resolve => setTimeout(resolve, 700));
+    // No return value needed for delete, or perhaps a success status.
+  },
+};
 
-// Mock Data - make it mutable for updates
-let mockBusinesses: Business[] = [
-  { id: "biz1", name: "Pandora Lounge Bar", contactEmail: "contacto@pandora.com", joinDate: "2023-01-15T00:00:00Z", activePromotions: 3 },
-  { id: "biz2", name: "El Rincón Bohemio", contactEmail: "info@rinconbohemio.pe", joinDate: "2023-03-22T00:00:00Z", activePromotions: 5 },
-  { id: "biz3", name: "La Noche Estrellada Cafe", contactEmail: "reservas@lanoche.com", joinDate: "2023-05-10T00:00:00Z", activePromotions: 2 },
-  { id: "biz4", name: "Disco Club Inferno", contactEmail: "manager@inferno.club", joinDate: "2023-07-01T00:00:00Z", activePromotions: 7 },
-];
 
 export default function AdminBusinessesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
-  const [businesses, setBusinesses] = useState<Business[]>(mockBusinesses); // Local state for businesses
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); // For form submissions
   const { toast } = useToast();
 
+  const fetchBusinesses = async () => {
+    setIsLoading(true);
+    try {
+      const fetchedBusinesses = await apiClient.getBusinesses();
+      setBusinesses(fetchedBusinesses);
+    } catch (error) {
+      console.error("Failed to fetch businesses:", error);
+      toast({
+        title: "Error al Cargar Negocios",
+        description: "No se pudieron obtener los datos de los negocios. Intenta de nuevo.",
+        variant: "destructive",
+      });
+      setBusinesses([]); // Set to empty on error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBusinesses();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   const filteredBusinesses = businesses.filter(biz =>
-    biz.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    biz.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
+    (biz.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (biz.contactEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const handleExport = () => {
+    if (filteredBusinesses.length === 0) {
+      toast({ title: "Sin Datos", description: "No hay negocios para exportar.", variant: "destructive" });
+      return;
+    }
     const headers = ["ID", "Nombre del Negocio", "Email Contacto", "Fecha Ingreso", "Promociones Activas"];
     const rows = filteredBusinesses.map(biz => [
       biz.id,
@@ -57,28 +125,54 @@ export default function AdminBusinessesPage() {
     document.body.removeChild(link);
   };
 
-  const handleCreateBusiness = (data: BusinessFormData) => {
-    const newBusiness: Business = {
-      id: `biz${Date.now()}`,
-      ...data,
-      joinDate: new Date().toISOString(),
-      activePromotions: 0,
-    };
-    setBusinesses(prev => [newBusiness, ...prev]);
-    setShowCreateModal(false);
-    toast({ title: "Negocio Creado", description: `El negocio "${newBusiness.name}" ha sido creado.` });
+  const handleCreateBusiness = async (data: BusinessFormData) => {
+    setIsSubmitting(true);
+    try {
+      // const newBusiness = await apiClient.createBusiness(data); // Real API call
+      // For mock, we simulate and then refetch or add locally for immediate UI update
+      await apiClient.createBusiness(data);
+      toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido programado para creación.` });
+      setShowCreateModal(false);
+      fetchBusinesses(); // Re-fetch the list from "server"
+    } catch (error) {
+      console.error("Failed to create business:", error);
+      toast({ title: "Error al Crear", description: "No se pudo crear el negocio.", variant: "destructive"});
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleEditBusiness = (data: BusinessFormData) => {
+  const handleEditBusiness = async (data: BusinessFormData) => {
     if (!editingBusiness) return;
-    setBusinesses(prev => prev.map(b => b.id === editingBusiness.id ? { ...editingBusiness, ...data } : b));
-    setEditingBusiness(null);
-    toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
+    setIsSubmitting(true);
+    try {
+      // const updatedBusiness = await apiClient.updateBusiness(editingBusiness.id, data); // Real API call
+      await apiClient.updateBusiness(editingBusiness.id, data);
+      toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido programado para actualización.` });
+      setEditingBusiness(null);
+      fetchBusinesses(); // Re-fetch
+    } catch (error) {
+      console.error("Failed to update business:", error);
+      toast({ title: "Error al Actualizar", description: "No se pudo actualizar el negocio.", variant: "destructive"});
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
-  const handleDeleteBusiness = (businessId: string) => {
-    setBusinesses(prev => prev.filter(b => b.id !== businessId));
-    toast({ title: "Negocio Eliminado", description: `El negocio ha sido eliminado.`, variant: "destructive" });
+  const handleDeleteBusiness = async (businessId: string, businessName?: string) => {
+    // To prevent accidental rapid clicks if delete also triggers a fetch
+    if (isSubmitting) return; 
+    setIsSubmitting(true);
+    try {
+      await apiClient.deleteBusiness(businessId);
+      toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido programado para eliminación.`, variant: "destructive" });
+      fetchBusinesses(); // Re-fetch
+    } catch (error) {
+      console.error("Failed to delete business:", error);
+      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el negocio.", variant: "destructive"});
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
@@ -89,10 +183,10 @@ export default function AdminBusinessesPage() {
           <Building className="h-8 w-8 mr-2" /> Gestión de Negocios
         </h1>
         <div className="flex space-x-2">
-          <Button onClick={handleExport} variant="outline">
+          <Button onClick={handleExport} variant="outline" disabled={isLoading || businesses.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Negocio
           </Button>
         </div>
@@ -110,69 +204,83 @@ export default function AdminBusinessesPage() {
               className="pl-8 w-full sm:w-[300px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={isLoading}
             />
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre del Negocio</TableHead>
-                <TableHead className="hidden md:table-cell">Email Contacto</TableHead>
-                <TableHead>Fecha Ingreso</TableHead>
-                <TableHead className="text-center">Promos Activas</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredBusinesses.length > 0 ? (
-                filteredBusinesses.map((biz) => (
-                  <TableRow key={biz.id}>
-                    <TableCell className="font-medium">{biz.name}</TableCell>
-                    <TableCell className="hidden md:table-cell">{biz.contactEmail}</TableCell>
-                    <TableCell>{format(new Date(biz.joinDate), "P", { locale: es })}</TableCell>
-                    <TableCell className="text-center">{biz.activePromotions}</TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => setEditingBusiness(biz)}>
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Editar</span>
-                      </Button>
-                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Eliminar</span>
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción no se puede deshacer. Esto eliminará permanentemente el negocio
-                               <span className="font-semibold"> {biz.name}</span>.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteBusiness(biz.id)}
-                              className="bg-destructive hover:bg-destructive/90"
-                            >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">No se encontraron negocios.</TableCell>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-60">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="ml-4 text-lg text-muted-foreground">Cargando negocios...</p>
+            </div>
+          ) : filteredBusinesses.length === 0 && !searchTerm ? (
+            <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
+              No hay negocios registrados. Haz clic en "Crear Negocio" para empezar.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre del Negocio</TableHead>
+                  <TableHead className="hidden md:table-cell">Email Contacto</TableHead>
+                  <TableHead>Fecha Ingreso</TableHead>
+                  <TableHead className="text-center">Promos Activas</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredBusinesses.length > 0 ? (
+                  filteredBusinesses.map((biz) => (
+                    <TableRow key={biz.id}>
+                      <TableCell className="font-medium">{biz.name}</TableCell>
+                      <TableCell className="hidden md:table-cell">{biz.contactEmail}</TableCell>
+                      <TableCell>{format(new Date(biz.joinDate), "P", { locale: es })}</TableCell>
+                      <TableCell className="text-center">{biz.activePromotions}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => setEditingBusiness(biz)} disabled={isSubmitting}>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Editar</span>
+                        </Button>
+                         <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Eliminar</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción no se puede deshacer. Esto eliminará permanentemente el negocio
+                                 <span className="font-semibold"> {biz.name}</span>.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteBusiness(biz.id, biz.name)}
+                                className="bg-destructive hover:bg-destructive/90"
+                                disabled={isSubmitting}
+                              >
+                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                   <TableRow>
+                    <TableCell colSpan={5} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
       
@@ -184,7 +292,8 @@ export default function AdminBusinessesPage() {
           </DialogHeader>
           <BusinessForm 
             onSubmit={handleCreateBusiness} 
-            onCancel={() => setShowCreateModal(false)} 
+            onCancel={() => setShowCreateModal(false)}
+            isSubmitting={isSubmitting}
           />
         </DialogContent>
       </Dialog>
@@ -200,6 +309,7 @@ export default function AdminBusinessesPage() {
               business={editingBusiness} 
               onSubmit={handleEditBusiness} 
               onCancel={() => setEditingBusiness(null)}
+              isSubmitting={isSubmitting}
             />
           </DialogContent>
         </Dialog>
@@ -207,3 +317,4 @@ export default function AdminBusinessesPage() {
     </div>
   );
 }
+
