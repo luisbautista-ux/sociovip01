@@ -22,7 +22,7 @@ interface AuthContextType {
   loadingAuth: boolean; 
   loadingProfile: boolean; 
   login: (email: string, pass: string) => Promise<UserCredential | AuthError>;
-  signup: (email: string, pass: string) => Promise<UserCredential | AuthError>; // For Super Admin initial setup
+  signup: (email: string, pass: string) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
 }
 
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<PlatformUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [loadingProfile, setLoadingProfile] = useState(true); 
+  const [loadingProfile, setLoadingProfile] = useState(false); // Initialize to false, set to true before fetch
   const router = useRouter();
 
   useEffect(() => {
@@ -54,26 +54,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (user) {
         setLoadingProfile(true); 
-        setUserProfile(null); // Clear previous profile while fetching new one
+        setUserProfile(null); 
         try {
           const userDocRef = doc(db, "platformUsers", user.uid);
           const userDocSnap = await getDoc(userDocRef);
+          
+          console.log("AuthContext: User UID from Auth:", user.uid); // For debugging
           if (userDocSnap.exists()) {
-            const profileData = { id: userDocSnap.id, uid: user.uid, ...userDocSnap.data() } as PlatformUser;
+            const profileDataFromDb = userDocSnap.data();
+            console.log("AuthContext: Profile data fetched from Firestore:", profileDataFromDb); // For debugging
+            const profileData = { 
+                id: userDocSnap.id, 
+                uid: user.uid, 
+                // Ensure roles is an array, even if it's missing or not an array in DB
+                roles: Array.isArray(profileDataFromDb.roles) ? profileDataFromDb.roles : [],
+                ...profileDataFromDb 
+            } as PlatformUser;
             setUserProfile(profileData);
           } else {
-            console.warn(`PROFILE NOT FOUND in Firestore for UID: ${user.uid}. This user might need a profile created in 'platformUsers' collection with their UID and role.`);
+            console.warn(`AuthContext: PROFILE NOT FOUND in Firestore for UID: ${user.uid}. This user might need a profile created in 'platformUsers' collection with their UID and roles.`);
             setUserProfile(null); 
           }
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.error("AuthContext: Error fetching user profile:", error);
           setUserProfile(null);
         } finally {
           setLoadingProfile(false); 
         }
       } else {
         setUserProfile(null); 
-        setLoadingProfile(false); 
+        setLoadingProfile(false); // Ensure loadingProfile is false if no user
       }
     });
     return () => unsubscribe();
@@ -82,6 +92,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      // Profile fetching is handled by onAuthStateChanged
       return userCredential;
     } catch (error) {
       return error as AuthError;
@@ -91,19 +102,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signup = async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-      // Automatically create a profile in Firestore for the new superadmin
       if (userCredential.user) {
         const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
-        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin'> & { lastLogin: any } = {
+        const newProfile: Partial<PlatformUser> & { roles: PlatformUser['roles'], email: string, uid: string, lastLogin: any } = {
           uid: userCredential.user.uid,
           email: userCredential.user.email || "",
-          name: userCredential.user.email?.split('@')[0] || "Super Admin", // Default name
+          name: userCredential.user.email?.split('@')[0] || "Super Admin",
           roles: ['superadmin'],
-          dni: "", // DNI is not asked during superadmin signup, can be updated later
+          dni: "", 
           lastLogin: serverTimestamp(),
-          // businessId is not applicable for superadmin
+          businessId: null,
         };
         await setDoc(userDocRef, newProfile);
+        // After signup, onAuthStateChanged will trigger and load this new profile.
       }
       return userCredential;
     } catch (error) {
@@ -115,9 +126,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await signOut(auth);
       // currentUser and userProfile will be set to null by onAuthStateChanged listener
+      // No need to manually push to /login here if layouts handle redirection based on currentUser
       router.push("/login"); 
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("AuthContext: Logout error:", error);
     }
   };
 
@@ -131,7 +143,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
     logout,
   };
 
-  // Render children only when initial auth check is done.
-  // Loading of profile can be handled within specific layouts.
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
