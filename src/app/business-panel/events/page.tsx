@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit, Trash2, Search, Calendar as CalendarIconLucide, Ticket as TicketIconLucide, Box, Copy, UserPlus, Loader2, AlertTriangle, CalendarIcon as CalendarShadcnIcon, Info, Percent, ListChecks, QrCode, ChevronDown, ChevronUp } from "lucide-react";
-import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, PromoterProfile, EventPromoterAssignment, CommissionRule, CommissionRuleType, CommissionRuleTarget, TicketTypeFormData, EventBoxFormData, BatchBoxFormData, CommissionRuleFormValues } from "@/lib/types";
+import { PlusCircle, Edit, Trash2, Search, Calendar as CalendarIconLucide, Ticket as TicketIconLucide, UserPlus as UserPlusIcon, Box, Copy, UserCheck, Percent, ListChecks, QrCode, ChevronDown, ChevronUp, BarChart3, Loader2 } from "lucide-react";
+import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, PromoterProfile, EventPromoterAssignment, CommissionRule, CommissionRuleType, CommissionRuleTarget, TicketTypeFormData, EventBoxFormData, BatchBoxFormData, CommissionRuleFormValues, BusinessPromoterLink } from "@/lib/types";
 import { format, parseISO, isBefore, isEqual, set, getMonth, startOfDay, endOfDay, isFuture } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -97,8 +97,8 @@ export default function BusinessEventsPage() {
   const [showCreateBatchBoxesModal, setShowCreateBatchBoxesModal] = useState(false);
   
   // States for managing PromoterAssignments within the event modal
-  const [mockBusinessPromoters, setMockBusinessPromoters] = useState<PromoterProfile[]>([]); 
-  const [selectedPromoterForAssignment, setSelectedPromoterForAssignment] = useState<string>("");
+  const [availablePromotersForAssignment, setAvailablePromotersForAssignment] = useState<BusinessPromoterLink[]>([]); 
+  const [selectedPromoterForAssignment, setSelectedPromoterForAssignment] = useState<string>(""); // Stores promoterProfileId
   
   const [showCommissionRuleForm, setShowCommissionRuleForm] = useState(false);
   const [editingCommissionRule, setEditingCommissionRule] = useState<CommissionRule | null>(null);
@@ -106,13 +106,15 @@ export default function BusinessEventsPage() {
 
   const [showInitialEventModal, setShowInitialEventModal] = useState(false);
 
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
+
   const initialEventForm = useForm<InitialEventFormValues>({
     resolver: zodResolver(initialEventFormSchema),
     defaultValues: { 
         name: "", 
         description: "", 
-        startDate: new Date(),
-        endDate: new Date(new Date().setDate(new Date().getDate() + 7)),
+        // startDate and endDate will use default new Date() or be commented out
     },
   });
 
@@ -127,52 +129,44 @@ export default function BusinessEventsPage() {
   });
 
   useEffect(() => {
-    if (userProfile?.businessId) {
-      setCurrentBusinessId(userProfile.businessId);
-    } else if (userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && !userProfile.businessId) {
+    const businessIdFromProfile = userProfile?.businessId;
+    if (businessIdFromProfile) {
+      console.log("Events Page: Setting currentBusinessId from profile:", businessIdFromProfile);
+      setCurrentBusinessId(businessIdFromProfile);
+    } else if (userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && !businessIdFromProfile) {
       toast({ title: "Error de Negocio", description: "Tu perfil de usuario no está asociado a un negocio.", variant: "destructive", duration: 7000 });
       setIsLoading(false);
+      console.warn("Events Page: User is business_admin/staff but has no businessId in profile.");
     }
   }, [userProfile, toast]);
 
 
-  const fetchBusinessPromoters = useCallback(async () => {
-    // Temporarily use a static list or empty array to avoid permission issues during testing
-    // In a real scenario, ensure 'promoterProfiles' can be read by business_admin/staff
-    const staticPromoters: PromoterProfile[] = [
-      { id: "promoter1", name: "Promotor Global Alfa", email: "alfa@promo.com", phone: "987654321", dni: "11111111"},
-      { id: "promoter2", name: "Promotora Global Beta", email: "beta@promo.com", phone: "912345678", dni: "22222222"},
-    ];
-    setMockBusinessPromoters(staticPromoters);
-    console.log('Events Page: Using static promoter list for assignment:', staticPromoters.length);
-
-    // Original Firestore fetching logic (keep for when rules are confirmed)
-    /*
-    if (!currentBusinessId) { // Though currentBusinessId is now a state, guard against initial undefined
-      setMockBusinessPromoters([]);
+  const fetchBusinessPromotersForAssignment = useCallback(async () => {
+    if (!currentBusinessId) {
+      setAvailablePromotersForAssignment([]);
       return;
     }
-    console.log('Events Page: Fetching promoter profiles for assignment. UserProfile:', userProfile);
+    console.log('Events Page: Fetching promoter links for assignment for businessId:', currentBusinessId);
     try {
-      const globalPromotersSnap = await getDocs(collection(db, "promoterProfiles"));
-      const fetchedPromoters: PromoterProfile[] = globalPromotersSnap.docs.map(docSnap => ({
+      const q = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId), where("isActive", "==", true));
+      const querySnapshot = await getDocs(q);
+      const fetchedPromoterLinks: BusinessPromoterLink[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data()
-      } as PromoterProfile));
-      setMockBusinessPromoters(fetchedPromoters);
-      console.log('Events Page: Fetched promoter profiles:', fetchedPromoters.length);
+      } as BusinessPromoterLink));
+      setAvailablePromotersForAssignment(fetchedPromoterLinks);
+      console.log('Events Page: Fetched promoter links for assignment:', fetchedPromoterLinks.length);
     } catch (error: any) { 
-      console.error("Events Page: Error fetching promoter profiles:", error.code, error.message, error);
-      setMockBusinessPromoters([]); 
+      console.error("Events Page: Error fetching promoter links for assignment:", error.code, error.message, error);
+      setAvailablePromotersForAssignment([]); 
       toast({ 
-        title: "Error al Cargar Promotores Disponibles", 
-        description: `No se pudieron obtener los perfiles de promotores. ${error.message}`, 
+        title: "Error al Cargar Promotores Vinculados", 
+        description: `No se pudieron obtener los promotores vinculados al negocio. ${error.message}`, 
         variant: "destructive", 
         duration: 7000 
       });
     }
-    */
-  }, []); // Removed currentBusinessId and userProfile from deps for static mock
+  }, [currentBusinessId, toast]);
 
   const fetchBusinessEvents = useCallback(async () => {
     if (!currentBusinessId) {
@@ -201,7 +195,7 @@ export default function BusinessEventsPage() {
             name: tt.name || "Entrada sin nombre",
             cost: typeof tt.cost === 'number' ? tt.cost : 0,
             description: tt.description || "",
-            quantity: typeof tt.quantity === 'number' || tt.quantity === null ? tt.quantity : undefined,
+            quantity: tt.quantity === undefined || tt.quantity === null ? undefined : Number(tt.quantity),
         })) : [];
 
         const eventBoxesData = Array.isArray(data.eventBoxes) ? data.eventBoxes.map((eb: any, index: number) => ({ 
@@ -212,7 +206,7 @@ export default function BusinessEventsPage() {
             cost: typeof eb.cost === 'number' ? eb.cost : 0,
             description: eb.description || "",
             status: eb.status || 'available',
-            capacity: typeof eb.capacity === 'number' || eb.capacity === null ? eb.capacity : undefined,
+            capacity: eb.capacity === undefined || eb.capacity === null ? undefined : Number(eb.capacity),
             sellerName: eb.sellerName || "",
             ownerName: eb.ownerName || "",
             ownerDni: eb.ownerDni || "",
@@ -246,11 +240,11 @@ export default function BusinessEventsPage() {
           isActive: data.isActive === undefined ? true : data.isActive,
           imageUrl: data.imageUrl || "",
           aiHint: data.aiHint || "",
-          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => ({...gc, observation: gc.observation ?? null, redemptionDate: gc.redemptionDate ?? null, redeemedByInfo: gc.redeemedByInfo ?? null, isVipCandidate: gc.isVipCandidate ?? false })) : [],
+          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc, observation: gc.observation ?? null, redemptionDate: gc.redemptionDate ?? null, redeemedByInfo: gc.redeemedByInfo ?? null, isVipCandidate: gc.isVipCandidate ?? false })) : [],
           ticketTypes: ticketTypesData,
           eventBoxes: eventBoxesData,
           assignedPromoters: assignedPromotersData,
-          maxAttendance: data.maxAttendance !== undefined ? data.maxAttendance : calculateMaxAttendance(ticketTypesData),
+          maxAttendance: calculateMaxAttendance(ticketTypesData),
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
         };
       });
@@ -272,9 +266,9 @@ export default function BusinessEventsPage() {
   useEffect(() => {
     if (currentBusinessId) { 
         fetchBusinessEvents();
-        fetchBusinessPromoters(); 
+        fetchBusinessPromotersForAssignment(); 
     }
-  }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromoters]);
+  }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment]);
 
 
   const filteredEvents = useMemo(() => {
@@ -298,10 +292,10 @@ export default function BusinessEventsPage() {
     setIsDuplicatingEvent(duplicate);
     initialEventForm.reset(); 
     commissionRuleForm.reset();
-    setSelectedPromoterForAssignment(""); // Reset promoter selection
+    setSelectedPromoterForAssignment("");
 
     if (duplicate && eventToManage) {
-        const { id, generatedCodes, ticketTypes = [], eventBoxes = [], assignedPromoters = [], createdAt, maxAttendance, ...eventDataToDuplicate } = eventToManage;
+        const { id, generatedCodes, ticketTypes = [], eventBoxes = [], assignedPromoters = [], createdAt, ...eventDataToDuplicate } = eventToManage;
         
         const duplicatedEventData = {
             ...eventDataToDuplicate,
@@ -309,6 +303,7 @@ export default function BusinessEventsPage() {
             startDate: eventToManage.startDate, 
             endDate: eventToManage.endDate,     
             isActive: true, 
+            maxAttendance: 0, // Will be recalculated based on its own tickets
         };
         const newEventForDuplication: BusinessManagedEntity = {
             ...(duplicatedEventData as Omit<BusinessManagedEntity, 'id' | 'businessId' | 'type' | 'generatedCodes' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'createdAt' | 'maxAttendance'>),
@@ -316,10 +311,9 @@ export default function BusinessEventsPage() {
             businessId: currentBusinessId || "", 
             type: 'event' as 'event',
             generatedCodes: [], 
-            ticketTypes: [], 
+            ticketTypes: [], // Duplicated events start with no tickets/boxes
             eventBoxes: [], 
-            assignedPromoters: [], 
-            maxAttendance: 0, 
+            assignedPromoters: [], // Duplicated events start with no promoters
             createdAt: undefined, 
         };
         setEditingEvent(newEventForDuplication);
@@ -334,8 +328,8 @@ export default function BusinessEventsPage() {
         initialEventForm.reset({
             name: "", 
             description: "", 
-            startDate: new Date(),
-            endDate: new Date(new Date().setDate(new Date().getDate() + 7)),
+            startDate: new Date(new Date().setHours(19,0,0,0)), // Default start time e.g. 7 PM
+            endDate: new Date(new Date(new Date().setDate(new Date().getDate() + 7)).setHours(23,59,0,0)), // Default end time e.g. 11:59 PM
         });
         setShowInitialEventModal(true); 
     }
@@ -351,9 +345,7 @@ export default function BusinessEventsPage() {
     console.log("Events Page (Initial Submit): UserProfile:", userProfile);
     console.log("Events Page (Initial Submit): Current Business ID:", currentBusinessId);
     
-    const tempEventIdForDefaultTicket = `temp-default-${Date.now()}`;
-
-    const defaultTicket: Omit<TicketType, 'id' | 'eventId'> = { // ID and eventId will be set after event save
+    const defaultTicketData: Omit<TicketType, 'id' | 'eventId'> = {
       businessId: currentBusinessId,
       name: "Entrada General",
       cost: 0,
@@ -361,7 +353,7 @@ export default function BusinessEventsPage() {
       description: "Entrada estándar para el evento."
     };
 
-    const newEventToSave: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'maxAttendance' | 'ticketTypes' > & { ticketTypes: Omit<TicketType, 'id' | 'eventId'>[] } = {
+    const newEventToSaveBase: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'maxAttendance' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'generatedCodes'> = {
       businessId: currentBusinessId,
       type: "event",
       name: data.name,
@@ -372,29 +364,17 @@ export default function BusinessEventsPage() {
       isActive: true,
       imageUrl: `https://placehold.co/600x400.png?text=${encodeURIComponent(data.name.substring(0,10))}`,
       aiHint: data.name.split(' ').slice(0,2).join(' '),
-      generatedCodes: [],
-      ticketTypes: [defaultTicket], // Add default ticket without ID initially
-      eventBoxes: [],
-      assignedPromoters: [],
     };
     
-    const tempStartDate = new Date(newEventToSave.startDate);
-    const tempEndDate = new Date(newEventToSave.endDate);
-
     const eventPayloadForFirestore: any = {
-      ...newEventToSave,
-      startDate: Timestamp.fromDate(tempStartDate),
-      endDate: Timestamp.fromDate(tempEndDate),
-      ticketTypes: newEventToSave.ticketTypes.map(tt => { // Map to remove id and eventId for Firestore addDoc
-        const { ...restOfTicket } = tt; 
-        return {
-          ...restOfTicket,
-          quantity: tt.quantity === undefined || tt.quantity === null ? 0 : tt.quantity,
-        };
-      }),
+      ...newEventToSaveBase,
+      startDate: Timestamp.fromDate(new Date(newEventToSaveBase.startDate)),
+      endDate: Timestamp.fromDate(new Date(newEventToSaveBase.endDate)),
+      ticketTypes: [], // Will be updated after saving event to link eventId
       eventBoxes: [],
       assignedPromoters: [],
-      maxAttendance: calculateMaxAttendance(newEventToSave.ticketTypes as TicketType[]), // Calculate with type assertion
+      generatedCodes: [],
+      maxAttendance: 0, // Will be recalculated with default ticket
       createdAt: serverTimestamp(),
     };
     
@@ -402,30 +382,41 @@ export default function BusinessEventsPage() {
     
     let docRef;
     try {
-      docRef = await addDoc(collection(db, "businessEntities"), eventPayloadForFirestore);
+      docRef = await addDoc(collection(db, "businessEntities"), sanitizeObjectForFirestore(eventPayloadForFirestore));
       console.log("Events Page: Event created with ID:", docRef.id);
       
-      const finalNewEvent: BusinessManagedEntity = {
-        ...newEventToSave,
+      const defaultTicketWithEventId: TicketType = {
+        ...defaultTicketData,
+        id: `tt-${docRef.id}-${Date.now()}`,
+        eventId: docRef.id,
+        quantity: defaultTicketData.quantity === undefined || defaultTicketData.quantity === null ? 0 : defaultTicketData.quantity,
+      };
+
+      const updatedEventWithDefaultTicket: BusinessManagedEntity = {
+        ...newEventToSaveBase,
         id: docRef.id, 
         startDate: data.startDate.toISOString(), 
         endDate: data.endDate.toISOString(),  
         createdAt: new Date().toISOString(), 
-        maxAttendance: eventPayloadForFirestore.maxAttendance,
-        ticketTypes: newEventToSave.ticketTypes.map((tt, index) => ({
-            ...(tt as Omit<TicketType, 'id' | 'eventId'>), // Cast to ensure type compatibility
-            id: `tt-${docRef!.id}-${Date.now()}-${index}`, 
-            eventId: docRef!.id,
-            quantity: tt.quantity === undefined || tt.quantity === null ? 0 : tt.quantity,
-        })),
+        ticketTypes: [defaultTicketWithEventId],
+        eventBoxes: [],
+        assignedPromoters: [],
+        generatedCodes: [],
+        maxAttendance: calculateMaxAttendance([defaultTicketWithEventId]),
       };
       
-      setEvents(prev => [finalNewEvent, ...prev].sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
+      // Now update the event in Firestore with the default ticket linked
+      await updateDoc(doc(db, "businessEntities", docRef.id), {
+        ticketTypes: [sanitizeObjectForFirestore(defaultTicketWithEventId)],
+        maxAttendance: updatedEventWithDefaultTicket.maxAttendance
+      });
       
-      toast({ title: "Evento Creado Inicialmente", description: `El evento "${finalNewEvent.name}" ha sido creado. Ahora puedes configurar más detalles.` });
+      fetchBusinessEvents(); // Re-fetch to get the updated list including the new event
+      
+      toast({ title: "Evento Creado Inicialmente", description: `El evento "${updatedEventWithDefaultTicket.name}" ha sido creado. Ahora puedes configurar más detalles.` });
       setShowInitialEventModal(false);
       initialEventForm.reset();
-      setEditingEvent(finalNewEvent); 
+      setEditingEvent(updatedEventWithDefaultTicket); 
       setShowManageEventModal(true); 
     } catch (error: any) {
       console.error("Events Page (Initial Submit): Error creating initial event:", error.code, error.message, error);
@@ -508,7 +499,7 @@ export default function BusinessEventsPage() {
       const sanitizedEvent = sanitizeObjectForFirestore(eventToSavePreSanitize);
       
       const finalTicketTypes = (sanitizedEvent.ticketTypes || []).map((tt: any) => {
-        const { businessId, ...rest } = tt; // businessId might not exist or be needed here
+        const { businessId, ...rest } = tt; 
         return sanitizeObjectForFirestore({...rest, eventId: sanitizedEvent.id });
       });
       const finalEventBoxes = (sanitizedEvent.eventBoxes || []).map((eb: any) => {
@@ -533,7 +524,7 @@ export default function BusinessEventsPage() {
         maxAttendance: sanitizedEvent.maxAttendance,
       };
       
-      console.log("Events Page (SaveManaged): Updating/Creating event with payload:", payloadForFirestore);
+      console.log("Events Page (SaveManaged): Updating/Creating event with payload:", JSON.stringify(payloadForFirestore, null, 2));
 
       if (isDuplicatingEvent || !editingEvent.id) { 
            if (payloadForFirestore.createdAt && typeof payloadForFirestore.createdAt !== 'function' && !(payloadForFirestore.createdAt instanceof Timestamp)) delete payloadForFirestore.createdAt;
@@ -546,7 +537,7 @@ export default function BusinessEventsPage() {
       } else { 
           const { id, createdAt, ...dataToUpdate } = payloadForFirestore; 
           if (createdAt && !(createdAt instanceof Timestamp) && typeof createdAt !== 'function' ){
-               delete (dataToUpdate as any).createdAt; // Ensure correct type for dataToUpdate
+               delete (dataToUpdate as any).createdAt; 
           }
           await updateDoc(doc(db, "businessEntities", editingEvent.id), dataToUpdate);
           toast({ title: "Evento Guardado", description: `Los cambios en "${sanitizedEvent.name}" han sido guardados.` });
@@ -558,7 +549,7 @@ export default function BusinessEventsPage() {
       fetchBusinessEvents();
     } catch (error: any) {
       console.error("Events Page: Error saving/updating event:", error.code, error.message, error);
-      toast({ title: "Error al Guardar Evento", description: `No se pudo guardar el evento. ${error.message}`, variant: "destructive"});
+      toast({ title: "Error al Guardar Evento", description: `No se pudo guardar el evento. ${error.message}. Payload: ${JSON.stringify(editingEvent, null, 2)}`, variant: "destructive", duration: 15000});
     } finally {
       setIsSubmitting(false);
     }
@@ -621,7 +612,7 @@ export default function BusinessEventsPage() {
 
     } catch (error: any) {
         console.error("Events Page: Error saving new codes to Firestore:", error.code, error.message, error);
-        toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos en la base de datos. ${error.message}`, variant: "destructive"});
+        toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
     }
   };
 
@@ -658,14 +649,17 @@ export default function BusinessEventsPage() {
   const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
     if (!currentBusinessId || !eventToToggle.id) {
         toast({ title: "Error", description: "ID de evento o negocio no disponible.", variant: "destructive" });
-        setIsSubmitting(false);
+        setIsSubmitting(false); // Reset submitting if it was set by another action
         return;
     }
     
     const newStatus = !eventToToggle.isActive;
     const eventName = eventToToggle.name;
 
+    // Prevent multiple submissions
+    if (isSubmitting) return;
     setIsSubmitting(true);
+    
     try {
       await updateDoc(doc(db, "businessEntities", eventToToggle.id), { isActive: newStatus });
       toast({
@@ -816,9 +810,9 @@ const handleCreateBatchBoxes = (data: BatchBoxFormData) => {
                 description: data.description,
                 status: data.status,
                 capacity: data.capacity,
-                sellerName: "", // Initialize empty for batch
-                ownerName: "",  // Initialize empty for batch
-                ownerDni: "",   // Initialize empty for batch
+                sellerName: "", 
+                ownerName: "",  
+                ownerDni: "",   
             }) as EventBox 
         );
     }
@@ -835,28 +829,28 @@ const handleAssignPromoterToEvent = () => {
         toast({ title: "Error", description: "Selecciona un evento y un promotor, o falta ID de negocio.", variant: "destructive" });
         return;
     }
-    const promoterProfile = mockBusinessPromoters.find(p => p.id === selectedPromoterForAssignment);
-    if (!promoterProfile) {
-        toast({ title: "Error", description: "Perfil de promotor no encontrado.", variant: "destructive" });
+    const promoterLinkData = availablePromotersForAssignment.find(pLink => pLink.promoterProfileId === selectedPromoterForAssignment);
+    if (!promoterLinkData) {
+        toast({ title: "Error", description: "Perfil de promotor vinculado no encontrado.", variant: "destructive" });
         return;
     }
 
-    const existingAssignment = editingEvent.assignedPromoters?.find(ap => ap.promoterProfileId === promoterProfile.id);
+    const existingAssignment = editingEvent.assignedPromoters?.find(ap => ap.promoterProfileId === promoterLinkData.promoterProfileId);
     if (existingAssignment) {
-        toast({ title: "Promotor ya Asignado", description: `${promoterProfile.name} ya está asignado a este evento.`, variant: "destructive"});
+        toast({ title: "Promotor ya Asignado", description: `${promoterLinkData.promoterName} ya está asignado a este evento.`, variant: "destructive"});
         return;
     }
 
     const newAssignment: EventPromoterAssignment = sanitizeObjectForFirestore({ 
-        promoterProfileId: promoterProfile.id,
-        promoterName: promoterProfile.name,
-        promoterEmail: promoterProfile.email,
+        promoterProfileId: promoterLinkData.promoterProfileId,
+        promoterName: promoterLinkData.promoterName,
+        promoterEmail: promoterLinkData.promoterEmail, // Make sure promoterEmail is part of BusinessPromoterLink type
         commissionRules: [], 
         notes: "",
     }) as EventPromoterAssignment;
     setEditingEvent(prev => prev ? { ...prev, assignedPromoters: [...(prev.assignedPromoters || []), newAssignment] } : null);
     setSelectedPromoterForAssignment("");
-    toast({ title: "Promotor Asignado al Evento", description: `${promoterProfile.name} asignado al evento en el editor.` });
+    toast({ title: "Promotor Asignado al Evento", description: `${promoterLinkData.promoterName} asignado al evento en el editor.` });
 };
 
 const handleRemovePromoterFromEvent = (promoterProfileId: string) => {
@@ -944,6 +938,11 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
     });
     setEditingEvent(prev => prev ? { ...prev, assignedPromoters: updatedAssignments } : null);
     toast({ title: `Regla de Comisión Eliminada del Editor`, variant: "destructive"});
+};
+
+const openStatsModal = (event: BusinessManagedEntity) => {
+    setSelectedEventForStats(event);
+    setShowStatsModal(true);
 };
 
   return (
@@ -1041,19 +1040,19 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                             </Button>
                           </TableCell>
                           <TableCell className="text-right space-x-1">
+                            <Button variant="ghost" size="xs" title="Estadísticas" onClick={() => openStatsModal(event)} disabled={isSubmitting} className="px-2 py-1 h-auto text-muted-foreground hover:text-primary">
+                                <BarChart3 className="h-4 w-4 mr-1" /> Estadísticas
+                            </Button>
                             <Button variant="ghost" size="icon" title="Duplicar Evento" onClick={() => handleOpenManageEventModal(event, true)} disabled={isSubmitting}>
                               <Copy className="h-4 w-4" />
-                              <span className="sr-only">Duplicar</span>
                             </Button>
                             <Button variant="ghost" size="icon" title="Gestionar Evento" onClick={() => handleOpenManageEventModal(event)} disabled={isSubmitting}>
                               <Edit className="h-4 w-4" />
-                              <span className="sr-only">Gestionar</span>
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" title="Eliminar Evento" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
                                   <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Eliminar</span>
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
@@ -1061,7 +1060,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                   <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
                                   <AlertDialogDescription>
                                     Esta acción no se puede deshacer. Esto eliminará permanentemente el evento:
-                                    <span className="font-semibold"> {event.name}</span> y todos sus datos asociados (entradas, boxes, códigos, etc.).
+                                    <span className="font-semibold"> {event.name}</span> y todos sus datos asociados.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -1138,7 +1137,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                         <FormControl>
                                             <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                                             {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
-                                            <CalendarShadcnIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            <CalendarShadcnUi className="ml-auto h-4 w-4 opacity-50" />
                                             </Button>
                                         </FormControl>
                                     </PopoverTrigger>
@@ -1161,7 +1160,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                         <FormControl>
                                             <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                                             {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
-                                            <CalendarShadcnIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            <CalendarShadcnUi className="ml-auto h-4 w-4 opacity-50" />
                                             </Button>
                                         </FormControl>
                                     </PopoverTrigger>
@@ -1206,19 +1205,19 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                   {isDuplicatingEvent ? `Duplicar Evento: ${(editingEvent?.name || 'Evento').replace(' (Copia)','')} (Copia)` : (editingEvent?.id ? `Gestionar Evento: ${editingEvent.name}` : "Gestionar Nuevo Evento")}
                 </DialogTitle>
                 <DialogDescription>
-                  {isDuplicatingEvent ? "Creando una copia. Ajusta los detalles. Las entradas, boxes y promotores no se duplican." : (editingEvent?.id ? "Modifica los detalles, entradas, boxes y promotores de tu evento." : "Completa los detalles principales de tu nuevo evento.")}
+                  {isDuplicatingEvent ? "Creando una copia. Ajusta los detalles." : (editingEvent?.id ? "Modifica los detalles, entradas, boxes y promotores de tu evento." : "Completa los detalles principales de tu nuevo evento.")}
                 </DialogDescription>
             </DialogHeader>
 
             {editingEvent && ( 
                  <ScrollArea className="max-h-[calc(90vh-220px)] pr-5"> 
                     <Tabs defaultValue="details" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 mb-4"> 
+                        <TabsList className="grid w-full grid-cols-4 mb-4"> {/* Adjusted to 4 cols */}
                             <TabsTrigger value="details">Detalles</TabsTrigger>
                             <TabsTrigger value="tickets">Entradas ({editingEvent.ticketTypes?.length || 0})</TabsTrigger>
                             <TabsTrigger value="boxes">Boxes ({editingEvent.eventBoxes?.length || 0})</TabsTrigger>
                             <TabsTrigger value="promoters">Promotores ({editingEvent.assignedPromoters?.length || 0})</TabsTrigger>
-                            <TabsTrigger value="stats">Estadísticas</TabsTrigger>
+                            {/* Statistics tab removed, will be in separate modal */}
                         </TabsList>
 
                         <TabsContent value="details">
@@ -1318,12 +1317,12 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                     <div className="flex items-end gap-2">
                                         <div className="flex-grow">
                                             <Label htmlFor="select-promoter-event">Seleccionar Promotor <span className="text-destructive">*</span></Label>
-                                            <Select value={selectedPromoterForAssignment} onValueChange={setSelectedPromoterForAssignment} disabled={isSubmitting || mockBusinessPromoters.length === 0}>
+                                            <Select value={selectedPromoterForAssignment} onValueChange={setSelectedPromoterForAssignment} disabled={isSubmitting || availablePromotersForAssignment.length === 0}>
                                                 <SelectTrigger id="select-promoter-event">
-                                                    <SelectValue placeholder={mockBusinessPromoters.length === 0 ? "No hay promotores para asignar" : "Elige un promotor"} />
+                                                    <SelectValue placeholder={availablePromotersForAssignment.length === 0 ? "No hay promotores vinculados al negocio" : "Elige un promotor"} />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {mockBusinessPromoters.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.email})</SelectItem>)}
+                                                    {availablePromotersForAssignment.map(pLink => <SelectItem key={pLink.promoterProfileId} value={pLink.promoterProfileId}>{pLink.promoterName} ({pLink.promoterEmail})</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -1371,24 +1370,6 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                             ))}
                                         </div>
                                     )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        <TabsContent value="stats">
-                             <Card>
-                                <CardHeader>
-                                    <CardTitle>Estadísticas para "{editingEvent.name}"</CardTitle>
-                                    <CardDescription>Resumen del rendimiento del evento.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <p><strong>Códigos Generados (Total):</strong> {editingEvent.generatedCodes?.length || 0}</p>
-                                    <p><strong>Códigos Canjeados/Asistentes:</strong> {editingEvent.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
-                                    <p><strong>Tasa de Canje/Asistencia:</strong> {editingEvent.generatedCodes && editingEvent.generatedCodes.length > 0 ? 
-                                        ((editingEvent.generatedCodes.filter(c => c.status === 'redeemed').length / editingEvent.generatedCodes.length) * 100).toFixed(1) + '%' 
-                                        : '0%'
-                                    }</p>
-                                    <p className="text-sm text-muted-foreground pt-2">Más estadísticas (top promotores, tipos de entrada más populares, etc.) estarán disponibles aquí.</p>
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -1580,6 +1561,37 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
         </DialogContent>
     </Dialog>
 
+    {/* Modal for Event Statistics */}
+    <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
+        <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Estadísticas para: {selectedEventForStats?.name}</DialogTitle>
+                <DialogDescription>Resumen del rendimiento del evento.</DialogDescription>
+            </DialogHeader>
+            {selectedEventForStats && (
+                <div className="space-y-3 py-4">
+                    <p><strong>Códigos Generados (Total):</strong> {selectedEventForStats.generatedCodes?.length || 0}</p>
+                    <p><strong>Códigos Canjeados/Asistentes:</strong> {selectedEventForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
+                    <p><strong>Tasa de Canje/Asistencia:</strong> {selectedEventForStats.generatedCodes && selectedEventForStats.generatedCodes.length > 0 ? 
+                        ((selectedEventForStats.generatedCodes.filter(c => c.status === 'redeemed').length / selectedEventForStats.generatedCodes.length) * 100).toFixed(1) + '%' 
+                        : '0%'}
+                    </p>
+                    <div className="border-t pt-3 mt-3">
+                        <h4 className="font-semibold text-muted-foreground">Más Detalles (Ejemplos):</h4>
+                        <ul className="list-disc list-inside text-sm text-muted-foreground">
+                            <li>Top Promotor (Ventas): [Nombre Promotor Ejemplo]</li>
+                            <li>Entrada Más Popular: [Nombre Entrada Ejemplo]</li>
+                            <li>Ingresos Estimados por Entradas: S/ [Monto Ejemplo]</li>
+                        </ul>
+                    </div>
+                </div>
+            )}
+            <UIDialogFooter>
+                <Button variant="outline" onClick={() => setShowStatsModal(false)}>Cerrar</Button>
+            </UIDialogFooter>
+        </DialogContent>
+    </Dialog>
+
 
     {selectedEntityForCreatingCodes && (
       <CreateCodesDialog
@@ -1627,3 +1639,6 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
     </div>
   );
 }
+
+
+    
