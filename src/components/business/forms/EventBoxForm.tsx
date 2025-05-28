@@ -107,7 +107,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Detalles del box, ej: Incluye 2 botellas y piqueos." {...field} rows={2} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del box, ej: Incluye 2 botellas y piqueos." {...field} value={field.value || ''} rows={2} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -118,7 +118,19 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Capacidad (Personas)</FormLabel>
-              <FormControl><Input type="number" placeholder="8" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)} disabled={isSubmitting} /></FormControl>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  placeholder="8" 
+                  {...field} 
+                  value={field.value === undefined || field.value === null ? '' : field.value}
+                  onChange={e => {
+                    const val = e.target.value;
+                    const numVal = parseInt(val, 10);
+                    field.onChange(val === "" ? undefined : (isNaN(numVal) ? undefined : numVal));
+                  }} 
+                  disabled={isSubmitting} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -129,7 +141,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Vendedor Asignado (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Nombre del vendedor" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Nombre del vendedor" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -140,7 +152,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre Dueño del Box (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
               <FormDescription className="text-xs">Si el box es reservado por un cliente específico.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -152,7 +164,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>DNI/CE Dueño del Box (Opcional)</FormLabel>
-              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -163,7 +175,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Estado <span className="text-destructive">*</span></FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+              <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona un estado" />
