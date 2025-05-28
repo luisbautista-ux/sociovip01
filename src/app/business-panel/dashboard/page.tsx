@@ -5,7 +5,7 @@ import { StatCard } from "@/components/admin/StatCard";
 import { Ticket, Calendar, Users, BarChart3, ScanLine, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
@@ -16,7 +16,7 @@ interface BusinessDashboardStats {
   activePromotions: number;
   upcomingEvents: number;
   totalRedemptionsToday: number;
-  newCustomersThisWeek: number; // Will remain mock for now
+  newCustomersThisWeek: number; 
 }
 
 export default function BusinessDashboardPage() {
@@ -29,82 +29,115 @@ export default function BusinessDashboardPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchBusinessStats = useCallback(async (businessId: string) => {
+    console.log("BusinessDashboardPage: Fetching stats for businessId:", businessId);
+    setIsLoading(true);
+    try {
+      const entitiesQuery = query(
+        collection(db, "businessEntities"),
+        where("businessId", "==", businessId)
+      );
+      const querySnapshot = await getDocs(entitiesQuery);
+      console.log("BusinessDashboardPage: Fetched entities snapshot size:", querySnapshot.size);
+
+      const entities: BusinessManagedEntity[] = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        const nowISO = new Date().toISOString();
+        return {
+          id: docSnap.id,
+          businessId: data.businessId,
+          type: data.type,
+          name: data.name || "Entidad sin nombre",
+          description: data.description || "",
+          startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : (typeof data.startDate === 'string' ? data.startDate : nowISO),
+          endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : (typeof data.endDate === 'string' ? data.endDate : nowISO),
+          usageLimit: data.usageLimit === undefined ? 0 : data.usageLimit,
+          maxAttendance: data.maxAttendance === undefined ? 0 : data.maxAttendance,
+          isActive: data.isActive === undefined ? true : data.isActive,
+          generatedCodes: data.generatedCodes || [],
+          // Ensure all other optional fields from BusinessManagedEntity are handled or defaulted if necessary
+          ticketTypes: data.ticketTypes || [],
+          eventBoxes: data.eventBoxes || [],
+          assignedPromoters: data.assignedPromoters || [],
+          imageUrl: data.imageUrl || "",
+          aiHint: data.aiHint || "",
+          termsAndConditions: data.termsAndConditions || "",
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
+        } as BusinessManagedEntity;
+      });
+      console.log("BusinessDashboardPage: Processed entities:", entities.length);
+
+
+      let activePromotionsCount = 0;
+      let upcomingEventsCount = 0;
+      let redemptionsTodayCount = 0;
+      const todayStart = startOfDay(new Date());
+      const todayEnd = endOfDay(new Date());
+
+      entities.forEach(entity => {
+        // console.log("BusinessDashboardPage: Checking entity:", entity.name, "Type:", entity.type, "Active:", entity.isActive, "Start:", entity.startDate, "End:", entity.endDate);
+        if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
+          activePromotionsCount++;
+        }
+        if (entity.type === 'event' && entity.isActive) { // Check isActive first
+          if (entity.startDate && isFuture(new Date(entity.startDate))) {
+            upcomingEventsCount++;
+          }
+        }
+
+        entity.generatedCodes?.forEach(code => {
+          if (code.status === 'redeemed' && code.redemptionDate) {
+            try {
+              const redemptionDateObj = new Date(code.redemptionDate);
+              if (redemptionDateObj >= todayStart && redemptionDateObj <= todayEnd) {
+                redemptionsTodayCount++;
+              }
+            } catch (e) {
+              console.warn("BusinessDashboardPage: Invalid redemptionDate format for code:", code.id, code.redemptionDate);
+            }
+          }
+        });
+      });
+      
+      console.log("BusinessDashboardPage: Calculated activePromotions:", activePromotionsCount);
+      console.log("BusinessDashboardPage: Calculated upcomingEvents:", upcomingEventsCount);
+      console.log("BusinessDashboardPage: Calculated redemptionsToday:", redemptionsTodayCount);
+
+      setStats(prevStats => ({
+        ...prevStats,
+        activePromotions: activePromotionsCount,
+        upcomingEvents: upcomingEventsCount,
+        totalRedemptionsToday: redemptionsTodayCount,
+        // newCustomersThisWeek remains mock for now
+      }));
+
+    } catch (error: any) {
+      console.error("BusinessDashboardPage: Error fetching business dashboard stats:", error.code, error.message, error);
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+    } finally {
+      setIsLoading(false);
+      console.log("BusinessDashboardPage: fetchBusinessStats finished.");
+    }
+  }, []);
+
   useEffect(() => {
     if (loadingAuth || loadingProfile) {
       setIsLoading(true);
       return;
     }
-    if (!userProfile || !userProfile.businessId) {
+    if (userProfile && userProfile.businessId) {
+      fetchBusinessStats(userProfile.businessId);
+    } else if (userProfile && !userProfile.businessId && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'))) {
+      console.warn("BusinessDashboardPage: User is business_admin/staff but has no businessId in profile.");
       setIsLoading(false);
       // Potentially show an error or a message "No business associated"
-      return;
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+    } else {
+      setIsLoading(false); // User might not be a business user or profile not fully loaded
     }
+  }, [userProfile, loadingAuth, loadingProfile, fetchBusinessStats]);
 
-    const fetchBusinessStats = async () => {
-      setIsLoading(true);
-      try {
-        const businessId = userProfile.businessId;
-        if (!businessId) {
-          setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
-          setIsLoading(false);
-          return;
-        }
-
-        const entitiesQuery = query(
-          collection(db, "businessEntities"),
-          where("businessId", "==", businessId)
-        );
-        const querySnapshot = await getDocs(entitiesQuery);
-        const entities: BusinessManagedEntity[] = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        } as BusinessManagedEntity));
-
-        let activePromotionsCount = 0;
-        let upcomingEventsCount = 0;
-        let redemptionsTodayCount = 0;
-        const todayStart = startOfDay(new Date());
-        const todayEnd = endOfDay(new Date());
-
-        entities.forEach(entity => {
-          if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
-            activePromotionsCount++;
-          }
-          if (entity.type === 'event' && entity.isActive && entity.startDate && isFuture(new Date(entity.startDate))) {
-            upcomingEventsCount++;
-          }
-
-          entity.generatedCodes?.forEach(code => {
-            if (code.status === 'redeemed' && code.redemptionDate) {
-              const redemptionDateObj = new Date(code.redemptionDate);
-              if (redemptionDateObj >= todayStart && redemptionDateObj <= todayEnd) {
-                redemptionsTodayCount++;
-              }
-            }
-          });
-        });
-        
-        // newCustomersThisWeek remains mock for now due to complexity
-        setStats(prevStats => ({
-          ...prevStats,
-          activePromotions: activePromotionsCount,
-          upcomingEvents: upcomingEventsCount,
-          totalRedemptionsToday: redemptionsTodayCount,
-          // newCustomersThisWeek: ... // TODO: Implement real calculation
-        }));
-
-      } catch (error) {
-        console.error("Error fetching business dashboard stats:", error);
-        // Keep mock or default stats on error
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchBusinessStats();
-  }, [userProfile, loadingAuth, loadingProfile]);
-
-  if (isLoading) {
+  if (isLoading || loadingAuth || loadingProfile) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -130,7 +163,7 @@ export default function BusinessDashboardPage() {
             <BarChart3 className="h-6 w-6 mr-2 text-primary" />
             Rendimiento Reciente de Promociones
           </CardTitle>
-          <CardDescription>Visualiza cómo están funcionando tus promociones. (Datos de ejemplo)</CardDescription>
+          <CardDescription>Visualiza cómo están funcionando tus promociones. (Datos de ejemplo para el gráfico)</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px] flex items-center justify-center">
           {/* TODO: Connect this chart to real, aggregated data */}
