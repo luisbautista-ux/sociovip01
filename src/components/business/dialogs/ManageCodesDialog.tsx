@@ -1,6 +1,7 @@
 
 "use client";
 
+import * as React from "react"; // Added this import
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +10,7 @@ import { useState, useEffect, useMemo } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ClipboardList, ClipboardCopy, ChevronDown, ChevronUp, Copy } from "lucide-react";
+import { PlusCircle, Trash2, ClipboardCopy, ChevronDown, ChevronUp, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,9 +19,9 @@ import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from
 
 interface ProcessedCodeItem {
   isBatch: boolean;
-  id: string; // Unique key for React list
-  batchId?: string; // Identifier for the batch
-  observation?: string | null; // Allow null
+  id: string; 
+  batchId?: string; 
+  observation?: string | null;
   generatedDate?: string;
   codesInBatch?: GeneratedCode[];
   singleCode?: GeneratedCode;
@@ -40,21 +41,22 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
     const currentBatch: GeneratedCode[] = [currentCode];
     let j = i + 1;
     
-    // Group codes if they have the exact same generation date and observation
-    // Handle null/undefined for observation consistently
     const currentObservation = currentCode.observation === undefined ? null : currentCode.observation;
+    const currentGeneratedTime = new Date(currentCode.generatedDate).getTime();
 
     while (
       j < sortedCodes.length &&
-      new Date(sortedCodes[j].generatedDate).getTime() === new Date(currentCode.generatedDate).getTime() &&
+      new Date(sortedCodes[j].generatedDate).getTime() === currentGeneratedTime &&
       (sortedCodes[j].observation === undefined ? null : sortedCodes[j].observation) === currentObservation
     ) {
       currentBatch.push(sortedCodes[j]);
       j++;
     }
 
+    const batchKeyBase = `${new Date(currentCode.generatedDate).toISOString()}-${currentObservation || 'no-obs'}`;
+    
     if (currentBatch.length > 1) {
-      const batchKey = `${new Date(currentCode.generatedDate).toISOString()}-${currentObservation || 'no-obs'}-${i}`;
+      const batchKey = `${batchKeyBase}-${i}`; // Ensure unique key for batch
       processedItems.push({
         isBatch: true,
         id: batchKey,
@@ -65,9 +67,11 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
       });
       i = j; 
     } else {
+      // Ensure single codes also have a truly unique ID for the list if their original ID isn't sufficient
+      // Though 'currentCode.id' should ideally be unique from Firestore or client-side generation
       processedItems.push({
         isBatch: false,
-        id: currentCode.id,
+        id: currentCode.id || `${batchKeyBase}-single-${i}`,
         singleCode: currentCode,
       });
       i++;
@@ -99,8 +103,8 @@ export function ManageCodesDialog({
   useEffect(() => {
     if (open && entity?.generatedCodes) {
       setInternalCodes([...entity.generatedCodes]);
-      setExpandedBatches({}); // Reset expanded state when dialog opens or entity changes
-    } else if (open && !entity?.generatedCodes) {
+      setExpandedBatches({}); 
+    } else if (open && (!entity || !entity.generatedCodes)) {
       setInternalCodes([]);
       setExpandedBatches({});
     }
@@ -125,7 +129,7 @@ export function ManageCodesDialog({
     }
     const updatedRawCodes = internalCodes.filter(c => c.id !== codeId);
     setInternalCodes(updatedRawCodes);
-    onCodesUpdated(entity.id, updatedRawCodes); // Propagate update to parent
+    onCodesUpdated(entity.id, updatedRawCodes); 
     toast({ title: "Código Eliminado", description: "El código ha sido eliminado.", variant: "destructive" });
   };
 
@@ -164,18 +168,18 @@ export function ManageCodesDialog({
     }
   };
 
-
   if (!entity) return null; 
 
-  const renderCodeRow = (code: GeneratedCode, isInsideBatch = false) => (
+  const renderCodeRow = (code: GeneratedCode, isInsideBatch = false, batchBorder = false) => (
     <TableRow 
         key={code.id} 
         className={cn(
             "text-xs", 
-            isInsideBatch ? "bg-muted/30 hover:bg-muted/50" : "hover:bg-muted/20"
+            isInsideBatch ? "bg-muted/20 hover:bg-muted/40" : "hover:bg-muted/20",
+            batchBorder && "border-l-4 border-primary/50" // Add left border for batched items
         )}
     >
-      <TableCell className="font-mono py-1.5 px-2">
+      <TableCell className={cn("font-mono py-1.5 px-2", isInsideBatch && batchBorder && "pl-4")}>
         <div className="flex items-center gap-1">
             <span>{code.value}</span>
             <Button
@@ -289,8 +293,8 @@ export function ManageCodesDialog({
                         </TableRow>
                         {isExpanded && (
                           <>
-                            <TableRow>
-                                <TableCell colSpan={7} className="pt-2 pb-1 px-6 bg-muted/10">
+                            <TableRow className="bg-muted/10">
+                                <TableCell colSpan={7} className="pt-1 pb-1 px-6">
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -301,13 +305,13 @@ export function ManageCodesDialog({
                                     </Button>
                                 </TableCell>
                             </TableRow>
-                            {item.codesInBatch.map(code => renderCodeRow(code, true))}
+                            {item.codesInBatch.map(code => renderCodeRow(code, true, true))}
                           </>
                         )}
                       </React.Fragment>
                     );
                   } else if (item.singleCode) {
-                    return renderCodeRow(item.singleCode, false);
+                    return renderCodeRow(item.singleCode, false, false);
                   }
                   return null;
                 })}
@@ -316,7 +320,7 @@ export function ManageCodesDialog({
           </ScrollArea>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
-            <ClipboardList className="h-12 w-12 mb-2"/>
+            <ClipboardCopy className="h-12 w-12 mb-2"/> {/* Changed icon for better context */}
             <p>No hay códigos generados para esta entidad aún.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>
           </div>
@@ -328,5 +332,3 @@ export function ManageCodesDialog({
     </Dialog>
   );
 }
-
-    
