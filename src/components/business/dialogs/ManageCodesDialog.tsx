@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as React from "react"; // Added this import
+import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ClipboardCopy, ChevronDown, ChevronUp, Copy } from "lucide-react";
+import { PlusCircle, Trash2, ClipboardCopy, ChevronDown, ChevronUp, Copy, AlertTriangle } from "lucide-react"; // Added AlertTriangle
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,10 +19,10 @@ import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from
 
 interface ProcessedCodeItem {
   isBatch: boolean;
-  id: string; 
-  batchId?: string; 
+  id: string;
+  batchId?: string;
   observation?: string | null;
-  generatedDate?: string;
+  generatedDate?: string; // Common generatedDate for the batch
   codesInBatch?: GeneratedCode[];
   singleCode?: GeneratedCode;
 }
@@ -42,21 +42,22 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
     let j = i + 1;
     
     const currentObservation = currentCode.observation === undefined ? null : currentCode.observation;
-    const currentGeneratedTime = new Date(currentCode.generatedDate).getTime();
+    // Group by date (ignoring seconds/milliseconds for more stable grouping if needed, but full ISO string is fine for exact matches)
+    const currentGeneratedTimeSignature = `${new Date(currentCode.generatedDate).toISOString().substring(0, 19)}-${currentCode.generatedByName}`; // Group also by creator for batches
 
     while (
       j < sortedCodes.length &&
-      new Date(sortedCodes[j].generatedDate).getTime() === currentGeneratedTime &&
+      `${new Date(sortedCodes[j].generatedDate).toISOString().substring(0, 19)}-${sortedCodes[j].generatedByName}` === currentGeneratedTimeSignature &&
       (sortedCodes[j].observation === undefined ? null : sortedCodes[j].observation) === currentObservation
     ) {
       currentBatch.push(sortedCodes[j]);
       j++;
     }
 
-    const batchKeyBase = `${new Date(currentCode.generatedDate).toISOString()}-${currentObservation || 'no-obs'}`;
+    const batchKeyBase = `${currentGeneratedTimeSignature}-${currentObservation || 'no-obs'}`;
     
     if (currentBatch.length > 1) {
-      const batchKey = `${batchKeyBase}-${i}`; // Ensure unique key for batch
+      const batchKey = `${batchKeyBase}-${i}`;
       processedItems.push({
         isBatch: true,
         id: batchKey,
@@ -67,11 +68,9 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
       });
       i = j; 
     } else {
-      // Ensure single codes also have a truly unique ID for the list if their original ID isn't sufficient
-      // Though 'currentCode.id' should ideally be unique from Firestore or client-side generation
       processedItems.push({
         isBatch: false,
-        id: currentCode.id || `${batchKeyBase}-single-${i}`,
+        id: currentCode.id || `${batchKeyBase}-single-${i}-${Math.random().toString(36).slice(2)}`, // Ensure unique key
         singleCode: currentCode,
       });
       i++;
@@ -102,7 +101,7 @@ export function ManageCodesDialog({
 
   useEffect(() => {
     if (open && entity?.generatedCodes) {
-      setInternalCodes([...entity.generatedCodes]);
+      setInternalCodes([...entity.generatedCodes]); // Create a mutable copy
       setExpandedBatches({}); 
     } else if (open && (!entity || !entity.generatedCodes)) {
       setInternalCodes([]);
@@ -130,8 +129,36 @@ export function ManageCodesDialog({
     const updatedRawCodes = internalCodes.filter(c => c.id !== codeId);
     setInternalCodes(updatedRawCodes);
     onCodesUpdated(entity.id, updatedRawCodes); 
-    toast({ title: "Código Eliminado", description: "El código ha sido eliminado.", variant: "destructive" });
+    toast({ title: "Código Eliminado", description: `El código "${codeToDelete?.value}" ha sido eliminado.`, variant: "destructive" });
   };
+
+  const handleDeleteBatchCodes = (batchItem: ProcessedCodeItem) => {
+    if (!entity || !batchItem.isBatch || !batchItem.codesInBatch) return;
+
+    const codesInBatchIds = batchItem.codesInBatch.map(c => c.id);
+    const codesToDeleteFromBatch = batchItem.codesInBatch.filter(c => c.status !== 'redeemed').map(c => c.id);
+    
+    if (codesToDeleteFromBatch.length === 0) {
+        toast({ title: "Nada que Eliminar", description: "Todos los códigos en este lote ya han sido canjeados o no hay códigos elegibles para eliminar.", variant: "default"});
+        return;
+    }
+
+    const updatedRawCodes = internalCodes.filter(c => !codesToDeleteFromBatch.includes(c.id));
+    
+    setInternalCodes(updatedRawCodes);
+    onCodesUpdated(entity.id, updatedRawCodes);
+    toast({ title: "Códigos del Lote Eliminados", description: `${codesToDeleteFromBatch.length} código(s) no canjeado(s) del lote han sido eliminados.`, variant: "destructive" });
+    // Collapse the batch if all its displayable codes were removed (or if it's empty now)
+    const remainingInBatch = updatedRawCodes.filter(c => codesInBatchIds.includes(c.id));
+    if (remainingInBatch.length === 0) {
+      setExpandedBatches(prev => {
+        const newState = {...prev};
+        if(batchItem.batchId) delete newState[batchItem.batchId];
+        return newState;
+      });
+    }
+  };
+
 
   const handleCopyIndividualCode = async (codeValue: string) => {
     try {
@@ -170,16 +197,15 @@ export function ManageCodesDialog({
 
   if (!entity) return null; 
 
-  const renderCodeRow = (code: GeneratedCode, isInsideBatch = false, batchBorder = false) => (
+  const renderCodeRow = (code: GeneratedCode, isInsideBatch = false, isFirstInBatch = false) => (
     <TableRow 
-        key={code.id} 
+        key={code.id || `code-fallback-${Math.random()}`}
         className={cn(
             "text-xs", 
-            isInsideBatch ? "bg-muted/20 hover:bg-muted/40" : "hover:bg-muted/20",
-            batchBorder && "border-l-4 border-primary/50" // Add left border for batched items
+            isInsideBatch ? "bg-muted/10 hover:bg-muted/30" : "hover:bg-muted/20",
         )}
     >
-      <TableCell className={cn("font-mono py-1.5 px-2", isInsideBatch && batchBorder && "pl-4")}>
+      <TableCell className={cn("font-mono py-1.5 px-2", isInsideBatch && "pl-6")}> {/* Indent batched codes */}
         <div className="flex items-center gap-1">
             <span>{code.value}</span>
             <Button
@@ -195,7 +221,7 @@ export function ManageCodesDialog({
       </TableCell>
       <TableCell className="py-1.5 px-2">{code.generatedByName}</TableCell>
       <TableCell className="py-1.5 px-2">
-          <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status]} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status]}</Badge>
+          <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status] || 'outline'} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status] || code.status}</Badge>
       </TableCell>
       <TableCell className="py-1.5 px-2 max-w-[150px] truncate" title={code.observation || undefined}>{code.observation || "N/A"}</TableCell>
       <TableCell className="py-1.5 px-2">{code.generatedDate ? format(new Date(code.generatedDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}</TableCell>
@@ -241,7 +267,7 @@ export function ManageCodesDialog({
         <DialogHeader>
           <DialogTitle>Códigos para: {entity.name}</DialogTitle>
           <DialogDescription>
-            Visualiza y gestiona los códigos existentes. Se ordenan por fecha de creación (más recientes primero) y se agrupan si se crearon juntos con la misma observación.
+            Visualiza y gestiona los códigos existentes. Se ordenan por fecha de creación (más recientes primero) y se agrupan si se crearon juntos con la misma observación y por el mismo usuario.
           </DialogDescription>
         </DialogHeader>
 
@@ -276,6 +302,7 @@ export function ManageCodesDialog({
                 {processedAndGroupedCodes.map((item) => {
                   if (item.isBatch && item.codesInBatch && item.batchId) {
                     const isExpanded = !!expandedBatches[item.batchId];
+                    const nonRedeemedInBatchCount = item.codesInBatch.filter(c => c.status !== 'redeemed').length;
                     return (
                       <React.Fragment key={item.id}>
                         <TableRow 
@@ -285,7 +312,7 @@ export function ManageCodesDialog({
                           <TableCell colSpan={7} className="py-2.5 px-4 text-sm">
                             <div className="flex items-center justify-start group w-full">
                               {isExpanded ? <ChevronUp className="h-4 w-4 mr-2 shrink-0" /> : <ChevronDown className="h-4 w-4 mr-2 shrink-0" />}
-                              Lote de {item.codesInBatch.length} códigos
+                              Lote de {item.codesInBatch.length} códigos (Creado por: {item.codesInBatch[0]?.generatedByName || 'N/A'})
                               {item.generatedDate && ` (${format(new Date(item.generatedDate), "P p", { locale: es })})`}
                               {item.observation && <span className="ml-2 text-muted-foreground text-xs truncate" title={item.observation}> - Obs: {item.observation}</span>}
                             </div>
@@ -293,16 +320,47 @@ export function ManageCodesDialog({
                         </TableRow>
                         {isExpanded && (
                           <>
-                            <TableRow className="bg-muted/10">
-                                <TableCell colSpan={7} className="pt-1 pb-1 px-6">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-xs h-auto py-1 px-2"
-                                        onClick={(e) => { e.stopPropagation(); handleCopyBatchCodes(item.codesInBatch);}}
-                                    >
-                                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Códigos del Lote ({item.codesInBatch!.length})
-                                    </Button>
+                            <TableRow className="bg-muted/5">
+                                <TableCell colSpan={7} className="pt-2 pb-1 px-6">
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="xs"
+                                            className="text-xs h-auto py-1 px-2"
+                                            onClick={(e) => { e.stopPropagation(); handleCopyBatchCodes(item.codesInBatch);}}
+                                        >
+                                            <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Lote ({item.codesInBatch!.length})
+                                        </Button>
+                                        {nonRedeemedInBatchCount > 0 && (
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="xs"
+                                                        className="text-xs h-auto py-1 px-2"
+                                                        onClick={(e) => e.stopPropagation()} // Prevent row click
+                                                    >
+                                                        <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Eliminar No Canjeados ({nonRedeemedInBatchCount})
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2"/>¿Eliminar Códigos del Lote?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Se eliminarán {nonRedeemedInBatchCount} código(s) no canjeado(s) de este lote. 
+                                                            Los códigos ya canjeados no se verán afectados. Esta acción no se puede deshacer.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteBatchCodes(item)} className="bg-destructive hover:bg-destructive/90">
+                                                            Sí, Eliminar No Canjeados
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        )}
+                                    </div>
                                 </TableCell>
                             </TableRow>
                             {item.codesInBatch.map(code => renderCodeRow(code, true, true))}
@@ -320,7 +378,7 @@ export function ManageCodesDialog({
           </ScrollArea>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
-            <ClipboardCopy className="h-12 w-12 mb-2"/> {/* Changed icon for better context */}
+            <ClipboardCopy className="h-12 w-12 mb-2"/>
             <p>No hay códigos generados para esta entidad aún.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>
           </div>
@@ -332,3 +390,5 @@ export function ManageCodesDialog({
     </Dialog>
   );
 }
+
+    
