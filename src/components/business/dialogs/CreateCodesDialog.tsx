@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import type { GeneratedCode } from "@/lib/types";
-import { CheckCircle, Copy, PlusCircle, Loader2 } from "lucide-react"; // Added Loader2
+import { CheckCircle, Copy, PlusCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function generateAlphanumericCode(length: number): string {
@@ -27,7 +27,8 @@ interface CreateCodesDialogProps {
   entityId: string;
   onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string) => void;
   existingCodesValues: string[]; 
-  isSubmitting?: boolean; // Added for consistency
+  isSubmittingMain?: boolean; // Renamed from isSubmitting to avoid conflict if parent has it
+  currentUserProfileName?: string; // Added prop
 }
 
 export function CreateCodesDialog({ 
@@ -37,12 +38,14 @@ export function CreateCodesDialog({
     entityId, 
     onCodesCreated,
     existingCodesValues,
-    isSubmitting = false, // Default to false
+    isSubmittingMain = false, // Default to false
+    currentUserProfileName, // Destructure new prop
 }: CreateCodesDialogProps) {
   const [numCodes, setNumCodes] = useState(1);
   const [observation, setObservation] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [justCreatedCodes, setJustCreatedCodes] = useState<GeneratedCode[]>([]);
+  const [isCreating, setIsCreating] = useState(false); // Local submitting state
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,6 +54,7 @@ export function CreateCodesDialog({
       setObservation("");
       setShowSuccess(false);
       setJustCreatedCodes([]);
+      setIsCreating(false);
     }
   }, [open]);
 
@@ -63,6 +67,7 @@ export function CreateCodesDialog({
       });
       return;
     }
+    setIsCreating(true);
 
     const newCodesBatch: GeneratedCode[] = [];
     const currentAndNewCodes = new Set(existingCodesValues);
@@ -70,7 +75,7 @@ export function CreateCodesDialog({
     for (let i = 0; i < numCodes; i++) {
       let newCodeValue = generateAlphanumericCode(9);
       let attemptCount = 0;
-      const maxAttempts = 100; // Prevent infinite loop if character space is too small for many codes
+      const maxAttempts = 100; 
 
       while (currentAndNewCodes.has(newCodeValue) && attemptCount < maxAttempts) {
         newCodeValue = generateAlphanumericCode(9); 
@@ -82,24 +87,29 @@ export function CreateCodesDialog({
             description: "No se pudo generar un código único después de varios intentos. Intente con menos códigos o más tarde.",
             variant: "destructive"
         });
-        return; // Stop if we can't find a unique code
+        setIsCreating(false);
+        return; 
       }
 
       currentAndNewCodes.add(newCodeValue);
       newCodesBatch.push({
-        id: `code-${entityId}-${Date.now()}-${i}`, // Consider a more robust ID generation if needed
+        id: `code-${entityId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
         entityId: entityId,
         value: newCodeValue,
         status: "available",
-        generatedByName: "Negocio", // Updated to be more generic
+        generatedByName: currentUserProfileName || "Sistema", // Use passed name or fallback
         generatedDate: new Date().toISOString(),
-        observation: observation || undefined,
+        observation: observation.trim() === "" ? null : observation.trim(),
+        redemptionDate: null,
+        redeemedByInfo: null,
+        isVipCandidate: false,
       });
     }
     
-    onCodesCreated(entityId, newCodesBatch, observation || undefined);
+    onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim());
     setJustCreatedCodes(newCodesBatch);
     setShowSuccess(true);
+    setIsCreating(false);
   };
 
   const handleCopyCreatedCodes = async () => {
@@ -119,11 +129,12 @@ export function CreateCodesDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
-        if (!isOpen) { // Reset states when dialog is closed
+        if (!isOpen) { 
             setNumCodes(1);
             setObservation("");
             setShowSuccess(false);
             setJustCreatedCodes([]);
+            setIsCreating(false);
         }
         onOpenChange(isOpen);
     }}>
@@ -151,7 +162,7 @@ export function CreateCodesDialog({
                 value={numCodes}
                 onChange={(e) => setNumCodes(parseInt(e.target.value, 10) || 1)}
                 className="mt-1"
-                disabled={isSubmitting}
+                disabled={isCreating || isSubmittingMain}
               />
             </div>
             <div>
@@ -163,7 +174,7 @@ export function CreateCodesDialog({
                 onChange={(e) => setObservation(e.target.value)}
                 className="mt-1"
                 rows={3}
-                disabled={isSubmitting}
+                disabled={isCreating || isSubmittingMain}
               />
             </div>
           </div>
@@ -187,9 +198,9 @@ export function CreateCodesDialog({
             <Button onClick={handleCloseAndReset} className="w-full" variant="outline">Cerrar</Button>
           ) : (
             <>
-              <Button variant="outline" onClick={handleCloseAndReset} disabled={isSubmitting}>Cancelar</Button>
-              <Button onClick={handleCreateCodes} className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button variant="outline" onClick={handleCloseAndReset} disabled={isCreating || isSubmittingMain}>Cancelar</Button>
+              <Button onClick={handleCreateCodes} className="bg-primary hover:bg-primary/90" disabled={isCreating || isSubmittingMain}>
+                {(isCreating || isSubmittingMain) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <PlusCircle className="mr-2 h-4 w-4" /> Crear Códigos
               </Button>
             </>

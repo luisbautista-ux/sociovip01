@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { CreateBatchBoxesDialog } from "@/components/business/dialogs/CreateBatchBoxesDialog";
-import { isEntityCurrentlyActivatable, calculateMaxAttendance } from "@/lib/utils";
+import { isEntityCurrentlyActivatable, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch } from "firebase/firestore";
@@ -46,10 +46,10 @@ const initialEventFormSchema = z.object({
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
 }).refine(data => {
-    if (!data.startDate || !data.endDate) return true; // Validation handled by required_error
+    if (!data.startDate || !data.endDate) return true; 
     const start = startOfDay(data.startDate);
-    const end = startOfDay(data.endDate); // Compare start of day for both
-    return isEqual(end, start) || isBefore(start, end) || isEqual(start, end) ;
+    const end = startOfDay(data.endDate); 
+    return isEqual(end, start) || isBefore(start, end) ;
 }, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
   path: ["endDate"],
@@ -65,33 +65,6 @@ const commissionRuleFormSchema = z.object({
   commissionValue: z.coerce.number().min(0, "El valor no puede ser negativo."),
   description: z.string().optional(),
 });
-
-
-// Helper function to sanitize an object for Firestore, converting undefined to null
-function sanitizeObjectForFirestore(obj: any): any {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeObjectForFirestore(item));
-  }
-
-  const sanitized: { [key: string]: any } = {};
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const value = obj[key];
-      if (value === undefined) {
-        sanitized[key] = null; // Convert undefined to null
-      } else if (typeof value === 'object') {
-        sanitized[key] = sanitizeObjectForFirestore(value);
-      } else {
-        sanitized[key] = value;
-      }
-    }
-  }
-  return sanitized;
-}
 
 
 export default function BusinessEventsPage() {
@@ -115,7 +88,6 @@ export default function BusinessEventsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false); 
   const { toast } = useToast();
 
-  // States for managing sub-entities within the main event modal
   const [editingTicketInEventModal, setEditingTicketInEventModal] = useState<TicketType | null>(null);
   const [showTicketFormInEventModal, setShowTicketFormInEventModal] = useState(false);
 
@@ -123,7 +95,7 @@ export default function BusinessEventsPage() {
   const [showBoxFormInEventModal, setShowBoxFormInEventModal] = useState(false);
   const [showCreateBatchBoxesModal, setShowCreateBatchBoxesModal] = useState(false);
   
-  const [availablePromoters, setAvailablePromoters] = useState<PromoterProfile[]>([]); 
+  const [mockBusinessPromoters, setMockBusinessPromoters] = useState<PromoterProfile[]>([]); 
   const [selectedPromoterForAssignment, setSelectedPromoterForAssignment] = useState<string>("");
   
   const [showCommissionRuleForm, setShowCommissionRuleForm] = useState(false);
@@ -153,27 +125,26 @@ export default function BusinessEventsPage() {
   });
 
   const fetchBusinessPromoters = useCallback(async () => {
-    // This will fetch all global promoter profiles.
-    // In a real app, you might have a more specific list or relation.
     if (!currentBusinessId) {
-      setAvailablePromoters([]);
+      setMockBusinessPromoters([]);
       return;
     }
     console.log('Events Page: Fetching promoter profiles for assignment. UserProfile:', userProfile);
     try {
-      const globalPromotersSnap = await getDocs(collection(db, "promoterProfiles"));
+      const q = query(collection(db, "promoterProfiles"));
+      const globalPromotersSnap = await getDocs(q);
       const fetchedPromoters: PromoterProfile[] = globalPromotersSnap.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data()
       } as PromoterProfile));
-      setAvailablePromoters(fetchedPromoters);
+      setMockBusinessPromoters(fetchedPromoters);
       console.log('Events Page: Fetched promoter profiles:', fetchedPromoters.length);
     } catch (error: any) { 
       console.error("Events Page: Error fetching promoter profiles:", error.code, error.message, error);
-      setAvailablePromoters([]); // Set to empty on error to prevent UI issues
+      setMockBusinessPromoters([]); 
       toast({ 
         title: "Error al Cargar Promotores Disponibles", 
-        description: `No se pudieron obtener los perfiles de promotores globales. ${error.message}`, 
+        description: `No se pudieron obtener los perfiles de promotores. ${error.message}`, 
         variant: "destructive", 
         duration: 7000 
       });
@@ -187,9 +158,10 @@ export default function BusinessEventsPage() {
       setIsLoading(false);
       return;
     }
-    const businessId = userProfile.businessId;
-    if (typeof businessId !== 'string' || businessId.trim() === '') {
-      console.error("Events Page: Error: Se intentó consultar con un businessId inválido.", "businessId:", businessId, "UserProfile:", userProfile);
+    
+    const businessIdToQuery = userProfile.businessId;
+    if (typeof businessIdToQuery !== 'string' || businessIdToQuery.trim() === '') {
+      console.error("Events Page: Error: Se intentó consultar con un businessId inválido.", "businessId:", businessIdToQuery, "UserProfile:", userProfile);
       setEvents([]);
       setIsLoading(false);
       if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
@@ -199,10 +171,10 @@ export default function BusinessEventsPage() {
     }
     
     console.log('Events Page: UserProfile for query:', userProfile);
-    console.log('Events Page: Querying events with businessId:', businessId);
+    console.log('Events Page: Querying events with businessId:', businessIdToQuery);
     setIsLoading(true);
     try {
-      const q = query(collection(db, "businessEntities"), where("businessId", "==", businessId), where("type", "==", "event"));
+      const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToQuery), where("type", "==", "event"));
       const querySnapshot = await getDocs(q);
       console.log("Events Page: Firestore query executed. Snapshot size:", querySnapshot.size);
       
@@ -211,35 +183,35 @@ export default function BusinessEventsPage() {
         const nowISO = new Date().toISOString();
 
         const ticketTypesData = Array.isArray(data.ticketTypes) ? data.ticketTypes.map((tt: any, index: number) => ({ 
-            id: tt.id || `fs-tt-${docSnap.id}-${eventIndex}-${index}-${Math.random().toString(36).slice(2)}`, 
-            eventId: docSnap.id, 
-            businessId: businessId, // Ensure businessId is passed down
+            id: tt.id || `fs-tt-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}`, 
+            eventId: tt.eventId || docSnap.id, 
+            businessId: tt.businessId || businessIdToQuery, 
             name: tt.name || "Entrada sin nombre",
             cost: typeof tt.cost === 'number' ? tt.cost : 0,
             description: tt.description || "",
-            quantity: typeof tt.quantity === 'number' ? tt.quantity : undefined,
+            quantity: typeof tt.quantity === 'number' ? tt.quantity : (tt.quantity === null ? undefined : undefined), 
         })) : [];
 
         const eventBoxesData = Array.isArray(data.eventBoxes) ? data.eventBoxes.map((eb: any, index: number) => ({ 
-            id: eb.id || `fs-eb-${docSnap.id}-${eventIndex}-${index}-${Math.random().toString(36).slice(2)}`,
-            eventId: docSnap.id, 
-            businessId: businessId,
+            id: eb.id || `fs-eb-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}`,
+            eventId: eb.eventId || docSnap.id,
+            businessId: eb.businessId || businessIdToQuery,
             name: eb.name || "Box sin nombre",
             cost: typeof eb.cost === 'number' ? eb.cost : 0,
             description: eb.description || "",
             status: eb.status || 'available',
-            capacity: typeof eb.capacity === 'number' ? eb.capacity : undefined,
+            capacity: typeof eb.capacity === 'number' ? eb.capacity : (eb.capacity === null ? undefined : undefined),
             sellerName: eb.sellerName || "",
             ownerName: eb.ownerName || "",
             ownerDni: eb.ownerDni || "",
         })) : [];
 
         const assignedPromotersData = Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map((ap: any, index: number) => ({
-            promoterProfileId: ap.promoterProfileId || `fs-ap-${docSnap.id}-${eventIndex}-${index}-${Math.random().toString(36).slice(2)}`,
+            promoterProfileId: ap.promoterProfileId || `fs-ap-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}`,
             promoterName: ap.promoterName || "Promotor sin nombre",
             promoterEmail: ap.promoterEmail || "",
             commissionRules: Array.isArray(ap.commissionRules) ? ap.commissionRules.map((cr: any, crIndex: number) => ({
-                id: cr.id || `fs-cr-${docSnap.id}-${eventIndex}-${index}-${crIndex}-${Math.random().toString(36).slice(2)}`,
+                id: cr.id || `fs-cr-${docSnap.id}-${index}-${crIndex}-${Math.random().toString(36).slice(2)}`,
                 appliesTo: cr.appliesTo || 'event_general',
                 appliesToId: cr.appliesToId || undefined,
                 appliesToName: cr.appliesToName || "General",
@@ -251,7 +223,7 @@ export default function BusinessEventsPage() {
 
         return {
           id: docSnap.id,
-          businessId: data.businessId || businessId,
+          businessId: data.businessId || businessIdToQuery,
           type: "event",
           name: data.name || "Evento sin nombre",
           description: data.description || "",
@@ -261,18 +233,18 @@ export default function BusinessEventsPage() {
           isActive: data.isActive === undefined ? true : data.isActive,
           imageUrl: data.imageUrl || "",
           aiHint: data.aiHint || "",
-          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => ({...gc, observation: gc.observation ?? null, redemptionDate: gc.redemptionDate ?? null, redeemedByInfo: gc.redeemedByInfo ?? null})) : [],
+          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => ({...gc, observation: gc.observation ?? null, redemptionDate: gc.redemptionDate ?? null, redeemedByInfo: gc.redeemedByInfo ?? null, isVipCandidate: gc.isVipCandidate ?? false })) : [],
           ticketTypes: ticketTypesData,
           eventBoxes: eventBoxesData,
           assignedPromoters: assignedPromotersData,
-          maxAttendance: typeof data.maxAttendance === 'number' ? data.maxAttendance : calculateMaxAttendance(ticketTypesData), // Ensure maxAttendance is calculated
+          maxAttendance: calculateMaxAttendance(ticketTypesData),
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
         };
       });
       setEvents(fetchedEvents.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
       console.log("Events Page: Fetched events successfully:", fetchedEvents.length);
     } catch (error: any) {
-      console.error("Events Page: Error fetching events:", error);
+      console.error("Events Page: Error fetching events:", error.code, error.message, error);
       toast({
         title: "Error al Cargar Eventos",
         description: `No se pudieron obtener los eventos. ${error.message}`,
@@ -291,7 +263,7 @@ export default function BusinessEventsPage() {
     } else if (userProfile === null || (userProfile && !currentBusinessId && (userProfile.roles.includes('business_admin')||userProfile.roles.includes('staff')))) {
         setIsLoading(false); 
         setEvents([]);
-        setAvailablePromoters([]);
+        setMockBusinessPromoters([]);
         if (userProfile) { 
             toast({ title: "Error de Negocio", description: "ID de negocio no disponible en tu perfil.", variant: "destructive", duration: 7000 });
         }
@@ -316,23 +288,22 @@ export default function BusinessEventsPage() {
   }, [events, searchTerm]);
 
  const handleOpenManageEventModal = (eventToManage: BusinessManagedEntity | null, duplicate = false) => {
-    setIsSubmitting(false);
+    setIsSubmitting(false); 
     setIsDuplicatingEvent(duplicate);
-    initialEventForm.reset(); // Reset initial form always
+    initialEventForm.reset(); 
 
     if (duplicate && eventToManage) {
         const { id, generatedCodes, ticketTypes, eventBoxes, assignedPromoters, createdAt, ...eventDataToDuplicate } = eventToManage;
         
-        const duplicatedEventData: Omit<BusinessManagedEntity, 'id' | 'generatedCodes' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'businessId' | 'type' | 'createdAt' > & { id?: string } = {
+        const duplicatedEventData = {
             ...eventDataToDuplicate,
             name: `${eventToManage.name || 'Evento'} (Copia)`,
             startDate: eventToManage.startDate, 
             endDate: eventToManage.endDate,     
             isActive: true, 
-            maxAttendance: 0, // Duplicated events start with no tickets/boxes
         };
         const newEventForDuplication: BusinessManagedEntity = {
-            ...duplicatedEventData,
+            ...(duplicatedEventData as Omit<BusinessManagedEntity, 'id' | 'businessId' | 'type' | 'generatedCodes' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'createdAt' | 'maxAttendance'>),
             id: '', 
             businessId: currentBusinessId || "", 
             type: 'event' as 'event',
@@ -340,20 +311,18 @@ export default function BusinessEventsPage() {
             ticketTypes: [], 
             eventBoxes: [],
             assignedPromoters: [],
-            createdAt: new Date().toISOString(), // Placeholder
+            maxAttendance: 0, 
+            createdAt: new Date().toISOString(), 
         };
-        
         setEditingEvent(newEventForDuplication);
         setShowManageEventModal(true);
     } else if (eventToManage) {  
         setEditingEvent({
           ...eventToManage,
-          // Ensure maxAttendance is correctly calculated when opening an existing event for edit
           maxAttendance: calculateMaxAttendance(eventToManage.ticketTypes) 
         }); 
         setShowManageEventModal(true);
     } else { 
-        // For creating a brand new event, open the initial small modal
         initialEventForm.reset({
             name: "", 
             description: "", 
@@ -371,10 +340,13 @@ export default function BusinessEventsPage() {
         return;
     }
     setIsSubmitting(true);
-    console.log("Events Page: UserProfile for initial event submit:", userProfile);
-    console.log("Events Page: Current Business ID to be used:", currentBusinessId);
+    console.log("Events Page (Initial Submit): UserProfile:", userProfile);
+    console.log("Events Page (Initial Submit): Current Business ID:", currentBusinessId);
     
-    const defaultTicket: Omit<TicketType, 'id' | 'eventId'> = {
+    const tempEventIdForSubItems = `temp-${Date.now()}`; // Temporary ID for sub-items before event is saved
+
+    const defaultTicket: Omit<TicketType, 'id'> = { // No id yet, eventId is temp
+      eventId: tempEventIdForSubItems,
       businessId: currentBusinessId,
       name: "Entrada General",
       cost: 0,
@@ -382,7 +354,7 @@ export default function BusinessEventsPage() {
       description: "Entrada estándar para el evento."
     };
 
-    const newEventToSave: Omit<BusinessManagedEntity, 'id' | 'createdAt' > = {
+    const newEventToSave: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'maxAttendance' > = {
       businessId: currentBusinessId,
       type: "event",
       name: data.name,
@@ -394,56 +366,54 @@ export default function BusinessEventsPage() {
       imageUrl: `https://placehold.co/600x400.png?text=${encodeURIComponent(data.name.substring(0,10))}`,
       aiHint: data.name.split(' ').slice(0,2).join(' '),
       generatedCodes: [],
-      ticketTypes: [defaultTicket], // Add default ticket directly here without ID/eventId
+      ticketTypes: [defaultTicket as TicketType], // Cast as TicketType, ID will be added after save
       eventBoxes: [],
       assignedPromoters: [],
-      maxAttendance: calculateMaxAttendance([{...defaultTicket, id: 'temp-id', eventId: 'temp-event-id'}]), // Calculated based on default ticket
     };
     
     const tempStartDate = new Date(newEventToSave.startDate);
     const tempEndDate = new Date(newEventToSave.endDate);
 
-    const eventPayloadForFirestore: any = {
+    const eventPayloadForFirestore = {
       ...newEventToSave,
       startDate: Timestamp.fromDate(tempStartDate),
       endDate: Timestamp.fromDate(tempEndDate),
-      // ticketTypes will be an array of objects; Firestore handles arrays of objects
-      ticketTypes: newEventToSave.ticketTypes.map(tt => ({ // Ensure no client-side only fields are sent
-        name: tt.name,
-        cost: tt.cost,
-        description: tt.description || null,
-        quantity: tt.quantity === undefined ? null : tt.quantity, // Store null if quantity is undefined
-        businessId: tt.businessId, // This is fine
-        // id and eventId are not part of the data structure for new tickets being embedded
-      })), 
-      eventBoxes: newEventToSave.eventBoxes || [],
-      assignedPromoters: newEventToSave.assignedPromoters || [],
+      ticketTypes: newEventToSave.ticketTypes.map(tt => {
+        const {id, eventId, ...restOfTicket} = tt; // Exclude client-side id and temp eventId for Firestore
+        return {
+          ...restOfTicket,
+          quantity: tt.quantity === undefined || tt.quantity === null ? 0 : tt.quantity,
+        }
+      }), 
+      eventBoxes: [],
+      assignedPromoters: [],
+      maxAttendance: calculateMaxAttendance(newEventToSave.ticketTypes), 
       createdAt: serverTimestamp(),
     };
-    console.log("Events Page: Creating event with payload for Firestore:", eventPayloadForFirestore);
+    
+    console.log("Events Page (Initial Submit): Event payload for Firestore:", eventPayloadForFirestore);
     
     let docRef;
     try {
       docRef = await addDoc(collection(db, "businessEntities"), eventPayloadForFirestore);
       console.log("Events Page: Event created with ID:", docRef.id);
       
-      // Prepare the event object as it would be fetched (with client-side IDs for tickets)
       const finalNewEvent: BusinessManagedEntity = {
         ...newEventToSave,
         id: docRef.id, 
-        ticketTypes: newEventToSave.ticketTypes.map((tt, index) => ({
-            ...tt, 
-            id: `tt-${docRef!.id}-${Date.now()}-${index}`, // Generate client-side ID after event is created
-            eventId: docRef!.id 
-        })),
         startDate: data.startDate.toISOString(), 
         endDate: data.endDate.toISOString(),  
-        createdAt: new Date().toISOString(), // For immediate client-side use
+        createdAt: new Date().toISOString(), 
+        maxAttendance: eventPayloadForFirestore.maxAttendance,
+        ticketTypes: (newEventToSave.ticketTypes as Omit<TicketType, 'id'>[]).map((tt, index) => ({ // Ensure correct type mapping
+            ...tt, 
+            id: `tt-${docRef!.id}-${Date.now()}-${index}`, 
+            eventId: docRef!.id,
+            quantity: tt.quantity === undefined || tt.quantity === null ? 0 : tt.quantity,
+        })),
       };
       
-      // fetchBusinessEvents(); // Re-fetch all events can be deferred if local state is updated accurately
       setEvents(prev => [finalNewEvent, ...prev].sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
-
       
       toast({ title: "Evento Creado Inicialmente", description: `El evento "${finalNewEvent.name}" ha sido creado. Ahora puedes configurar más detalles.` });
       setShowInitialEventModal(false);
@@ -451,7 +421,7 @@ export default function BusinessEventsPage() {
       setEditingEvent(finalNewEvent); 
       setShowManageEventModal(true); 
     } catch (error: any) {
-      console.error("Events Page: Error creating initial event:", error.code, error.message, error);
+      console.error("Events Page (Initial Submit): Error creating initial event:", error.code, error.message, error);
       let desc = `No se pudo crear el evento inicial.`;
       if (error.code === 'permission-denied') {
           desc = `Error de permisos al crear el evento. Usuario: ${userProfile?.email}, Negocio ID (del perfil): ${userProfile?.businessId}, Negocio ID (usado): ${currentBusinessId}. Revisa las reglas de Firestore y los datos del perfil.`;
@@ -482,7 +452,7 @@ export default function BusinessEventsPage() {
         setEditingEvent(prev => {
             if (!prev) return null;
             const currentTickets = prev.ticketTypes || [];
-            const newMaxAtt = calculateMaxAttendance(currentTickets); // Recalculate on detail update
+            const newMaxAtt = calculateMaxAttendance(currentTickets); 
             return { ...prev, ...updatedEventDetails, maxAttendance: newMaxAtt };
         });
         toast({ title: "Detalles del Evento Actualizados", description: `Los cambios en "${data.name}" han sido aplicados en el editor. Guarda el evento para persistir.` });
@@ -512,39 +482,36 @@ export default function BusinessEventsPage() {
   };
 
  const handleSaveManagedEventAndClose = async () => {
-    if (!editingEvent) {
-        toast({ title: "Error", description: "No hay evento para guardar.", variant: "destructive" });
-        return;
-    }
-    if (!currentBusinessId) {
-        toast({ title: "Error", description: "ID de negocio no disponible para guardar.", variant: "destructive" });
+    if (!editingEvent || !currentBusinessId) {
+        toast({ title: "Error", description: "No hay evento para guardar o ID de negocio no disponible.", variant: "destructive" });
+        setIsSubmitting(false);
         return;
     }
 
     setIsSubmitting(true);
     try {
       const calculatedAtt = calculateMaxAttendance(editingEvent.ticketTypes);
-      // Sanitize the editingEvent before saving to ensure no undefined values are sent to Firestore
-      const sanitizedEvent = sanitizeObjectForFirestore({
+      const eventToSave: BusinessManagedEntity = {
         ...editingEvent,
         maxAttendance: calculatedAtt,
         businessId: currentBusinessId, 
         type: "event" as "event", 
-      });
+      };
       
-      // Sanitize ticketTypes and eventBoxes if they exist
+      const sanitizedEvent = sanitizeObjectForFirestore(eventToSave);
+      
       const finalTicketTypes = (sanitizedEvent.ticketTypes || []).map((tt: any) => {
-        const { eventId, businessId, ...rest } = tt; // Exclude potentially problematic fields for sub-objects
-        return sanitizeObjectForFirestore(rest);
+        const { businessId, ...rest } = tt; // eventId is already part of tt, businessId can be excluded from array item if global to event
+        return sanitizeObjectForFirestore({...rest, eventId: sanitizedEvent.id }); // Ensure eventId is the main event's ID
       });
       const finalEventBoxes = (sanitizedEvent.eventBoxes || []).map((eb: any) => {
-        const { eventId, businessId, ...rest } = eb;
-        return sanitizeObjectForFirestore(rest);
+        const { businessId, ...rest } = eb;
+        return sanitizeObjectForFirestore({...rest, eventId: sanitizedEvent.id });
       });
       const finalAssignedPromoters = (sanitizedEvent.assignedPromoters || []).map((ap: any) => {
         return {
           ...sanitizeObjectForFirestore(ap),
-          commissionRules: (ap.commissionRules || []).map(sanitizeObjectForFirestore) // Sanitize nested rules
+          commissionRules: (ap.commissionRules || []).map(rule => sanitizeObjectForFirestore(rule)) 
         };
       });
 
@@ -558,6 +525,8 @@ export default function BusinessEventsPage() {
         generatedCodes: Array.isArray(sanitizedEvent.generatedCodes) ? sanitizedEvent.generatedCodes : [], 
       };
       
+      console.log("Events Page (SaveManaged): Updating/Creating event with payload:", payloadForFirestore);
+
       if (isDuplicatingEvent || !editingEvent.id) { 
            if (payloadForFirestore.createdAt && typeof payloadForFirestore.createdAt !== 'function') delete payloadForFirestore.createdAt;
            payloadForFirestore.createdAt = serverTimestamp(); 
@@ -609,39 +578,40 @@ export default function BusinessEventsPage() {
         return;
     }
     
-    const targetEvent = events.find(e => e.id === entityId) || (editingEvent?.id === entityId ? editingEvent : null);
-
-    if (!targetEvent) {
-         toast({title:"Error", description:"Evento no encontrado para añadir códigos.", variant: "destructive"});
-         return;
-    }
-    
-    const newCodesWithDetails = newCodes.map(code => {
-        const newCodeItem: GeneratedCode = {
-            ...code,
-            observation: (observation && observation.trim() !== "") ? observation.trim() : null, // Set to null if empty
-            redemptionDate: null, 
-            redeemedByInfo: null, 
-            isVipCandidate: false,
-        };
-        return sanitizeObjectForFirestore(newCodeItem); // Sanitize each new code
-    });
-
-    const updatedCodes = [...(targetEvent.generatedCodes || []), ...newCodesWithDetails];
-    
+    const targetEventRef = doc(db, "businessEntities", entityId);
     try {
-        await updateDoc(doc(db, "businessEntities", entityId), { generatedCodes: updatedCodes });
-        toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEvent.name}. Guardados en la base de datos.`});
+        const targetEventSnap = await getDoc(targetEventRef);
+        if (!targetEventSnap.exists()) {
+            toast({title:"Error", description:"Evento no encontrado para añadir códigos.", variant: "destructive"});
+            return;
+        }
+        const targetEventData = targetEventSnap.data();
+        const existingCodes = targetEventData.generatedCodes || [];
+
+        const newCodesWithDetails = newCodes.map(code => {
+            const newCodeItem: GeneratedCode = {
+                ...code,
+                observation: (observation && observation.trim() !== "") ? observation.trim() : null,
+                redemptionDate: null, 
+                redeemedByInfo: null, 
+                isVipCandidate: false,
+            };
+            return sanitizeObjectForFirestore(newCodeItem);
+        });
+
+        const updatedCodes = [...existingCodes, ...newCodesWithDetails];
+    
+        await updateDoc(targetEventRef, { generatedCodes: updatedCodes });
+        toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEventData.name}. Guardados en la base de datos.`});
         
         if (editingEvent && editingEvent.id === entityId) {
             setEditingEvent(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
         }
-        fetchBusinessEvents(); // Always re-fetch to ensure UI consistency across the board
+        fetchBusinessEvents(); 
 
     } catch (error: any) {
         console.error("Events Page: Error saving new codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos en la base de datos. ${error.message}`, variant: "destructive"});
-        fetchBusinessEvents(); 
     }
   };
 
@@ -651,17 +621,19 @@ export default function BusinessEventsPage() {
       return;
     }
     
-    const targetEvent = events.find(e => e.id === entityId) || (editingEvent?.id === entityId ? editingEvent : null);
-     if (!targetEvent) {
-        toast({title:"Error", description:"Evento no encontrado para actualizar códigos.", variant: "destructive"});
-        return;
-    }
-    
-     const updatedCodesForFirestore = updatedCodesFromDialog.map(code => sanitizeObjectForFirestore(code));
-
+    const targetEventRef = doc(db, "businessEntities", entityId);
      try {
-        await updateDoc(doc(db, "businessEntities", entityId), { generatedCodes: updatedCodesForFirestore });
-        toast({title: "Códigos Actualizados", description: `Los códigos para "${targetEvent.name}" han sido guardados en la base de datos.`});
+        const targetEventSnap = await getDoc(targetEventRef);
+        if (!targetEventSnap.exists()) {
+            toast({title:"Error", description:"Evento no encontrado para actualizar códigos.", variant: "destructive"});
+            return;
+        }
+        const targetEventData = targetEventSnap.data();
+    
+        const updatedCodesForFirestore = updatedCodesFromDialog.map(code => sanitizeObjectForFirestore(code));
+
+        await updateDoc(targetEventRef, { generatedCodes: updatedCodesForFirestore });
+        toast({title: "Códigos Actualizados", description: `Los códigos para "${targetEventData.name}" han sido guardados en la base de datos.`});
         
         if (editingEvent && editingEvent.id === entityId) {
              setEditingEvent(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
@@ -727,10 +699,11 @@ const handleCreateOrEditTicketTypeForEvent = (data: TicketTypeFormData) => {
         toast({ title: "Entrada Actualizada", description: `La entrada "${sanitizedData.name}" ha sido actualizada en el editor.` });
     } else { 
         const newTicket: TicketType = {
-            id: `tt-${editingEvent.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            id: `tt-${editingEvent.id || 'new'}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
             businessId: currentBusinessId,
-            eventId: editingEvent.id,
-            ...sanitizedData
+            eventId: editingEvent.id || "", 
+            ...sanitizedData,
+            quantity: sanitizedData.quantity === undefined || sanitizedData.quantity === null ? 0 : sanitizedData.quantity,
         };
         updatedTickets = [...currentTickets, newTicket];
         toast({ title: "Entrada Creada", description: `La entrada "${sanitizedData.name}" ha sido añadida al evento en el editor.` });
@@ -744,10 +717,13 @@ const handleCreateOrEditTicketTypeForEvent = (data: TicketTypeFormData) => {
 
 const handleDeleteTicketTypeFromEvent = (ticketId: string) => {
     if (!editingEvent) return;
+    const ticketToDelete = editingEvent.ticketTypes?.find(tt => tt.id === ticketId);
+    if (!ticketToDelete) return;
+
     const updatedTickets = (editingEvent.ticketTypes || []).filter(tt => tt.id !== ticketId);
     const newMaxAttendance = calculateMaxAttendance(updatedTickets);
     setEditingEvent(prev => prev ? { ...prev, ticketTypes: updatedTickets, maxAttendance: newMaxAttendance } : null);
-    toast({ title: "Entrada Eliminada del Editor", variant: "destructive" });
+    toast({ title: `Entrada "${ticketToDelete.name}" Eliminada del Editor`, variant: "destructive" });
 };
 
 const handleOpenBoxFormModal = (box: EventBox | null) => {
@@ -771,9 +747,9 @@ const handleCreateOrEditBoxForEvent = (data: EventBoxFormData) => {
         toast({ title: "Box Actualizado", description: `El box "${sanitizedData.name}" ha sido actualizado en el editor.` });
     } else { 
         const newBox: EventBox = {
-            id: `box-${editingEvent.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            id: `box-${editingEvent.id || 'new'}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
             businessId: currentBusinessId,
-            eventId: editingEvent.id,
+            eventId: editingEvent.id || "",
             ...sanitizedData
         };
         updatedBoxes = [...currentBoxes, newBox];
@@ -786,9 +762,11 @@ const handleCreateOrEditBoxForEvent = (data: EventBoxFormData) => {
 
 const handleDeleteBoxFromEvent = (boxId: string) => {
     if (!editingEvent) return;
+    const boxToDelete = editingEvent.eventBoxes?.find(b => b.id === boxId);
+    if (!boxToDelete) return;
     const updatedBoxes = (editingEvent.eventBoxes || []).filter(box => box.id !== boxId);
     setEditingEvent(prev => prev ? { ...prev, eventBoxes: updatedBoxes } : null);
-    toast({ title: "Box Eliminado del Editor", variant: "destructive" });
+    toast({ title: `Box "${boxToDelete.name}" Eliminado del Editor`, variant: "destructive" });
 };
 
 const handleCreateBatchBoxes = (data: BatchBoxFormData) => {
@@ -809,9 +787,9 @@ const handleCreateBatchBoxes = (data: BatchBoxFormData) => {
         }
         newBoxes.push(
             sanitizeObjectForFirestore({
-                id: `box-batch-${editingEvent.id}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
+                id: `box-batch-${editingEvent.id || 'new'}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
                 businessId: currentBusinessId,
-                eventId: editingEvent.id,
+                eventId: editingEvent.id || "",
                 name: boxName,
                 cost: data.cost,
                 description: data.description,
@@ -829,11 +807,11 @@ const handleCreateBatchBoxes = (data: BatchBoxFormData) => {
 };
 
 const handleAssignPromoterToEvent = () => {
-    if (!editingEvent || !selectedPromoterForAssignment) {
-        toast({ title: "Error", description: "Selecciona un evento y un promotor.", variant: "destructive" });
+    if (!editingEvent || !selectedPromoterForAssignment || !currentBusinessId) {
+        toast({ title: "Error", description: "Selecciona un evento y un promotor, o falta ID de negocio.", variant: "destructive" });
         return;
     }
-    const promoterProfile = availablePromoters.find(p => p.id === selectedPromoterForAssignment);
+    const promoterProfile = mockBusinessPromoters.find(p => p.id === selectedPromoterForAssignment);
     if (!promoterProfile) {
         toast({ title: "Error", description: "Perfil de promotor no encontrado.", variant: "destructive" });
         return;
@@ -858,8 +836,10 @@ const handleAssignPromoterToEvent = () => {
 
 const handleRemovePromoterFromEvent = (promoterProfileId: string) => {
     if (!editingEvent) return;
+    const promoterToRemove = editingEvent.assignedPromoters?.find(ap => ap.promoterProfileId === promoterProfileId);
+    if (!promoterToRemove) return;
     setEditingEvent(prev => prev ? { ...prev, assignedPromoters: (prev.assignedPromoters || []).filter(ap => ap.promoterProfileId !== promoterProfileId) } : null);
-    toast({ title: "Promotor Desvinculado del Evento", variant: "destructive"});
+    toast({ title: `Promotor "${promoterToRemove.promoterName}" Desvinculado del Evento`, variant: "destructive"});
 };
 
 const handleOpenCommissionRuleForm = (assignment: EventPromoterAssignment, rule?: CommissionRule) => {
@@ -904,7 +884,7 @@ const handleCommissionRuleFormSubmit = (data: CommissionRuleFormValues) => {
             }
 
             if (editingCommissionRule && editingCommissionRule.id) { 
-                updatedRules = updatedRules.map(rule => rule.id === editingCommissionRule.id ? { ...rule, ...newRuleBase } : rule);
+                updatedRules = updatedRules.map(rule => rule.id === editingCommissionRule.id ? { ...rule, ...newRuleBase, id: rule.id } : rule);
             } else { 
                 const newRule: CommissionRule = {
                     id: `cr-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -926,6 +906,10 @@ const handleCommissionRuleFormSubmit = (data: CommissionRuleFormValues) => {
 
 const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string) => {
     if (!editingEvent) return;
+    const assignedPromoter = editingEvent.assignedPromoters?.find(ap => ap.promoterProfileId === assignmentPromoterId);
+    const ruleToDelete = assignedPromoter?.commissionRules?.find(r => r.id === ruleId);
+    if (!ruleToDelete) return;
+
     const updatedAssignments = (editingEvent.assignedPromoters || []).map(assignment => {
         if (assignment.promoterProfileId === assignmentPromoterId) {
             const updatedRules = (assignment.commissionRules || []).filter(rule => rule.id !== ruleId);
@@ -934,7 +918,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
         return assignment;
     });
     setEditingEvent(prev => prev ? { ...prev, assignedPromoters: updatedAssignments } : null);
-    toast({ title: "Regla de Comisión Eliminada", variant: "destructive"});
+    toast({ title: `Regla de Comisión Eliminada del Editor`, variant: "destructive"});
 };
 
   return (
@@ -1193,7 +1177,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
         <DialogContent className="sm:max-w-4xl max-h-[90vh]">
             <DialogHeader>
                 <DialogTitle>
-                  {isDuplicatingEvent ? `Duplicar Evento: ${(editingEvent?.name || 'Evento').replace(' (Copia)','')} (Copia)` : (editingEvent?.id ? `Gestionar Evento: ${editingEvent.name}` : "Error: No hay evento para gestionar")}
+                  {isDuplicatingEvent ? `Duplicar Evento: ${(editingEvent?.name || 'Evento').replace(' (Copia)','')} (Copia)` : (editingEvent?.id ? `Gestionar Evento: ${editingEvent.name}` : "Crear Nuevo Evento (Completar Detalles)")}
                 </DialogTitle>
                 <DialogDescription>
                   {isDuplicatingEvent ? "Creando una copia. Ajusta los detalles. Las entradas, boxes y promotores no se duplican." : (editingEvent?.id ? "Modifica los detalles, entradas, boxes y promotores de tu evento." : "Completa los detalles principales de tu nuevo evento.")}
@@ -1215,7 +1199,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                             <BusinessEventForm
                                 event={editingEvent}
                                 onSubmit={handleMainEventDetailsUpdate}
-                                isSubmitting={isSubmitting}
+                                isSubmitting={isSubmitting} 
                             />
                         </TabsContent>
 
@@ -1236,7 +1220,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                             <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Descripción</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                             <TableBody>
                                                 {editingEvent.ticketTypes?.map((tt) => (
-                                                    <TableRow key={tt.id}>
+                                                    <TableRow key={tt.id || `tt-fallback-${Math.random().toString(36).slice(2)}`}>
                                                         <TableCell>{tt.name}</TableCell><TableCell>{tt.cost.toFixed(2)}</TableCell><TableCell className="max-w-xs truncate" title={tt.description || undefined}>{tt.description || "N/A"}</TableCell><TableCell>{tt.quantity === undefined || tt.quantity === null || tt.quantity <= 0 ? 'Ilimitada' : tt.quantity}</TableCell>
                                                         <TableCell className="text-right">
                                                           <Button variant="ghost" size="icon" onClick={() => handleOpenTicketFormModal(tt)} disabled={isSubmitting}><Edit className="h-4 w-4" /></Button>
@@ -1277,7 +1261,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                             <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Estado</TableHead><TableHead>Capacidad</TableHead><TableHead>Vendedor</TableHead><TableHead>Dueño (Cliente)</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                             <TableBody>
                                                 {editingEvent.eventBoxes?.map((box) => (
-                                                    <TableRow key={box.id}>
+                                                    <TableRow key={box.id || `box-fallback-${Math.random().toString(36).slice(2)}`}>
                                                         <TableCell>{box.name}</TableCell><TableCell>{box.cost.toFixed(2)}</TableCell><TableCell><Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={box.status === 'available' ? 'bg-green-500 hover:bg-green-600' : 'bg-orange-500 hover:bg-orange-600'}>{box.status === 'available' ? 'Disponible' : 'No Disponible'}</Badge></TableCell><TableCell>{box.capacity || 'N/A'}</TableCell><TableCell>{box.sellerName || 'N/A'}</TableCell><TableCell>{box.ownerName ? `${box.ownerName} (${box.ownerDni || 'N/A'})` : 'N/A'}</TableCell>
                                                         <TableCell className="text-right">
                                                             <Button variant="ghost" size="icon" onClick={() => handleOpenBoxFormModal(box)} disabled={isSubmitting}><Edit className="h-4 w-4" /></Button>
@@ -1308,12 +1292,12 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                     <div className="flex items-end gap-2">
                                         <div className="flex-grow">
                                             <Label htmlFor="select-promoter-event">Seleccionar Promotor <span className="text-destructive">*</span></Label>
-                                            <Select value={selectedPromoterForAssignment} onValueChange={setSelectedPromoterForAssignment} disabled={isSubmitting || availablePromoters.length === 0}>
+                                            <Select value={selectedPromoterForAssignment} onValueChange={setSelectedPromoterForAssignment} disabled={isSubmitting || mockBusinessPromoters.length === 0}>
                                                 <SelectTrigger id="select-promoter-event">
-                                                    <SelectValue placeholder={availablePromoters.length === 0 ? "No hay promotores para asignar" : "Elige un promotor"} />
+                                                    <SelectValue placeholder={mockBusinessPromoters.length === 0 ? "No hay promotores para asignar" : "Elige un promotor"} />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {availablePromoters.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.email})</SelectItem>)}
+                                                    {mockBusinessPromoters.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.email})</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
                                         </div>
@@ -1325,7 +1309,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                     ) : (
                                         <div className="space-y-3">
                                             {editingEvent.assignedPromoters?.map(ap => (
-                                                <Card key={ap.promoterProfileId} className="p-3">
+                                                <Card key={ap.promoterProfileId || `ap-fallback-${Math.random().toString(36).slice(2)}`} className="p-3">
                                                     <div className="flex justify-between items-start">
                                                         <div>
                                                             <p className="font-semibold">{ap.promoterName} <span className="text-xs text-muted-foreground">({ap.promoterEmail})</span></p>
@@ -1340,7 +1324,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                                                         {(ap.commissionRules || []).length === 0 ? <p className="text-xs text-muted-foreground italic">Sin reglas específicas.</p> : (
                                                             <ul className="list-disc list-inside pl-2 space-y-0.5 text-xs">
                                                                 {(ap.commissionRules || []).map(rule => (
-                                                                    <li key={rule.id} className="flex justify-between items-center">
+                                                                    <li key={rule.id || `cr-fallback-${Math.random().toString(36).slice(2)}`} className="flex justify-between items-center">
                                                                         <span>
                                                                             {rule.appliesTo === 'event_general' ? 'General Evento' : 
                                                                             (rule.appliesToName ? `${rule.appliesToName}` : `ID: ${rule.appliesToId?.substring(0,5)}...`)}: 
@@ -1389,7 +1373,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                     Cancelar
                 </Button>
                 <Button onClick={handleSaveManagedEventAndClose} className="bg-primary hover:bg-primary/90" disabled={isSubmitting || !editingEvent}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isDuplicatingEvent || !editingEvent?.id ? "Crear Evento y Cerrar" : "Guardar Cambios y Cerrar")}
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : ((editingEvent && !editingEvent.id) || isDuplicatingEvent ? "Crear Evento y Cerrar" : "Guardar Cambios y Cerrar")}
                 </Button>
             </UIDialogFooter>
         </DialogContent>
@@ -1409,7 +1393,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                 ticketType={editingTicketInEventModal || undefined}
                 onSubmit={handleCreateOrEditTicketTypeForEvent}
                 onCancel={() => { setShowTicketFormInEventModal(false); setEditingTicketInEventModal(null); }}
-                isSubmitting={isSubmitting}
+                isSubmitting={isSubmitting} 
             />
         </DialogContent>
     </Dialog>
@@ -1428,7 +1412,7 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
                 eventBox={editingBoxInEventModal || undefined}
                 onSubmit={handleCreateOrEditBoxForEvent}
                 onCancel={() => { setShowBoxFormInEventModal(false); setEditingBoxInEventModal(null); }}
-                isSubmitting={isSubmitting}
+                isSubmitting={isSubmitting} 
             />
         </DialogContent>
     </Dialog>
@@ -1580,7 +1564,8 @@ const handleDeleteCommissionRule = (assignmentPromoterId: string, ruleId: string
         entityId={selectedEntityForCreatingCodes.id}
         existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
         onCodesCreated={handleNewCodesCreated}
-        isSubmitting={isSubmitting} 
+        isSubmittingMain={isSubmitting} 
+        currentUserProfileName={userProfile?.name}
       />
     )}
 
