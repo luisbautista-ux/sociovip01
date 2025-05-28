@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -20,7 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -35,7 +36,16 @@ const promotionFormSchema = z.object({
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
   aiHint: z.string().optional(),
   termsAndConditions: z.string().optional(),
-}).refine(data => data.endDate >= data.startDate, {
+}).refine(data => {
+    // Ensure endDate is on or after startDate
+    if (data.startDate && data.endDate) {
+        // Compare only date parts if time is not relevant or set to midnight
+        const start = new Date(data.startDate.getFullYear(), data.startDate.getMonth(), data.startDate.getDate());
+        const end = new Date(data.endDate.getFullYear(), data.endDate.getMonth(), data.endDate.getDate());
+        return end >= start;
+    }
+    return true; // Pass if dates are not set (though schema requires them)
+}, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
   path: ["endDate"],
 });
@@ -57,7 +67,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       description: promotion?.description || "",
       startDate: promotion?.startDate ? new Date(promotion.startDate) : new Date(),
       endDate: promotion?.endDate ? new Date(promotion.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
-      usageLimit: promotion?.usageLimit || undefined,
+      usageLimit: promotion?.usageLimit === undefined || promotion?.usageLimit === null ? '' : promotion.usageLimit, // Initialize with '' if undefined/null
       isActive: promotion?.isActive === undefined ? true : promotion.isActive,
       imageUrl: promotion?.imageUrl || "",
       aiHint: promotion?.aiHint || "",
@@ -66,7 +76,12 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   });
 
   const handleSubmit = (values: PromotionFormValues) => {
-    onSubmit(values);
+    // Ensure usageLimit is number or undefined before submitting
+    const dataToSubmit: BusinessPromotionFormData = {
+        ...values,
+        usageLimit: values.usageLimit === '' || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
+    };
+    onSubmit(dataToSubmit);
   };
 
   return (
@@ -99,7 +114,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           name="termsAndConditions"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
+              <FormLabel>Términos y Condiciones</FormLabel>
               <FormControl><Textarea placeholder="Condiciones de la promoción, ej: Válido solo para consumo en local." {...field} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -116,7 +131,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
+                        {field.value ? format(new Date(field.value), "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
@@ -139,7 +154,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
+                        {field.value ? format(new Date(field.value), "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
@@ -158,8 +173,24 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           name="usageLimit"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Límite de Usos (Opcional)</FormLabel>
-              <FormControl><Input type="number" placeholder="Ej: 100 (0 para ilimitado)" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || undefined)} disabled={isSubmitting} /></FormControl>
+              <FormLabel>Límite de Usos</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  placeholder="Ej: 100 (0 o vacío para ilimitado)" 
+                  {...field}
+                  value={field.value === null || field.value === undefined ? '' : String(field.value)} // Ensure input gets string
+                  onChange={e => {
+                    const value = e.target.value;
+                    // If empty string, set form state to undefined (for optional Zod validation)
+                    // Otherwise, parse as integer. Invalid numbers become NaN, then undefined.
+                    const numValue = parseInt(value, 10);
+                    field.onChange(value === "" ? undefined : (isNaN(numValue) ? undefined : numValue));
+                  }} 
+                  disabled={isSubmitting} 
+                />
+              </FormControl>
+              <FormDescription className="text-xs">Dejar vacío o 0 para usos ilimitados.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -169,7 +200,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           name="imageUrl"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>URL de Imagen (Opcional)</FormLabel>
+              <FormLabel>URL de Imagen</FormLabel>
               <FormControl>
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-muted-foreground" />
