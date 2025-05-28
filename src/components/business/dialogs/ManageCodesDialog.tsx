@@ -9,10 +9,9 @@ import { useState, useEffect, useMemo } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ClipboardList, ClipboardCopy, ChevronDown, Copy } from "lucide-react";
+import { PlusCircle, Trash2, ClipboardList, ClipboardCopy, ChevronDown, ChevronUp, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from "@/lib/constants";
@@ -20,8 +19,8 @@ import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from
 interface ProcessedCodeItem {
   isBatch: boolean;
   id: string; // Unique key for React list
-  batchId?: string; // Identifier for the batch, used for AccordionItem value
-  observation?: string;
+  batchId?: string; // Identifier for the batch
+  observation?: string | null; // Allow null
   generatedDate?: string;
   codesInBatch?: GeneratedCode[];
   singleCode?: GeneratedCode;
@@ -40,32 +39,35 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
     const currentCode = sortedCodes[i];
     const currentBatch: GeneratedCode[] = [currentCode];
     let j = i + 1;
+    
     // Group codes if they have the exact same generation date and observation
+    // Handle null/undefined for observation consistently
+    const currentObservation = currentCode.observation === undefined ? null : currentCode.observation;
+
     while (
       j < sortedCodes.length &&
       new Date(sortedCodes[j].generatedDate).getTime() === new Date(currentCode.generatedDate).getTime() &&
-      (sortedCodes[j].observation || undefined) === (currentCode.observation || undefined)
+      (sortedCodes[j].observation === undefined ? null : sortedCodes[j].observation) === currentObservation
     ) {
       currentBatch.push(sortedCodes[j]);
       j++;
     }
 
     if (currentBatch.length > 1) {
-      const batchKey = `${new Date(currentCode.generatedDate).toISOString()}-${currentCode.observation || 'no-obs'}-${i}`;
+      const batchKey = `${new Date(currentCode.generatedDate).toISOString()}-${currentObservation || 'no-obs'}-${i}`;
       processedItems.push({
         isBatch: true,
-        id: batchKey, // Unique ID for the batch item itself
-        batchId: batchKey, // ID for AccordionItem value
-        observation: currentCode.observation,
+        id: batchKey,
+        batchId: batchKey,
+        observation: currentObservation,
         generatedDate: currentCode.generatedDate,
         codesInBatch: currentBatch,
       });
-      i = j; // Move index past the processed batch
+      i = j; 
     } else {
-      // Single code, not part of a batch of more than 1
       processedItems.push({
         isBatch: false,
-        id: currentCode.id, // Use the code's own ID
+        id: currentCode.id,
         singleCode: currentCode,
       });
       i++;
@@ -78,7 +80,7 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
 interface ManageCodesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  entity: BusinessManagedEntity | null; // Allow entity to be null initially
+  entity: BusinessManagedEntity | null; 
   onCodesUpdated: (entityId: string, updatedCodes: GeneratedCode[]) => void;
   onRequestCreateNewCodes: () => void;
 }
@@ -92,16 +94,23 @@ export function ManageCodesDialog({
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const { toast } = useToast();
+  const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (open && entity?.generatedCodes) {
       setInternalCodes([...entity.generatedCodes]);
+      setExpandedBatches({}); // Reset expanded state when dialog opens or entity changes
     } else if (open && !entity?.generatedCodes) {
       setInternalCodes([]);
+      setExpandedBatches({});
     }
   }, [entity, open]);
 
   const processedAndGroupedCodes = useMemo(() => groupAndSortCodes(internalCodes), [internalCodes]);
+
+  const toggleBatchExpansion = (batchId: string) => {
+    setExpandedBatches(prev => ({ ...prev, [batchId]: !prev[batchId] }));
+  };
 
   const handleDeleteCode = (codeId: string) => {
     if (!entity) return;
@@ -116,7 +125,7 @@ export function ManageCodesDialog({
     }
     const updatedRawCodes = internalCodes.filter(c => c.id !== codeId);
     setInternalCodes(updatedRawCodes);
-    onCodesUpdated(entity.id, updatedRawCodes);
+    onCodesUpdated(entity.id, updatedRawCodes); // Propagate update to parent
     toast({ title: "Código Eliminado", description: "El código ha sido eliminado.", variant: "destructive" });
   };
 
@@ -156,10 +165,16 @@ export function ManageCodesDialog({
   };
 
 
-  if (!entity) return null; // Return null if entity is not yet available
+  if (!entity) return null; 
 
   const renderCodeRow = (code: GeneratedCode, isInsideBatch = false) => (
-    <TableRow key={code.id} className={cn(isInsideBatch ? "bg-muted/20 hover:bg-muted/40" : "", "text-xs")}>
+    <TableRow 
+        key={code.id} 
+        className={cn(
+            "text-xs", 
+            isInsideBatch ? "bg-muted/30 hover:bg-muted/50" : "hover:bg-muted/20"
+        )}
+    >
       <TableCell className="font-mono py-1.5 px-2">
         <div className="flex items-center gap-1">
             <span>{code.value}</span>
@@ -178,7 +193,7 @@ export function ManageCodesDialog({
       <TableCell className="py-1.5 px-2">
           <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status]} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status]}</Badge>
       </TableCell>
-      <TableCell className="py-1.5 px-2 max-w-[150px] truncate" title={code.observation}>{code.observation || "N/A"}</TableCell>
+      <TableCell className="py-1.5 px-2 max-w-[150px] truncate" title={code.observation || undefined}>{code.observation || "N/A"}</TableCell>
       <TableCell className="py-1.5 px-2">{code.generatedDate ? format(new Date(code.generatedDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}</TableCell>
       <TableCell className="py-1.5 px-2">
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
@@ -216,12 +231,9 @@ export function ManageCodesDialog({
     </TableRow>
   );
 
-  const singleCodeItems = processedAndGroupedCodes.filter(item => item.singleCode);
-  const batchCodeItems = processedAndGroupedCodes.filter(item => item.isBatch && item.codesInBatch && item.codesInBatch.length > 0);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl"> {/* Increased width */}
+      <DialogContent className="sm:max-w-5xl"> 
         <DialogHeader>
           <DialogTitle>Códigos para: {entity.name}</DialogTitle>
           <DialogDescription>
@@ -257,62 +269,48 @@ export function ManageCodesDialog({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Render single code items first */}
-                {singleCodeItems.map(item => item.singleCode && renderCodeRow(item.singleCode))}
-
-                {/* Then render batched items if any */}
-                {batchCodeItems.length > 0 && (
-                  <Accordion type="multiple" className="w-full">
-                    {batchCodeItems.map((item) => (
-                        item.codesInBatch && item.codesInBatch.length > 0 && (
-                            <AccordionItem value={item.batchId!} key={item.id} className="border-b-0">
-                                {/* This TableRow is a direct child of AccordionItem which is a div, this might cause issues.
-                                Let's make AccordionTrigger a full-width cell or handle it differently.
-                                A better approach is to have AccordionItem contain the TableRow for the trigger,
-                                and AccordionContent contain the Table for the codes.
-                                However, for simplicity within a single TableBody, this is tricky.
-                                The provided solution of splitting table might be the cleanest.
-                                Let's try to make the trigger span across cells.
-                                */}
-                                <tr className="border-b hover:bg-transparent data-[state=open]:bg-muted/30">
-                                    <td colSpan={7} className="p-0">
-                                        <AccordionTrigger className="py-2.5 px-4 text-sm hover:no-underline justify-start group w-full">
-                                        <div className="flex items-center"> {/* Wrapper to ensure items are in a row */}
-                                            <ChevronDown className="h-4 w-4 mr-2 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                                            Lote de {item.codesInBatch.length} códigos
-                                            {item.generatedDate && ` (${format(new Date(item.generatedDate), "P p", { locale: es })})`}
-                                            {item.observation && <span className="ml-2 text-muted-foreground text-xs truncate" title={item.observation}> - Obs: {item.observation}</span>}
-                                        </div>
-                                        </AccordionTrigger>
-                                    </td>
-                                </tr>
-                                <AccordionContent asChild>
-                                    <tr className="w-full">
-                                        <td colSpan={7} className="p-0 bg-muted/10"> {/* Apply bg to the cell for the content */}
-                                        <div className="pl-6 pr-2 py-2 border-l-2 border-primary ml-5 mr-1 space-y-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="text-xs h-auto py-1 px-2"
-                                                onClick={() => handleCopyBatchCodes(item.codesInBatch)}
-                                            >
-                                                <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Códigos del Lote ({item.codesInBatch!.length})
-                                            </Button>
-                                            <Table>
-                                                <TableBody>
-                                                {item.codesInBatch.map(code => renderCodeRow(code, true))}
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-                                        </td>
-                                    </tr>
-                                </AccordionContent>
-                            </AccordionItem>
-                        )
-                      )
-                    )}
-                  </Accordion>
-                )}
+                {processedAndGroupedCodes.map((item) => {
+                  if (item.isBatch && item.codesInBatch && item.batchId) {
+                    const isExpanded = !!expandedBatches[item.batchId];
+                    return (
+                      <React.Fragment key={item.id}>
+                        <TableRow 
+                            className="border-b hover:bg-muted/30 cursor-pointer"
+                            onClick={() => toggleBatchExpansion(item.batchId!)}
+                        >
+                          <TableCell colSpan={7} className="py-2.5 px-4 text-sm">
+                            <div className="flex items-center justify-start group w-full">
+                              {isExpanded ? <ChevronUp className="h-4 w-4 mr-2 shrink-0" /> : <ChevronDown className="h-4 w-4 mr-2 shrink-0" />}
+                              Lote de {item.codesInBatch.length} códigos
+                              {item.generatedDate && ` (${format(new Date(item.generatedDate), "P p", { locale: es })})`}
+                              {item.observation && <span className="ml-2 text-muted-foreground text-xs truncate" title={item.observation}> - Obs: {item.observation}</span>}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <>
+                            <TableRow>
+                                <TableCell colSpan={7} className="pt-2 pb-1 px-6 bg-muted/10">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs h-auto py-1 px-2"
+                                        onClick={(e) => { e.stopPropagation(); handleCopyBatchCodes(item.codesInBatch);}}
+                                    >
+                                        <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar Códigos del Lote ({item.codesInBatch!.length})
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                            {item.codesInBatch.map(code => renderCodeRow(code, true))}
+                          </>
+                        )}
+                      </React.Fragment>
+                    );
+                  } else if (item.singleCode) {
+                    return renderCodeRow(item.singleCode, false);
+                  }
+                  return null;
+                })}
               </TableBody>
             </Table>
           </ScrollArea>
@@ -330,3 +328,5 @@ export function ManageCodesDialog({
     </Dialog>
   );
 }
+
+    
