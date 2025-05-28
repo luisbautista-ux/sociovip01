@@ -19,36 +19,41 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarShadcn } from "@/components/ui/calendar"; // Renamed to avoid conflict
+import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
 import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfDay, isBefore, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessEventFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 
-const eventFormSchema = z.object({
+// Schema for the details tab form
+const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
   termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
-  // maxAttendance is no longer a direct form input here, it's calculated
   isActive: z.boolean().default(true),
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
   aiHint: z.string().optional(),
-}).refine(data => data.endDate >= data.startDate, {
+}).refine(data => {
+    if (!data.startDate || !data.endDate) return true; 
+    const start = startOfDay(data.startDate);
+    const end = startOfDay(data.endDate); 
+    return isEqual(end, start) || isBefore(start, end) ;
+}, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
   path: ["endDate"],
 });
 
 // This type is for what the form itself manages and submits
-type EventFormValues = Omit<BusinessEventFormData, 'maxAttendance'>;
+type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 
 
 interface BusinessEventFormProps {
   event?: BusinessManagedEntity; 
-  onSubmit: (data: EventFormValues) => void;
+  onSubmit: (data: EventDetailsFormValues) => void; // Renamed from BusinessEventFormData as maxAttendance is not directly submitted by this form
   onCancel?: () => void; 
   isSubmitting?: boolean;
 }
@@ -56,11 +61,11 @@ interface BusinessEventFormProps {
 export function BusinessEventForm({ 
   event, 
   onSubmit, 
-  onCancel, 
+  onCancel, // onCancel is not used by this form directly as it's part of a larger modal
   isSubmitting = false,
 }: BusinessEventFormProps) {
-  const form = useForm<EventFormValues>({
-    resolver: zodResolver(eventFormSchema),
+  const form = useForm<EventDetailsFormValues>({
+    resolver: zodResolver(eventDetailsFormSchema),
     defaultValues: {
       name: event?.name || "",
       description: event?.description || "",
@@ -89,7 +94,7 @@ export function BusinessEventForm({
   }, [event, form]);
 
 
-  const handleSubmit = (values: EventFormValues) => {
+  const handleSubmit = (values: EventDetailsFormValues) => {
     onSubmit(values); 
   };
 
@@ -124,7 +129,7 @@ export function BusinessEventForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -139,14 +144,14 @@ export function BusinessEventForm({
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
-                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
+                      <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcn mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus />
+                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
@@ -162,14 +167,14 @@ export function BusinessEventForm({
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
-                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
+                      <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                         {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcn mode="single" selected={field.value} onSelect={field.onChange} disabled={{ before: form.getValues("startDate") }} locale={es} initialFocus />
+                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} locale={es} initialFocus />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
@@ -180,11 +185,13 @@ export function BusinessEventForm({
         
         <div>
           <FormLabel>Aforo Máximo (Calculado)</FormLabel>
-          <p className="text-sm font-medium mt-1">
-            {event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance < 0 ? '0 (o Ilimitado si no hay entradas con cantidad)' : event.maxAttendance}
-          </p>
-          <FormDescription className="text-xs">
-            Se calcula sumando las cantidades de los tipos de entrada definidos.
+          <div className="mt-1 p-2 border rounded-md bg-muted/50">
+            <p className="text-sm font-medium">
+              {event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance < 0 ? '0 (o Ilimitado si no hay entradas con cantidad)' : event.maxAttendance}
+            </p>
+          </div>
+          <FormDescription className="text-xs mt-1">
+            Se calcula sumando las cantidades de los tipos de entrada definidos en la pestaña "Entradas".
           </FormDescription>
         </div>
 
@@ -197,7 +204,7 @@ export function BusinessEventForm({
               <FormControl>
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="https://ejemplo.com/imagen_evento.png" {...field} disabled={isSubmitting} />
+                  <Input placeholder="https://ejemplo.com/imagen_evento.png" {...field} value={field.value || ""} disabled={isSubmitting} />
                 </div>
               </FormControl>
               <FormMessage />
@@ -210,7 +217,7 @@ export function BusinessEventForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Palabras Clave para Imagen (si URL está vacía)</FormLabel>
-              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
           )}
@@ -228,13 +235,12 @@ export function BusinessEventForm({
             </FormItem>
           )}
         />
-        <DialogFooter className="pt-6">
-          {/* The main save/cancel buttons are in the parent Dialog managing tabs */}
+        <div className="pt-4 flex justify-end">
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
              Actualizar Detalles del Evento
           </Button>
-        </DialogFooter>
+        </div>
       </form>
     </Form>
   );
