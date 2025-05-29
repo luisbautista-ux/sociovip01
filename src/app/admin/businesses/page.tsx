@@ -4,8 +4,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Building, PlusCircle, Download, Search, Edit, Trash2, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Building, PlusCircle, Download, Search, Edit, Trash2, Loader2, ExternalLink } from "lucide-react";
 import type { Business, BusinessFormData } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -13,10 +13,10 @@ import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { db } from "@/lib/firebase"; 
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where } from "firebase/firestore";
+import Link from "next/link";
 
 export default function AdminBusinessesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -25,20 +25,23 @@ export default function AdminBusinessesPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingUrlPaths, setExistingUrlPaths] = useState<string[]>([]);
   const { toast } = useToast();
 
   const fetchBusinesses = useCallback(async () => {
     setIsLoading(true);
     try {
       const querySnapshot = await getDocs(collection(db, "businesses"));
-      const fetchedBusinesses: Business[] = querySnapshot.docs.map(docSnap => {
+      const fetchedBusinesses: Business[] = [];
+      const paths: string[] = [];
+      querySnapshot.forEach(docSnap => {
         const data = docSnap.data();
-        return {
+        fetchedBusinesses.push({
           id: docSnap.id,
           name: data.name,
           contactEmail: data.contactEmail,
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate || new Date().toISOString()),
-          activePromotions: data.activePromotions || 0, // Assuming this might still be relevant or calculated elsewhere
+          activePromotions: data.activePromotions || 0, 
           ruc: data.ruc,
           razonSocial: data.razonSocial,
           department: data.department,
@@ -48,9 +51,20 @@ export default function AdminBusinessesPage() {
           managerName: data.managerName,
           managerDni: data.managerDni,
           businessType: data.businessType,
-        };
+          logoUrl: data.logoUrl,
+          publicCoverImageUrl: data.publicCoverImageUrl,
+          slogan: data.slogan,
+          publicContactEmail: data.publicContactEmail,
+          publicPhone: data.publicPhone,
+          publicAddress: data.publicAddress,
+          customUrlPath: data.customUrlPath,
+        });
+        if (data.customUrlPath) {
+          paths.push(data.customUrlPath);
+        }
       });
-      setBusinesses(fetchedBusinesses);
+      setBusinesses(fetchedBusinesses.sort((a,b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime()));
+      setExistingUrlPaths(paths);
     } catch (error) {
       console.error("Failed to fetch businesses:", error);
       toast({
@@ -59,6 +73,7 @@ export default function AdminBusinessesPage() {
         variant: "destructive",
       });
       setBusinesses([]);
+      setExistingUrlPaths([]);
     } finally {
       setIsLoading(false);
     }
@@ -78,24 +93,18 @@ export default function AdminBusinessesPage() {
 
   const handleExport = () => {
     if (filteredBusinesses.length === 0) {
-      toast({ title: "Sin Datos", description: "No hay negocios para exportar.", variant: "destructive" });
+      toast({ title: "Sin Datos", description: "No hay negocios para exportar.", variant: "default" });
       return;
     }
-    const headers = ["ID", "Nombre Comercial", "Razón Social", "RUC", "Email Contacto", "Fecha Ingreso", "Giro", "Departamento", "Provincia", "Distrito", "Dirección", "Gerente", "DNI Gerente"];
+    const headers = ["ID", "Nombre Comercial", "Razón Social", "RUC", "Email Contacto", "Fecha Ingreso", "Giro", "Departamento", "Provincia", "Distrito", "Dirección", "Gerente", "DNI Gerente", "URL Personalizada", "Logo URL", "Portada URL", "Slogan", "Email Público", "Teléfono Público", "Dirección Pública"];
     const rows = filteredBusinesses.map(biz => [
-      biz.id,
-      biz.name,
-      biz.razonSocial || "N/A",
-      biz.ruc || "N/A",
-      biz.contactEmail,
+      biz.id, biz.name, biz.razonSocial || "N/A", biz.ruc || "N/A", biz.contactEmail,
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
-      biz.businessType || "N/A",
-      biz.department || "N/A",
-      biz.province || "N/A",
-      biz.district || "N/A",
-      biz.address || "N/A",
-      biz.managerName || "N/A",
-      biz.managerDni || "N/A",
+      biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
+      biz.managerName || "N/A", biz.managerDni || "N/A", 
+      biz.customUrlPath ? `sociovip.app/b/${biz.customUrlPath}` : "N/A",
+      biz.logoUrl || "N/A", biz.publicCoverImageUrl || "N/A", biz.slogan || "N/A",
+      biz.publicContactEmail || "N/A", biz.publicPhone || "N/A", biz.publicAddress || "N/A",
     ]);
     let csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
@@ -119,8 +128,29 @@ export default function AdminBusinessesPage() {
     setShowCreateEditModal(true);
   };
 
+  const checkCustomUrlPathUniqueness = async (path: string, currentBusinessId?: string): Promise<boolean> => {
+    if (!path) return true; // Si no hay path, es único (o no se está usando)
+    const q = query(collection(db, "businesses"), where("customUrlPath", "==", path.toLowerCase()));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return true;
+    // Si estamos editando, permitir que el path actual sea el mismo
+    return snapshot.docs.every(doc => doc.id === currentBusinessId);
+  };
+
+
   const handleCreateOrEditBusiness = async (data: BusinessFormData) => {
     setIsSubmitting(true);
+    
+    if (data.customUrlPath) {
+      const isUnique = await checkCustomUrlPathUniqueness(data.customUrlPath, editingBusiness?.id);
+      if (!isUnique) {
+        toast({ title: "Error de Validación", description: "La Ruta URL Personalizada ya está en uso. Por favor, elige otra.", variant: "destructive"});
+        setIsSubmitting(false);
+        form.setError("customUrlPath", { type: "manual", message: "Esta ruta URL ya está en uso." }); // Asumiendo que tienes acceso a 'form' si lo pasas o usas context
+        return;
+      }
+    }
+
     const businessPayload = {
         name: data.name,
         contactEmail: data.contactEmail,
@@ -133,19 +163,25 @@ export default function AdminBusinessesPage() {
         managerName: data.managerName || null,
         managerDni: data.managerDni || null,
         businessType: data.businessType || null,
-        // activePromotions and joinDate are handled differently
+        logoUrl: data.logoUrl || null,
+        publicCoverImageUrl: data.publicCoverImageUrl || null,
+        slogan: data.slogan || null,
+        publicContactEmail: data.publicContactEmail || null,
+        publicPhone: data.publicPhone || null,
+        publicAddress: data.publicAddress || null,
+        customUrlPath: data.customUrlPath ? data.customUrlPath.toLowerCase().trim() : null,
     };
 
     try {
-      if (editingBusiness) { // Editing
+      if (editingBusiness) { 
         const businessRef = doc(db, "businesses", editingBusiness.id);
         await updateDoc(businessRef, businessPayload);
         toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
-      } else { // Creating
+      } else { 
         const docRef = await addDoc(collection(db, "businesses"), {
           ...businessPayload,
           joinDate: serverTimestamp(), 
-          activePromotions: 0, // Default for new business
+          activePromotions: 0, 
         });
         toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${docRef.id}.` });
       }
@@ -161,19 +197,18 @@ export default function AdminBusinessesPage() {
   };
   
   const handleDeleteBusiness = async (businessId: string, businessName?: string) => {
-    // Prevent action if already submitting (e.g. double click)
     if (isSubmitting) return; 
     
-    setIsSubmitting(true); // Set submitting for this specific delete operation
+    setIsSubmitting(true); 
     try {
       await deleteDoc(doc(db, "businesses", businessId));
       toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
-      fetchBusinesses(); // Re-fetch
+      fetchBusinesses(); 
     } catch (error) {
       console.error("Failed to delete business:", error);
       toast({ title: "Error al Eliminar", description: "No se pudo eliminar el negocio.", variant: "destructive"});
     } finally {
-      setIsSubmitting(false); // Reset submitting state for delete
+      setIsSubmitting(false); 
     }
   };
 
@@ -196,7 +231,7 @@ export default function AdminBusinessesPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Negocios Afiliados</CardTitle>
-          <CardDescription>Negocios que utilizan la plataforma SocioVIP. Haz clic en un negocio para ver más detalles o editar.</CardDescription>
+          <UIDialogDescription>Negocios que utilizan la plataforma SocioVIP.</UIDialogDescription>
            <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -229,7 +264,7 @@ export default function AdminBusinessesPage() {
                     <TableHead className="hidden md:table-cell">RUC</TableHead>
                     <TableHead className="hidden lg:table-cell">Email Contacto</TableHead>
                     <TableHead className="hidden xl:table-cell">Giro</TableHead>
-                    <TableHead>Fecha Ingreso</TableHead>
+                    <TableHead>URL Pública</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -242,7 +277,13 @@ export default function AdminBusinessesPage() {
                         <TableCell className="hidden md:table-cell">{biz.ruc || "N/A"}</TableCell>
                         <TableCell className="hidden lg:table-cell">{biz.contactEmail}</TableCell>
                         <TableCell className="hidden xl:table-cell">{biz.businessType || "N/A"}</TableCell>
-                        <TableCell>{biz.joinDate ? format(parseISO(biz.joinDate as string), "P", { locale: es }) : 'N/A'}</TableCell>
+                        <TableCell>
+                          {biz.customUrlPath ? (
+                            <Link href={`/b/${biz.customUrlPath}`} target="_blank" className="text-primary hover:underline text-xs flex items-center">
+                              sociovip.app/b/{biz.customUrlPath} <ExternalLink className="ml-1 h-3 w-3" />
+                            </Link>
+                          ) : "N/A"}
+                        </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditModal(biz)} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />
@@ -257,7 +298,7 @@ export default function AdminBusinessesPage() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
                                 <AlertDialogDescription>
                                   Esta acción no se puede deshacer. Esto eliminará permanentemente el negocio
                                   <span className="font-semibold"> {biz.name}</span>.
@@ -296,19 +337,20 @@ export default function AdminBusinessesPage() {
           setShowCreateEditModal(false);
           setEditingBusiness(null);
         } else {
-            setShowCreateEditModal(true); // Ensure it opens if needed
+            setShowCreateEditModal(true); 
         }
       }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingBusiness ? `Editar Negocio: ${editingBusiness.name}` : "Crear Nuevo Negocio"}</DialogTitle>
-            <DialogDescription>{editingBusiness ? "Actualiza los detalles del negocio." : "Completa los detalles para registrar un nuevo negocio."}</DialogDescription>
+            <UIDialogDescription>{editingBusiness ? "Actualiza los detalles del negocio." : "Completa los detalles para registrar un nuevo negocio."}</UIDialogDescription>
           </DialogHeader>
           <BusinessForm 
             business={editingBusiness || undefined}
             onSubmit={handleCreateOrEditBusiness} 
             onCancel={() => { setShowCreateEditModal(false); setEditingBusiness(null);}}
             isSubmitting={isSubmitting}
+            existingCustomUrlPaths={existingUrlPaths.filter(p => editingBusiness ? p !== editingBusiness.customUrlPath : true)}
           />
         </DialogContent>
       </Dialog>
