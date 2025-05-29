@@ -2,22 +2,28 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter
+} from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc } from "firebase/firestore";
-import type { BusinessManagedEntity, Business, PromotionDetails } from "@/lib/types"; // PromotionDetails might not be needed if directly using BusinessManagedEntity
+import type { BusinessManagedEntity, Business, PromotionDetails } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, CalendarDays } from "lucide-react";
+import { Loader2, Building, Tag, CalendarDays, ExternalLink } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
-// Placeholder for PublicHeaderAuth, to be implemented
-// import PublicHeaderAuth from "@/components/layout/PublicHeaderAuth";
+// Marcador Visual para verificar cambios - se eliminará después
+// <h1 className="text-3xl text-center font-bold text-orange-500 p-4 fixed top-0 left-0 bg-white/50 z-50 w-full">VERIFICACIÓN CAMBIO GLOBAL - vFINAL</h1>
 
-// Combined type for display
 interface PublicDisplayEntity extends BusinessManagedEntity {
   businessName?: string;
   businessLogoUrl?: string;
@@ -34,24 +40,22 @@ export default function HomePage() {
     setIsLoading(true);
     setError(null);
     try {
-      // 1. Fetch all businesses and map them by ID
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
       businessesSnapshot.forEach(docSnap => {
-        const bizData = docSnap.data() as Business;
+        const bizData = docSnap.data() as Omit<Business, 'id'>;
         businessesMap.set(docSnap.id, { id: docSnap.id, ...bizData });
       });
       console.log(`HomePage: Fetched ${businessesMap.size} businesses.`);
 
-      // 2. Fetch all active businessEntities
       const entitiesQuery = query(collection(db, "businessEntities"), where("isActive", "==", true));
       const entitiesSnapshot = await getDocs(entitiesQuery);
       console.log(`HomePage: Fetched ${entitiesSnapshot.docs.length} active business entities initially.`);
 
       const validEntities: PublicDisplayEntity[] = [];
-      const nowStr = new Date().toISOString(); // Fallback for missing dates
+      const nowStr = new Date().toISOString();
 
-      entitiesSnapshot.forEach(docSnap => {
+      for (const docSnap of entitiesSnapshot.docs) {
         const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
         
         let startDateStr: string;
@@ -64,7 +68,7 @@ export default function HomePage() {
         } else if (entityData.startDate instanceof Date) {
           startDateStr = entityData.startDate.toISOString();
         } else {
-          console.warn(`HomePage: Entity ${docSnap.id} missing or invalid startDate. Using fallback.`);
+          console.warn(`HomePage: Entity ${docSnap.id} has invalid startDate. Using fallback.`);
           startDateStr = nowStr; 
         }
 
@@ -75,7 +79,7 @@ export default function HomePage() {
         } else if (entityData.endDate instanceof Date) {
           endDateStr = entityData.endDate.toISOString();
         } else {
-          console.warn(`HomePage: Entity ${docSnap.id} missing or invalid endDate. Using fallback.`);
+          console.warn(`HomePage: Entity ${docSnap.id} has invalid endDate. Using fallback.`);
           endDateStr = nowStr;
         }
         
@@ -93,10 +97,10 @@ export default function HomePage() {
           imageUrl: entityData.imageUrl,
           aiHint: entityData.aiHint,
           termsAndConditions: entityData.termsAndConditions,
-          generatedCodes: entityData.generatedCodes,
-          ticketTypes: entityData.ticketTypes,
-          eventBoxes: entityData.eventBoxes,
-          assignedPromoters: entityData.assignedPromoters,
+          generatedCodes: entityData.generatedCodes || [],
+          ticketTypes: entityData.ticketTypes || [],
+          eventBoxes: entityData.eventBoxes || [],
+          assignedPromoters: entityData.assignedPromoters || [],
           createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (typeof entityData.createdAt === 'string' ? entityData.createdAt : undefined),
         };
 
@@ -106,15 +110,16 @@ export default function HomePage() {
             validEntities.push({
               ...entity,
               businessName: business.name,
-              businessLogoUrl: business.logoUrl,
+              businessLogoUrl: business.logoUrl, // Asumiendo que Business tiene logoUrl
               businessCustomUrlPath: business.customUrlPath,
             });
           } else {
-            console.warn(`HomePage: Business not found for entity ${entity.id} with businessId ${entity.businessId}. Entity will be shown without business details.`);
-            validEntities.push(entity); // Show entity even if business details are missing
+            console.warn(`HomePage: Business not found for entity ${entity.id} with businessId ${entity.businessId}.`);
+            // Decidir si mostrar la entidad sin datos del negocio o no. Por ahora, la mostramos.
+            validEntities.push(entity);
           }
         }
-      });
+      }
 
       console.log(`HomePage: Filtered to ${validEntities.length} currently activatable entities.`);
       setPublicEntities(validEntities.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
@@ -138,9 +143,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Marcador Visual Temporal para verificar cambios */}
-      {/* <h1 className="text-3xl text-center font-bold text-orange-500 p-4 fixed top-0 left-0 bg-white/50 z-50 w-full">VERIFICACIÓN CAMBIO GLOBAL - vFINAL</h1> */}
-      
       {/* Placeholder for PublicHeaderAuth - To be implemented later */}
       <header className="py-6 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground shadow-md">
         <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
@@ -149,9 +151,7 @@ export default function HomePage() {
           <p className="mt-2 text-lg text-primary-foreground/90">
             Descubre promociones y eventos exclusivos cerca de ti.
           </p>
-          {/* <div className="mt-4 p-2 border border-dashed border-primary-foreground/50 rounded-md">
-            <p className="text-xs">[PublicHeaderAuth Placeholder: Login/User Info Here]</p>
-          </div> */}
+          {/* Aquí iría el PublicHeaderAuth en la siguiente iteración */}
         </div>
       </header>
 
@@ -180,7 +180,6 @@ export default function HomePage() {
 
         {!isLoading && !error && (
           <>
-            {/* Sección de Eventos */}
             {events.length > 0 && (
               <section className="mb-12">
                 <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
@@ -223,9 +222,9 @@ export default function HomePage() {
                         </p>
                       </CardContent>
                        <CardFooter>
-                        <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public`} passHref className="w-full">
+                         <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public`} passHref className="w-full">
                           <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                            Ver Detalles del Evento
+                            Ver Detalles del Evento <ExternalLink className="ml-2 h-4 w-4" />
                           </Button>
                         </Link>
                       </CardFooter>
@@ -235,7 +234,6 @@ export default function HomePage() {
               </section>
             )}
 
-            {/* Sección de Promociones */}
             {promotions.length > 0 && (
               <section>
                 <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
@@ -280,7 +278,7 @@ export default function HomePage() {
                        <CardFooter>
                          <Link href={promo.businessCustomUrlPath ? `/b/${promo.businessCustomUrlPath}` : `/business/${promo.businessId}/public`} passHref className="w-full">
                           <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                            Ver Detalles de la Promoción
+                            Ver Detalles de la Promoción <ExternalLink className="ml-2 h-4 w-4" />
                           </Button>
                         </Link>
                       </CardFooter>
@@ -294,7 +292,9 @@ export default function HomePage() {
       </main>
 
       <footer className="mt-12 py-8 bg-muted/50 text-center">
-        <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.</p>
+        <p className="text-sm text-muted-foreground">
+          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociovip.app</Link>
+        </p>
       </footer>
     </div>
   );
