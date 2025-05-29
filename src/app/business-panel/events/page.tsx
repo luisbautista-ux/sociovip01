@@ -6,35 +6,18 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogHeader, 
-    DialogTitle, 
-    DialogDescription as UIDialogDescription, 
-    DialogFooter as UIDialogFooterAliased 
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooterAliased } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, Edit, Trash2, Search, Calendar as CalendarIconLucide, Ticket as TicketIconLucide, Box, Copy, UserCheck, Percent, ListChecks, QrCode as QrCodeIcon, ChevronDown, ChevronUp, BarChart3, Loader2, Info } from "lucide-react";
-import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, EventPromoterAssignment, CommissionRule, BusinessPromoterLink } from "@/lib/types";
+import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, EventPromoterAssignment, CommissionRule, BusinessPromoterLink, PromoterProfile } from "@/lib/types";
 import { format, parseISO, isBefore, isEqual, set, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { 
-    AlertDialog, 
-    AlertDialogAction, 
-    AlertDialogCancel, 
-    AlertDialogContent, 
-    AlertDialogDescription, 
-    AlertDialogFooter, 
-    AlertDialogHeader, 
-    AlertDialogTitle as UIAlertDialogTitle, 
-    AlertDialogTrigger 
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { BusinessEventForm } from "@/components/business/forms/BusinessEventForm";
 import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
@@ -51,10 +34,12 @@ import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage as FormMessageHook } from "@/components/ui/form";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
+
 
 const initialEventFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -95,10 +80,10 @@ export default function BusinessEventsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
 
-  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
   const [events, setEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -113,13 +98,11 @@ export default function BusinessEventsPage() {
   const [showCreateCodesModal, setShowCreateCodesModal] = useState(false);
   const [selectedEntityForCreatingCodes, setSelectedEntityForCreatingCodes] = useState<BusinessManagedEntity | null>(null);
   
-  const [showTicketManagementModal, setShowTicketManagementModal] = useState(false); // Deprecated in favor of tab
-  const [selectedEventForTicketManagement, setSelectedEventForTicketManagement] = useState<BusinessManagedEntity | null>(null); // Used by tab logic
+  // States for managing tickets within the main event modal
   const [editingTicketInEventModal, setEditingTicketInEventModal] = useState<TicketType | null>(null);
   const [showTicketFormInEventModal, setShowTicketFormInEventModal] = useState(false);
 
-  const [showBoxManagementModal, setShowBoxManagementModal] = useState(false); // Deprecated
-  const [selectedEventForBoxManagement, setSelectedEventForBoxManagement] = useState<BusinessManagedEntity | null>(null); // Used by tab logic
+  // States for managing boxes within the main event modal
   const [editingBoxInEventModal, setEditingBoxInEventModal] = useState<EventBox | null>(null);
   const [showBoxFormInEventModal, setShowBoxFormInEventModal] = useState(false);
   const [showCreateBatchBoxesModal, setShowCreateBatchBoxesModal] = useState(false);
@@ -207,11 +190,11 @@ export default function BusinessEventsPage() {
           promoterDni: data.promoterDni || "N/A", 
           promoterName: data.promoterName || "Promotor Sin Nombre",
           promoterEmail: data.promoterEmail || "Sin Email",
-          promoterPhone: data.promoterPhone,
+          promoterPhone: data.promoterPhone || "",
           commissionRate: data.commissionRate || "No definida", 
           isActive: data.isActive === undefined ? true : data.isActive,
           isPlatformUser: data.isPlatformUser || false,
-          platformUserUid: data.platformUserUid,
+          platformUserUid: data.platformUserUid || undefined,
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate || new Date().toISOString()),
         };
       });
@@ -236,8 +219,8 @@ export default function BusinessEventsPage() {
         setIsLoading(false);
         return;
     }
-    setIsLoading(true);
     console.log('Events Page: Querying events with businessId:', businessIdToFetch);
+    setIsLoading(true);
     try {
       const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToFetch), where("type", "==", "event"));
       const querySnapshot = await getDocs(q);
@@ -327,22 +310,39 @@ export default function BusinessEventsPage() {
       setEvents([]);
     } finally {
       setIsLoading(false);
+      console.log("Events Page: setIsLoading(false) in fetchBusinessEvents finally block.");
     }
   }, [toast]);
 
   useEffect(() => {
     if (currentBusinessId && !loadingAuth && !loadingProfile) {
+        console.log("Events Page: Valid currentBusinessId found, calling fetchBusinessEvents and fetchBusinessPromotersForAssignment.", currentBusinessId);
+        // Combined fetch to manage loading state correctly
+        setIsLoading(true); 
         Promise.all([
             fetchBusinessEvents(currentBusinessId),
             fetchBusinessPromotersForAssignment(currentBusinessId)
         ]).catch(error => {
-            console.error("Error fetching initial data for events page:", error);
-            // setIsLoading(false) will be handled by individual fetch functions
+            console.error("Events Page: Error fetching initial data for events page:", error);
+            // Individual fetches will show their own toasts
+            setEvents([]); // Ensure data arrays are cleared on error
+            setAvailablePromotersForAssignment([]);
+        }).finally(() => {
+             // This finally might be redundant if fetchBusinessEvents sets it,
+             // but ensure it's set to false if fetchBusinessPromotersForAssignment was the only one or if all fail.
+             // If fetchBusinessEvents is the main data driver for the page, its finally block handles setIsLoading.
+             // For now, fetchBusinessEvents' finally block should be sufficient.
+             // If fetchBusinessPromotersForAssignment also dictates primary page loading, adjust.
+             // Let's assume fetchBusinessEvents setting isLoading is enough for primary page view.
+             // If fetchBusinessPromotersForAssignment has its own loading indicator, that's separate.
+             // If its data is critical for the main view before events load, setIsLoading(false) should be here.
+             // For now, let's rely on fetchBusinessEvents to set loading false.
         });
-    } else if (!currentBusinessId && !loadingAuth && !loadingProfile) {
+    } else if (!loadingAuth && !loadingProfile && !currentBusinessId) {
+        console.log("Events Page: No valid currentBusinessId after auth/profile load, setting loading to false.");
+        setIsLoading(false);
         setEvents([]);
         setAvailablePromotersForAssignment([]);
-        setIsLoading(false);
     }
 }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment, loadingAuth, loadingProfile]);
 
@@ -441,8 +441,7 @@ export default function BusinessEventsPage() {
     
     let docRef;
     try {
-      const defaultTicketData: Omit<TicketType, 'id' | 'eventId'> = {
-        businessId: currentBusinessId,
+      const defaultTicketData: Omit<TicketType, 'id' | 'eventId' | 'businessId'> = {
         name: "Entrada General",
         cost: 0,
         quantity: 0, 
@@ -455,9 +454,8 @@ export default function BusinessEventsPage() {
         startDate: Timestamp.fromDate(tempStartDate),
         endDate: Timestamp.fromDate(tempEndDate),
         createdAt: serverTimestamp(),
-        // TicketTypes will be added after event creation OR in the final save
+        ticketTypes: [], // Initialize with empty, will be updated
       });
-      delete eventPayloadForFirestore.ticketTypes; // Don't save empty array initially if we add default later
       
       console.log("handleInitialEventSubmit: Event payload for Firestore:", eventPayloadForFirestore);
       docRef = await addDoc(collection(db, "businessEntities"), eventPayloadForFirestore);
@@ -467,6 +465,7 @@ export default function BusinessEventsPage() {
           ...defaultTicketData,
           id: `tt-${docRef.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`, 
           eventId: docRef.id,
+          businessId: currentBusinessId,
       };
       
       const finalNewEvent: BusinessManagedEntity = {
@@ -481,7 +480,6 @@ export default function BusinessEventsPage() {
         generatedCodes: [],
       };
       
-      // Update the event in Firestore with the default ticket type
       await updateDoc(doc(db, "businessEntities", docRef.id), sanitizeObjectForFirestore({
         ticketTypes: finalNewEvent.ticketTypes.map(tt => sanitizeObjectForFirestore(tt)),
         maxAttendance: finalNewEvent.maxAttendance
@@ -593,6 +591,7 @@ export default function BusinessEventsPage() {
 
       const finalAssignedPromoters = (eventToSave.assignedPromoters || []).map(ap => ({
         ...ap,
+        promoterProfileId: ap.promoterProfileId || `unknown-promoter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         commissionRules: (ap.commissionRules || []).map((cr, crIndex) => ({
           ...cr,
           id: cr.id || `cr-${ap.promoterProfileId || 'unknown'}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}`
@@ -663,7 +662,7 @@ export default function BusinessEventsPage() {
     console.log("Events Page: handleNewCodesCreated called for entityId:", entityId, "New codes count:", newCodes.length, "Observation:", observation);
     if (isSubmitting) {
         console.log("Events Page: Submission already in progress, skipping new codes creation.");
-        setIsSubmitting(false);
+        setIsSubmitting(false); 
         return;
     }
     if (!currentBusinessId || !userProfile?.name) {
@@ -682,8 +681,7 @@ export default function BusinessEventsPage() {
             return;
         }
         const targetEventData = targetEventSnap.data() as BusinessManagedEntity;
-        const existingCodes = targetEventData.generatedCodes || [];
-
+        
         const newCodesWithDetails = newCodes.map(code => sanitizeObjectForFirestore({
             ...code,
             generatedByName: userProfile.name, 
@@ -693,7 +691,7 @@ export default function BusinessEventsPage() {
             isVipCandidate: false,
         }));
 
-        const updatedCodes = [...existingCodes, ...newCodesWithDetails];
+        const updatedCodes = [...(targetEventData.generatedCodes || []), ...newCodesWithDetails];
     
         await updateDoc(targetEventRef, { generatedCodes: updatedCodes });
         toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEventData.name}. Guardados en la base de datos.`});
@@ -751,7 +749,7 @@ export default function BusinessEventsPage() {
         console.error("Events Page: Error saving updated codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   };
 
@@ -794,7 +792,6 @@ export default function BusinessEventsPage() {
         toast({title:"Error", description: "No hay un evento seleccionado para gestionar entradas.", variant: "destructive"});
         return;
       }
-      setSelectedEventForTicketManagement(editingEvent); // Set context for the form
       setEditingTicketInEventModal(ticket);
       setShowTicketFormInEventModal(true);
   };
@@ -835,9 +832,6 @@ export default function BusinessEventsPage() {
       const newMaxAttendance = calculateMaxAttendance(updatedTickets);
       setEditingEvent(prev => prev ? { ...prev, ticketTypes: updatedTickets, maxAttendance: newMaxAttendance } : null);
       
-      // Note: Firestore update for tickets happens when "Guardar Cambios y Cerrar" is clicked for the main event.
-      // If direct save per ticket is needed, updateDoc would be called here.
-
       setShowTicketFormInEventModal(false);
       setEditingTicketInEventModal(null);
   };
@@ -860,7 +854,6 @@ export default function BusinessEventsPage() {
       toast({title:"Error", description: "No hay un evento seleccionado para gestionar boxes.", variant: "destructive"});
       return;
     }
-    setSelectedEventForBoxManagement(editingEvent); // Set context for the form
     setEditingBoxInEventModal(box);
     setShowBoxFormInEventModal(true);
   };
@@ -1068,7 +1061,7 @@ export default function BusinessEventsPage() {
           return assignment;
       });
       setEditingEvent(prev => prev ? { ...prev, assignedPromoters: updatedAssignments } : null);
-      toast({ title: `Regla de Comisión "${ruleToDelete.appliesToName || ruleToDelete.id.substring(0,5)}" Eliminada`, variant: "destructive"});
+      toast({ title: `Regla de Comisión "${ruleToDelete.appliesToName || (ruleToDelete.id ? ruleToDelete.id.substring(0,5) : 'N/A')}" Eliminada`, variant: "destructive"});
   };
 
   const openStatsModalForMainList = (event: BusinessManagedEntity) => {
@@ -1128,14 +1121,13 @@ export default function BusinessEventsPage() {
                     <TableRow>
                       <TableHead className="w-[30%] min-w-[250px]">Evento y Gestión</TableHead>
                       <TableHead className="min-w-[140px]">Vigencia</TableHead>
-                      <TableHead className="min-w-[180px]">Rendimiento QRs</TableHead>
+                      <TableHead className="min-w-[180px]">QRs Entrada</TableHead>
                       <TableHead className="min-w-[150px]">Códigos Creados</TableHead>
                       <TableHead className="text-left min-w-[120px]">Acciones Adicionales</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredEvents.length > 0 ? filteredEvents.map((event) => {
-                      const codesCreatedCount = event.generatedCodes?.length || 0;
                       const codesUsedCount = event.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
                       const maxAttendanceDisplay = event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance <= 0 ? 'Ilimitado' : event.maxAttendance;
 
@@ -1174,18 +1166,18 @@ export default function BusinessEventsPage() {
                           </TableCell>
                           <TableCell className="align-top py-3">
                                <div className="flex flex-col text-xs space-y-0.5">
-                                    <span>QRs Generados (Clientes): N/A (Requiere Backend)</span>
-                                    <span>Códigos Usados (Asistencia): ({codesUsedCount})</span>
-                                    <span>Aforo Máximo: ({maxAttendanceDisplay})</span>
+                                    <span>QRs Generados (`0`)</span>
+                                    <span>QRs Usados (`{codesUsedCount}`)</span>
+                                    <span>Aforo Máximo (`{maxAttendanceDisplay}`)</span>
                                </div>
                           </TableCell>
                           <TableCell className="align-top py-3">
                               <div className="flex flex-col items-start gap-1">
-                                <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(event)} disabled={!isEntityCurrentlyActivatable(event) || isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(event)} disabled={!isEntityCurrentlyActivatable(event) || isSubmitting} className="bg-accent hover:bg-accent/90 text-accent-foreground px-2 py-1 h-auto text-xs">
                                     <QrCodeIcon className="h-3 w-3 mr-1" /> Crear
                                 </Button>
                                 <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(event)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                    <ListChecks className="h-3 w-3 mr-1" /> Ver ({codesCreatedCount})
+                                    <ListChecks className="h-3 w-3 mr-1" /> Ver (`{event.generatedCodes?.length || 0}`)
                                 </Button>
                               </div>
                           </TableCell>
@@ -1358,9 +1350,9 @@ export default function BusinessEventsPage() {
                     <Tabs defaultValue="details" className="w-full">
                         <TabsList className="grid w-full grid-cols-4 mb-4"> 
                             <TabsTrigger value="details">Detalles</TabsTrigger>
-                            <TabsTrigger value="tickets">Entradas ({editingEvent.ticketTypes?.length || 0})</TabsTrigger>
-                            <TabsTrigger value="boxes">Boxes ({editingEvent.eventBoxes?.length || 0})</TabsTrigger>
-                            <TabsTrigger value="promoters">Promotores ({editingEvent.assignedPromoters?.length || 0})</TabsTrigger>
+                            <TabsTrigger value="tickets">Entradas (`{editingEvent.ticketTypes?.length || 0}`)</TabsTrigger>
+                            <TabsTrigger value="boxes">Boxes (`{editingEvent.eventBoxes?.length || 0}`)</TabsTrigger>
+                            <TabsTrigger value="promoters">Promotores (`{editingEvent.assignedPromoters?.length || 0}`)</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="details">
@@ -1476,8 +1468,8 @@ export default function BusinessEventsPage() {
                                                         </SelectItem>
                                                     )}
                                                     {availablePromotersForAssignment.map((pLink, index) => {
-                                                        const key = pLink && pLink.id ? pLink.id : `promoter-select-item-${index}-${Math.random()}`;
-                                                        const value = pLink && pLink.id ? pLink.id : `promoter-value-fallback-${index}-${Math.random()}`; 
+                                                        const key = pLink && pLink.id ? pLink.id : `promoter-select-item-${index}-${Math.random().toString(36).slice(2)}A`; // Added unique suffix
+                                                        const value = pLink && pLink.id ? pLink.id : `promoter-value-fallback-${index}-${Math.random().toString(36).slice(2)}B`; 
                                                         if (!pLink || !pLink.id) {
                                                             console.warn("Events Page - Promoter Select: Missing pLink or pLink.id for item at index", index, pLink);
                                                         }
@@ -1517,7 +1509,7 @@ export default function BusinessEventsPage() {
                                                                     <li key={rule.id || `cr-fallback-${Math.random()}`} className="flex justify-between items-center">
                                                                         <span>
                                                                             {rule.appliesTo === 'event_general' ? 'General del Evento' : 
-                                                                            (rule.appliesToName ? `${rule.appliesToName}` : `ID: ${rule.appliesToId?.substring(0,5)}...`)}: 
+                                                                            (rule.appliesToName ? `${rule.appliesToName}` : (rule.appliesToId ? `ID: ${rule.appliesToId.substring(0,5)}...` : 'Elemento específico'))}: 
                                                                             {rule.commissionType === 'fixed' ? `S/ ${(rule.commissionValue || 0).toFixed(2)}` : `${rule.commissionValue || 0}%`}
                                                                             {rule.description ? ` (${rule.description})` : ''}
                                                                         </span>
@@ -1551,22 +1543,6 @@ export default function BusinessEventsPage() {
         </DialogContent>
     </Dialog>
 
-    <Dialog open={showTicketManagementModal} onOpenChange={(isOpen) => { /* Kept for structure, but form opens in main modal now */
-        if(!isOpen) {
-            setShowTicketFormInEventModal(false);
-            setEditingTicketInEventModal(null);
-        }
-        setShowTicketManagementModal(isOpen);
-    }}>
-        <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-                <DialogTitle>Gestionar Entradas para: {editingEvent?.name}</DialogTitle>
-                <UIDialogDescription>Define los diferentes tipos de entrada. El aforo total se calcula a partir de estas.</UIDialogDescription>
-            </DialogHeader>
-            {/* Content moved to Tabs in main modal */}
-        </DialogContent>
-    </Dialog>
-
     <Dialog open={showTicketFormInEventModal} onOpenChange={(isOpen) => {
         if(!isOpen) setEditingTicketInEventModal(null);
         setShowTicketFormInEventModal(isOpen);
@@ -1582,22 +1558,6 @@ export default function BusinessEventsPage() {
                 onCancel={() => { setShowTicketFormInEventModal(false); setEditingTicketInEventModal(null); }}
                 isSubmitting={isSubmitting} 
             />
-        </DialogContent>
-    </Dialog>
-
-    <Dialog open={showBoxManagementModal} onOpenChange={(isOpen) => {  /* Kept for structure, but form opens in main modal now */
-        if(!isOpen) {
-            setShowBoxFormInEventModal(false);
-            setEditingBoxInEventModal(null);
-        }
-        setShowBoxManagementModal(isOpen);
-    }}>
-        <DialogContent className="sm:max-w-3xl">
-            <DialogHeader>
-                <DialogTitle>Gestionar Boxes para: {editingEvent?.name}</DialogTitle>
-                <UIDialogDescription>Define los boxes disponibles para este evento.</UIDialogDescription>
-            </DialogHeader>
-             {/* Content moved to Tabs in main modal */}
         </DialogContent>
     </Dialog>
 
@@ -1727,7 +1687,7 @@ export default function BusinessEventsPage() {
                             <FormItem>
                                 <Label>Valor de Comisión <span className="text-destructive">*</span></Label>
                                 <FormControl><Input type="number" placeholder="Ej: 5 o 10" {...field} disabled={isSubmitting} /></FormControl>
-                                <FormDescription className="text-xs">Si es porcentaje, ingresa solo el número (ej: 10 para 10%).</FormDescription>
+                                <UIDialogDescription className="text-xs">Si es porcentaje, ingresa solo el número (ej: 10 para 10%).</UIDialogDescription>
                                 <FormMessageHook />
                             </FormItem>
                         )}
@@ -1762,13 +1722,13 @@ export default function BusinessEventsPage() {
             </DialogHeader>
             {selectedEventForStats && (
                 <div className="space-y-3 py-4">
-                    <p><strong>Códigos Creados:</strong> ({selectedEventForStats.generatedCodes?.length || 0})</p>
-                    <p><strong>Códigos Usados (Asistencia):</strong> ({selectedEventForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0})</p>
+                    <p><strong>Códigos Creados:</strong> (`{selectedEventForStats.generatedCodes?.length || 0}`)</p>
+                    <p><strong>Códigos Usados (Asistencia):</strong> (`{selectedEventForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}`)</p>
                     <p><strong>Tasa de Asistencia:</strong> {selectedEventForStats.generatedCodes && selectedEventForStats.generatedCodes.length > 0 ? 
                         ((selectedEventForStats.generatedCodes.filter(c => c.status === 'redeemed').length / selectedEventForStats.generatedCodes.length) * 100).toFixed(1) + '%' 
                         : '0%'}
                     </p>
-                    <p><strong>Aforo Máximo Configurado:</strong> ({selectedEventForStats.maxAttendance === 0 || !selectedEventForStats.maxAttendance ? 'Ilimitado' : selectedEventForStats.maxAttendance})</p>
+                    <p><strong>Aforo Máximo Configurado:</strong> (`{selectedEventForStats.maxAttendance === 0 || !selectedEventForStats.maxAttendance ? 'Ilimitado' : selectedEventForStats.maxAttendance}`)</p>
                     <div className="border-t pt-3 mt-3">
                         <h4 className="font-semibold text-muted-foreground">Más Detalles (Ejemplos):</h4>
                         <ul className="list-disc list-inside text-sm text-muted-foreground">
@@ -1832,3 +1792,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
+    
