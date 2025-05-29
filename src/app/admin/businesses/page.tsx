@@ -1,10 +1,10 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription as ShadcnCardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Renamed CardDescription
+import { Card, CardContent, CardDescription as ShadcnCardDescription, CardHeader, CardTitle } from "@/components/ui/card"; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog";
 import { Building, PlusCircle, Download, Search, Edit, Trash2, Loader2, ExternalLink } from "lucide-react";
 import type { Business, BusinessFormData } from "@/lib/types";
 import { format, parseISO } from "date-fns";
@@ -13,9 +13,9 @@ import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Renamed AlertDialogFooter
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; 
 import { db } from "@/lib/firebase"; 
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit, writeBatch } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit } from "firebase/firestore";
 import Link from "next/link";
 
 export default function AdminBusinessesPage() {
@@ -36,29 +36,30 @@ export default function AdminBusinessesPage() {
       const paths: string[] = [];
       querySnapshot.forEach(docSnap => {
         const data = docSnap.data();
-        fetchedBusinesses.push({
+        const businessData: Business = {
           id: docSnap.id,
-          name: data.name,
-          contactEmail: data.contactEmail,
+          name: data.name || "Nombre no disponible",
+          contactEmail: data.contactEmail || "Email no disponible",
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate || new Date().toISOString()),
-          // activePromotions: data.activePromotions || 0, // This field is not directly on Business anymore
-          ruc: data.ruc,
-          razonSocial: data.razonSocial,
-          department: data.department,
-          province: data.province,
-          district: data.district,
-          address: data.address,
-          managerName: data.managerName,
-          managerDni: data.managerDni,
-          businessType: data.businessType,
-          logoUrl: data.logoUrl,
-          publicCoverImageUrl: data.publicCoverImageUrl,
-          slogan: data.slogan,
-          publicContactEmail: data.publicContactEmail,
-          publicPhone: data.publicPhone,
-          publicAddress: data.publicAddress,
-          customUrlPath: data.customUrlPath,
-        });
+          ruc: data.ruc || undefined,
+          razonSocial: data.razonSocial || undefined,
+          department: data.department || undefined,
+          province: data.province || undefined,
+          district: data.district || undefined,
+          address: data.address || undefined,
+          managerName: data.managerName || undefined,
+          managerDni: data.managerDni || undefined,
+          businessType: data.businessType || undefined,
+          logoUrl: data.logoUrl || undefined,
+          publicCoverImageUrl: data.publicCoverImageUrl || undefined,
+          slogan: data.slogan || undefined,
+          publicContactEmail: data.publicContactEmail || undefined,
+          publicPhone: data.publicPhone || undefined,
+          publicAddress: data.publicAddress || undefined,
+          customUrlPath: data.customUrlPath || undefined,
+          activePromotions: 0, // Placeholder, no longer directly on business
+        };
+        fetchedBusinesses.push(businessData);
         if (data.customUrlPath) {
           paths.push(data.customUrlPath);
         }
@@ -66,7 +67,7 @@ export default function AdminBusinessesPage() {
       setBusinesses(fetchedBusinesses.sort((a,b) => new Date(b.joinDate as string).getTime() - new Date(a.joinDate as string).getTime()));
       setExistingUrlPaths(paths);
     } catch (error: any) {
-      console.error("Failed to fetch businesses:", error.code, error.message, error);
+      console.error("Failed to fetch businesses:", error);
       toast({
         title: "Error al Cargar Negocios",
         description: `No se pudieron obtener los datos de los negocios. ${error.message}`,
@@ -130,28 +131,28 @@ export default function AdminBusinessesPage() {
 
   const checkCustomUrlPathUniqueness = async (path: string, currentBusinessId?: string): Promise<boolean> => {
     if (!path || path.trim() === "") return true; 
-    const q = query(collection(db, "businesses"), where("customUrlPath", "==", path.toLowerCase().trim()));
+    const q = query(collection(db, "businesses"), where("customUrlPath", "==", path.toLowerCase().trim()), limit(1));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return true;
-    // If a document with this path exists, it's only unique if it's the current business being edited
-    return snapshot.docs.every(doc => doc.id === currentBusinessId);
+    return snapshot.docs[0].id === currentBusinessId;
   };
 
 
   const handleCreateOrEditBusiness = async (data: BusinessFormData, currentBusinessId?: string): Promise<{success: boolean; error?: string}> => {
     setIsSubmitting(true);
     
-    const cleanedCustomUrlPath = data.customUrlPath ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-') : null;
+    const cleanedCustomUrlPath = data.customUrlPath ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : null;
 
     if (cleanedCustomUrlPath) {
       const isUnique = await checkCustomUrlPathUniqueness(cleanedCustomUrlPath, currentBusinessId);
       if (!isUnique) {
         setIsSubmitting(false);
-        return { success: false, error: "La Ruta URL Personalizada ya está en uso. Por favor, elige otra." };
+        toast({ title: "Error de URL", description: "La Ruta URL Personalizada ya está en uso. Por favor, elige otra.", variant: "destructive" });
+        return { success: false, error: "La Ruta URL Personalizada ya está en uso." };
       }
     }
 
-    const businessPayload = {
+    const businessPayload: Partial<Omit<Business, 'id' | 'joinDate' | 'activePromotions'>> & { joinDate?: any } = {
         name: data.name,
         contactEmail: data.contactEmail,
         ruc: data.ruc || null,
@@ -169,7 +170,7 @@ export default function AdminBusinessesPage() {
         publicContactEmail: data.publicContactEmail || null,
         publicPhone: data.publicPhone || null,
         publicAddress: data.publicAddress || null,
-        customUrlPath: cleanedCustomUrlPath || null, // Ensure it's null if empty
+        customUrlPath: cleanedCustomUrlPath || null,
     };
 
     try {
@@ -178,11 +179,8 @@ export default function AdminBusinessesPage() {
         await updateDoc(businessRef, businessPayload);
         toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
       } else { 
-        const docRef = await addDoc(collection(db, "businesses"), {
-          ...businessPayload,
-          joinDate: serverTimestamp(), 
-          // activePromotions: 0, // This field is not directly on Business anymore
-        });
+        businessPayload.joinDate = serverTimestamp();
+        const docRef = await addDoc(collection(db, "businesses"), businessPayload);
         toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${docRef.id}.` });
       }
       setShowCreateEditModal(false);
@@ -190,7 +188,7 @@ export default function AdminBusinessesPage() {
       fetchBusinesses(); 
       return { success: true };
     } catch (error: any) {
-      console.error("Failed to create/update business:", error.code, error.message, error);
+      console.error("Failed to create/update business:", error);
       toast({ title: "Error al Guardar", description: `No se pudo guardar el negocio. ${error.message}`, variant: "destructive"});
       return { success: false, error: error.message };
     } finally {
@@ -204,22 +202,11 @@ export default function AdminBusinessesPage() {
     setIsSubmitting(true); 
     try {
       // TODO: Consider deleting related entities (promotions, events, etc.) in businessEntities
-      // This would typically involve a batched write or a Cloud Function for cascading deletes.
-      // Example (conceptual, needs to be robust):
-      // const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", businessId));
-      // const entitiesSnap = await getDocs(entitiesQuery);
-      // if (!entitiesSnap.empty) {
-      //   const batch = writeBatch(db);
-      //   entitiesSnap.forEach(doc => batch.delete(doc.ref));
-      //   await batch.commit();
-      //   console.log(`Deleted ${entitiesSnap.size} related entities for business ${businessId}`);
-      // }
-
       await deleteDoc(doc(db, "businesses", businessId));
       toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
       fetchBusinesses(); 
     } catch (error: any) {
-      console.error("Failed to delete business:", error.code, error.message, error);
+      console.error("Failed to delete business:", error);
       toast({ title: "Error al Eliminar", description: `No se pudo eliminar el negocio. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false); 
@@ -276,8 +263,6 @@ export default function AdminBusinessesPage() {
                     <TableHead>Nombre Comercial</TableHead>
                     <TableHead className="hidden xl:table-cell">Razón Social</TableHead>
                     <TableHead className="hidden md:table-cell">RUC</TableHead>
-                    <TableHead className="hidden lg:table-cell">Email Contacto</TableHead>
-                    <TableHead className="hidden xl:table-cell">Giro</TableHead>
                     <TableHead>URL Pública</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -289,15 +274,13 @@ export default function AdminBusinessesPage() {
                         <TableCell className="font-medium">{biz.name}</TableCell>
                         <TableCell className="hidden xl:table-cell">{biz.razonSocial || "N/A"}</TableCell>
                         <TableCell className="hidden md:table-cell">{biz.ruc || "N/A"}</TableCell>
-                        <TableCell className="hidden lg:table-cell">{biz.contactEmail}</TableCell>
-                        <TableCell className="hidden xl:table-cell">{biz.businessType || "N/A"}</TableCell>
                         <TableCell>
                           {biz.customUrlPath ? (
                             <Link href={`/b/${biz.customUrlPath}`} target="_blank" className="text-primary hover:underline text-xs flex items-center">
                               sociosvip.app/b/{biz.customUrlPath} <ExternalLink className="ml-1 h-3 w-3" />
                             </Link>
                           ) : (
-                            <span className="text-xs text-muted-foreground">N/A (Usará ID por defecto)</span>
+                             <span className="text-xs text-muted-foreground">No configurada</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
@@ -317,7 +300,7 @@ export default function AdminBusinessesPage() {
                                 <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
                                 <AlertDialogDescription>
                                   Esta acción no se puede deshacer. Esto eliminará permanentemente el negocio
-                                  <span className="font-semibold"> {biz.name}</span> y podría afectar a sus entidades asociadas (promociones, eventos, etc.).
+                                  <span className="font-semibold"> {biz.name}</span> y todas sus entidades asociadas (promociones, eventos, etc.).
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <ShadcnAlertDialogFooter>
@@ -338,7 +321,7 @@ export default function AdminBusinessesPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
+                      <TableCell colSpan={5} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -350,11 +333,9 @@ export default function AdminBusinessesPage() {
       
       <Dialog open={showCreateEditModal} onOpenChange={(isOpen) => {
         if (!isOpen) {
-          setShowCreateEditModal(false);
           setEditingBusiness(null);
-        } else {
-            setShowCreateEditModal(true); 
         }
+        setShowCreateEditModal(isOpen); 
       }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -365,7 +346,7 @@ export default function AdminBusinessesPage() {
             business={editingBusiness || undefined}
             onSubmit={handleCreateOrEditBusiness} 
             onCancel={() => { setShowCreateEditModal(false); setEditingBusiness(null);}}
-            isSubmittingForm={isSubmitting} // Pass the correct prop name
+            isSubmittingForm={isSubmitting}
             existingCustomUrlPaths={existingUrlPaths.filter(p => editingBusiness && p === editingBusiness.customUrlPath ? false : true)}
           />
         </DialogContent>
@@ -373,5 +354,3 @@ export default function AdminBusinessesPage() {
     </div>
   );
 }
-
-    

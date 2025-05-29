@@ -18,30 +18,26 @@ import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, CalendarDays, ExternalLink, Search as SearchIcon } from "lucide-react";
+import { Loader2, Building, Tag, CalendarDays, ExternalLink } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth";
-import { Input } from "@/components/ui/input";
 
 interface PublicDisplayEntity extends BusinessManagedEntity {
   businessName?: string;
   businessLogoUrl?: string;
-  businessCustomUrlPath?: string;
+  businessCustomUrlPath?: string; // Clave para el enlace
 }
 
 export default function HomePage() {
-  const [allPublicEntities, setAllPublicEntities] = useState<PublicDisplayEntity[]>([]);
-  const [filteredEntities, setFilteredEntities] = useState<PublicDisplayEntity[]>([]);
+  const [publicEntities, setPublicEntities] = useState<PublicDisplayEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchPublicEntitiesAndBusinesses = useCallback(async () => {
     console.log("HomePage: Fetching public entities and businesses...");
     setIsLoading(true);
     setError(null);
-    setAllPublicEntities([]);
-    setFilteredEntities([]);
+    setPublicEntities([]);
     try {
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
@@ -50,6 +46,7 @@ export default function HomePage() {
         businessesMap.set(docSnap.id, { 
             id: docSnap.id, 
             ...bizData,
+            // Asegurar que las fechas y otros campos opcionales se manejen
             joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
             customUrlPath: bizData.customUrlPath || undefined,
          });
@@ -63,7 +60,7 @@ export default function HomePage() {
       const validEntities: PublicDisplayEntity[] = [];
 
       for (const docSnap of entitiesSnapshot.docs) {
-        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
+        const entityData = docSnap.data();
         
         let startDateStr: string;
         let endDateStr: string;
@@ -91,7 +88,7 @@ export default function HomePage() {
             endDateStr = nowStr; 
         }
         
-        const entityForCheck: BusinessManagedEntity = {
+        const entityToCheck: BusinessManagedEntity = {
           id: docSnap.id,
           businessId: entityData.businessId,
           type: entityData.type,
@@ -112,17 +109,19 @@ export default function HomePage() {
           createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (typeof entityData.createdAt === 'string' ? entityData.createdAt : undefined),
         };
 
-        if (isEntityCurrentlyActivatable(entityForCheck)) {
-          const business = businessesMap.get(entityForCheck.businessId);
+        if (isEntityCurrentlyActivatable(entityToCheck)) {
+          const business = businessesMap.get(entityToCheck.businessId);
           if (business) {
             validEntities.push({
-              ...entityForCheck,
+              ...entityToCheck,
               businessName: business.name,
               businessLogoUrl: business.logoUrl,
-              businessCustomUrlPath: business.customUrlPath, // Get customUrlPath from business
+              businessCustomUrlPath: business.customUrlPath,
             });
           } else {
-            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}.`);
+            console.warn(`HomePage: Business not found for entity ${entityToCheck.id} with businessId ${entityToCheck.businessId}.`);
+            // Consider still pushing the entity if you want to show it without business details
+            // validEntities.push(entityToCheck); 
           }
         }
       }
@@ -135,14 +134,12 @@ export default function HomePage() {
         if (a.type !== 'event' && b.type === 'event') return 1;
         return bDate - aDate; 
       });
-      setAllPublicEntities(sortedEntities);
-      setFilteredEntities(sortedEntities);
+      setPublicEntities(sortedEntities);
 
     } catch (err: any) {
       console.error("HomePage: Error fetching public data:", err);
       setError("No se pudieron cargar las promociones y eventos. Inténtalo de nuevo más tarde.");
-      setAllPublicEntities([]);
-      setFilteredEntities([]);
+      setPublicEntities([]);
     } finally {
       setIsLoading(false);
       console.log("HomePage: Fetching complete. isLoading set to false.");
@@ -153,25 +150,12 @@ export default function HomePage() {
     fetchPublicEntitiesAndBusinesses();
   }, [fetchPublicEntitiesAndBusinesses]);
 
-  useEffect(() => {
-    if (!searchTerm) {
-      setFilteredEntities(allPublicEntities);
-      return;
-    }
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    const filtered = allPublicEntities.filter(entity => 
-      (entity.name?.toLowerCase().includes(lowerSearchTerm)) ||
-      (entity.description?.toLowerCase().includes(lowerSearchTerm)) ||
-      (entity.businessName?.toLowerCase().includes(lowerSearchTerm))
-    );
-    setFilteredEntities(filtered);
-  }, [searchTerm, allPublicEntities]);
-
-  const events = filteredEntities.filter(entity => entity.type === 'event');
-  const promotions = filteredEntities.filter(entity => entity.type === 'promotion');
+  const events = publicEntities.filter(entity => entity.type === 'event');
+  const promotions = publicEntities.filter(entity => entity.type === 'promotion');
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <p className="text-3xl text-center font-bold text-red-500 p-4 bg-yellow-200">VERIFICACIÓN CAMBIO GLOBAL - vLATEST</p>
       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
             <Link href="/" passHref className="flex items-center gap-2 group">
@@ -185,19 +169,17 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input 
-              type="search"
-              placeholder="Buscar eventos, promociones o negocios..."
-              className="w-full pl-10 py-3 text-base rounded-lg shadow-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
+      <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        {/* Sección de Branding SocioVIP */}
+        <section className="text-center mb-12">
+          <SocioVipLogo className="h-20 w-20 text-primary mx-auto mb-4" />
+          <h1 className="text-4xl md:text-5xl font-bold text-primary">
+            Bienvenido a SocioVIP
+          </h1>
+          <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto">
+            Descubre eventos exclusivos y promociones imperdibles. Conéctate con tus negocios favoritos y disfruta de beneficios únicos.
+          </p>
+        </section>
 
         {isLoading && (
           <div className="flex justify-center items-center min-h-[300px]">
@@ -213,13 +195,11 @@ export default function HomePage() {
           </div>
         )}
 
-        {!isLoading && !error && filteredEntities.length === 0 && (
+        {!isLoading && !error && publicEntities.length === 0 && (
           <div className="text-center py-10">
             <Tag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl text-muted-foreground">
-              {searchTerm ? "No se encontraron resultados para tu búsqueda." : "No hay eventos ni promociones disponibles en este momento."}
-            </p>
-            {!searchTerm && <p className="text-sm text-muted-foreground">Vuelve más tarde para descubrir nuevas ofertas.</p>}
+            <p className="text-xl text-muted-foreground">No hay eventos ni promociones disponibles en este momento.</p>
+            <p className="text-sm text-muted-foreground">Vuelve más tarde para descubrir nuevas ofertas.</p>
           </div>
         )}
 
@@ -227,7 +207,7 @@ export default function HomePage() {
           <>
             {events.length > 0 && (
               <section className="mb-12">
-                <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
+                <h2 className="text-3xl font-bold tracking-tight text-primary mb-8 flex items-center">
                   <CalendarDays className="h-8 w-8 mr-3" />
                   Eventos Próximos
                 </h2>
@@ -235,50 +215,34 @@ export default function HomePage() {
                   {events.map((event) => {
                     const businessLink = event.businessCustomUrlPath 
                                         ? `/b/${event.businessCustomUrlPath}` 
-                                        : null; // No link if no customUrlPath
+                                        : null; // No renderizar link si no hay customUrlPath
                     return (
                     <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
-                      {businessLink ? (
-                        <Link href={businessLink} passHref>
-                          <div className="relative aspect-[16/9] w-full">
-                            <Image
-                              src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
-                              alt={event.name || "Evento"}
-                              fill
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                              className="object-cover"
-                              data-ai-hint={event.aiHint || "event party"}
-                            />
-                          </div>
-                        </Link>
-                      ) : (
-                        <div className="relative aspect-[16/9] w-full">
-                           <Image
-                              src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
-                              alt={event.name || "Evento"}
-                              fill
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                              className="object-cover"
-                              data-ai-hint={event.aiHint || "event party"}
-                            />
-                        </div>
-                      )}
+                      <div className="relative aspect-[16/9] w-full">
+                        <Image
+                          src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
+                          alt={event.name || "Evento"}
+                          fill
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          className="object-cover"
+                          data-ai-hint={event.aiHint || "event party"}
+                        />
+                      </div>
                       <CardHeader className="pb-3">
                         <CardTitle className="text-xl hover:text-primary transition-colors">
-                          {businessLink ? <Link href={businessLink} passHref>{event.name}</Link> : event.name}
+                          {event.name}
                         </CardTitle>
                         {event.businessName && (
-                          businessLink ? (
-                            <Link href={businessLink} passHref>
-                              <p className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center mt-1">
-                                <Building className="h-4 w-4 mr-1.5" /> {event.businessName}
-                              </p>
-                            </Link>
-                          ) : (
-                            <p className="text-sm text-muted-foreground flex items-center mt-1">
-                              <Building className="h-4 w-4 mr-1.5" /> {event.businessName}
-                            </p>
-                          )
+                          <p className="text-sm text-muted-foreground flex items-center mt-1">
+                            <Building className="h-4 w-4 mr-1.5" /> 
+                            {businessLink ? (
+                              <Link href={businessLink} className="hover:underline hover:text-primary">
+                                {event.businessName}
+                              </Link>
+                            ) : (
+                              event.businessName
+                            )}
+                          </p>
                         )}
                       </CardHeader>
                       <CardContent className="flex-grow">
@@ -296,7 +260,7 @@ export default function HomePage() {
                             </Link>
                          ) : (
                             <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
-                                Detalles No Disponibles
+                                Página del Negocio No Disponible
                             </Button>
                          )}
                       </CardFooter>
@@ -308,7 +272,7 @@ export default function HomePage() {
 
             {promotions.length > 0 && (
               <section>
-                <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
+                <h2 className="text-3xl font-bold tracking-tight text-primary mb-8 flex items-center">
                   <Tag className="h-8 w-8 mr-3" />
                   Promociones Vigentes
                 </h2>
@@ -316,51 +280,35 @@ export default function HomePage() {
                   {promotions.map((promo) => {
                     const businessLink = promo.businessCustomUrlPath 
                                         ? `/b/${promo.businessCustomUrlPath}` 
-                                        : null; 
+                                        : null;
                     return (
                     <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
-                       {businessLink ? (
-                          <Link href={businessLink} passHref>
-                            <div className="relative aspect-[16/9] w-full">
-                              <Image
-                                src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promo"}
-                                alt={promo.name || "Promoción"}
-                                fill
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                className="object-cover"
-                                data-ai-hint={promo.aiHint || "discount offer"}
-                              />
-                            </div>
-                          </Link>
-                       ) : (
-                            <div className="relative aspect-[16/9] w-full">
-                              <Image
-                                src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promo"}
-                                alt={promo.name || "Promoción"}
-                                fill
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                className="object-cover"
-                                data-ai-hint={promo.aiHint || "discount offer"}
-                              />
-                            </div>
-                       )}
+                       <div className="relative aspect-[16/9] w-full">
+                          <Image
+                            src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promo"}
+                            alt={promo.name || "Promoción"}
+                            fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            className="object-cover"
+                            data-ai-hint={promo.aiHint || "discount offer"}
+                          />
+                        </div>
                       <CardHeader className="pb-3">
                         <CardTitle className="text-xl hover:text-primary transition-colors">
-                           {businessLink ? <Link href={businessLink} passHref>{promo.name}</Link> : promo.name}
+                           {promo.name}
                         </CardTitle>
                          {promo.businessName && (
-                           businessLink ? (
-                            <Link href={businessLink} passHref>
-                              <p className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center mt-1">
-                                <Building className="h-4 w-4 mr-1.5" /> {promo.businessName}
-                              </p>
-                            </Link>
-                           ) : (
-                            <p className="text-sm text-muted-foreground flex items-center mt-1">
-                              <Building className="h-4 w-4 mr-1.5" /> {promo.businessName}
+                           <p className="text-sm text-muted-foreground flex items-center mt-1">
+                              <Building className="h-4 w-4 mr-1.5" />
+                               {businessLink ? (
+                                <Link href={businessLink} className="hover:underline hover:text-primary">
+                                  {promo.businessName}
+                                </Link>
+                              ) : (
+                                promo.businessName
+                              )}
                             </p>
-                           )
-                        )}
+                         )}
                       </CardHeader>
                       <CardContent className="flex-grow">
                         <p className="text-sm text-muted-foreground line-clamp-3 mb-2">{promo.description}</p>
@@ -377,7 +325,7 @@ export default function HomePage() {
                           </Link>
                          ) : (
                             <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
-                                Detalles No Disponibles
+                                Página del Negocio No Disponible
                             </Button>
                          )}
                       </CardFooter>
@@ -392,11 +340,9 @@ export default function HomePage() {
 
       <footer className="mt-12 py-8 bg-muted/50 text-center">
         <p className="text-sm text-muted-foreground">
-          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociovip.app</Link>
+          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
         </p>
       </footer>
     </div>
   );
 }
-
-    

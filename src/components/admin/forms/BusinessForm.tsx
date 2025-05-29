@@ -24,7 +24,7 @@ import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 
 
-const businessFormSchema = z.object({
+const businessFormSchemaBase = z.object({
   name: z.string().min(3, { message: "El nombre comercial debe tener al menos 3 caracteres." }),
   razonSocial: z.string().min(3, "La razón social debe tener al menos 3 caracteres.").optional().or(z.literal("")),
   ruc: z.string().length(11, "El RUC debe tener 11 dígitos.").regex(/^\d+$/, "El RUC solo debe contener números.").optional().or(z.literal("")),
@@ -50,13 +50,13 @@ const businessFormSchema = z.object({
     .optional().or(z.literal("")),
 });
 
-type BusinessFormValues = z.infer<typeof businessFormSchema>;
+type BusinessFormValues = z.infer<typeof businessFormSchemaBase>;
 
 interface BusinessFormProps {
   business?: Business;
   onSubmit: (data: BusinessFormData, currentBusinessId?: string) => Promise<{success: boolean; error?: string}>;
   onCancel: () => void;
-  isSubmittingForm?: boolean; // Renamed to avoid conflict with form's internal isSubmitting
+  isSubmittingForm?: boolean;
   existingCustomUrlPaths: string[]; 
 }
 
@@ -68,19 +68,21 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
   
   const departments = Object.keys(PERU_LOCATIONS);
 
+  const businessFormSchema = businessFormSchemaBase.refine(data => {
+    if (data.customUrlPath && data.customUrlPath.trim() !== "") {
+      const currentPath = data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      const isEditingOwnPath = business && business.customUrlPath === currentPath;
+      return isEditingOwnPath || !existingCustomUrlPaths.includes(currentPath);
+    }
+    return true;
+  }, {
+    message: "Esta ruta URL personalizada ya está en uso por otro negocio.",
+    path: ["customUrlPath"],
+  });
+
+
   const form = useForm<BusinessFormValues>({
-    resolver: zodResolver(businessFormSchema.refine(data => {
-      if (data.customUrlPath && data.customUrlPath.trim() !== "") {
-        const currentPath = data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-');
-        // Check if path is in the list of existing paths AND it's not the business's own current path
-        const isEditingOwnPath = business && business.customUrlPath === currentPath;
-        return isEditingOwnPath || !existingCustomUrlPaths.includes(currentPath);
-      }
-      return true;
-    }, {
-      message: "Esta ruta URL personalizada ya está en uso por otro negocio.",
-      path: ["customUrlPath"],
-    })),
+    resolver: zodResolver(businessFormSchema),
     defaultValues: {
       name: business?.name || "",
       contactEmail: business?.contactEmail || "",
@@ -132,9 +134,8 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       setProvinces(currentProvinces);
       setSelectedProvince(defaultVals.province);
       if (currentProvinces.includes(defaultVals.province)) {
-        const provinceKey = defaultVals.province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS];
-        // @ts-ignore
-        const districtsForProvince = PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS][provinceKey] || [];
+        // @ts-ignore // Ignoramos el error de tipo aquí ya que validamos la existencia de la provincia
+        const districtsForProvince = PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS][defaultVals.province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || [];
         setDistricts(districtsForProvince);
         if (!districtsForProvince.includes(defaultVals.district)) {
           form.setValue("district", ""); 
@@ -150,7 +151,8 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       setSelectedProvince("");
       setDistricts([]);
     }
-  }, [business, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [business, form.reset]);
 
 
   useEffect(() => {
@@ -170,7 +172,8 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       setSelectedProvince("");
       setDistricts([]);
     }
-  }, [selectedDepartment, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDepartment, form.setValue, form.getValues]);
 
   useEffect(() => {
     if (selectedDepartment && selectedProvince && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]]) {
@@ -184,7 +187,8 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       setDistricts([]);
       form.setValue("district", "");
     }
-  }, [selectedDepartment, selectedProvince, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDepartment, selectedProvince, form.setValue, form.getValues]);
 
   const processSubmit = async (values: BusinessFormValues) => {
     const dataToSubmit: BusinessFormData = {
@@ -200,7 +204,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       publicContactEmail: values.publicContactEmail || undefined,
       publicPhone: values.publicPhone || undefined,
       publicAddress: values.publicAddress || undefined,
-      customUrlPath: values.customUrlPath ? values.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-') : undefined,
+      customUrlPath: values.customUrlPath ? values.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : undefined,
     };
     await onSubmit(dataToSubmit, business?.id);
   };
@@ -261,14 +265,15 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
                   onChange={(e) => {
                     const sanitizedValue = e.target.value
                       .toLowerCase()
-                      .replace(/\s+/g, '-') 
-                      .replace(/[^a-z0-9-]/g, ''); 
+                      .trim() // Primero trim para quitar espacios al inicio/fin
+                      .replace(/\s+/g, '-') // Reemplazar espacios internos con guion
+                      .replace(/[^a-z0-9-]/g, ''); // Eliminar caracteres no permitidos
                     field.onChange(sanitizedValue);
                   }}
                 />
               </FormControl>
             </div>
-            <FormDescription>Solo letras minúsculas, números y guiones. Será único para tu negocio.</FormDescription>
+            <FormDescription>Solo letras minúsculas, números y guiones. Será único para tu negocio y no puede empezar ni terminar con guion.</FormDescription>
             <FormMessage />
           </FormItem>
         )}/>
@@ -302,5 +307,3 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
     </Form>
   );
 }
-
-    

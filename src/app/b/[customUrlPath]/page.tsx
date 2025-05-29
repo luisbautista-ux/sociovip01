@@ -1,10 +1,10 @@
 
 // src/app/b/[customUrlPath]/page.tsx
-"use server"; // Mark as Server Component
+"use server"; 
 
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
-import type { Business, BusinessManagedEntity } from "@/lib/types";
+import { collection, getDocs, query, where, Timestamp, limit, doc, getDoc } from "firebase/firestore";
+import type { Business, BusinessManagedEntity, QrClient, PromotionDetails, QrCodeData, NewQrClientFormData } from "@/lib/types";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,14 @@ import { isEntityCurrentlyActivatable } from "@/lib/utils";
 import { Building, CalendarDays, Tag, Mail, Phone, MapPin, ExternalLink, AlertTriangle, QrCode as QrCodeIcon, Home } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import Link from "next/link";
-import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth"; // Added for login/logout
+import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth";
+// Client-side components for QR Generation flow will be needed here
+import { BusinessPublicPageClientContent } from "./client-page";
+
 
 export default async function BusinessPublicPageByUrl({ params }: { params: { customUrlPath: string } }) {
   let businessDetails: Business | null = null;
-  let activeEntities: BusinessManagedEntity[] = [];
+  let activeEntitiesForBusiness: BusinessManagedEntity[] = [];
   let fetchError: string | null = null;
 
   console.log("BusinessPublicPageByUrl: Fetching business with customUrlPath:", params.customUrlPath);
@@ -30,12 +33,12 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
     } else {
         const businessQuery = query(
           collection(db, "businesses"),
-          where("customUrlPath", "==", params.customUrlPath.toLowerCase()),
-          // limit(1) // Firestore v9 query doesn't have limit as part of query()
+          where("customUrlPath", "==", params.customUrlPath.toLowerCase().trim()),
+          limit(1)
         );
         const businessSnap = await getDocs(businessQuery);
 
-        if (businessSnap.empty || businessSnap.docs.length === 0) {
+        if (businessSnap.empty) {
           console.warn("BusinessPublicPageByUrl: No business found for customUrlPath:", params.customUrlPath);
           fetchError = "Negocio no encontrado. Verifica que la URL sea correcta.";
         } else {
@@ -45,7 +48,14 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
             id: businessDoc.id, 
             ...bizData,
             joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
-            customUrlPath: bizData.customUrlPath || params.customUrlPath,
+            customUrlPath: bizData.customUrlPath || params.customUrlPath, // Ensure it has the path
+            // Ensure all optional public fields are at least undefined if not present
+            logoUrl: bizData.logoUrl || undefined,
+            publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
+            slogan: bizData.slogan || undefined,
+            publicContactEmail: bizData.publicContactEmail || undefined,
+            publicPhone: bizData.publicPhone || undefined,
+            publicAddress: bizData.publicAddress || undefined,
           };
           console.log("BusinessPublicPageByUrl: Business data found:", businessDetails.name);
 
@@ -109,7 +119,7 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
                   createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (typeof entityData.createdAt === 'string' ? entityData.createdAt : undefined),
                 });
             });
-            activeEntities = allActiveEntities.filter(isEntityCurrentlyActivatable).sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+            activeEntitiesForBusiness = allActiveEntities.filter(isEntityCurrentlyActivatable).sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
           }
         }
     }
@@ -121,6 +131,7 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
   if (fetchError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <p className="text-3xl text-center font-bold text-blue-500 p-4 bg-yellow-200">VERIFICACIÓN CAMBIO NEGOCIO - vLATEST</p>
         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <Link href="/" passHref className="flex items-center gap-2 group">
@@ -138,7 +149,7 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
             </Link>
         </div>
         <footer className="w-full mt-12 py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociovip.app</Link></p>
+            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
         </footer>
       </div>
     );
@@ -147,6 +158,7 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
   if (!businessDetails) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <p className="text-3xl text-center font-bold text-blue-500 p-4 bg-yellow-200">VERIFICACIÓN CAMBIO NEGOCIO - vLATEST (NO ENCONTRADO)</p>
         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <Link href="/" passHref className="flex items-center gap-2 group">
@@ -159,23 +171,27 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
         <div className="pt-24">
             <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
-            <p className="text-muted-foreground mt-2">La página del negocio con la URL "{params.customUrlPath}" no existe o la URL es incorrecta.</p>
+            <p className="text-muted-foreground mt-2">La página del negocio con la URL "/b/{params.customUrlPath}" no existe o la URL es incorrecta.</p>
             <Link href="/" passHref className="mt-6">
               <Button variant="outline">Volver a la Página Principal</Button>
             </Link>
         </div>
         <footer className="w-full mt-12 py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociovip.app</Link></p>
+            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
         </footer>
       </div>
     );
   }
 
-  const events = activeEntities.filter(e => e.type === 'event');
-  const promotions = activeEntities.filter(e => e.type === 'promotion');
+  const events = activeEntitiesForBusiness.filter(e => e.type === 'event');
+  const promotions = activeEntitiesForBusiness.filter(e => e.type === 'promotion');
+
+  console.log("BusinessPublicPageByUrl - businessDetails:", businessDetails);
+  console.log("BusinessPublicPageByUrl - activeEntitiesForBusiness:", activeEntitiesForBusiness);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <p className="text-3xl text-center font-bold text-blue-500 p-4 bg-yellow-200">VERIFICACIÓN CAMBIO NEGOCIO - vLATEST</p>
       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <Link href="/" passHref className="flex items-center gap-2 group">
@@ -221,99 +237,10 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
         </div>
       
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        
-        {events.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-6 flex items-center">
-              <CalendarDays className="h-7 w-7 mr-3 text-primary" />
-              Eventos Próximos
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {events.map((event) => (
-                <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
-                  {event.imageUrl && (
-                    <div className="relative aspect-[16/9] w-full">
-                      <Image
-                        src={event.imageUrl}
-                        alt={event.name || "Evento"}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-cover"
-                        data-ai-hint={event.aiHint || "event party"}
-                      />
-                    </div>
-                  )}
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xl">{event.name}</CardTitle>
-                    <CardDescription>
-                      Del {format(parseISO(event.startDate), "dd MMM, HH:mm", { locale: es })} al {format(parseISO(event.endDate), "dd MMM, HH:mm 'hrs'", { locale: es })}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                    <p className="text-sm text-muted-foreground line-clamp-4">{event.description}</p>
-                    {event.termsAndConditions && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">T&C: {event.termsAndConditions}</p>}
-                  </CardContent>
-                  <CardFooter>
-                    <Button disabled className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                      <QrCodeIcon className="mr-2 h-4 w-4"/> Generar QR (Próximamente)
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {promotions.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground mb-6 flex items-center">
-              <Tag className="h-7 w-7 mr-3 text-primary" />
-              Promociones Vigentes
-            </h2>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {promotions.map((promo) => (
-                <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
-                  {promo.imageUrl && (
-                    <div className="relative aspect-[16/9] w-full">
-                      <Image
-                        src={promo.imageUrl}
-                        alt={promo.name || "Promoción"}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-cover"
-                        data-ai-hint={promo.aiHint || "discount offer"}
-                      />
-                    </div>
-                  )}
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xl">{promo.name}</CardTitle>
-                    <CardDescription>
-                      Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-grow">
-                    <p className="text-sm text-muted-foreground line-clamp-4">{promo.description}</p>
-                     {promo.termsAndConditions && <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">T&C: {promo.termsAndConditions}</p>}
-                  </CardContent>
-                   <CardFooter>
-                    <Button disabled className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                        <QrCodeIcon className="mr-2 h-4 w-4"/> Generar QR (Próximamente)
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {!isLoading && activeEntities.length === 0 && (
-           <div className="text-center py-10">
-            <Tag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl text-muted-foreground">
-                Este negocio no tiene eventos ni promociones activas en este momento.
-            </p>
-          </div>
-        )}
+        <BusinessPublicPageClientContent 
+          initialBusinessDetails={businessDetails} 
+          initialActiveEntities={activeEntitiesForBusiness} 
+        />
 
         <section className="mt-12 pt-8 border-t">
             <h2 className="text-xl font-semibold tracking-tight text-foreground mb-4 flex items-center">
@@ -333,11 +260,9 @@ export default async function BusinessPublicPageByUrl({ params }: { params: { cu
 
       <footer className="mt-12 py-8 bg-muted/50 text-center">
         <p className="text-sm text-muted-foreground">
-          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociovip.app</Link>
+          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
         </p>
       </footer>
     </div>
   );
 }
-
-    
