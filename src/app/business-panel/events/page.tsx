@@ -98,11 +98,9 @@ export default function BusinessEventsPage() {
   const [showCreateCodesModal, setShowCreateCodesModal] = useState(false);
   const [selectedEntityForCreatingCodes, setSelectedEntityForCreatingCodes] = useState<BusinessManagedEntity | null>(null);
   
-  // States for managing tickets within the main event modal
   const [editingTicketInEventModal, setEditingTicketInEventModal] = useState<TicketType | null>(null);
   const [showTicketFormInEventModal, setShowTicketFormInEventModal] = useState(false);
 
-  // States for managing boxes within the main event modal
   const [editingBoxInEventModal, setEditingBoxInEventModal] = useState<EventBox | null>(null);
   const [showBoxFormInEventModal, setShowBoxFormInEventModal] = useState(false);
   const [showCreateBatchBoxesModal, setShowCreateBatchBoxesModal] = useState(false);
@@ -161,13 +159,117 @@ export default function BusinessEventsPage() {
           });
         }
       }
-    } else {
+    } else { // No userProfile
       setCurrentBusinessId(null);
       setEvents([]);
       setAvailablePromotersForAssignment([]);
       setIsLoading(false);
     }
   }, [userProfile, loadingAuth, loadingProfile, toast]);
+
+  const fetchBusinessEvents = useCallback(async (businessIdToFetch: string) => {
+    if (typeof businessIdToFetch !== 'string' || businessIdToFetch.trim() === '') {
+        console.error("Events Page: fetchBusinessEvents called with invalid businessId:", businessIdToFetch);
+        setEvents([]);
+        // setIsLoading(false); // This might be set by the calling useEffect
+        return;
+    }
+    console.log('Events Page: Querying events with businessId:', businessIdToFetch);
+    // setIsLoading(true); // Already set by the calling useEffect if needed
+    try {
+      const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToFetch), where("type", "==", "event"));
+      const querySnapshot = await getDocs(q);
+      console.log("Events Page: Firestore query executed for events. Snapshot size:", querySnapshot.size);
+      
+      const fetchedEvents: BusinessManagedEntity[] = querySnapshot.docs.map((docSnap, eventIndex) => {
+        const data = docSnap.data();
+        const nowISO = new Date().toISOString();
+
+        const ticketTypesData = Array.isArray(data.ticketTypes) ? data.ticketTypes.map((tt: any, index: number) => ({ 
+            id: tt.id || `fs-tt-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}A`, 
+            eventId: tt.eventId || docSnap.id, 
+            businessId: tt.businessId || businessIdToFetch, 
+            name: tt.name || "Entrada sin nombre",
+            cost: typeof tt.cost === 'number' ? tt.cost : 0,
+            description: tt.description || "",
+            quantity: tt.quantity === undefined || tt.quantity === null ? undefined : Number(tt.quantity),
+        })) : [];
+
+        const eventBoxesData = Array.isArray(data.eventBoxes) ? data.eventBoxes.map((eb: any, index: number) => ({ 
+            id: eb.id || `fs-eb-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}B`,
+            eventId: eb.eventId || docSnap.id,
+            businessId: eb.businessId || businessIdToFetch,
+            name: eb.name || "Box sin nombre",
+            cost: typeof eb.cost === 'number' ? eb.cost : 0,
+            description: eb.description || "",
+            status: eb.status || 'available',
+            capacity: eb.capacity === undefined || eb.capacity === null ? undefined : Number(eb.capacity),
+            sellerName: eb.sellerName || "",
+            ownerName: eb.ownerName || "",
+            ownerDni: eb.ownerDni || "",
+        })) : [];
+
+        const assignedPromotersData = Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map((ap: any, index: number) => {
+             const promoterIdToUse = ap.promoterProfileId || `fs-ap-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}C`;
+             return {
+                promoterProfileId: promoterIdToUse, 
+                promoterName: ap.promoterName || "Promotor sin nombre",
+                promoterEmail: ap.promoterEmail || "",
+                commissionRules: Array.isArray(ap.commissionRules) ? ap.commissionRules.map((cr: any, crIndex: number) => ({
+                    id: cr.id || `fs-cr-${promoterIdToUse}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}D`,
+                    appliesTo: cr.appliesTo || 'event_general',
+                    appliesToId: cr.appliesToId || undefined,
+                    appliesToName: cr.appliesToName || "General",
+                    commissionType: cr.commissionType || 'fixed',
+                    commissionValue: typeof cr.commissionValue === 'number' ? cr.commissionValue : 0,
+                    description: cr.description || "",
+                })) : [],
+                notes: ap.notes || "",
+            };
+        }) : [];
+        
+        const eventEntity: BusinessManagedEntity = {
+          id: docSnap.id,
+          businessId: data.businessId || businessIdToFetch,
+          type: "event" as "event",
+          name: data.name || "Evento sin nombre",
+          description: data.description || "",
+          termsAndConditions: data.termsAndConditions || "",
+          startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : (typeof data.startDate === 'string' ? data.startDate : nowISO),
+          endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : (typeof data.endDate === 'string' ? data.endDate : nowISO),
+          isActive: data.isActive === undefined ? true : data.isActive,
+          imageUrl: data.imageUrl || "",
+          aiHint: data.aiHint || "",
+          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
+          ticketTypes: ticketTypesData,
+          eventBoxes: eventBoxesData,
+          assignedPromoters: assignedPromotersData,
+          maxAttendance: 0, // Will be recalculated
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
+        };
+        eventEntity.maxAttendance = calculateMaxAttendance(eventEntity.ticketTypes);
+        return eventEntity;
+      });
+      setEvents(fetchedEvents.sort((a,b) => {
+        if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (a.createdAt) return -1;
+        if (b.createdAt) return 1;
+        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+      }));
+      console.log("Events Page: Fetched events successfully:", fetchedEvents.length);
+    } catch (error: any) {
+      console.error("Events Page: Error fetching events:", error.code, error.message, error);
+      toast({
+        title: "Error al Cargar Eventos",
+        description: `No se pudieron obtener los eventos. ${error.message}`,
+        variant: "destructive",
+      });
+      setEvents([]);
+    } 
+    // finally { // setIsLoading will be handled by the calling useEffect Promise.all
+    //   console.log("Events Page: setIsLoading(false) in fetchBusinessEvents finally block.");
+    // }
+  }, [toast]);
 
   const fetchBusinessPromotersForAssignment = useCallback(async (businessIdToFetch: string) => {
     if (!businessIdToFetch) {
@@ -201,7 +303,7 @@ export default function BusinessEventsPage() {
       setAvailablePromotersForAssignment(fetchedPromoterLinks);
       console.log('Events Page - Fetched promoter links for assignment:', fetchedPromoterLinks.length);
     } catch (error: any) { 
-      console.error("Events Page - Error fetching promoter links for assignment:", error.code, error.message, error);
+      console.error("Events Page: Error fetching promoter links for assignment:", error.code, error.message, error);
       setAvailablePromotersForAssignment([]); 
       toast({ 
         title: "Error al Cargar Promotores Vinculados", 
@@ -212,139 +314,30 @@ export default function BusinessEventsPage() {
     } 
   }, [toast]);
 
-  const fetchBusinessEvents = useCallback(async (businessIdToFetch: string) => {
-    if (typeof businessIdToFetch !== 'string' || businessIdToFetch.trim() === '') {
-        console.error("Events Page: fetchBusinessEvents called with invalid businessId:", businessIdToFetch);
-        setEvents([]);
-        setIsLoading(false);
-        return;
-    }
-    console.log('Events Page: Querying events with businessId:', businessIdToFetch);
-    setIsLoading(true);
-    try {
-      const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToFetch), where("type", "==", "event"));
-      const querySnapshot = await getDocs(q);
-      console.log("Events Page: Firestore query executed for events. Snapshot size:", querySnapshot.size);
-      
-      const fetchedEvents: BusinessManagedEntity[] = querySnapshot.docs.map((docSnap, eventIndex) => {
-        const data = docSnap.data();
-        const nowISO = new Date().toISOString();
-
-        const ticketTypesData = Array.isArray(data.ticketTypes) ? data.ticketTypes.map((tt: any, index: number) => ({ 
-            id: tt.id || `fs-tt-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}`, 
-            eventId: tt.eventId || docSnap.id, 
-            businessId: tt.businessId || businessIdToFetch, 
-            name: tt.name || "Entrada sin nombre",
-            cost: typeof tt.cost === 'number' ? tt.cost : 0,
-            description: tt.description || "",
-            quantity: tt.quantity === undefined || tt.quantity === null ? undefined : Number(tt.quantity),
-        })) : [];
-
-        const eventBoxesData = Array.isArray(data.eventBoxes) ? data.eventBoxes.map((eb: any, index: number) => ({ 
-            id: eb.id || `fs-eb-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}`,
-            eventId: eb.eventId || docSnap.id,
-            businessId: eb.businessId || businessIdToFetch,
-            name: eb.name || "Box sin nombre",
-            cost: typeof eb.cost === 'number' ? eb.cost : 0,
-            description: eb.description || "",
-            status: eb.status || 'available',
-            capacity: eb.capacity === undefined || eb.capacity === null ? undefined : Number(eb.capacity),
-            sellerName: eb.sellerName || "",
-            ownerName: eb.ownerName || "",
-            ownerDni: eb.ownerDni || "",
-        })) : [];
-
-        const assignedPromotersData = Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map((ap: any, index: number) => {
-             const promoterIdToUse = ap.promoterProfileId || `fs-ap-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}`;
-             return {
-                promoterProfileId: promoterIdToUse, 
-                promoterName: ap.promoterName || "Promotor sin nombre",
-                promoterEmail: ap.promoterEmail || "",
-                commissionRules: Array.isArray(ap.commissionRules) ? ap.commissionRules.map((cr: any, crIndex: number) => ({
-                    id: cr.id || `fs-cr-${promoterIdToUse}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}`,
-                    appliesTo: cr.appliesTo || 'event_general',
-                    appliesToId: cr.appliesToId || undefined,
-                    appliesToName: cr.appliesToName || "General",
-                    commissionType: cr.commissionType || 'fixed',
-                    commissionValue: typeof cr.commissionValue === 'number' ? cr.commissionValue : 0,
-                    description: cr.description || "",
-                })) : [],
-                notes: ap.notes || "",
-            };
-        }) : [];
-        
-        return {
-          id: docSnap.id,
-          businessId: data.businessId || businessIdToFetch,
-          type: "event" as "event",
-          name: data.name || "Evento sin nombre",
-          description: data.description || "",
-          termsAndConditions: data.termsAndConditions || "",
-          startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : (typeof data.startDate === 'string' ? data.startDate : nowISO),
-          endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : (typeof data.endDate === 'string' ? data.endDate : nowISO),
-          isActive: data.isActive === undefined ? true : data.isActive,
-          imageUrl: data.imageUrl || "",
-          aiHint: data.aiHint || "",
-          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
-          ticketTypes: ticketTypesData,
-          eventBoxes: eventBoxesData,
-          assignedPromoters: assignedPromotersData,
-          maxAttendance: calculateMaxAttendance(ticketTypesData), 
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
-        };
-      });
-      setEvents(fetchedEvents.sort((a,b) => {
-        if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        if (a.createdAt) return -1;
-        if (b.createdAt) return 1;
-        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-      }));
-      console.log("Events Page: Fetched events successfully:", fetchedEvents.length);
-    } catch (error: any) {
-      console.error("Events Page: Error fetching events:", error.code, error.message, error);
-      toast({
-        title: "Error al Cargar Eventos",
-        description: `No se pudieron obtener los eventos. ${error.message}`,
-        variant: "destructive",
-      });
-      setEvents([]);
-    } finally {
-      setIsLoading(false);
-      console.log("Events Page: setIsLoading(false) in fetchBusinessEvents finally block.");
-    }
-  }, [toast]);
 
   useEffect(() => {
     if (currentBusinessId && !loadingAuth && !loadingProfile) {
-        console.log("Events Page: Valid currentBusinessId found, calling fetchBusinessEvents and fetchBusinessPromotersForAssignment.", currentBusinessId);
-        // Combined fetch to manage loading state correctly
+        console.log("Events Page: Valid currentBusinessId, starting initial data fetch.", currentBusinessId);
         setIsLoading(true); 
         Promise.all([
             fetchBusinessEvents(currentBusinessId),
             fetchBusinessPromotersForAssignment(currentBusinessId)
         ]).catch(error => {
-            console.error("Events Page: Error fetching initial data for events page:", error);
-            // Individual fetches will show their own toasts
-            setEvents([]); // Ensure data arrays are cleared on error
+            console.error("Events Page: Error during initial data fetch (Promise.all):", error);
+            // Individual fetches will show their own toasts if they fail
+            setEvents([]); 
             setAvailablePromotersForAssignment([]);
         }).finally(() => {
-             // This finally might be redundant if fetchBusinessEvents sets it,
-             // but ensure it's set to false if fetchBusinessPromotersForAssignment was the only one or if all fail.
-             // If fetchBusinessEvents is the main data driver for the page, its finally block handles setIsLoading.
-             // For now, fetchBusinessEvents' finally block should be sufficient.
-             // If fetchBusinessPromotersForAssignment also dictates primary page loading, adjust.
-             // Let's assume fetchBusinessEvents setting isLoading is enough for primary page view.
-             // If fetchBusinessPromotersForAssignment has its own loading indicator, that's separate.
-             // If its data is critical for the main view before events load, setIsLoading(false) should be here.
-             // For now, let's rely on fetchBusinessEvents to set loading false.
+             setIsLoading(false);
+             console.log("Events Page: Initial data fetch (Promise.all) finished, isLoading set to false.");
         });
     } else if (!loadingAuth && !loadingProfile && !currentBusinessId) {
-        console.log("Events Page: No valid currentBusinessId after auth/profile load, setting loading to false.");
-        setIsLoading(false);
+        console.log("Events Page: No valid currentBusinessId after auth/profile load, setting isLoading to false.");
+        setIsLoading(false); // Ensure loading is false if no businessId
         setEvents([]);
         setAvailablePromotersForAssignment([]);
     }
-}, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment, loadingAuth, loadingProfile]);
+  }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment, loadingAuth, loadingProfile]);
 
 
   const filteredEvents = useMemo(() => {
@@ -364,7 +357,6 @@ export default function BusinessEventsPage() {
     });
   }, [events, searchTerm]);
 
-
   const handleOpenManageEventModal = (eventToManage: BusinessManagedEntity | null, duplicate = false) => {
     setIsSubmitting(false); 
     setIsDuplicatingEvent(duplicate);
@@ -377,7 +369,7 @@ export default function BusinessEventsPage() {
             ...(sanitizeObjectForFirestore(eventDataToDuplicate) as Omit<BusinessManagedEntity, 'id' | 'businessId' | 'type' | 'createdAt'>),
             id: '', 
             businessId: currentBusinessId || "", 
-            type: 'event' as 'event',
+            type: 'event' as "event",
             name: `${eventToManage.name || 'Evento'} (Copia)`,
             startDate: eventToManage.startDate, 
             endDate: eventToManage.endDate,     
@@ -419,16 +411,16 @@ export default function BusinessEventsPage() {
     console.log("Events Page (Initial Submit): UserProfile:", userProfile);
     console.log("Events Page (Initial Submit): Current Business ID to be used:", currentBusinessId);
     
-    const tempStartDate = data.startDate || new Date();
-    const tempEndDate = data.endDate || new Date(new Date().setDate(new Date().getDate() + 1));
+    const tempStartDate = data.startDate; 
+    const tempEndDate = data.endDate; 
     
-    const newEventToSave: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId'> = {
+    const newEventToSave: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId' | 'startDate' | 'endDate' | 'maxAttendance' | 'ticketTypes'> & {startDate: Date, endDate: Date, ticketTypes: TicketType[], maxAttendance: number} = {
       type: "event",
       name: data.name,
       description: data.description || "",
       termsAndConditions: "", 
-      startDate: tempStartDate.toISOString(),
-      endDate: tempEndDate.toISOString(),
+      startDate: tempStartDate,
+      endDate: tempEndDate,
       isActive: true,
       imageUrl: `https://placehold.co/600x400.png?text=${encodeURIComponent(data.name.substring(0,10))}`,
       aiHint: data.name.split(' ').slice(0,2).join(' '),
@@ -439,50 +431,57 @@ export default function BusinessEventsPage() {
       maxAttendance: 0, 
     };
     
-    let docRef;
-    try {
-      const defaultTicketData: Omit<TicketType, 'id' | 'eventId' | 'businessId'> = {
-        name: "Entrada General",
-        cost: 0,
-        quantity: 0, 
-        description: "Entrada estándar para el evento."
-      };
+    const defaultTicketData: Omit<TicketType, 'id' | 'eventId' | 'businessId'> = {
+      name: "Entrada General",
+      cost: 0,
+      quantity: 0, 
+      description: "Entrada estándar para el evento."
+    };
+    
+    const defaultTicketWithTempId: TicketType = {
+      ...defaultTicketData,
+      id: `tt-new-${Date.now()}-${Math.random().toString(36).slice(2)}E`,
+      eventId: '', // Will be set after event is created
+      businessId: currentBusinessId,
+    };
+    newEventToSave.ticketTypes = [defaultTicketWithTempId];
+    newEventToSave.maxAttendance = calculateMaxAttendance(newEventToSave.ticketTypes);
       
-      const eventPayloadForFirestore: any = sanitizeObjectForFirestore({
-        ...newEventToSave,
+    const eventPayloadForFirestore: any = {
+        ...sanitizeObjectForFirestore(newEventToSave), // Sanitize before Timestamp conversion
         businessId: currentBusinessId, 
         startDate: Timestamp.fromDate(tempStartDate),
         endDate: Timestamp.fromDate(tempEndDate),
         createdAt: serverTimestamp(),
-        ticketTypes: [], // Initialize with empty, will be updated
-      });
-      
-      console.log("handleInitialEventSubmit: Event payload for Firestore:", eventPayloadForFirestore);
+        ticketTypes: newEventToSave.ticketTypes.map(tt => sanitizeObjectForFirestore(tt)), // Sanitize tickets as well
+    };
+    // Remove the 'id' from tickets if they are temporary client-side IDs, Firestore will generate its own if these were subcollections
+    // For arrays, ensure IDs are consistent or handled by your update logic.
+    // For this setup, we are generating IDs on client for array items.
+
+    console.log("handleInitialEventSubmit: Event payload for Firestore:", eventPayloadForFirestore);
+    let docRef;
+    try {
       docRef = await addDoc(collection(db, "businessEntities"), eventPayloadForFirestore);
       console.log("Events Page: Event created with ID:", docRef.id);
       
-      const defaultTicketWithId: TicketType = {
-          ...defaultTicketData,
-          id: `tt-${docRef.id}-${Date.now()}-${Math.random().toString(36).slice(2)}`, 
-          eventId: docRef.id,
-          businessId: currentBusinessId,
-      };
-      
       const finalNewEvent: BusinessManagedEntity = {
-        ...(newEventToSave as Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId'>),
+        ...(newEventToSave as Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId' | 'startDate' | 'endDate'>),
         id: docRef.id, 
         businessId: currentBusinessId,
+        startDate: newEventToSave.startDate.toISOString(),
+        endDate: newEventToSave.endDate.toISOString(),
         createdAt: new Date().toISOString(), 
-        ticketTypes: [defaultTicketWithId],
-        maxAttendance: calculateMaxAttendance([defaultTicketWithId]),
-        eventBoxes: [], 
-        assignedPromoters: [],
-        generatedCodes: [],
+        ticketTypes: newEventToSave.ticketTypes.map(tt => ({...tt, eventId: docRef!.id })), // Link ticket to new event ID
+        maxAttendance: calculateMaxAttendance(newEventToSave.ticketTypes),
       };
       
+      // Update the event in Firestore with the linked ticketTypes (with eventId)
+      // This step is optional if you manage eventId linking on client or if sub-elements don't need it.
+      // However, for consistency, it's good practice.
       await updateDoc(doc(db, "businessEntities", docRef.id), sanitizeObjectForFirestore({
-        ticketTypes: finalNewEvent.ticketTypes.map(tt => sanitizeObjectForFirestore(tt)),
-        maxAttendance: finalNewEvent.maxAttendance
+        ticketTypes: finalNewEvent.ticketTypes,
+        maxAttendance: finalNewEvent.maxAttendance // Ensure maxAttendance is also updated if calculated from tickets
       }));
       
       if (currentBusinessId) fetchBusinessEvents(currentBusinessId); 
@@ -527,9 +526,9 @@ export default function BusinessEventsPage() {
         };
         setEditingEvent(prev => {
             if (!prev) return null;
-            const currentTickets = prev.ticketTypes || [];
-            const newMaxAtt = calculateMaxAttendance(currentTickets); 
-            return { ...prev, ...updatedEventDetails, maxAttendance: newMaxAtt };
+            // Max attendance is now calculated from tickets, so don't update it directly from this form's submit
+            // It will be recalculated when the main event is saved.
+            return { ...prev, ...updatedEventDetails };
         });
         toast({ title: "Detalles del Evento Actualizados", description: `Los cambios en "${data.name}" han sido aplicados en el editor. Guarda el evento para persistir.` });
     }
@@ -578,23 +577,23 @@ export default function BusinessEventsPage() {
       
       const finalTicketTypes = (eventToSave.ticketTypes || []).map((tt, index) => ({
         ...tt,
-        id: tt.id || `tt-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`, 
+        id: tt.id || `tt-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}F`, 
         eventId: eventToSave.id || "", 
         businessId: currentBusinessId,
       }));
       const finalEventBoxes = (eventToSave.eventBoxes || []).map((eb, index) => ({
         ...eb,
-        id: eb.id || `box-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+        id: eb.id || `box-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}G`,
         eventId: eventToSave.id || "",
         businessId: currentBusinessId,
       }));
 
       const finalAssignedPromoters = (eventToSave.assignedPromoters || []).map(ap => ({
         ...ap,
-        promoterProfileId: ap.promoterProfileId || `unknown-promoter-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        promoterProfileId: ap.promoterProfileId || `unknown-promoter-${Date.now()}-${Math.random().toString(36).slice(2)}H`,
         commissionRules: (ap.commissionRules || []).map((cr, crIndex) => ({
           ...cr,
-          id: cr.id || `cr-${ap.promoterProfileId || 'unknown'}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}`
+          id: cr.id || `cr-${ap.promoterProfileId || 'unknown'}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}I`
         }))
       }));
       
@@ -622,7 +621,7 @@ export default function BusinessEventsPage() {
           toast({ title: isDuplicatingEvent ? "Evento Duplicado Exitosamente" : "Evento Creado Exitosamente", description: `El evento "${sanitizedEventForFirestore.name}" ha sido guardado con ID: ${docRef.id}.` });
 
       } else { 
-          delete payloadForFirestore.createdAt; 
+          delete payloadForFirestore.createdAt; // Do not update createdAt on existing events
           console.log("Events Page (SaveManaged - Updating): Updating event with ID",editingEvent.id, "Payload:", payloadForFirestore);
           await updateDoc(doc(db, "businessEntities", editingEvent.id), payloadForFirestore);
           toast({ title: "Evento Guardado", description: `Los cambios en "${sanitizedEventForFirestore.name}" han sido guardados.` });
@@ -819,7 +818,7 @@ export default function BusinessEventsPage() {
           toast({ title: "Entrada Actualizada", description: `La entrada "${sanitizedData.name}" ha sido actualizada.` });
       } else { 
           const newTicket: TicketType = {
-              id: `tt-${editingEvent.id || 'new'}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              id: `tt-${editingEvent.id || 'new'}-${Date.now()}-${Math.random().toString(36).slice(2)}J`,
               businessId: currentBusinessId,
               eventId: editingEvent.id || "", 
               ...sanitizedData,
@@ -873,7 +872,7 @@ export default function BusinessEventsPage() {
       toast({ title: "Box Actualizado", description: `El box "${sanitizedData.name}" ha sido actualizado.` });
     } else {
       const newBox: EventBox = {
-        id: `box-${editingEvent.id || 'new'}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: `box-${editingEvent.id || 'new'}-${Date.now()}-${Math.random().toString(36).slice(2)}K`,
         businessId: currentBusinessId,
         eventId: editingEvent.id || "",
         ...sanitizedData
@@ -918,7 +917,7 @@ export default function BusinessEventsPage() {
           }
           newBoxes.push(
               sanitizeObjectForFirestore({ 
-                  id: `box-batch-${editingEvent.id || 'new'}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
+                  id: `box-batch-${editingEvent.id || 'new'}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}L`,
                   businessId: currentBusinessId,
                   eventId: editingEvent.id || "",
                   name: boxName,
@@ -1030,7 +1029,7 @@ export default function BusinessEventsPage() {
                   updatedRules = updatedRules.map(rule => rule.id === editingCommissionRule.id ? { ...newRuleBase, id: rule.id } : rule);
               } else { 
                   const newRule: CommissionRule = {
-                      id: `cr-${currentPromoterAssignmentForRules.promoterProfileId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                      id: `cr-${currentPromoterAssignmentForRules.promoterProfileId}-${Date.now()}-${Math.random().toString(36).slice(2)}M`,
                       ...newRuleBase,
                   };
                   updatedRules.push(newRule);
@@ -1128,9 +1127,7 @@ export default function BusinessEventsPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredEvents.length > 0 ? filteredEvents.map((event) => {
-                      const codesUsedCount = event.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
-                      const maxAttendanceDisplay = event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance <= 0 ? 'Ilimitado' : event.maxAttendance;
-
+                      const codesRedeemedCount = event.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
                       return (
                       <TableRow key={event.id || `event-fallback-${Math.random()}`}>
                         <TableCell className="font-medium align-top py-3">
@@ -1166,9 +1163,9 @@ export default function BusinessEventsPage() {
                           </TableCell>
                           <TableCell className="align-top py-3">
                                <div className="flex flex-col text-xs space-y-0.5">
-                                    <span>QRs Generados (`0`)</span>
-                                    <span>QRs Usados (`{codesUsedCount}`)</span>
-                                    <span>Aforo Máximo (`{maxAttendanceDisplay}`)</span>
+                                    <span>QRs Generados (0)</span>
+                                    <span>QRs Usados ({codesRedeemedCount})</span>
+                                    <span>Aforo Máximo ({event.maxAttendance || 'Ilimitado'})</span>
                                </div>
                           </TableCell>
                           <TableCell className="align-top py-3">
@@ -1177,7 +1174,7 @@ export default function BusinessEventsPage() {
                                     <QrCodeIcon className="h-3 w-3 mr-1" /> Crear
                                 </Button>
                                 <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(event)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                    <ListChecks className="h-3 w-3 mr-1" /> Ver (`{event.generatedCodes?.length || 0}`)
+                                    <ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})
                                 </Button>
                               </div>
                           </TableCell>
@@ -1350,9 +1347,9 @@ export default function BusinessEventsPage() {
                     <Tabs defaultValue="details" className="w-full">
                         <TabsList className="grid w-full grid-cols-4 mb-4"> 
                             <TabsTrigger value="details">Detalles</TabsTrigger>
-                            <TabsTrigger value="tickets">Entradas (`{editingEvent.ticketTypes?.length || 0}`)</TabsTrigger>
-                            <TabsTrigger value="boxes">Boxes (`{editingEvent.eventBoxes?.length || 0}`)</TabsTrigger>
-                            <TabsTrigger value="promoters">Promotores (`{editingEvent.assignedPromoters?.length || 0}`)</TabsTrigger>
+                            <TabsTrigger value="tickets">Entradas ({editingEvent.ticketTypes?.length || 0})</TabsTrigger>
+                            <TabsTrigger value="boxes">Boxes ({editingEvent.eventBoxes?.length || 0})</TabsTrigger>
+                            <TabsTrigger value="promoters">Promotores ({editingEvent.assignedPromoters?.length || 0})</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="details">
@@ -1468,7 +1465,7 @@ export default function BusinessEventsPage() {
                                                         </SelectItem>
                                                     )}
                                                     {availablePromotersForAssignment.map((pLink, index) => {
-                                                        const key = pLink && pLink.id ? pLink.id : `promoter-select-item-${index}-${Math.random().toString(36).slice(2)}A`; // Added unique suffix
+                                                        const key = pLink && pLink.id ? pLink.id : `promoter-select-item-${index}-${Math.random().toString(36).slice(2)}A`;
                                                         const value = pLink && pLink.id ? pLink.id : `promoter-value-fallback-${index}-${Math.random().toString(36).slice(2)}B`; 
                                                         if (!pLink || !pLink.id) {
                                                             console.warn("Events Page - Promoter Select: Missing pLink or pLink.id for item at index", index, pLink);
@@ -1585,7 +1582,6 @@ export default function BusinessEventsPage() {
             onOpenChange={setShowCreateBatchBoxesModal}
             onSubmit={handleCreateBatchBoxes}
             isSubmitting={isSubmitting}
-            eventForContext={editingEvent} 
         />
     )}
 
@@ -1722,13 +1718,13 @@ export default function BusinessEventsPage() {
             </DialogHeader>
             {selectedEventForStats && (
                 <div className="space-y-3 py-4">
-                    <p><strong>Códigos Creados:</strong> (`{selectedEventForStats.generatedCodes?.length || 0}`)</p>
-                    <p><strong>Códigos Usados (Asistencia):</strong> (`{selectedEventForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}`)</p>
+                    <p><strong>Códigos Creados:</strong> ({selectedEventForStats.generatedCodes?.length || 0})</p>
+                    <p><strong>Códigos Usados (Asistencia):</strong> ({selectedEventForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0})</p>
                     <p><strong>Tasa de Asistencia:</strong> {selectedEventForStats.generatedCodes && selectedEventForStats.generatedCodes.length > 0 ? 
                         ((selectedEventForStats.generatedCodes.filter(c => c.status === 'redeemed').length / selectedEventForStats.generatedCodes.length) * 100).toFixed(1) + '%' 
                         : '0%'}
                     </p>
-                    <p><strong>Aforo Máximo Configurado:</strong> (`{selectedEventForStats.maxAttendance === 0 || !selectedEventForStats.maxAttendance ? 'Ilimitado' : selectedEventForStats.maxAttendance}`)</p>
+                    <p><strong>Aforo Máximo Configurado:</strong> ({selectedEventForStats.maxAttendance === 0 || !selectedEventForStats.maxAttendance ? 'Ilimitado' : selectedEventForStats.maxAttendance})</p>
                     <div className="border-t pt-3 mt-3">
                         <h4 className="font-semibold text-muted-foreground">Más Detalles (Ejemplos):</h4>
                         <ul className="list-disc list-inside text-sm text-muted-foreground">
@@ -1793,4 +1789,3 @@ export default function BusinessEventsPage() {
   );
 }
 
-    
