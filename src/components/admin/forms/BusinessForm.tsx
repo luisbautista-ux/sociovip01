@@ -36,15 +36,17 @@ const businessFormSchema = z.object({
   contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }),
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
   managerDni: z.string().min(8, "DNI/CE debe tener al menos 8 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^[a-zA-Z0-9]*$/, "Solo debe contener letras y números.").optional().or(z.literal("")),
+  
   logoUrl: z.string().url("URL de logo inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
   publicCoverImageUrl: z.string().url("URL de imagen de portada inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
   slogan: z.string().max(100, "El slogan no debe exceder 100 caracteres.").optional().or(z.literal("")),
   publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")),
-  publicPhone: z.string().optional().or(z.literal("")),
-  publicAddress: z.string().optional().or(z.literal("")),
+  publicPhone: z.string().regex(/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{3,6}$/im, "Número de teléfono público inválido.").optional().or(z.literal("")),
+  publicAddress: z.string().max(200, "La dirección pública no debe exceder 200 caracteres.").optional().or(z.literal("")),
   customUrlPath: z.string()
     .min(3, "La ruta URL debe tener al menos 3 caracteres.")
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Solo letras minúsculas, números y guiones (ej: mi-negocio).")
+    .max(50, "La ruta URL no debe exceder 50 caracteres.")
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Solo letras minúsculas, números y guiones (ej: mi-negocio). No debe empezar ni terminar con guion, ni tener guiones consecutivos.")
     .optional().or(z.literal("")),
 });
 
@@ -52,13 +54,13 @@ type BusinessFormValues = z.infer<typeof businessFormSchema>;
 
 interface BusinessFormProps {
   business?: Business;
-  onSubmit: (data: BusinessFormData) => void;
+  onSubmit: (data: BusinessFormData, currentBusinessId?: string) => Promise<{success: boolean; error?: string}>;
   onCancel: () => void;
-  isSubmitting?: boolean;
+  isSubmittingForm?: boolean; // Renamed to avoid conflict with form's internal isSubmitting
   existingCustomUrlPaths: string[]; 
 }
 
-export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = false, existingCustomUrlPaths }: BusinessFormProps) {
+export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = false, existingCustomUrlPaths }: BusinessFormProps) {
   const [selectedDepartment, setSelectedDepartment] = useState(business?.department || "");
   const [provinces, setProvinces] = useState<string[]>([]);
   const [selectedProvince, setSelectedProvince] = useState(business?.province || "");
@@ -69,7 +71,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
   const form = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema.refine(data => {
       if (data.customUrlPath && data.customUrlPath.trim() !== "") {
-        const currentPath = data.customUrlPath.toLowerCase().trim();
+        const currentPath = data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-');
         // Check if path is in the list of existing paths AND it's not the business's own current path
         const isEditingOwnPath = business && business.customUrlPath === currentPath;
         return isEditingOwnPath || !existingCustomUrlPaths.includes(currentPath);
@@ -128,16 +130,17 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
     if (defaultVals.department && PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]) {
       const currentProvinces = Object.keys(PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]);
       setProvinces(currentProvinces);
-      setSelectedProvince(defaultVals.province); // Set before checking inclusion
+      setSelectedProvince(defaultVals.province);
       if (currentProvinces.includes(defaultVals.province)) {
         const provinceKey = defaultVals.province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS];
+        // @ts-ignore
         const districtsForProvince = PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS][provinceKey] || [];
         setDistricts(districtsForProvince);
         if (!districtsForProvince.includes(defaultVals.district)) {
-          form.setValue("district", ""); // Reset district if not in the list for the loaded province
+          form.setValue("district", ""); 
         }
       } else {
-        form.setValue("province", ""); // Reset province if not in the list for the loaded department
+        form.setValue("province", ""); 
         form.setValue("district", "");
         setSelectedProvince("");
         setDistricts([]);
@@ -155,9 +158,9 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
       const currentProvinces = Object.keys(PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]);
       setProvinces(currentProvinces);
       if (!currentProvinces.includes(form.getValues("province"))) {
-         form.setValue("province", ""); // Reset if current province is not valid for new department
+         form.setValue("province", "");
          form.setValue("district", "");
-         setSelectedProvince(""); // Also reset selectedProvince state
+         setSelectedProvince("");
          setDistricts([]);
       }
     } else {
@@ -167,11 +170,11 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
       setSelectedProvince("");
       setDistricts([]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDepartment, form.setValue]); // form.getValues creates new reference, use form.setValue for stable deps
+  }, [selectedDepartment, form]);
 
   useEffect(() => {
     if (selectedDepartment && selectedProvince && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]]) {
+      // @ts-ignore
       const currentDistricts = PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS][selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || [];
       setDistricts(currentDistricts);
       if (!currentDistricts.includes(form.getValues("district"))) {
@@ -181,55 +184,65 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
       setDistricts([]);
       form.setValue("district", "");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDepartment, selectedProvince, form.setValue]);
+  }, [selectedDepartment, selectedProvince, form]);
 
-  const handleSubmit = (values: BusinessFormValues) => {
+  const processSubmit = async (values: BusinessFormValues) => {
     const dataToSubmit: BusinessFormData = {
       ...values,
+      ruc: values.ruc || undefined,
+      razonSocial: values.razonSocial || undefined,
+      address: values.address || undefined,
+      managerName: values.managerName || undefined,
+      managerDni: values.managerDni || undefined,
+      logoUrl: values.logoUrl || undefined,
+      publicCoverImageUrl: values.publicCoverImageUrl || undefined,
+      slogan: values.slogan || undefined,
+      publicContactEmail: values.publicContactEmail || undefined,
+      publicPhone: values.publicPhone || undefined,
+      publicAddress: values.publicAddress || undefined,
       customUrlPath: values.customUrlPath ? values.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-') : undefined,
     };
-    onSubmit(dataToSubmit);
+    await onSubmit(dataToSubmit, business?.id);
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-3 pl-1 py-1">
+      <form onSubmit={form.handleSubmit(processSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-3 pl-1 py-1">
         <FormField control={form.control} name="name" render={({ field }) => (
-          <FormItem><FormLabel>Nombre Comercial <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Pandora Lounge Bar" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Nombre Comercial <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Pandora Lounge Bar" {...field} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="razonSocial" render={({ field }) => (
-          <FormItem><FormLabel>Razón Social</FormLabel><FormControl><Input placeholder="Nombre legal de la empresa" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Razón Social</FormLabel><FormControl><Input placeholder="Nombre legal de la empresa" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="ruc" render={({ field }) => (
-          <FormItem><FormLabel>RUC</FormLabel><FormControl><Input placeholder="12345678901" {...field} value={field.value || ""} maxLength={11} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>RUC</FormLabel><FormControl><Input placeholder="12345678901" {...field} value={field.value || ""} maxLength={11} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="businessType" render={({ field }) => (
-          <FormItem><FormLabel>Giro de Negocio <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un giro" /></SelectTrigger></FormControl><SelectContent>{BUSINESS_TYPES.map((type) => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>
+          <FormItem><FormLabel>Giro de Negocio <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un giro" /></SelectTrigger></FormControl><SelectContent>{BUSINESS_TYPES.map((type) => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>
         )}/>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField control={form.control} name="department" render={({ field }) => (
-                <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedDepartment(value); form.setValue("province", ""); form.setValue("district", ""); setSelectedProvince(""); setDistricts([]); }} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedDepartment(value); form.setValue("province", ""); form.setValue("district", ""); setSelectedProvince(""); setDistricts([]); }} value={field.value} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="province" render={({ field }) => (
-                <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedProvince(value); form.setValue("district", ""); setDistricts([]);}} value={field.value} disabled={isSubmitting || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedProvince(value); form.setValue("district", ""); setDistricts([]);}} value={field.value} disabled={isSubmittingForm || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="district" render={({ field }) => (
-                <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
         </div>
         <FormField control={form.control} name="address" render={({ field }) => (
-          <FormItem><FormLabel>Dirección del Negocio</FormLabel><FormControl><Input placeholder="Ej: Av. Principal 123, Urb. Las Flores" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Dirección del Negocio</FormLabel><FormControl><Input placeholder="Ej: Av. Principal 123, Urb. Las Flores" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="contactEmail" render={({ field }) => (
-          <FormItem><FormLabel>Email de Contacto del Negocio <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: contacto@negocio.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Email de Contacto del Negocio <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: contacto@negocio.com" {...field} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="managerName" render={({ field }) => (
-          <FormItem><FormLabel>Nombre del Gerente General</FormLabel><FormControl><Input placeholder="Nombre completo del gerente" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Nombre del Gerente General</FormLabel><FormControl><Input placeholder="Nombre completo del gerente" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="managerDni" render={({ field }) => (
-          <FormItem><FormLabel>DNI/CE del Gerente General</FormLabel><FormControl><Input placeholder="DNI o Carnet de Extranjería" {...field} value={field.value || ""} maxLength={15} disabled={isSubmitting} /></FormControl><FormDescription className="text-xs">Puede ser un usuario existente de la plataforma.</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>DNI/CE del Gerente General</FormLabel><FormControl><Input placeholder="DNI o Carnet de Extranjería" {...field} value={field.value || ""} maxLength={15} disabled={isSubmittingForm} /></FormControl><FormDescription className="text-xs">Puede ser un usuario existente de la plataforma.</FormDescription><FormMessage /></FormItem>
         )}/>
 
         <h3 className="text-lg font-semibold pt-4 border-t mt-6">Información Pública y Branding</h3>
@@ -237,19 +250,19 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           <FormItem>
             <FormLabel>Ruta URL Personalizada (Slug)</FormLabel>
             <div className="flex items-center">
-              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociovip.app/b/</span>
+              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociosvip.app/b/</span>
               <FormControl>
                 <Input 
                   placeholder="mi-negocio" 
                   {...field} 
                   value={field.value || ""} 
-                  disabled={isSubmitting}
+                  disabled={isSubmittingForm}
                   className="rounded-l-none"
                   onChange={(e) => {
                     const sanitizedValue = e.target.value
                       .toLowerCase()
-                      .replace(/\s+/g, '-') // Reemplaza espacios con guiones
-                      .replace(/[^a-z0-9-]/g, ''); // Elimina caracteres no alfanuméricos excepto guiones
+                      .replace(/\s+/g, '-') 
+                      .replace(/[^a-z0-9-]/g, ''); 
                     field.onChange(sanitizedValue);
                   }}
                 />
@@ -260,28 +273,28 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           </FormItem>
         )}/>
         <FormField control={form.control} name="slogan" render={({ field }) => (
-          <FormItem><FormLabel>Slogan del Negocio</FormLabel><FormControl><Input placeholder="Tu frase pegajosa aquí" {...field} value={field.value || ""} maxLength={100} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Slogan del Negocio</FormLabel><FormControl><Input placeholder="Tu frase pegajosa aquí" {...field} value={field.value || ""} maxLength={100} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="logoUrl" render={({ field }) => (
-          <FormItem><FormLabel>URL del Logo</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/logo.png" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormDescription>URL pública de tu logo (ej. subido a Firebase Storage).</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>URL del Logo</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/logo.png" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormDescription>URL pública de tu logo (ej. subido a Firebase Storage).</FormDescription><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicCoverImageUrl" render={({ field }) => (
-          <FormItem><FormLabel>URL Imagen de Portada Pública</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/portada.jpg" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormDescription>Imagen para la página pública de tu negocio.</FormDescription><FormMessage /></FormItem>
+          <FormItem><FormLabel>URL Imagen de Portada Pública</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/portada.jpg" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormDescription>Imagen para la página pública de tu negocio.</FormDescription><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicAddress" render={({ field }) => (
-          <FormItem><FormLabel>Dirección Pública (si difiere de la principal)</FormLabel><FormControl><Input placeholder="Ej: Av. Comercial 456" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Dirección Pública (si difiere de la principal)</FormLabel><FormControl><Input placeholder="Ej: Av. Comercial 456" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicContactEmail" render={({ field }) => (
-          <FormItem><FormLabel>Email Público de Contacto</FormLabel><FormControl><Input type="email" placeholder="Ej: info@minegocio.com" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Email Público de Contacto</FormLabel><FormControl><Input type="email" placeholder="Ej: info@minegocio.com" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicPhone" render={({ field }) => (
-          <FormItem><FormLabel>Teléfono Público de Contacto</FormLabel><FormControl><Input type="tel" placeholder="+51 1 2345678" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Teléfono Público de Contacto</FormLabel><FormControl><Input type="tel" placeholder="+51 1 2345678" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
 
-        <DialogFooter className="pt-6 sticky bottom-0 bg-background pb-4 -mb-2"> {/* Ensure footer is visible */}
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <DialogFooter className="pt-6 sticky bottom-0 bg-background pb-4 -mb-2">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmittingForm}>Cancelar</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmittingForm}>
+            {isSubmittingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {business ? "Guardar Cambios" : "Crear Negocio"}
           </Button>
         </DialogFooter>
@@ -289,3 +302,5 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
     </Form>
   );
 }
+
+    

@@ -10,8 +10,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardFooter,
-  CardDescription
+  CardFooter
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, getDoc } from "firebase/firestore";
@@ -41,6 +40,8 @@ export default function HomePage() {
     console.log("HomePage: Fetching public entities and businesses...");
     setIsLoading(true);
     setError(null);
+    setAllPublicEntities([]);
+    setFilteredEntities([]);
     try {
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
@@ -69,25 +70,25 @@ export default function HomePage() {
         const nowStr = new Date().toISOString();
 
         if (entityData.startDate instanceof Timestamp) {
-          startDateStr = entityData.startDate.toDate().toISOString();
+            startDateStr = entityData.startDate.toDate().toISOString();
         } else if (typeof entityData.startDate === 'string') {
-          startDateStr = entityData.startDate;
+            startDateStr = entityData.startDate;
         } else if (entityData.startDate instanceof Date) {
-          startDateStr = entityData.startDate.toISOString();
+            startDateStr = entityData.startDate.toISOString();
         } else {
-          console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
-          startDateStr = nowStr; 
+            console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
+            startDateStr = nowStr; 
         }
 
         if (entityData.endDate instanceof Timestamp) {
-          endDateStr = entityData.endDate.toDate().toISOString();
+            endDateStr = entityData.endDate.toDate().toISOString();
         } else if (typeof entityData.endDate === 'string') {
-          endDateStr = entityData.endDate;
+            endDateStr = entityData.endDate;
         } else if (entityData.endDate instanceof Date) {
-          endDateStr = entityData.endDate.toISOString();
+            endDateStr = entityData.endDate.toISOString();
         } else {
-          console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
-          endDateStr = nowStr; 
+            console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
+            endDateStr = nowStr; 
         }
         
         const entityForCheck: BusinessManagedEntity = {
@@ -118,10 +119,10 @@ export default function HomePage() {
               ...entityForCheck,
               businessName: business.name,
               businessLogoUrl: business.logoUrl,
-              businessCustomUrlPath: business.customUrlPath,
+              businessCustomUrlPath: business.customUrlPath, // Get customUrlPath from business
             });
           } else {
-            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}. Entity will not be shown if it depends on businessCustomUrlPath for linking.`);
+            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}.`);
           }
         }
       }
@@ -132,11 +133,10 @@ export default function HomePage() {
         const bDate = new Date(b.startDate).getTime();
         if (a.type === 'event' && b.type !== 'event') return -1;
         if (a.type !== 'event' && b.type === 'event') return 1;
-        return bDate - aDate; // Más recientes primero dentro de su tipo
+        return bDate - aDate; 
       });
       setAllPublicEntities(sortedEntities);
       setFilteredEntities(sortedEntities);
-
 
     } catch (err: any) {
       console.error("HomePage: Error fetching public data:", err);
@@ -166,7 +166,6 @@ export default function HomePage() {
     );
     setFilteredEntities(filtered);
   }, [searchTerm, allPublicEntities]);
-
 
   const events = filteredEntities.filter(entity => entity.type === 'event');
   const promotions = filteredEntities.filter(entity => entity.type === 'promotion');
@@ -233,32 +232,53 @@ export default function HomePage() {
                   Eventos Próximos
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {events.map((event) => (
+                  {events.map((event) => {
+                    const businessLink = event.businessCustomUrlPath 
+                                        ? `/b/${event.businessCustomUrlPath}` 
+                                        : null; // No link if no customUrlPath
+                    return (
                     <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
-                      <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public-fallback`} passHref>
+                      {businessLink ? (
+                        <Link href={businessLink} passHref>
+                          <div className="relative aspect-[16/9] w-full">
+                            <Image
+                              src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
+                              alt={event.name || "Evento"}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              className="object-cover"
+                              data-ai-hint={event.aiHint || "event party"}
+                            />
+                          </div>
+                        </Link>
+                      ) : (
                         <div className="relative aspect-[16/9] w-full">
-                          <Image
-                            src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
-                            alt={event.name || "Evento"}
-                            fill
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            className="object-cover"
-                            data-ai-hint={event.aiHint || "event party"}
-                          />
+                           <Image
+                              src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
+                              alt={event.name || "Evento"}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              className="object-cover"
+                              data-ai-hint={event.aiHint || "event party"}
+                            />
                         </div>
-                      </Link>
+                      )}
                       <CardHeader className="pb-3">
                         <CardTitle className="text-xl hover:text-primary transition-colors">
-                           <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public-fallback`} passHref>
-                            {event.name}
-                          </Link>
+                          {businessLink ? <Link href={businessLink} passHref>{event.name}</Link> : event.name}
                         </CardTitle>
                         {event.businessName && (
-                          <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public-fallback`} passHref>
-                            <p className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center mt-1">
+                          businessLink ? (
+                            <Link href={businessLink} passHref>
+                              <p className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center mt-1">
+                                <Building className="h-4 w-4 mr-1.5" /> {event.businessName}
+                              </p>
+                            </Link>
+                          ) : (
+                            <p className="text-sm text-muted-foreground flex items-center mt-1">
                               <Building className="h-4 w-4 mr-1.5" /> {event.businessName}
                             </p>
-                          </Link>
+                          )
                         )}
                       </CardHeader>
                       <CardContent className="flex-grow">
@@ -268,14 +288,20 @@ export default function HomePage() {
                         </p>
                       </CardContent>
                        <CardFooter>
-                         <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public-fallback`} passHref className="w-full">
-                          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                            Ver Detalles del Evento <ExternalLink className="ml-2 h-4 w-4" />
-                          </Button>
-                        </Link>
+                         {businessLink ? (
+                            <Link href={businessLink} passHref className="w-full">
+                              <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                                Ver Detalles del Evento <ExternalLink className="ml-2 h-4 w-4" />
+                              </Button>
+                            </Link>
+                         ) : (
+                            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
+                                Detalles No Disponibles
+                            </Button>
+                         )}
                       </CardFooter>
                     </Card>
-                  ))}
+                  )})}
                 </div>
               </section>
             )}
@@ -287,32 +313,53 @@ export default function HomePage() {
                   Promociones Vigentes
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {promotions.map((promo) => (
+                  {promotions.map((promo) => {
+                    const businessLink = promo.businessCustomUrlPath 
+                                        ? `/b/${promo.businessCustomUrlPath}` 
+                                        : null; 
+                    return (
                     <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
-                       <Link href={promo.businessCustomUrlPath ? `/b/${promo.businessCustomUrlPath}` : `/business/${promo.businessId}/public-fallback`} passHref>
-                        <div className="relative aspect-[16/9] w-full">
-                          <Image
-                            src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promo"}
-                            alt={promo.name || "Promoción"}
-                            fill
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                            className="object-cover"
-                            data-ai-hint={promo.aiHint || "discount offer"}
-                          />
-                        </div>
-                      </Link>
+                       {businessLink ? (
+                          <Link href={businessLink} passHref>
+                            <div className="relative aspect-[16/9] w-full">
+                              <Image
+                                src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promo"}
+                                alt={promo.name || "Promoción"}
+                                fill
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                className="object-cover"
+                                data-ai-hint={promo.aiHint || "discount offer"}
+                              />
+                            </div>
+                          </Link>
+                       ) : (
+                            <div className="relative aspect-[16/9] w-full">
+                              <Image
+                                src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promo"}
+                                alt={promo.name || "Promoción"}
+                                fill
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                className="object-cover"
+                                data-ai-hint={promo.aiHint || "discount offer"}
+                              />
+                            </div>
+                       )}
                       <CardHeader className="pb-3">
                         <CardTitle className="text-xl hover:text-primary transition-colors">
-                          <Link href={promo.businessCustomUrlPath ? `/b/${promo.businessCustomUrlPath}` : `/business/${promo.businessId}/public-fallback`} passHref>
-                            {promo.name}
-                          </Link>
+                           {businessLink ? <Link href={businessLink} passHref>{promo.name}</Link> : promo.name}
                         </CardTitle>
                          {promo.businessName && (
-                          <Link href={promo.businessCustomUrlPath ? `/b/${promo.businessCustomUrlPath}` : `/business/${promo.businessId}/public-fallback`} passHref>
-                            <p className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center mt-1">
+                           businessLink ? (
+                            <Link href={businessLink} passHref>
+                              <p className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center mt-1">
+                                <Building className="h-4 w-4 mr-1.5" /> {promo.businessName}
+                              </p>
+                            </Link>
+                           ) : (
+                            <p className="text-sm text-muted-foreground flex items-center mt-1">
                               <Building className="h-4 w-4 mr-1.5" /> {promo.businessName}
                             </p>
-                          </Link>
+                           )
                         )}
                       </CardHeader>
                       <CardContent className="flex-grow">
@@ -322,14 +369,20 @@ export default function HomePage() {
                         </p>
                       </CardContent>
                        <CardFooter>
-                         <Link href={promo.businessCustomUrlPath ? `/b/${promo.businessCustomUrlPath}` : `/business/${promo.businessId}/public-fallback`} passHref className="w-full">
-                          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                            Ver Detalles de la Promoción <ExternalLink className="ml-2 h-4 w-4" />
-                          </Button>
-                        </Link>
+                         {businessLink ? (
+                           <Link href={businessLink} passHref className="w-full">
+                            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                              Ver Detalles de la Promoción <ExternalLink className="ml-2 h-4 w-4" />
+                            </Button>
+                          </Link>
+                         ) : (
+                            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
+                                Detalles No Disponibles
+                            </Button>
+                         )}
                       </CardFooter>
                     </Card>
-                  ))}
+                  )})}
                 </div>
               </section>
             )}
@@ -345,3 +398,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

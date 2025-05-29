@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription as ShadcnCardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Renamed CardDescription
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -13,7 +13,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; // Renamed AlertDialogFooter
 import { db } from "@/lib/firebase"; 
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit, writeBatch } from "firebase/firestore";
 import Link from "next/link";
@@ -41,7 +41,7 @@ export default function AdminBusinessesPage() {
           name: data.name,
           contactEmail: data.contactEmail,
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate || new Date().toISOString()),
-          activePromotions: data.activePromotions || 0, 
+          // activePromotions: data.activePromotions || 0, // This field is not directly on Business anymore
           ruc: data.ruc,
           razonSocial: data.razonSocial,
           department: data.department,
@@ -63,16 +63,16 @@ export default function AdminBusinessesPage() {
           paths.push(data.customUrlPath);
         }
       });
-      setBusinesses(fetchedBusinesses.sort((a,b) => new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime()));
+      setBusinesses(fetchedBusinesses.sort((a,b) => new Date(b.joinDate as string).getTime() - new Date(a.joinDate as string).getTime()));
       setExistingUrlPaths(paths);
-    } catch (error) {
-      console.error("Failed to fetch businesses:", error);
+    } catch (error: any) {
+      console.error("Failed to fetch businesses:", error.code, error.message, error);
       toast({
         title: "Error al Cargar Negocios",
-        description: "No se pudieron obtener los datos de los negocios. Intenta de nuevo.",
+        description: `No se pudieron obtener los datos de los negocios. ${error.message}`,
         variant: "destructive",
       });
-      setBusinesses([]); // Reset on error
+      setBusinesses([]); 
       setExistingUrlPaths([]);
     } finally {
       setIsLoading(false);
@@ -102,7 +102,7 @@ export default function AdminBusinessesPage() {
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
       biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
       biz.managerName || "N/A", biz.managerDni || "N/A", 
-      biz.customUrlPath ? `sociovip.app/b/${biz.customUrlPath}` : "N/A",
+      biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : "N/A",
       biz.logoUrl || "N/A", biz.publicCoverImageUrl || "N/A", biz.slogan || "N/A",
       biz.publicContactEmail || "N/A", biz.publicPhone || "N/A", biz.publicAddress || "N/A",
     ]);
@@ -112,7 +112,7 @@ export default function AdminBusinessesPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "sociovip_negocios.csv");
+    link.setAttribute("download", "sociosvip_negocios.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -133,22 +133,21 @@ export default function AdminBusinessesPage() {
     const q = query(collection(db, "businesses"), where("customUrlPath", "==", path.toLowerCase().trim()));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return true;
+    // If a document with this path exists, it's only unique if it's the current business being edited
     return snapshot.docs.every(doc => doc.id === currentBusinessId);
   };
 
 
-  const handleCreateOrEditBusiness = async (data: BusinessFormData) => {
+  const handleCreateOrEditBusiness = async (data: BusinessFormData, currentBusinessId?: string): Promise<{success: boolean; error?: string}> => {
     setIsSubmitting(true);
     
     const cleanedCustomUrlPath = data.customUrlPath ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-') : null;
 
     if (cleanedCustomUrlPath) {
-      const isUnique = await checkCustomUrlPathUniqueness(cleanedCustomUrlPath, editingBusiness?.id);
+      const isUnique = await checkCustomUrlPathUniqueness(cleanedCustomUrlPath, currentBusinessId);
       if (!isUnique) {
-        toast({ title: "Error de Validación", description: "La Ruta URL Personalizada ya está en uso. Por favor, elige otra.", variant: "destructive"});
         setIsSubmitting(false);
-        // form.setError("customUrlPath", { type: "manual", message: "Esta ruta URL ya está en uso." }); // Esto requeriría pasar el form ref
-        return;
+        return { success: false, error: "La Ruta URL Personalizada ya está en uso. Por favor, elige otra." };
       }
     }
 
@@ -170,28 +169,30 @@ export default function AdminBusinessesPage() {
         publicContactEmail: data.publicContactEmail || null,
         publicPhone: data.publicPhone || null,
         publicAddress: data.publicAddress || null,
-        customUrlPath: cleanedCustomUrlPath,
+        customUrlPath: cleanedCustomUrlPath || null, // Ensure it's null if empty
     };
 
     try {
-      if (editingBusiness) { 
-        const businessRef = doc(db, "businesses", editingBusiness.id);
+      if (currentBusinessId) { 
+        const businessRef = doc(db, "businesses", currentBusinessId);
         await updateDoc(businessRef, businessPayload);
         toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
       } else { 
         const docRef = await addDoc(collection(db, "businesses"), {
           ...businessPayload,
           joinDate: serverTimestamp(), 
-          activePromotions: 0, 
+          // activePromotions: 0, // This field is not directly on Business anymore
         });
         toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${docRef.id}.` });
       }
       setShowCreateEditModal(false);
       setEditingBusiness(null);
       fetchBusinesses(); 
-    } catch (error) {
-      console.error("Failed to create/update business:", error);
-      toast({ title: "Error al Guardar", description: "No se pudo guardar el negocio.", variant: "destructive"});
+      return { success: true };
+    } catch (error: any) {
+      console.error("Failed to create/update business:", error.code, error.message, error);
+      toast({ title: "Error al Guardar", description: `No se pudo guardar el negocio. ${error.message}`, variant: "destructive"});
+      return { success: false, error: error.message };
     } finally {
       setIsSubmitting(false);
     }
@@ -202,20 +203,24 @@ export default function AdminBusinessesPage() {
     
     setIsSubmitting(true); 
     try {
-      // Placeholder for deleting related entities (promotions, events, etc.) if necessary
+      // TODO: Consider deleting related entities (promotions, events, etc.) in businessEntities
+      // This would typically involve a batched write or a Cloud Function for cascading deletes.
+      // Example (conceptual, needs to be robust):
       // const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", businessId));
       // const entitiesSnap = await getDocs(entitiesQuery);
-      // const batch = writeBatch(db);
-      // entitiesSnap.forEach(doc => batch.delete(doc.ref));
-      // await batch.commit();
-      // console.log(`Deleted ${entitiesSnap.size} related entities for business ${businessId}`);
+      // if (!entitiesSnap.empty) {
+      //   const batch = writeBatch(db);
+      //   entitiesSnap.forEach(doc => batch.delete(doc.ref));
+      //   await batch.commit();
+      //   console.log(`Deleted ${entitiesSnap.size} related entities for business ${businessId}`);
+      // }
 
       await deleteDoc(doc(db, "businesses", businessId));
       toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
       fetchBusinesses(); 
-    } catch (error) {
-      console.error("Failed to delete business:", error);
-      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el negocio.", variant: "destructive"});
+    } catch (error: any) {
+      console.error("Failed to delete business:", error.code, error.message, error);
+      toast({ title: "Error al Eliminar", description: `No se pudo eliminar el negocio. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false); 
     }
@@ -240,7 +245,7 @@ export default function AdminBusinessesPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Negocios Afiliados</CardTitle>
-          <UIDialogDescription>Negocios que utilizan la plataforma SocioVIP.</UIDialogDescription>
+          <ShadcnCardDescription>Negocios que utilizan la plataforma SocioVIP.</ShadcnCardDescription>
            <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -289,9 +294,11 @@ export default function AdminBusinessesPage() {
                         <TableCell>
                           {biz.customUrlPath ? (
                             <Link href={`/b/${biz.customUrlPath}`} target="_blank" className="text-primary hover:underline text-xs flex items-center">
-                              sociovip.app/b/{biz.customUrlPath} <ExternalLink className="ml-1 h-3 w-3" />
+                              sociosvip.app/b/{biz.customUrlPath} <ExternalLink className="ml-1 h-3 w-3" />
                             </Link>
-                          ) : "N/A"}
+                          ) : (
+                            <span className="text-xs text-muted-foreground">N/A (Usará ID por defecto)</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditModal(biz)} disabled={isSubmitting}>
@@ -310,10 +317,10 @@ export default function AdminBusinessesPage() {
                                 <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
                                 <AlertDialogDescription>
                                   Esta acción no se puede deshacer. Esto eliminará permanentemente el negocio
-                                  <span className="font-semibold"> {biz.name}</span>.
+                                  <span className="font-semibold"> {biz.name}</span> y podría afectar a sus entidades asociadas (promociones, eventos, etc.).
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
-                              <AlertDialogFooter>
+                              <ShadcnAlertDialogFooter>
                                 <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => handleDeleteBusiness(biz.id, biz.name)}
@@ -323,7 +330,7 @@ export default function AdminBusinessesPage() {
                                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                   Eliminar
                                 </AlertDialogAction>
-                              </AlertDialogFooter>
+                              </ShadcnAlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         </TableCell>
@@ -358,7 +365,7 @@ export default function AdminBusinessesPage() {
             business={editingBusiness || undefined}
             onSubmit={handleCreateOrEditBusiness} 
             onCancel={() => { setShowCreateEditModal(false); setEditingBusiness(null);}}
-            isSubmitting={isSubmitting}
+            isSubmittingForm={isSubmitting} // Pass the correct prop name
             existingCustomUrlPaths={existingUrlPaths.filter(p => editingBusiness && p === editingBusiness.customUrlPath ? false : true)}
           />
         </DialogContent>
@@ -366,3 +373,5 @@ export default function AdminBusinessesPage() {
     </div>
   );
 }
+
+    
