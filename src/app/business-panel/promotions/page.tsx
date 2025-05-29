@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
 import { PlusCircle, Edit, Trash2, Search, Ticket, QrCode, ListChecks, Copy, Loader2, BarChart3 } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
 import { format, parseISO } from "date-fns";
@@ -50,18 +50,19 @@ export default function BusinessPromotionsPage() {
 
 
   useEffect(() => {
-    const businessIdFromProfile = userProfile?.businessId;
-    if (businessIdFromProfile) {
-      setCurrentBusinessId(businessIdFromProfile);
-    } else if (userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && !businessIdFromProfile) {
+    if (userProfile && userProfile.businessId) {
+      setCurrentBusinessId(userProfile.businessId);
+    } else if (userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && !userProfile.businessId) {
       toast({ title: "Error de Negocio", description: "Tu perfil de usuario no está asociado a un negocio.", variant: "destructive", duration: 7000 });
       setIsLoading(false);
+    } else if (!userProfile && !isLoading) { // If userProfile is null and not loading, probably no user for this panel
+        setIsLoading(false);
     }
-  }, [userProfile, toast]);
+  }, [userProfile, toast, isLoading]);
 
   const fetchBusinessPromotions = useCallback(async () => {
     if (!currentBusinessId) {
-      console.warn("Promotions Page: No currentBusinessId available. Skipping fetch.");
+      console.warn("Promotions Page: No currentBusinessId. Skipping fetch.");
       setPromotions([]);
       setIsLoading(false);
       return;
@@ -82,13 +83,7 @@ export default function BusinessPromotionsPage() {
         const data = docSnap.data();
         const nowISO = new Date().toISOString();
         
-        const generatedCodes = Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({
-            ...gc,
-            observation: gc.observation ?? null,
-            redemptionDate: gc.redemptionDate ?? null,
-            redeemedByInfo: gc.redeemedByInfo ?? null,
-            isVipCandidate: gc.isVipCandidate ?? false
-        })) : [];
+        const generatedCodes = Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [];
 
         return {
           id: docSnap.id,
@@ -105,7 +100,6 @@ export default function BusinessPromotionsPage() {
           aiHint: data.aiHint || "",
           generatedCodes: generatedCodes,
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
-          // Fields not applicable for promotions from BusinessManagedEntity are defaulted or empty
           ticketTypes: [], 
           eventBoxes: [],  
           assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
@@ -113,7 +107,7 @@ export default function BusinessPromotionsPage() {
         };
       });
       setPromotions(fetchedPromotions.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
-      console.log("Promotions Page: Fetched promotions successfully:", fetchedPromotions);
+      console.log("Promotions Page: Fetched promotions successfully:", fetchedPromotions.length);
     } catch (error: any) {
       console.error("Promotions Page: Error fetching promotions:", error);
       toast({
@@ -164,7 +158,6 @@ export default function BusinessPromotionsPage() {
         name: `${promotion.name || 'Promoción'} (Copia)`,
         generatedCodes: [], 
         isActive: true, 
-        // Fields not applicable for promotions
         ticketTypes: [], 
         eventBoxes: [],
         assignedPromoters: [],
@@ -197,7 +190,7 @@ export default function BusinessPromotionsPage() {
       endDate: data.endDate.toISOString(),   
       usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : data.usageLimit,
       isActive: data.isActive,
-      imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/300x200.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : `https://placehold.co/300x200.png`),
+      imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/600x400.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingPromotion?.imageUrl || `https://placehold.co/600x400.png`),
       aiHint: data.aiHint || "",
     };
     
@@ -205,7 +198,6 @@ export default function BusinessPromotionsPage() {
         ...promotionPayloadBase,
         startDate: Timestamp.fromDate(new Date(promotionPayloadBase.startDate)),
         endDate: Timestamp.fromDate(new Date(promotionPayloadBase.endDate)),
-        // These are specific to BusinessManagedEntity but not directly from BusinessPromotionFormData for promotions
         generatedCodes: (editingPromotion && !isDuplicating ? editingPromotion.generatedCodes : []) || [],
         ticketTypes: [],
         eventBoxes: [],
@@ -225,7 +217,7 @@ export default function BusinessPromotionsPage() {
         toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
       } else {
         let createData = { ...promotionPayloadForFirestore, createdAt: serverTimestamp() };
-        if (createData.id === '') delete createData.id; 
+        if ('id' in createData && (createData as any).id === '') delete (createData as any).id; 
 
         const docRef = await addDoc(collection(db, "businessEntities"), createData);
         toast({ title: isDuplicating ? "Promoción Duplicada" : "Promoción Creada", description: `La promoción "${data.name}" ha sido creada con ID: ${docRef.id}.` });
@@ -235,7 +227,7 @@ export default function BusinessPromotionsPage() {
       setIsDuplicating(false);
       fetchBusinessPromotions(); 
     } catch (error: any) {
-      console.error("Promotions Page: Error saving promotion:", error);
+      console.error("Promotions Page: Error saving promotion:", error.code, error.message, error);
       toast({ title: "Error al Guardar Promoción", description: `No se pudo guardar la promoción. ${error.message}`, variant: "destructive", duration: 10000});
     } finally {
       setIsSubmitting(false);
@@ -294,16 +286,13 @@ export default function BusinessPromotionsPage() {
         const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
         const existingCodes = targetPromotionData.generatedCodes || [];
 
-        const newCodesWithDetails = newCodes.map(code => {
-            const newCodeItem: GeneratedCode = {
-                ...code,
-                observation: (observation && observation.trim() !== "") ? observation.trim() : null,
-                redemptionDate: null, 
-                redeemedByInfo: null, 
-                isVipCandidate: false,
-            };
-            return sanitizeObjectForFirestore(newCodeItem); 
-        });
+        const newCodesWithDetails = newCodes.map(code => sanitizeObjectForFirestore({
+            ...code,
+            observation: (observation && observation.trim() !== "") ? observation.trim() : null,
+            redemptionDate: null, 
+            redeemedByInfo: null, 
+            isVipCandidate: false,
+        }));
 
         const updatedCodes = [...existingCodes, ...newCodesWithDetails];
     
@@ -447,91 +436,91 @@ export default function BusinessPromotionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead className="hidden md:table-cell">Vigencia</TableHead>
-                      <TableHead className="hidden lg:table-cell text-center">Canjes / Límite</TableHead>
-                      <TableHead className="text-center">Estado</TableHead>
-                      <TableHead>Códigos</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
+                      <TableHead className="w-[30%]">Nombre y Estado</TableHead>
+                      <TableHead>Vigencia</TableHead>
+                      <TableHead className="text-center">Canjes / Límite</TableHead>
+                      <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredPromotions.length > 0 ? (
                       filteredPromotions.map((promo) => (
                         <TableRow key={promo.id}>
-                          <TableCell className="font-medium">{promo.name}</TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            {promo.startDate ? format(parseISO(promo.startDate), "P", { locale: es }) : 'N/A'} - {promo.endDate ? format(parseISO(promo.endDate), "P", { locale: es }) : 'N/A'}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell text-center">{getRedemptionCount(promo)}</TableCell>
-                          <TableCell className="text-center">
-                              <div className="flex items-center justify-center space-x-2">
-                                  <Switch
-                                      checked={promo.isActive}
-                                      onCheckedChange={() => handleTogglePromotionStatus(promo)}
-                                      aria-label={`Estado de la promoción ${promo.name}`}
-                                      id={`status-switch-${promo.id}`}
-                                      disabled={isSubmitting}
-                                  />
-                                  <Label htmlFor={`status-switch-${promo.id}`} className="sr-only">
-                                      {promo.isActive ? "Activa" : "Inactiva"}
-                                  </Label>
-                                  <Badge variant={promo.isActive ? "default" : "outline"} className={cn(promo.isActive ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600 text-white", !isEntityCurrentlyActivatable(promo) && promo.isActive && "bg-yellow-500 hover:bg-yellow-600 text-black")}>
-                                      {promo.isActive ? (isEntityCurrentlyActivatable(promo) ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
-                                  </Badge>
-                              </div>
-                          </TableCell>
-                          <TableCell className="space-x-1">
-                            <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(promo)} disabled={!isEntityCurrentlyActivatable(promo) || isSubmitting} className="bg-accent hover:bg-accent/90 text-accent-foreground px-2 py-1 h-auto">
-                              <QrCode className="h-3 w-3 mr-1" /> Crear
-                            </Button>
-                            <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto">
-                              <ListChecks className="h-3 w-3 mr-1" /> Ver ({promo.generatedCodes?.length || 0})
-                            </Button>
-                          </TableCell>
-                          <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="xs" title="Estadísticas" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-muted-foreground hover:text-primary">
-                                <BarChart3 className="h-4 w-4 mr-1" /> Estadísticas
-                            </Button>
-                            <Button variant="ghost" size="icon" title="Duplicar Promoción" onClick={() => handleOpenCreateEditModal(promo, true)} disabled={isSubmitting}>
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" title="Editar Promoción" onClick={() => handleOpenCreateEditModal(promo)} disabled={isSubmitting}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" title="Eliminar Promoción" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta acción no se puede deshacer. Esto eliminará permanentemente la promoción:
-                                    <span className="font-semibold"> {promo.name}</span> y todos sus códigos asociados.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeletePromotion(promo.id, promo.name)}
-                                    className="bg-destructive hover:bg-destructive/90"
+                          <TableCell className="font-medium align-top">
+                            <div className="font-semibold">{promo.name}</div>
+                            <div className="flex items-center space-x-2 mt-1">
+                                <Switch
+                                    checked={promo.isActive}
+                                    onCheckedChange={() => handleTogglePromotionStatus(promo)}
+                                    aria-label={`Estado de la promoción ${promo.name}`}
+                                    id={`status-switch-${promo.id}`}
                                     disabled={isSubmitting}
-                                  >
-                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                />
+                                <Label htmlFor={`status-switch-${promo.id}`} className="sr-only">
+                                    {promo.isActive ? "Activa" : "Inactiva"}
+                                </Label>
+                                <Badge variant={promo.isActive ? "default" : "outline"} className={cn(promo.isActive ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600 text-white", !isEntityCurrentlyActivatable(promo) && promo.isActive && "bg-yellow-500 hover:bg-yellow-600 text-black")}>
+                                    {promo.isActive ? (isEntityCurrentlyActivatable(promo) ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
+                                </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-top">
+                            {promo.startDate ? format(parseISO(promo.startDate), "P", { locale: es }) : 'N/A'}
+                            <br />
+                            {promo.endDate ? format(parseISO(promo.endDate), "P", { locale: es }) : 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-center align-top">{getRedemptionCount(promo)}</TableCell>
+                          <TableCell className="align-top">
+                            <div className="flex flex-col sm:flex-row flex-wrap gap-1 items-start">
+                                <Button variant="default" size="xs" onClick={() => openCreateCodesDialog(promo)} disabled={!isEntityCurrentlyActivatable(promo) || isSubmitting} className="bg-accent hover:bg-accent/90 text-accent-foreground px-2 py-1 h-auto">
+                                  <QrCode className="h-3 w-3 mr-1" /> Crear Códigos
+                                </Button>
+                                <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto">
+                                  <ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({promo.generatedCodes?.length || 0})
+                                </Button>
+                                <Button variant="outline" size="xs" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-muted-foreground hover:text-primary">
+                                    <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
+                                </Button>
+                                <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo, true)} disabled={isSubmitting} className="px-2 py-1 h-auto">
+                                  <Copy className="h-3 w-3 mr-1" /> Duplicar
+                                </Button>
+                                <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto">
+                                  <Edit className="h-3 w-3 mr-1" /> Editar
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="xs" disabled={isSubmitting} className="px-2 py-1 h-auto">
+                                      <Trash2 className="h-3 w-3 mr-1" /> Eliminar
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Esta acción no se puede deshacer. Esto eliminará permanentemente la promoción:
+                                        <span className="font-semibold"> {promo.name}</span> y todos sus códigos asociados.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDeletePromotion(promo.id!, promo.name)}
+                                        className="bg-destructive hover:bg-destructive/90"
+                                        disabled={isSubmitting}
+                                      >
+                                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                        Eliminar
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center h-24">No se encontraron promociones con los filtros aplicados.</TableCell>
+                        <TableCell colSpan={4} className="text-center h-24">No se encontraron promociones con los filtros aplicados.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -552,9 +541,9 @@ export default function BusinessPromotionsPage() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{isDuplicating ? `Duplicar Promoción: ${editingPromotion?.name?.replace(' (Copia)','') || 'Nueva Promoción'}` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</DialogTitle>
-            <DialogDescription>
+            <UIDialogDescription>
               {isDuplicating ? "Creando una copia. Ajusta los detalles necesarios." : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
-            </DialogDescription>
+            </UIDialogDescription>
           </DialogHeader>
           <BusinessPromotionForm
             promotion={editingPromotion || undefined} 
@@ -577,7 +566,7 @@ export default function BusinessPromotionsPage() {
             setShowCreateCodesModal(isOpen);
            }}
           entityName={selectedEntityForCreatingCodes.name}
-          entityId={selectedEntityForCreatingCodes.id}
+          entityId={selectedEntityForCreatingCodes.id!}
           existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
           onCodesCreated={handleNewCodesCreated}
           isSubmittingMain={isSubmitting}
@@ -613,34 +602,29 @@ export default function BusinessPromotionsPage() {
         />
       )}
 
-      {/* Modal for Promotion Statistics */}
-        <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Estadísticas para: {selectedPromotionForStats?.name}</DialogTitle>
-                    <DialogDescription>Resumen del rendimiento de la promoción.</DialogDescription>
-                </DialogHeader>
-                {selectedPromotionForStats && (
-                    <div className="space-y-3 py-4">
-                        <p><strong>Códigos Generados (Total):</strong> {selectedPromotionForStats.generatedCodes?.length || 0}</p>
-                        <p><strong>Códigos Canjeados:</strong> {selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
-                        <p><strong>Tasa de Canje:</strong> {selectedPromotionForStats.generatedCodes && selectedPromotionForStats.generatedCodes.length > 0 ? 
-                            ((selectedPromotionForStats.generatedCodes.filter(c => c.status === 'redeemed').length / selectedPromotionForStats.generatedCodes.length) * 100).toFixed(1) + '%' 
-                            : '0%'}
-                        </p>
-                        {/* Add more promotion-specific stats here if needed */}
-                    </div>
-                )}
-                <UIDialogFooter>
-                    <Button variant="outline" onClick={() => setShowStatsModal(false)}>Cerrar</Button>
-                </UIDialogFooter>
-            </DialogContent>
-        </Dialog>
+    <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Estadísticas para: {selectedPromotionForStats?.name}</DialogTitle>
+                <UIDialogDescription>Resumen del rendimiento de la promoción.</UIDialogDescription>
+            </DialogHeader>
+            {selectedPromotionForStats && (
+                <div className="space-y-3 py-4">
+                    <p><strong>Códigos Generados (Total):</strong> {selectedPromotionForStats.generatedCodes?.length || 0}</p>
+                    <p><strong>Códigos Canjeados:</strong> {selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
+                    <p><strong>Tasa de Canje:</strong> {selectedPromotionForStats.generatedCodes && selectedPromotionForStats.generatedCodes.length > 0 ? 
+                        ((selectedPromotionForStats.generatedCodes.filter(c => c.status === 'redeemed').length / selectedPromotionForStats.generatedCodes.length) * 100).toFixed(1) + '%' 
+                        : '0%'}
+                    </p>
+                </div>
+            )}
+            <UIDialogFooter>
+                <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedPromotionForStats(null);}}>Cerrar</Button>
+            </UIDialogFooter>
+        </DialogContent>
+    </Dialog>
     </div>
   );
 }
-    
-  
-
 
     
