@@ -2,18 +2,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; // Added CardFooter
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui/button"; // Asumiendo que quieres un botón de "Ver Más"
+import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { isEntityCurrentlyActivatable } from "@/lib/utils"; // Asegúrate que esta función es robusta
+import { isEntityCurrentlyActivatable } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays } from "lucide-react";
-import { SocioVipLogo } from "@/components/icons"; // Asumiendo que este es el logo de SocioVIP
+import { SocioVipLogo } from "@/components/icons";
 
 // Tipos para la entidad pública combinada
 interface PublicDisplayEntity extends BusinessManagedEntity {
@@ -36,7 +36,8 @@ export default function HomePage() {
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
       businessesSnapshot.forEach(docSnap => {
-        businessesMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Business);
+        const bizData = docSnap.data() as Business;
+        businessesMap.set(docSnap.id, { id: docSnap.id, ...bizData });
       });
       console.log(`HomePage: Fetched ${businessesMap.size} businesses.`);
 
@@ -45,17 +46,17 @@ export default function HomePage() {
       const entitiesSnapshot = await getDocs(entitiesQuery);
       console.log(`HomePage: Fetched ${entitiesSnapshot.docs.length} active business entities initially.`);
 
-      const now = new Date();
       const validEntities: PublicDisplayEntity[] = [];
 
       entitiesSnapshot.forEach(docSnap => {
         const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
+        // Ensure dates are strings for isEntityCurrentlyActivatable if they come as Timestamps
         const entity: BusinessManagedEntity = {
           id: docSnap.id,
           ...entityData,
-          startDate: entityData.startDate instanceof Timestamp ? entityData.startDate.toDate().toISOString() : entityData.startDate,
-          endDate: entityData.endDate instanceof Timestamp ? entityData.endDate.toDate().toISOString() : entityData.endDate,
-          createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : entityData.createdAt,
+          startDate: entityData.startDate instanceof Timestamp ? entityData.startDate.toDate().toISOString() : String(entityData.startDate),
+          endDate: entityData.endDate instanceof Timestamp ? entityData.endDate.toDate().toISOString() : String(entityData.endDate),
+          createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (entityData.createdAt ? String(entityData.createdAt) : undefined),
         };
 
         if (isEntityCurrentlyActivatable(entity)) {
@@ -64,13 +65,12 @@ export default function HomePage() {
             validEntities.push({
               ...entity,
               businessName: business.name,
-              businessLogoUrl: business.logoUrl,
+              businessLogoUrl: business.logoUrl, // Assuming business has logoUrl
               businessCustomUrlPath: business.customUrlPath
             });
           } else {
-            console.warn(`HomePage: Business not found for entity ${entity.id} with businessId ${entity.businessId}`);
-            // Opcionalmente, añadir la entidad sin datos del negocio o excluirla
-            validEntities.push(entity); // La mostramos sin datos del negocio
+            console.warn(`HomePage: Business not found for entity ${entity.id} with businessId ${entity.businessId}. Entity will be shown without business details.`);
+            validEntities.push(entity); // Show entity even if business details are missing
           }
         }
       });
@@ -97,9 +97,9 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <h1 className="text-3xl text-center font-bold text-orange-500 p-4 fixed top-0 left-0 bg-white/50 z-50 w-full">VERIFICACIÓN CAMBIO GLOBAL - SocioVIP vFINAL</h1>
+      {/* Marcador Visual Temporal */}
+      <h1 className="text-3xl text-center font-bold text-orange-500 p-4 fixed top-0 left-0 bg-white/50 z-50 w-full">VERIFICACIÓN CAMBIO GLOBAL - vFINAL</h1>
       
-      {/* Header SocioVIP */}
       <header className="py-6 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground shadow-md mt-16"> {/* mt-16 para dejar espacio al marcador */}
         <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
           <SocioVipLogo className="h-16 w-16 mb-3" />
@@ -107,6 +107,10 @@ export default function HomePage() {
           <p className="mt-2 text-lg text-primary-foreground/90">
             Descubre promociones y eventos exclusivos cerca de ti.
           </p>
+          {/* Placeholder para el PublicHeaderAuth que se implementará después */}
+          <div className="mt-4 p-2 border border-dashed border-primary-foreground/50 rounded-md">
+            <p className="text-xs">[PublicHeaderAuth Placeholder: Login/User Info Here]</p>
+          </div>
         </div>
       </header>
 
@@ -254,6 +258,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-    
