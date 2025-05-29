@@ -19,7 +19,7 @@ import type { Business, BusinessFormData, BusinessType } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BUSINESS_TYPES, PERU_LOCATIONS } from "@/lib/constants"; // Importar PERU_LOCATIONS
+import { PERU_LOCATIONS, BUSINESS_TYPES } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -35,17 +35,16 @@ const businessFormSchema = z.object({
   address: z.string().min(5, "La dirección debe tener al menos 5 caracteres.").optional().or(z.literal("")),
   contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }),
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
-  managerDni: z.string().min(8, "DNI/CE del gerente debe tener al menos 8 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^[a-zA-Z0-9]*$/, "DNI/CE del gerente solo debe contener letras y números.").optional().or(z.literal("")),
-  // Nuevos campos públicos
-  logoUrl: z.string().url("URL de logo inválida.").optional().or(z.literal("")),
-  publicCoverImageUrl: z.string().url("URL de imagen de portada inválida.").optional().or(z.literal("")),
+  managerDni: z.string().min(8, "DNI/CE debe tener al menos 8 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^[a-zA-Z0-9]*$/, "Solo debe contener letras y números.").optional().or(z.literal("")),
+  logoUrl: z.string().url("URL de logo inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
+  publicCoverImageUrl: z.string().url("URL de imagen de portada inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
   slogan: z.string().max(100, "El slogan no debe exceder 100 caracteres.").optional().or(z.literal("")),
   publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")),
   publicPhone: z.string().optional().or(z.literal("")),
   publicAddress: z.string().optional().or(z.literal("")),
   customUrlPath: z.string()
     .min(3, "La ruta URL debe tener al menos 3 caracteres.")
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Solo letras minúsculas, números y guiones. Ej: mi-negocio-cool")
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Solo letras minúsculas, números y guiones (ej: mi-negocio).")
     .optional().or(z.literal("")),
 });
 
@@ -56,7 +55,7 @@ interface BusinessFormProps {
   onSubmit: (data: BusinessFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
-  existingCustomUrlPaths: string[]; // Para validación de unicidad en cliente
+  existingCustomUrlPaths: string[]; 
 }
 
 export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = false, existingCustomUrlPaths }: BusinessFormProps) {
@@ -69,14 +68,15 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
 
   const form = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema.refine(data => {
-      if (data.customUrlPath) {
-        const currentPath = data.customUrlPath.toLowerCase();
+      if (data.customUrlPath && data.customUrlPath.trim() !== "") {
+        const currentPath = data.customUrlPath.toLowerCase().trim();
+        // Check if path is in the list of existing paths AND it's not the business's own current path
         const isEditingOwnPath = business && business.customUrlPath === currentPath;
         return isEditingOwnPath || !existingCustomUrlPaths.includes(currentPath);
       }
       return true;
     }, {
-      message: "Esta ruta URL personalizada ya está en uso.",
+      message: "Esta ruta URL personalizada ya está en uso por otro negocio.",
       path: ["customUrlPath"],
     })),
     defaultValues: {
@@ -128,10 +128,18 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
     if (defaultVals.department && PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]) {
       const currentProvinces = Object.keys(PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]);
       setProvinces(currentProvinces);
-      setSelectedProvince(defaultVals.province);
-      if (defaultVals.province && PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]?.[defaultVals.province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]]) {
-        setDistricts(PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS][defaultVals.province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || []);
+      setSelectedProvince(defaultVals.province); // Set before checking inclusion
+      if (currentProvinces.includes(defaultVals.province)) {
+        const provinceKey = defaultVals.province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS];
+        const districtsForProvince = PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS][provinceKey] || [];
+        setDistricts(districtsForProvince);
+        if (!districtsForProvince.includes(defaultVals.district)) {
+          form.setValue("district", ""); // Reset district if not in the list for the loaded province
+        }
       } else {
+        form.setValue("province", ""); // Reset province if not in the list for the loaded department
+        form.setValue("district", "");
+        setSelectedProvince("");
         setDistricts([]);
       }
     } else {
@@ -147,17 +155,20 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
       const currentProvinces = Object.keys(PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]);
       setProvinces(currentProvinces);
       if (!currentProvinces.includes(form.getValues("province"))) {
-         form.setValue("province", "");
+         form.setValue("province", ""); // Reset if current province is not valid for new department
          form.setValue("district", "");
-         setSelectedProvince("");
+         setSelectedProvince(""); // Also reset selectedProvince state
+         setDistricts([]);
       }
     } else {
       setProvinces([]);
       form.setValue("province", "");
       form.setValue("district", "");
       setSelectedProvince("");
+      setDistricts([]);
     }
-  }, [selectedDepartment, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDepartment, form.setValue]); // form.getValues creates new reference, use form.setValue for stable deps
 
   useEffect(() => {
     if (selectedDepartment && selectedProvince && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]]) {
@@ -170,20 +181,20 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
       setDistricts([]);
       form.setValue("district", "");
     }
-  }, [selectedDepartment, selectedProvince, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDepartment, selectedProvince, form.setValue]);
 
   const handleSubmit = (values: BusinessFormValues) => {
     const dataToSubmit: BusinessFormData = {
       ...values,
-      customUrlPath: values.customUrlPath ? values.customUrlPath.toLowerCase().trim() : undefined,
+      customUrlPath: values.customUrlPath ? values.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-') : undefined,
     };
     onSubmit(dataToSubmit);
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
-        {/* Campos existentes */}
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-3 pl-1 py-1">
         <FormField control={form.control} name="name" render={({ field }) => (
           <FormItem><FormLabel>Nombre Comercial <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Pandora Lounge Bar" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )}/>
@@ -199,10 +210,10 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField control={form.control} name="department" render={({ field }) => (
-                <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedDepartment(value); form.setValue("province", "", { shouldValidate: true }); form.setValue("district", "", { shouldValidate: true }); setSelectedProvince(""); }} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedDepartment(value); form.setValue("province", ""); form.setValue("district", ""); setSelectedProvince(""); setDistricts([]); }} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="province" render={({ field }) => (
-                <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedProvince(value); form.setValue("district", "", { shouldValidate: true });}} value={field.value} disabled={isSubmitting || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedProvince(value); form.setValue("district", ""); setDistricts([]);}} value={field.value} disabled={isSubmitting || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="district" render={({ field }) => (
                 <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
@@ -221,8 +232,33 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
           <FormItem><FormLabel>DNI/CE del Gerente General</FormLabel><FormControl><Input placeholder="DNI o Carnet de Extranjería" {...field} value={field.value || ""} maxLength={15} disabled={isSubmitting} /></FormControl><FormDescription className="text-xs">Puede ser un usuario existente de la plataforma.</FormDescription><FormMessage /></FormItem>
         )}/>
 
-        {/* Nuevos campos públicos */}
         <h3 className="text-lg font-semibold pt-4 border-t mt-6">Información Pública y Branding</h3>
+        <FormField control={form.control} name="customUrlPath" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Ruta URL Personalizada (Slug)</FormLabel>
+            <div className="flex items-center">
+              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociovip.app/b/</span>
+              <FormControl>
+                <Input 
+                  placeholder="mi-negocio" 
+                  {...field} 
+                  value={field.value || ""} 
+                  disabled={isSubmitting}
+                  className="rounded-l-none"
+                  onChange={(e) => {
+                    const sanitizedValue = e.target.value
+                      .toLowerCase()
+                      .replace(/\s+/g, '-') // Reemplaza espacios con guiones
+                      .replace(/[^a-z0-9-]/g, ''); // Elimina caracteres no alfanuméricos excepto guiones
+                    field.onChange(sanitizedValue);
+                  }}
+                />
+              </FormControl>
+            </div>
+            <FormDescription>Solo letras minúsculas, números y guiones. Será único para tu negocio.</FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}/>
         <FormField control={form.control} name="slogan" render={({ field }) => (
           <FormItem><FormLabel>Slogan del Negocio</FormLabel><FormControl><Input placeholder="Tu frase pegajosa aquí" {...field} value={field.value || ""} maxLength={100} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )}/>
@@ -241,28 +277,8 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmitting = fals
         <FormField control={form.control} name="publicPhone" render={({ field }) => (
           <FormItem><FormLabel>Teléfono Público de Contacto</FormLabel><FormControl><Input type="tel" placeholder="+51 1 2345678" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )}/>
-        <FormField control={form.control} name="customUrlPath" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Ruta URL Personalizada</FormLabel>
-            <div className="flex items-center">
-              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociovip.app/b/</span>
-              <FormControl>
-                <Input 
-                  placeholder="mi-negocio" 
-                  {...field} 
-                  value={field.value || ""} 
-                  disabled={isSubmitting}
-                  className="rounded-l-none"
-                  onChange={(e) => field.onChange(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                />
-              </FormControl>
-            </div>
-            <FormDescription>Solo letras minúsculas, números y guiones. Ej: "nombre-de-mi-negocio". Será único.</FormDescription>
-            <FormMessage />
-          </FormItem>
-        )}/>
 
-        <DialogFooter className="pt-6">
+        <DialogFooter className="pt-6 sticky bottom-0 bg-background pb-4 -mb-2"> {/* Ensure footer is visible */}
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

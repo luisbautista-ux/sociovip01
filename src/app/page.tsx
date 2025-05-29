@@ -14,14 +14,15 @@ import {
   CardDescription
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, CalendarDays, ExternalLink } from "lucide-react";
+import { Loader2, Building, Tag, CalendarDays, ExternalLink, Search as SearchIcon } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth";
+import { Input } from "@/components/ui/input";
 
 interface PublicDisplayEntity extends BusinessManagedEntity {
   businessName?: string;
@@ -30,9 +31,11 @@ interface PublicDisplayEntity extends BusinessManagedEntity {
 }
 
 export default function HomePage() {
-  const [publicEntities, setPublicEntities] = useState<PublicDisplayEntity[]>([]);
+  const [allPublicEntities, setAllPublicEntities] = useState<PublicDisplayEntity[]>([]);
+  const [filteredEntities, setFilteredEntities] = useState<PublicDisplayEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchPublicEntitiesAndBusinesses = useCallback(async () => {
     console.log("HomePage: Fetching public entities and businesses...");
@@ -47,7 +50,7 @@ export default function HomePage() {
             id: docSnap.id, 
             ...bizData,
             joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
-            customUrlPath: bizData.customUrlPath || undefined, // Asegurar que customUrlPath esté
+            customUrlPath: bizData.customUrlPath || undefined,
          });
       });
       console.log(`HomePage: Fetched ${businessesMap.size} businesses.`);
@@ -59,19 +62,33 @@ export default function HomePage() {
       const validEntities: PublicDisplayEntity[] = [];
 
       for (const docSnap of entitiesSnapshot.docs) {
-        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & { startDate: Timestamp | string, endDate: Timestamp | string, createdAt?: Timestamp | string };
+        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
         
         let startDateStr: string;
         let endDateStr: string;
-        const nowISO = new Date().toISOString();
+        const nowStr = new Date().toISOString();
 
-        if (entityData.startDate instanceof Timestamp) startDateStr = entityData.startDate.toDate().toISOString();
-        else if (typeof entityData.startDate === 'string') startDateStr = entityData.startDate;
-        else { console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`); startDateStr = nowISO; }
+        if (entityData.startDate instanceof Timestamp) {
+          startDateStr = entityData.startDate.toDate().toISOString();
+        } else if (typeof entityData.startDate === 'string') {
+          startDateStr = entityData.startDate;
+        } else if (entityData.startDate instanceof Date) {
+          startDateStr = entityData.startDate.toISOString();
+        } else {
+          console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
+          startDateStr = nowStr; 
+        }
 
-        if (entityData.endDate instanceof Timestamp) endDateStr = entityData.endDate.toDate().toISOString();
-        else if (typeof entityData.endDate === 'string') endDateStr = entityData.endDate;
-        else { console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`); endDateStr = nowISO; }
+        if (entityData.endDate instanceof Timestamp) {
+          endDateStr = entityData.endDate.toDate().toISOString();
+        } else if (typeof entityData.endDate === 'string') {
+          endDateStr = entityData.endDate;
+        } else if (entityData.endDate instanceof Date) {
+          endDateStr = entityData.endDate.toISOString();
+        } else {
+          console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
+          endDateStr = nowStr; 
+        }
         
         const entityForCheck: BusinessManagedEntity = {
           id: docSnap.id,
@@ -104,19 +121,28 @@ export default function HomePage() {
               businessCustomUrlPath: business.customUrlPath,
             });
           } else {
-            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}. Entity will not be shown.`);
-            // validEntities.push(entityForCheck); // Omitir si el negocio no se encuentra para evitar errores de enlace
+            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}. Entity will not be shown if it depends on businessCustomUrlPath for linking.`);
           }
         }
       }
 
       console.log(`HomePage: Filtered to ${validEntities.length} currently activatable entities.`);
-      setPublicEntities(validEntities.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
+      const sortedEntities = validEntities.sort((a, b) => {
+        const aDate = new Date(a.startDate).getTime();
+        const bDate = new Date(b.startDate).getTime();
+        if (a.type === 'event' && b.type !== 'event') return -1;
+        if (a.type !== 'event' && b.type === 'event') return 1;
+        return bDate - aDate; // Más recientes primero dentro de su tipo
+      });
+      setAllPublicEntities(sortedEntities);
+      setFilteredEntities(sortedEntities);
+
 
     } catch (err: any) {
       console.error("HomePage: Error fetching public data:", err);
       setError("No se pudieron cargar las promociones y eventos. Inténtalo de nuevo más tarde.");
-      setPublicEntities([]);
+      setAllPublicEntities([]);
+      setFilteredEntities([]);
     } finally {
       setIsLoading(false);
       console.log("HomePage: Fetching complete. isLoading set to false.");
@@ -127,19 +153,33 @@ export default function HomePage() {
     fetchPublicEntitiesAndBusinesses();
   }, [fetchPublicEntitiesAndBusinesses]);
 
-  const events = publicEntities.filter(entity => entity.type === 'event');
-  const promotions = publicEntities.filter(entity => entity.type === 'promotion');
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredEntities(allPublicEntities);
+      return;
+    }
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    const filtered = allPublicEntities.filter(entity => 
+      (entity.name?.toLowerCase().includes(lowerSearchTerm)) ||
+      (entity.description?.toLowerCase().includes(lowerSearchTerm)) ||
+      (entity.businessName?.toLowerCase().includes(lowerSearchTerm))
+    );
+    setFilteredEntities(filtered);
+  }, [searchTerm, allPublicEntities]);
+
+
+  const events = filteredEntities.filter(entity => entity.type === 'event');
+  const promotions = filteredEntities.filter(entity => entity.type === 'promotion');
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* <h1 className="text-3xl text-center font-bold text-orange-500 p-4">VERIFICACIÓN CAMBIO GLOBAL - v3</h1>  */}
       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
             <Link href="/" passHref className="flex items-center gap-2 group">
                 <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
                 <div>
                   <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
-                  <p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p> {/* Slogan Hardcodeado */}
+                  <p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p>
                 </div>
             </Link>
             <PublicHeaderAuth />
@@ -147,6 +187,19 @@ export default function HomePage() {
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input 
+              type="search"
+              placeholder="Buscar eventos, promociones o negocios..."
+              className="w-full pl-10 py-3 text-base rounded-lg shadow-md"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
         {isLoading && (
           <div className="flex justify-center items-center min-h-[300px]">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -161,11 +214,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {!isLoading && !error && publicEntities.length === 0 && (
+        {!isLoading && !error && filteredEntities.length === 0 && (
           <div className="text-center py-10">
             <Tag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl text-muted-foreground">No hay eventos ni promociones disponibles en este momento.</p>
-            <p className="text-sm text-muted-foreground">Vuelve más tarde para descubrir nuevas ofertas.</p>
+            <p className="text-xl text-muted-foreground">
+              {searchTerm ? "No se encontraron resultados para tu búsqueda." : "No hay eventos ni promociones disponibles en este momento."}
+            </p>
+            {!searchTerm && <p className="text-sm text-muted-foreground">Vuelve más tarde para descubrir nuevas ofertas.</p>}
           </div>
         )}
 
@@ -179,7 +234,7 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events.map((event) => (
-                    <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg">
+                    <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                       <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public-fallback`} passHref>
                         <div className="relative aspect-[16/9] w-full">
                           <Image
@@ -214,7 +269,7 @@ export default function HomePage() {
                       </CardContent>
                        <CardFooter>
                          <Link href={event.businessCustomUrlPath ? `/b/${event.businessCustomUrlPath}` : `/business/${event.businessId}/public-fallback`} passHref className="w-full">
-                          <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                             Ver Detalles del Evento <ExternalLink className="ml-2 h-4 w-4" />
                           </Button>
                         </Link>
@@ -233,7 +288,7 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {promotions.map((promo) => (
-                    <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg">
+                    <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                        <Link href={promo.businessCustomUrlPath ? `/b/${promo.businessCustomUrlPath}` : `/business/${promo.businessId}/public-fallback`} passHref>
                         <div className="relative aspect-[16/9] w-full">
                           <Image
@@ -268,7 +323,7 @@ export default function HomePage() {
                       </CardContent>
                        <CardFooter>
                          <Link href={promo.businessCustomUrlPath ? `/b/${promo.businessCustomUrlPath}` : `/business/${promo.businessId}/public-fallback`} passHref className="w-full">
-                          <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                             Ver Detalles de la Promoción <ExternalLink className="ml-2 h-4 w-4" />
                           </Button>
                         </Link>
@@ -290,4 +345,3 @@ export default function HomePage() {
     </div>
   );
 }
-

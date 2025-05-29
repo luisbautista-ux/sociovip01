@@ -15,7 +15,7 @@ import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { db } from "@/lib/firebase"; 
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit, writeBatch } from "firebase/firestore";
 import Link from "next/link";
 
 export default function AdminBusinessesPage() {
@@ -72,7 +72,7 @@ export default function AdminBusinessesPage() {
         description: "No se pudieron obtener los datos de los negocios. Intenta de nuevo.",
         variant: "destructive",
       });
-      setBusinesses([]);
+      setBusinesses([]); // Reset on error
       setExistingUrlPaths([]);
     } finally {
       setIsLoading(false);
@@ -129,11 +129,10 @@ export default function AdminBusinessesPage() {
   };
 
   const checkCustomUrlPathUniqueness = async (path: string, currentBusinessId?: string): Promise<boolean> => {
-    if (!path) return true; // Si no hay path, es único (o no se está usando)
-    const q = query(collection(db, "businesses"), where("customUrlPath", "==", path.toLowerCase()));
+    if (!path || path.trim() === "") return true; 
+    const q = query(collection(db, "businesses"), where("customUrlPath", "==", path.toLowerCase().trim()));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return true;
-    // Si estamos editando, permitir que el path actual sea el mismo
     return snapshot.docs.every(doc => doc.id === currentBusinessId);
   };
 
@@ -141,12 +140,14 @@ export default function AdminBusinessesPage() {
   const handleCreateOrEditBusiness = async (data: BusinessFormData) => {
     setIsSubmitting(true);
     
-    if (data.customUrlPath) {
-      const isUnique = await checkCustomUrlPathUniqueness(data.customUrlPath, editingBusiness?.id);
+    const cleanedCustomUrlPath = data.customUrlPath ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-') : null;
+
+    if (cleanedCustomUrlPath) {
+      const isUnique = await checkCustomUrlPathUniqueness(cleanedCustomUrlPath, editingBusiness?.id);
       if (!isUnique) {
         toast({ title: "Error de Validación", description: "La Ruta URL Personalizada ya está en uso. Por favor, elige otra.", variant: "destructive"});
         setIsSubmitting(false);
-        form.setError("customUrlPath", { type: "manual", message: "Esta ruta URL ya está en uso." }); // Asumiendo que tienes acceso a 'form' si lo pasas o usas context
+        // form.setError("customUrlPath", { type: "manual", message: "Esta ruta URL ya está en uso." }); // Esto requeriría pasar el form ref
         return;
       }
     }
@@ -169,7 +170,7 @@ export default function AdminBusinessesPage() {
         publicContactEmail: data.publicContactEmail || null,
         publicPhone: data.publicPhone || null,
         publicAddress: data.publicAddress || null,
-        customUrlPath: data.customUrlPath ? data.customUrlPath.toLowerCase().trim() : null,
+        customUrlPath: cleanedCustomUrlPath,
     };
 
     try {
@@ -201,6 +202,14 @@ export default function AdminBusinessesPage() {
     
     setIsSubmitting(true); 
     try {
+      // Placeholder for deleting related entities (promotions, events, etc.) if necessary
+      // const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", businessId));
+      // const entitiesSnap = await getDocs(entitiesQuery);
+      // const batch = writeBatch(db);
+      // entitiesSnap.forEach(doc => batch.delete(doc.ref));
+      // await batch.commit();
+      // console.log(`Deleted ${entitiesSnap.size} related entities for business ${businessId}`);
+
       await deleteDoc(doc(db, "businesses", businessId));
       toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
       fetchBusinesses(); 
@@ -350,7 +359,7 @@ export default function AdminBusinessesPage() {
             onSubmit={handleCreateOrEditBusiness} 
             onCancel={() => { setShowCreateEditModal(false); setEditingBusiness(null);}}
             isSubmitting={isSubmitting}
-            existingCustomUrlPaths={existingUrlPaths.filter(p => editingBusiness ? p !== editingBusiness.customUrlPath : true)}
+            existingCustomUrlPaths={existingUrlPaths.filter(p => editingBusiness && p === editingBusiness.customUrlPath ? false : true)}
           />
         </DialogContent>
       </Dialog>
