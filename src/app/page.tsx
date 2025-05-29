@@ -8,21 +8,19 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
   CardFooter
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc } from "firebase/firestore";
-import type { BusinessManagedEntity, Business, PromotionDetails } from "@/lib/types";
+import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays, ExternalLink } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
-// Marcador Visual para verificar cambios - se eliminará después
-// <h1 className="text-3xl text-center font-bold text-orange-500 p-4 fixed top-0 left-0 bg-white/50 z-50 w-full">VERIFICACIÓN CAMBIO GLOBAL - vFINAL</h1>
+import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth"; // Importar
 
 interface PublicDisplayEntity extends BusinessManagedEntity {
   businessName?: string;
@@ -52,14 +50,15 @@ export default function HomePage() {
       const entitiesSnapshot = await getDocs(entitiesQuery);
       console.log(`HomePage: Fetched ${entitiesSnapshot.docs.length} active business entities initially.`);
 
+      const now = new Date();
       const validEntities: PublicDisplayEntity[] = [];
-      const nowStr = new Date().toISOString();
 
       for (const docSnap of entitiesSnapshot.docs) {
         const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
         
         let startDateStr: string;
         let endDateStr: string;
+        const defaultDateStr = now.toISOString();
 
         if (entityData.startDate instanceof Timestamp) {
           startDateStr = entityData.startDate.toDate().toISOString();
@@ -69,7 +68,7 @@ export default function HomePage() {
           startDateStr = entityData.startDate.toISOString();
         } else {
           console.warn(`HomePage: Entity ${docSnap.id} has invalid startDate. Using fallback.`);
-          startDateStr = nowStr; 
+          startDateStr = defaultDateStr; 
         }
 
         if (entityData.endDate instanceof Timestamp) {
@@ -80,10 +79,10 @@ export default function HomePage() {
           endDateStr = entityData.endDate.toISOString();
         } else {
           console.warn(`HomePage: Entity ${docSnap.id} has invalid endDate. Using fallback.`);
-          endDateStr = nowStr;
+          endDateStr = defaultDateStr;
         }
         
-        const entity: BusinessManagedEntity = {
+        const entityForCheck: BusinessManagedEntity = { // Create a temporary entity for date checking
           id: docSnap.id,
           businessId: entityData.businessId,
           type: entityData.type,
@@ -91,32 +90,32 @@ export default function HomePage() {
           description: entityData.description,
           startDate: startDateStr,
           endDate: endDateStr,
-          usageLimit: entityData.usageLimit,
-          maxAttendance: entityData.maxAttendance,
-          isActive: entityData.isActive,
-          imageUrl: entityData.imageUrl,
-          aiHint: entityData.aiHint,
-          termsAndConditions: entityData.termsAndConditions,
-          generatedCodes: entityData.generatedCodes || [],
+          isActive: entityData.isActive, 
+          // Fill other required fields with defaults or from entityData if necessary for isEntityCurrentlyActivatable
+          usageLimit: entityData.usageLimit || 0,
+          maxAttendance: entityData.maxAttendance || 0,
           ticketTypes: entityData.ticketTypes || [],
           eventBoxes: entityData.eventBoxes || [],
           assignedPromoters: entityData.assignedPromoters || [],
+          generatedCodes: entityData.generatedCodes || [],
+          imageUrl: entityData.imageUrl,
+          aiHint: entityData.aiHint,
+          termsAndConditions: entityData.termsAndConditions,
           createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (typeof entityData.createdAt === 'string' ? entityData.createdAt : undefined),
         };
 
-        if (isEntityCurrentlyActivatable(entity)) {
-          const business = businessesMap.get(entity.businessId);
+        if (isEntityCurrentlyActivatable(entityForCheck)) {
+          const business = businessesMap.get(entityForCheck.businessId);
           if (business) {
             validEntities.push({
-              ...entity,
+              ...entityForCheck,
               businessName: business.name,
-              businessLogoUrl: business.logoUrl, // Asumiendo que Business tiene logoUrl
+              businessLogoUrl: business.logoUrl,
               businessCustomUrlPath: business.customUrlPath,
             });
           } else {
-            console.warn(`HomePage: Business not found for entity ${entity.id} with businessId ${entity.businessId}.`);
-            // Decidir si mostrar la entidad sin datos del negocio o no. Por ahora, la mostramos.
-            validEntities.push(entity);
+            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}.`);
+            validEntities.push(entityForCheck); // Show entity even if business details are missing
           }
         }
       }
@@ -143,15 +142,18 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Placeholder for PublicHeaderAuth - To be implemented later */}
       <header className="py-6 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground shadow-md">
-        <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
-          <SocioVipLogo className="h-16 w-16 mb-3" />
-          <h1 className="text-4xl font-bold tracking-tight">SocioVIP</h1>
-          <p className="mt-2 text-lg text-primary-foreground/90">
-            Descubre promociones y eventos exclusivos cerca de ti.
-          </p>
-          {/* Aquí iría el PublicHeaderAuth en la siguiente iteración */}
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between">
+          <div className="flex flex-col items-center sm:items-start text-center sm:text-left mb-4 sm:mb-0">
+            <div className="flex items-center gap-3">
+              <SocioVipLogo className="h-12 w-12" />
+              <div>
+                <h1 className="text-4xl font-bold tracking-tight">SocioVIP</h1>
+                <p className="mt-1 text-md text-primary-foreground/80">Descubre promociones y eventos exclusivos.</p>
+              </div>
+            </div>
+          </div>
+          <PublicHeaderAuth />
         </div>
       </header>
 
@@ -299,5 +301,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

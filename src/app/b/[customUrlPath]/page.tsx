@@ -11,11 +11,14 @@ import { es } from "date-fns/locale";
 import Link from "next/link";
 import { Building, CalendarDays, Tag, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
-// Marcador Visual para verificar cambios - se eliminará después
-// <h1 className="text-3xl text-center font-bold text-blue-500 p-4">VERIFICACIÓN CAMBIO NEGOCIO - vFINAL</h1>
+import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth"; // Importar
 
-async function getBusinessData(customUrlPath: string) {
+async function getBusinessData(customUrlPath: string): Promise<Business | null> {
   console.log("BusinessPublicPage: Fetching business with customUrlPath:", customUrlPath);
+  if (!customUrlPath || typeof customUrlPath !== 'string' || customUrlPath.trim() === '') {
+    console.warn("BusinessPublicPage: Invalid customUrlPath provided.");
+    return null;
+  }
   const businessQuery = query(collection(db, "businesses"), where("customUrlPath", "==", customUrlPath));
   const businessSnap = await getDocs(businessQuery);
 
@@ -26,10 +29,15 @@ async function getBusinessData(customUrlPath: string) {
   const businessDoc = businessSnap.docs[0];
   const businessData = businessDoc.data() as Omit<Business, 'id'>;
   console.log("BusinessPublicPage: Business data found:", businessData.name);
-  return { id: businessDoc.id, ...businessData };
+  return { 
+    id: businessDoc.id, 
+    ...businessData,
+    // Ensure date fields are strings if they come as Timestamps for consistency
+    joinDate: businessData.joinDate instanceof Timestamp ? businessData.joinDate.toDate().toISOString() : String(businessData.joinDate),
+  };
 }
 
-async function getBusinessEntities(businessId: string) {
+async function getBusinessEntities(businessId: string): Promise<BusinessManagedEntity[]> {
   console.log("BusinessPublicPage: Fetching entities for businessId:", businessId);
   const entitiesQuery = query(
     collection(db, "businessEntities"),
@@ -39,7 +47,7 @@ async function getBusinessEntities(businessId: string) {
   const entitiesSnap = await getDocs(entitiesQuery);
   console.log(`BusinessPublicPage: Fetched ${entitiesSnap.docs.length} active entities for business ${businessId}.`);
 
-  const nowStr = new Date().toISOString();
+  const now = new Date();
   const validEntities: BusinessManagedEntity[] = [];
 
   entitiesSnap.forEach(docSnap => {
@@ -47,6 +55,7 @@ async function getBusinessEntities(businessId: string) {
     
     let startDateStr: string;
     let endDateStr: string;
+    const defaultDateStr = now.toISOString();
 
     if (entityData.startDate instanceof Timestamp) {
       startDateStr = entityData.startDate.toDate().toISOString();
@@ -55,8 +64,8 @@ async function getBusinessEntities(businessId: string) {
     } else if (entityData.startDate instanceof Date) {
       startDateStr = entityData.startDate.toISOString();
     } else {
-      console.warn(`BusinessPublicPage: Entity ${docSnap.id} missing or invalid startDate for business ${businessId}. Using fallback.`);
-      startDateStr = nowStr; 
+      console.warn(`BusinessPublicPage: Entity ${docSnap.id} for business ${businessId} missing or invalid startDate. Using fallback.`);
+      startDateStr = defaultDateStr; 
     }
 
     if (entityData.endDate instanceof Timestamp) {
@@ -66,8 +75,8 @@ async function getBusinessEntities(businessId: string) {
     } else if (entityData.endDate instanceof Date) {
       endDateStr = entityData.endDate.toISOString();
     } else {
-      console.warn(`BusinessPublicPage: Entity ${docSnap.id} missing or invalid endDate for business ${businessId}. Using fallback.`);
-      endDateStr = nowStr;
+      console.warn(`BusinessPublicPage: Entity ${docSnap.id} for business ${businessId} missing or invalid endDate. Using fallback.`);
+      endDateStr = defaultDateStr;
     }
 
     const entity: BusinessManagedEntity = {
@@ -78,16 +87,17 @@ async function getBusinessEntities(businessId: string) {
       description: entityData.description,
       startDate: startDateStr,
       endDate: endDateStr,
-      usageLimit: entityData.usageLimit,
-      maxAttendance: entityData.maxAttendance,
       isActive: entityData.isActive, // isActive is already true from query
-      imageUrl: entityData.imageUrl,
-      aiHint: entityData.aiHint,
-      termsAndConditions: entityData.termsAndConditions,
-      generatedCodes: entityData.generatedCodes || [],
+      // Fill other required fields with defaults or from entityData
+      usageLimit: entityData.usageLimit || 0,
+      maxAttendance: entityData.maxAttendance || 0,
       ticketTypes: entityData.ticketTypes || [],
       eventBoxes: entityData.eventBoxes || [],
       assignedPromoters: entityData.assignedPromoters || [],
+      generatedCodes: entityData.generatedCodes || [],
+      imageUrl: entityData.imageUrl,
+      aiHint: entityData.aiHint,
+      termsAndConditions: entityData.termsAndConditions,
       createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (typeof entityData.createdAt === 'string' ? entityData.createdAt : undefined),
     };
     if (isEntityCurrentlyActivatable(entity)) {
@@ -123,8 +133,18 @@ export default async function BusinessPublicPage({ params }: { params: { customU
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-       {/* Aquí iría el PublicHeaderAuth en la siguiente iteración */}
       <header className="relative">
+         {/* Branding and Auth Header */}
+        <div className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <Link href="/" passHref className="flex items-center gap-2 group">
+                    <SocioVipLogo className="h-8 w-8 text-primary group-hover:animate-pulse" />
+                    <span className="font-semibold text-xl text-primary group-hover:text-primary/80">SocioVIP</span>
+                </Link>
+                <PublicHeaderAuth />
+            </div>
+        </div>
+
         {businessDetails.publicCoverImageUrl && (
           <div className="relative h-48 md:h-64 lg:h-80 w-full">
             <Image
@@ -135,7 +155,7 @@ export default async function BusinessPublicPage({ params }: { params: { customU
               data-ai-hint="business cover"
               priority
             />
-            <div className="absolute inset-0 bg-black/30"></div> {/* Overlay sutil */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-black/10"></div>
           </div>
         )}
         <div className={`max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 ${businessDetails.publicCoverImageUrl ? '-mt-16 md:-mt-20' : 'pt-12 pb-6'} relative z-10`}>
@@ -147,7 +167,7 @@ export default async function BusinessPublicPage({ params }: { params: { customU
                   alt={`Logo de ${businessDetails.name}`}
                   width={100}
                   height={100}
-                  className="rounded-md object-contain h-20 w-20 sm:h-24 sm:w-24 border bg-background p-1"
+                  className="rounded-md object-contain h-20 w-20 sm:h-24 sm:w-24 border bg-background p-1 shadow-md"
                   data-ai-hint="business logo"
                 />
               )}
@@ -266,9 +286,6 @@ export default async function BusinessPublicPage({ params }: { params: { customU
       </main>
 
       <footer className="mt-12 py-8 bg-muted/50 text-center">
-        <Link href="/" passHref>
-            <Button variant="link" className="text-sm text-primary mb-2">Volver a Todas las Promociones y Eventos</Button>
-        </Link>
         <p className="text-sm text-muted-foreground">
           Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociovip.app</Link>
         </p>
@@ -276,5 +293,3 @@ export default async function BusinessPublicPage({ params }: { params: { customU
     </div>
   );
 }
-
-    
