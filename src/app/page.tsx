@@ -2,20 +2,22 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; // Added CardFooter
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc } from "firebase/firestore";
-import type { BusinessManagedEntity, Business } from "@/lib/types";
+import type { BusinessManagedEntity, Business, PromotionDetails } from "@/lib/types"; // PromotionDetails might not be needed if directly using BusinessManagedEntity
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
+// Placeholder for PublicHeaderAuth, to be implemented
+// import PublicHeaderAuth from "@/components/layout/PublicHeaderAuth";
 
-// Tipos para la entidad pública combinada
+// Combined type for display
 interface PublicDisplayEntity extends BusinessManagedEntity {
   businessName?: string;
   businessLogoUrl?: string;
@@ -32,7 +34,7 @@ export default function HomePage() {
     setIsLoading(true);
     setError(null);
     try {
-      // 1. Obtener todos los negocios y mapearlos por ID
+      // 1. Fetch all businesses and map them by ID
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
       businessesSnapshot.forEach(docSnap => {
@@ -41,22 +43,61 @@ export default function HomePage() {
       });
       console.log(`HomePage: Fetched ${businessesMap.size} businesses.`);
 
-      // 2. Obtener todas las entidades activas
+      // 2. Fetch all active businessEntities
       const entitiesQuery = query(collection(db, "businessEntities"), where("isActive", "==", true));
       const entitiesSnapshot = await getDocs(entitiesQuery);
       console.log(`HomePage: Fetched ${entitiesSnapshot.docs.length} active business entities initially.`);
 
       const validEntities: PublicDisplayEntity[] = [];
+      const nowStr = new Date().toISOString(); // Fallback for missing dates
 
       entitiesSnapshot.forEach(docSnap => {
         const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
-        // Ensure dates are strings for isEntityCurrentlyActivatable if they come as Timestamps
+        
+        let startDateStr: string;
+        let endDateStr: string;
+
+        if (entityData.startDate instanceof Timestamp) {
+          startDateStr = entityData.startDate.toDate().toISOString();
+        } else if (typeof entityData.startDate === 'string') {
+          startDateStr = entityData.startDate;
+        } else if (entityData.startDate instanceof Date) {
+          startDateStr = entityData.startDate.toISOString();
+        } else {
+          console.warn(`HomePage: Entity ${docSnap.id} missing or invalid startDate. Using fallback.`);
+          startDateStr = nowStr; 
+        }
+
+        if (entityData.endDate instanceof Timestamp) {
+          endDateStr = entityData.endDate.toDate().toISOString();
+        } else if (typeof entityData.endDate === 'string') {
+          endDateStr = entityData.endDate;
+        } else if (entityData.endDate instanceof Date) {
+          endDateStr = entityData.endDate.toISOString();
+        } else {
+          console.warn(`HomePage: Entity ${docSnap.id} missing or invalid endDate. Using fallback.`);
+          endDateStr = nowStr;
+        }
+        
         const entity: BusinessManagedEntity = {
           id: docSnap.id,
-          ...entityData,
-          startDate: entityData.startDate instanceof Timestamp ? entityData.startDate.toDate().toISOString() : String(entityData.startDate),
-          endDate: entityData.endDate instanceof Timestamp ? entityData.endDate.toDate().toISOString() : String(entityData.endDate),
-          createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (entityData.createdAt ? String(entityData.createdAt) : undefined),
+          businessId: entityData.businessId,
+          type: entityData.type,
+          name: entityData.name,
+          description: entityData.description,
+          startDate: startDateStr,
+          endDate: endDateStr,
+          usageLimit: entityData.usageLimit,
+          maxAttendance: entityData.maxAttendance,
+          isActive: entityData.isActive,
+          imageUrl: entityData.imageUrl,
+          aiHint: entityData.aiHint,
+          termsAndConditions: entityData.termsAndConditions,
+          generatedCodes: entityData.generatedCodes,
+          ticketTypes: entityData.ticketTypes,
+          eventBoxes: entityData.eventBoxes,
+          assignedPromoters: entityData.assignedPromoters,
+          createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (typeof entityData.createdAt === 'string' ? entityData.createdAt : undefined),
         };
 
         if (isEntityCurrentlyActivatable(entity)) {
@@ -65,8 +106,8 @@ export default function HomePage() {
             validEntities.push({
               ...entity,
               businessName: business.name,
-              businessLogoUrl: business.logoUrl, // Assuming business has logoUrl
-              businessCustomUrlPath: business.customUrlPath
+              businessLogoUrl: business.logoUrl,
+              businessCustomUrlPath: business.customUrlPath,
             });
           } else {
             console.warn(`HomePage: Business not found for entity ${entity.id} with businessId ${entity.businessId}. Entity will be shown without business details.`);
@@ -97,20 +138,20 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Marcador Visual Temporal */}
-      <h1 className="text-3xl text-center font-bold text-orange-500 p-4 fixed top-0 left-0 bg-white/50 z-50 w-full">VERIFICACIÓN CAMBIO GLOBAL - vFINAL</h1>
+      {/* Marcador Visual Temporal para verificar cambios */}
+      {/* <h1 className="text-3xl text-center font-bold text-orange-500 p-4 fixed top-0 left-0 bg-white/50 z-50 w-full">VERIFICACIÓN CAMBIO GLOBAL - vFINAL</h1> */}
       
-      <header className="py-6 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground shadow-md mt-16"> {/* mt-16 para dejar espacio al marcador */}
+      {/* Placeholder for PublicHeaderAuth - To be implemented later */}
+      <header className="py-6 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground shadow-md">
         <div className="max-w-5xl mx-auto flex flex-col items-center text-center">
           <SocioVipLogo className="h-16 w-16 mb-3" />
           <h1 className="text-4xl font-bold tracking-tight">SocioVIP</h1>
           <p className="mt-2 text-lg text-primary-foreground/90">
             Descubre promociones y eventos exclusivos cerca de ti.
           </p>
-          {/* Placeholder para el PublicHeaderAuth que se implementará después */}
-          <div className="mt-4 p-2 border border-dashed border-primary-foreground/50 rounded-md">
+          {/* <div className="mt-4 p-2 border border-dashed border-primary-foreground/50 rounded-md">
             <p className="text-xs">[PublicHeaderAuth Placeholder: Login/User Info Here]</p>
-          </div>
+          </div> */}
         </div>
       </header>
 
@@ -258,3 +299,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
