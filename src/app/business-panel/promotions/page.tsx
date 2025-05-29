@@ -26,6 +26,7 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 
+
 export default function BusinessPromotionsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
@@ -49,48 +50,13 @@ export default function BusinessPromotionsPage() {
   const [selectedPromotionForStats, setSelectedPromotionForStats] = useState<BusinessManagedEntity | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
-    if (loadingAuth || loadingProfile) {
-      setIsLoading(true);
-      return;
-    }
-    if (userProfile) {
-      if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
-        setCurrentBusinessId(userProfile.businessId);
-      } else {
-        setCurrentBusinessId(null);
-        setPromotions([]);
-        setIsLoading(false);
-        if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
-          toast({
-            title: "Error de Negocio",
-            description: "Tu perfil de usuario no está asociado a un negocio. No se pueden cargar promociones.",
-            variant: "destructive",
-            duration: 7000,
-          });
-        }
-      }
-    } else {
-      setCurrentBusinessId(null);
-      setPromotions([]);
-      setIsLoading(false);
-    }
-  }, [userProfile, loadingAuth, loadingProfile, toast]);
-
-  const fetchBusinessPromotions = useCallback(async (businessIdToFetch: string) => {
-    if (!businessIdToFetch) {
-      console.warn("Promotions Page: fetchBusinessPromotions called without valid businessId.");
-      setPromotions([]);
-      setIsLoading(false);
-      return;
-    }
-    
-    console.log("Promotions Page: Attempting to fetch promotions for businessId:", businessIdToFetch);
+  const fetchBusinessPromotions = useCallback(async (businessIdToQuery: string) => {
+    console.log("Promotions Page: Attempting to fetch promotions for businessId:", businessIdToQuery);
     setIsLoading(true);
     try {
       const q = query(
         collection(db, "businessEntities"),
-        where("businessId", "==", businessIdToFetch),
+        where("businessId", "==", businessIdToQuery),
         where("type", "==", "promotion")
       );
       const querySnapshot = await getDocs(q);
@@ -102,7 +68,7 @@ export default function BusinessPromotionsPage() {
         
         return {
           id: docSnap.id,
-          businessId: data.businessId || businessIdToFetch,
+          businessId: data.businessId || businessIdToQuery,
           type: "promotion" as "promotion",
           name: data.name || "Promoción sin nombre",
           description: data.description || "",
@@ -130,7 +96,7 @@ export default function BusinessPromotionsPage() {
          return 0;
       });
       setPromotions(sortedPromotions);
-      console.log("Promotions Page: Fetched promotions successfully:", sortedPromotions);
+      console.log("Promotions Page: Fetched promotions successfully:", sortedPromotions.length);
     } catch (error: any) {
       console.error("Promotions Page: Error fetching promotions:", error.code, error.message, error);
       toast({
@@ -146,13 +112,46 @@ export default function BusinessPromotionsPage() {
   }, [toast]); 
 
   useEffect(() => {
-    if (currentBusinessId && !loadingAuth && !loadingProfile) {
-      console.log("Promotions Page: Valid currentBusinessId found, calling fetchBusinessPromotions.", currentBusinessId);
-      fetchBusinessPromotions(currentBusinessId);
-    } else if (!loadingAuth && !loadingProfile && !currentBusinessId) {
-      console.log("Promotions Page: No valid currentBusinessId after auth/profile load, setting loading to false.");
-      setIsLoading(false);
+    if (loadingAuth || loadingProfile) {
+      setIsLoading(true); // Keep loading if auth/profile is still in progress
+      return;
+    }
+    if (userProfile) {
+      if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
+        console.log("Promotions Page: Valid businessId found in userProfile:", userProfile.businessId);
+        setCurrentBusinessId(userProfile.businessId);
+        // setIsLoading(true); // Fetch will set its own loading state
+      } else {
+        console.warn("Promotions Page: UserProfile available but businessId is invalid or missing.", userProfile);
+        setCurrentBusinessId(null);
+        setPromotions([]);
+        setIsLoading(false);
+        if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
+          toast({
+            title: "Error de Negocio",
+            description: "Tu perfil de usuario no está asociado a un negocio. No se pueden cargar promociones.",
+            variant: "destructive",
+            duration: 7000,
+          });
+        }
+      }
+    } else { // No userProfile after auth/profile loading is done
+      console.log("Promotions Page: No userProfile after auth/profile loading. Cannot fetch promotions.");
+      setCurrentBusinessId(null);
       setPromotions([]);
+      setIsLoading(false);
+    }
+  }, [userProfile, loadingAuth, loadingProfile, toast]);
+
+  useEffect(() => {
+    if (currentBusinessId) {
+      console.log("Promotions Page: currentBusinessId is set, calling fetchBusinessPromotions.", currentBusinessId);
+      fetchBusinessPromotions(currentBusinessId);
+    } else if (!loadingAuth && !loadingProfile) {
+      // If no currentBusinessId and auth/profile not loading, means we've determined no businessId is available.
+      console.log("Promotions Page: No currentBusinessId and not loading auth/profile, setting promotions to empty and isLoading to false.");
+      setPromotions([]);
+      setIsLoading(false);
     }
   }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile]);
 
@@ -245,6 +244,7 @@ export default function BusinessPromotionsPage() {
     try {
       if (editingPromotion && !isDuplicating && editingPromotion.id) { 
         const { createdAt, ...updateData } = sanitizedPayload; 
+        console.log("Promotions Page: Updating promotion with ID",editingPromotion.id, "Payload:", updateData);
         await updateDoc(doc(db, "businessEntities", editingPromotion.id), updateData);
         toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
       } else { 
@@ -296,7 +296,7 @@ export default function BusinessPromotionsPage() {
   };
   
   const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
-    console.log("Promotions Page: handleNewCodesCreated called for entityId:", entityId);
+    console.log("Promotions Page: handleNewCodesCreated called for entityId:", entityId, "New codes count:", newCodes.length);
     if (isSubmitting) {
       console.warn("Promotions Page: Submission in progress, skipping new codes creation.");
       setIsSubmitting(false); 
@@ -329,7 +329,8 @@ export default function BusinessPromotionsPage() {
         }));
 
         const updatedCodes = [...(targetPromotionData.generatedCodes || []), ...newCodesWithDetails];
-    
+        
+        console.log("Promotions Page: Updating Firestore with new codes for entityId:", entityId, "Updated codes count:", updatedCodes.length);
         await updateDoc(targetPromotionRef, { generatedCodes: updatedCodes });
         toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}. Guardados en la base de datos.`});
         
@@ -453,10 +454,9 @@ export default function BusinessPromotionsPage() {
     setShowStatsModal(true);
   };
   
+  
   return (
     <div className="space-y-6">
-      {/* TEMPORARY MARKER FOR CHANGE VERIFICATION */}
-      {/* <p className="text-blue-600 font-bold text-xl p-4 bg-blue-100 border border-blue-300 rounded-md">PROMOTIONS PAGE - REVISION CHECK</p> */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
         <h1 className="text-3xl font-bold text-primary flex items-center">
           <TicketIconLucide className="h-8 w-8 mr-2" /> Gestión de Promociones
@@ -539,14 +539,14 @@ export default function BusinessPromotionsPage() {
                                   {promo.isActive ? (isEntityCurrentlyActivatable(promo) ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
                               </Badge>
                           </div>
-                          <div className="mt-2.5 space-y-1 flex flex-col items-start">
-                            <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                <Edit className="h-3 w-3 mr-1" /> Editar
-                            </Button>
-                            <Button variant="outline" size="xs" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
-                            </Button>
-                          </div>
+                           <div className="mt-2.5 flex flex-col items-start gap-1">
+                                <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                    <Edit className="h-3 w-3 mr-1" /> Editar
+                                </Button>
+                                <Button variant="outline" size="xs" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                    <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
+                                </Button>
+                            </div>
                         </TableCell>
                         <TableCell className="align-top py-3 text-xs">
                           {promo.startDate ? format(parseISO(promo.startDate), "P p", { locale: es }) : 'N/A'}
@@ -555,9 +555,9 @@ export default function BusinessPromotionsPage() {
                         </TableCell>
                         <TableCell className="align-top py-3">
                            <div className="flex flex-col text-xs space-y-0.5">
-                                <span>QRs Generados (`0`)</span>
-                                <span>QRs Usados (`{codesRedeemedCount}`)</span>
-                                <span>Máximo Promociones (`{promo.usageLimit || 'Ilimitado'}`)</span>
+                                <span>QRs Generados (0)</span>
+                                <span>QRs Usados ({codesRedeemedCount})</span>
+                                <span>Máximo Promociones ({promo.usageLimit || 'Ilimitado'})</span>
                            </div>
                          </TableCell>
                          <TableCell className="align-top py-3">
@@ -578,7 +578,7 @@ export default function BusinessPromotionsPage() {
                                     disabled={isSubmitting} 
                                     className="px-2 py-1 h-auto text-xs"
                                 >
-                                    <ListChecks className="h-3 w-3 mr-1" /> Ver (`{promo.generatedCodes?.length || 0}`)
+                                    <ListChecks className="h-3 w-3 mr-1" /> Ver ({promo.generatedCodes?.length || 0})
                                 </Button>
                             </div>
                           </TableCell>
@@ -708,13 +708,13 @@ export default function BusinessPromotionsPage() {
             </DialogHeader>
             {selectedPromotionForStats && (
                 <div className="space-y-3 py-4">
-                    <p><strong>Códigos Creados:</strong> (`{selectedPromotionForStats.generatedCodes?.length || 0}`)</p>
-                    <p><strong>Códigos Canjeados:</strong> (`{selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}`)</p>
+                    <p><strong>Códigos Creados:</strong> ({selectedPromotionForStats.generatedCodes?.length || 0})</p>
+                    <p><strong>Códigos Canjeados:</strong> ({selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0})</p>
                     <p><strong>Tasa de Canje:</strong> {selectedPromotionForStats.generatedCodes && selectedPromotionForStats.generatedCodes.length > 0 ? 
                         ((selectedPromotionForStats.generatedCodes.filter(c => c.status === 'redeemed').length / selectedPromotionForStats.generatedCodes.length) * 100).toFixed(1) + '%' 
                         : '0%'}
                     </p>
-                     <p><strong>Límite de Canjes Configurado:</strong> (`{selectedPromotionForStats.usageLimit && selectedPromotionForStats.usageLimit > 0 ? selectedPromotionForStats.usageLimit : 'Ilimitado'}`)</p>
+                     <p><strong>Límite de Canjes Configurado:</strong> ({selectedPromotionForStats.usageLimit && selectedPromotionForStats.usageLimit > 0 ? selectedPromotionForStats.usageLimit : 'Ilimitado'})</p>
                 </div>
             )}
             <ShadcnDialogFooter> 
@@ -725,5 +725,3 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
-
-    
