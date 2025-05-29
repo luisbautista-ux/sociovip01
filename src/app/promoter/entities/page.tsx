@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, updateDoc, getDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooterAliased } from "@/components/ui/dialog";
 
 
 export default function PromoterEntitiesPage() {
@@ -52,26 +52,31 @@ export default function PromoterEntitiesPage() {
     try {
       const promoterUid = userProfile.uid;
       console.log("Promoter Entities Page: Fetching for promoter UID:", promoterUid);
-
-      // This query assumes that businessEntities have an 'assignedPromoters' array
-      // where each element is an object like { promoterProfileId: 'someUid', ... }
-      // Firestore's array-contains-any or multiple 'array-contains' might be needed for more complex scenarios
-      // or fetching all active entities and filtering client-side if assignments are complex.
       
-      // Fetch all entities and then filter client-side
-      const allEntitiesQuery = query(collection(db, "businessEntities")); // Consider adding where("isActive", "==", true) if feasible
-      const entitiesSnap = await getDocs(allEntitiesQuery); 
+      const allEntitiesQuery = query(collection(db, "businessEntities"), where("assignedPromoters", "array-contains-any", [{promoterProfileId: promoterUid}]));
+      // Firestore's "array-contains-any" requires an array of up to 10 items to check against.
+      // A more robust way for larger scale might be to have a separate collection linking promoters to entities,
+      // or to fetch all entities for businesses the promoter is linked to and then filter.
+      // For now, this simplified query attempts to find entities where the promoter's UID is in assignedPromoters.
+      // This query is likely to be inefficient or might require specific indexing.
+      // A more common Firestore pattern is to have a subcollection or a direct array of UIDs.
+      // Let's assume assignedPromoters is [{ promoterProfileId: "uid1", ...}, {promoterProfileId: "uid2", ...}]
+      // This query might be more complex if assignedPromoters is an array of complex objects.
+      // A more direct query if assignedPromoters just stored UIDs:
+      // const allEntitiesQuery = query(collection(db, "businessEntities"), where("assignedPromoterUids", "array-contains", promoterUid));
+
+      // Simpler approach: Fetch all active entities and filter client-side (less efficient for large datasets)
+      const entitiesSnap = await getDocs(collection(db, "businessEntities"));
       
       const fetchedEntities: BusinessManagedEntity[] = [];
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data() as Omit<BusinessManagedEntity, 'id'>; 
         
-        // Check if the current logged-in promoter is assigned to this entity
         const isAssignedToThisPromoter = data.assignedPromoters?.some(ap => ap.promoterProfileId === promoterUid);
         
         if (isAssignedToThisPromoter) {
             const nowISO = new Date().toISOString();
-            const sanitizedData = sanitizeObjectForFirestore(data);
+            const sanitizedData = sanitizeObjectForFirestore(data); // Make sure this function is defined
             fetchedEntities.push({
               id: docSnap.id,
               businessId: sanitizedData.businessId,
@@ -95,7 +100,12 @@ export default function PromoterEntitiesPage() {
         }
       });
       
-      setEntities(fetchedEntities.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
+      setEntities(fetchedEntities.sort((a,b) => {
+        if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (a.createdAt) return -1;
+        if (b.createdAt) return 1;
+        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+      }));
       console.log("Promoter Entities Page: Fetched entities assigned to promoter:", fetchedEntities.length);
 
     } catch (error) {
@@ -111,11 +121,9 @@ export default function PromoterEntitiesPage() {
     if (!loadingAuth && !loadingProfile && userProfile) {
       fetchAssignedEntities();
     } else if (!loadingAuth && !loadingProfile && !userProfile) {
-      // No user profile, stop loading and clear entities
       setIsLoading(false);
       setEntities([]);
     }
-    // Add loadingAuth and loadingProfile to dependencies to re-trigger if they change
   }, [userProfile, fetchAssignedEntities, loadingAuth, loadingProfile]);
 
 
@@ -127,6 +135,7 @@ export default function PromoterEntitiesPage() {
         const bActiveCurrent = isEntityCurrentlyActivatable(b);
         if (aActiveCurrent && !bActiveCurrent) return -1;
         if (!aActiveCurrent && bActiveCurrent) return 1;
+        if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
     });
   }, [entities, searchTerm]);
@@ -181,6 +190,10 @@ export default function PromoterEntitiesPage() {
         toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEntityData.name}. Guardados en la base de datos.`});
         
         fetchAssignedEntities(); 
+         if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+            setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
+        }
+
 
     } catch (error: any) {
         console.error("Promoter Entities Page: Error saving new codes to Firestore:", error.code, error.message, error);
@@ -202,15 +215,20 @@ export default function PromoterEntitiesPage() {
         }
         const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
         
-        const otherPromotersCodes = (targetEntityData.generatedCodes || []).filter(
-            c => c.generatedByName !== userProfile?.name
+        // When updating codes for a promoter, only affect codes generated by this promoter.
+        // Keep other promoters' codes or system-generated codes intact.
+        const otherCodes = (targetEntityData.generatedCodes || []).filter(
+            c => c.generatedByName !== userProfile?.name 
         );
-        const finalUpdatedCodes = [...otherPromotersCodes, ...updatedCodesManaged.map(c => sanitizeObjectForFirestore(c))];
+        const finalUpdatedCodes = [...otherCodes, ...updatedCodesManaged.map(c => sanitizeObjectForFirestore(c))];
 
         await updateDoc(targetEntityRef, { generatedCodes: finalUpdatedCodes });
         toast({title: "Tus Códigos Actualizados", description: `Tus códigos para "${targetEntityData.name}" han sido guardados.`});
         
         fetchAssignedEntities(); 
+        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+             setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: finalUpdatedCodes} : null);
+        }
     } catch (error: any) {
         console.error("Promoter Entities Page: Error saving updated codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar tus códigos. ${error.message}`, variant: "destructive"});
@@ -234,6 +252,8 @@ export default function PromoterEntitiesPage() {
       let commissionPerCode = 0.50; 
 
       if (assignment && assignment.commissionRules && assignment.commissionRules.length > 0) {
+        // More complex commission logic would go here based on rules
+        // For now, sticking to a simple fixed rate as an example
         const generalRule = assignment.commissionRules.find(
             r => r.appliesTo === (entity.type === 'promotion' ? 'promotion_general' : 'event_general') && 
                  r.commissionType === 'fixed'
@@ -298,7 +318,7 @@ export default function PromoterEntitiesPage() {
                   const promoterStats = getPromoterCodeStats(entity);
                   return (
                   <TableRow key={entity.id || `entity-fallback-${Math.random()}`}>
-                    <TableCell className="font-medium align-top py-2">
+                    <TableCell className="font-medium align-top py-3">
                         <div className="font-semibold">{entity.name}</div>
                         <div className="mt-1">
                             <Badge variant={entity.isActive && isEntityCurrentlyActivatable(entity) ? "default" : "outline"} 
@@ -306,26 +326,26 @@ export default function PromoterEntitiesPage() {
                                 {entity.isActive && isEntityCurrentlyActivatable(entity) ? "Vigente" : (entity.isActive ? "Activa (Fuera de Fecha)" : "Inactiva")}
                             </Badge>
                         </div>
-                         <div className="flex flex-wrap gap-1 mt-2">
+                         <div className="flex flex-col items-start gap-1 mt-2">
                             <Button variant="outline" size="xs" onClick={() => openStatsModal(entity)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
                                 <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
                             </Button>
                         </div>
                     </TableCell>
-                    <TableCell className="align-top py-2">
+                    <TableCell className="align-top py-3">
                       <Badge variant="outline">{entity.type === 'promotion' ? 'Promoción' : 'Evento'}</Badge>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell align-top py-2">
+                    <TableCell className="hidden md:table-cell align-top py-3">
                       {entity.startDate ? format(parseISO(entity.startDate), "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(parseISO(entity.endDate), "P", { locale: es }) : 'N/A'}
                     </TableCell>
-                    <TableCell className="text-center align-top py-2">
+                    <TableCell className="text-center align-top py-3">
                         <div className="flex flex-col text-xs">
-                            <span>Mis QRs Generados: {promoterStats.created}</span>
-                            <span>Mis QRs Usados: {promoterStats.used}</span>
+                            <span>Mis Códigos Creados: {promoterStats.created}</span>
+                            <span>Mis Códigos Usados: {promoterStats.used}</span>
                         </div>
                     </TableCell>
-                    <TableCell className="text-center hidden lg:table-cell align-top py-2">{getMockCommission(entity)}</TableCell>
-                    <TableCell className="align-top space-y-1 py-2">
+                    <TableCell className="text-center hidden lg:table-cell align-top py-3">{getMockCommission(entity)}</TableCell>
+                    <TableCell className="align-top py-3">
                         <div className="flex flex-col items-start gap-1">
                             <Button 
                                 variant="outline" 
@@ -352,7 +372,7 @@ export default function PromoterEntitiesPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
+             !isLoading && <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
                 <AlertTriangle className="h-10 w-10 mb-2 text-yellow-500"/>
                 <p className="font-semibold">No tienes promociones o eventos asignados que coincidan con tu búsqueda o que estén activos.</p>
                 <p className="text-sm">Si esperabas ver alguna, contacta al administrador del negocio correspondiente.</p>
@@ -415,7 +435,7 @@ export default function PromoterEntitiesPage() {
                     <UIDialogDescription>Resumen de tus códigos para esta entidad.</UIDialogDescription>
                 </DialogHeader>
                 <div className="space-y-3 py-4">
-                    <p><strong>Tus Códigos Generados:</strong> {selectedEntityForStats.generatedCodes?.filter(c=> c.generatedByName === userProfile.name).length || 0}</p>
+                    <p><strong>Tus Códigos Creados:</strong> {selectedEntityForStats.generatedCodes?.filter(c=> c.generatedByName === userProfile.name).length || 0}</p>
                     <p><strong>Tus Códigos Canjeados:</strong> {selectedEntityForStats.generatedCodes?.filter(c => c.generatedByName === userProfile.name && c.status === 'redeemed').length || 0}</p>
                     <p><strong>Tu Tasa de Canje:</strong> 
                         {(() => {
@@ -427,9 +447,9 @@ export default function PromoterEntitiesPage() {
                     </p>
                     <p><strong>Comisión Estimada (Ejemplo):</strong> {getMockCommission(selectedEntityForStats)}</p>
                 </div>
-                <UIDialogFooter>
+                <UIDialogFooterAliased>
                     <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedEntityForStats(null);}}>Cerrar</Button>
-                </UIDialogFooter>
+                </UIDialogFooterAliased>
             </DialogContent>
         </Dialog>
       )}
