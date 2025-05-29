@@ -1,5 +1,5 @@
 
-"use client";
+      "use client";
 
 import * as React from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, Edit, Trash2, Search, Calendar as CalendarIconLucide, Ticket as TicketIconLucide, Box, Copy, UserCheck, Percent, ListChecks, QrCode as QrCodeIcon, ChevronDown, ChevronUp, BarChart3, Loader2, Info } from "lucide-react";
-import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, EventPromoterAssignment, CommissionRule, BusinessPromoterLink, PromoterProfile } from "@/lib/types";
+import type { BusinessManagedEntity, BusinessEventFormData, GeneratedCode, TicketType, EventBox, EventPromoterAssignment, CommissionRule, BusinessPromoterLink } from "@/lib/types";
 import { format, parseISO, isBefore, isEqual, set, startOfDay, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +26,7 @@ import { EventBoxForm } from "@/components/business/forms/EventBoxForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { CreateBatchBoxesDialog } from "@/components/business/dialogs/CreateBatchBoxesDialog";
+import { CreateBatchBoxesDialog, type BatchBoxFormData } from "@/components/business/dialogs/CreateBatchBoxesDialog";
 import { isEntityCurrentlyActivatable, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -139,8 +139,7 @@ export default function BusinessEventsPage() {
 
   useEffect(() => {
     if (loadingAuth || loadingProfile) {
-      setIsLoading(true);
-      return;
+      return; 
     }
     if (userProfile) {
       if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
@@ -159,7 +158,7 @@ export default function BusinessEventsPage() {
           });
         }
       }
-    } else { // No userProfile
+    } else { 
       setCurrentBusinessId(null);
       setEvents([]);
       setAvailablePromotersForAssignment([]);
@@ -168,14 +167,8 @@ export default function BusinessEventsPage() {
   }, [userProfile, loadingAuth, loadingProfile, toast]);
 
   const fetchBusinessEvents = useCallback(async (businessIdToFetch: string) => {
-    if (typeof businessIdToFetch !== 'string' || businessIdToFetch.trim() === '') {
-        console.error("Events Page: fetchBusinessEvents called with invalid businessId:", businessIdToFetch);
-        setEvents([]);
-        // setIsLoading(false); // This might be set by the calling useEffect
-        return;
-    }
     console.log('Events Page: Querying events with businessId:', businessIdToFetch);
-    // setIsLoading(true); // Already set by the calling useEffect if needed
+    setIsLoading(true);
     try {
       const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToFetch), where("type", "==", "event"));
       const querySnapshot = await getDocs(q);
@@ -208,14 +201,10 @@ export default function BusinessEventsPage() {
             ownerName: eb.ownerName || "",
             ownerDni: eb.ownerDni || "",
         })) : [];
-
+        
         const assignedPromotersData = Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map((ap: any, index: number) => {
              const promoterIdToUse = ap.promoterProfileId || `fs-ap-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}C`;
-             return {
-                promoterProfileId: promoterIdToUse, 
-                promoterName: ap.promoterName || "Promotor sin nombre",
-                promoterEmail: ap.promoterEmail || "",
-                commissionRules: Array.isArray(ap.commissionRules) ? ap.commissionRules.map((cr: any, crIndex: number) => ({
+             const commissionRulesData = Array.isArray(ap.commissionRules) ? ap.commissionRules.map((cr: any, crIndex: number) => ({
                     id: cr.id || `fs-cr-${promoterIdToUse}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}D`,
                     appliesTo: cr.appliesTo || 'event_general',
                     appliesToId: cr.appliesToId || undefined,
@@ -223,7 +212,12 @@ export default function BusinessEventsPage() {
                     commissionType: cr.commissionType || 'fixed',
                     commissionValue: typeof cr.commissionValue === 'number' ? cr.commissionValue : 0,
                     description: cr.description || "",
-                })) : [],
+                })) : [];
+             return {
+                promoterProfileId: promoterIdToUse, 
+                promoterName: ap.promoterName || "Promotor sin nombre",
+                promoterEmail: ap.promoterEmail || "",
+                commissionRules: commissionRulesData,
                 notes: ap.notes || "",
             };
         }) : [];
@@ -244,7 +238,7 @@ export default function BusinessEventsPage() {
           ticketTypes: ticketTypesData,
           eventBoxes: eventBoxesData,
           assignedPromoters: assignedPromotersData,
-          maxAttendance: 0, // Will be recalculated
+          maxAttendance: 0, 
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
         };
         eventEntity.maxAttendance = calculateMaxAttendance(eventEntity.ticketTypes);
@@ -258,17 +252,17 @@ export default function BusinessEventsPage() {
       }));
       console.log("Events Page: Fetched events successfully:", fetchedEvents.length);
     } catch (error: any) {
-      console.error("Events Page: Error fetching events:", error.code, error.message, error);
+      console.error("Events Page: Error fetching events:", error);
       toast({
         title: "Error al Cargar Eventos",
         description: `No se pudieron obtener los eventos. ${error.message}`,
         variant: "destructive",
       });
       setEvents([]);
-    } 
-    // finally { // setIsLoading will be handled by the calling useEffect Promise.all
-    //   console.log("Events Page: setIsLoading(false) in fetchBusinessEvents finally block.");
-    // }
+    } finally {
+        setIsLoading(false);
+        console.log("Events Page: setIsLoading(false) in fetchBusinessEvents finally block.");
+    }
   }, [toast]);
 
   const fetchBusinessPromotersForAssignment = useCallback(async (businessIdToFetch: string) => {
@@ -296,18 +290,18 @@ export default function BusinessEventsPage() {
           commissionRate: data.commissionRate || "No definida", 
           isActive: data.isActive === undefined ? true : data.isActive,
           isPlatformUser: data.isPlatformUser || false,
-          platformUserUid: data.platformUserUid || undefined,
+          platformUserUid: data.platformUserUid,
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate || new Date().toISOString()),
         };
       });
       setAvailablePromotersForAssignment(fetchedPromoterLinks);
       console.log('Events Page - Fetched promoter links for assignment:', fetchedPromoterLinks.length);
     } catch (error: any) { 
-      console.error("Events Page: Error fetching promoter links for assignment:", error.code, error.message, error);
-      setAvailablePromotersForAssignment([]); 
+      console.error("Events Page: Error fetching promoter profiles:", error.code, error.message, error);
+      setAvailablePromotersForAssignment([]); // Ensure it's an empty array on error
       toast({ 
-        title: "Error al Cargar Promotores Vinculados", 
-        description: `No se pudieron obtener los promotores vinculados al negocio. ${error.message}`, 
+        title: "Error al cargar promotores", 
+        description: `No se pudieron cargar los promotores disponibles para asignar. ${error.message}`, 
         variant: "destructive", 
         duration: 7000 
       });
@@ -324,7 +318,6 @@ export default function BusinessEventsPage() {
             fetchBusinessPromotersForAssignment(currentBusinessId)
         ]).catch(error => {
             console.error("Events Page: Error during initial data fetch (Promise.all):", error);
-            // Individual fetches will show their own toasts if they fail
             setEvents([]); 
             setAvailablePromotersForAssignment([]);
         }).finally(() => {
@@ -333,7 +326,7 @@ export default function BusinessEventsPage() {
         });
     } else if (!loadingAuth && !loadingProfile && !currentBusinessId) {
         console.log("Events Page: No valid currentBusinessId after auth/profile load, setting isLoading to false.");
-        setIsLoading(false); // Ensure loading is false if no businessId
+        setIsLoading(false);
         setEvents([]);
         setAvailablePromotersForAssignment([]);
     }
@@ -357,39 +350,19 @@ export default function BusinessEventsPage() {
     });
   }, [events, searchTerm]);
 
-  const handleOpenManageEventModal = (eventToManage: BusinessManagedEntity | null, duplicate = false) => {
-    setIsSubmitting(false); 
-    setIsDuplicatingEvent(duplicate);
-    commissionRuleForm.reset({ appliesTo: 'event_general', appliesToId: undefined, appliesToName: "", commissionType: 'fixed', commissionValue: 0, description: "" });
+  const handleOpenManageEventModal = (eventToManage: BusinessManagedEntity | null) => {
+    setIsSubmitting(false);
+    setIsDuplicatingEvent(false); // Default to not duplicating
+    commissionRuleForm.reset();
     setSelectedPromoterForAssignment("");
 
-    if (duplicate && eventToManage) { 
-        const { id, generatedCodes, ticketTypes = [], eventBoxes = [], assignedPromoters = [], createdAt, ...eventDataToDuplicate } = eventToManage;
-        const newEventForDuplication: BusinessManagedEntity = {
-            ...(sanitizeObjectForFirestore(eventDataToDuplicate) as Omit<BusinessManagedEntity, 'id' | 'businessId' | 'type' | 'createdAt'>),
-            id: '', 
-            businessId: currentBusinessId || "", 
-            type: 'event' as "event",
-            name: `${eventToManage.name || 'Evento'} (Copia)`,
-            startDate: eventToManage.startDate, 
-            endDate: eventToManage.endDate,     
-            isActive: true, 
-            ticketTypes: [], 
-            eventBoxes: [],
-            assignedPromoters: [],
-            generatedCodes: [],
-            maxAttendance: 0,
-            createdAt: undefined,
-        };
-        setEditingEvent(newEventForDuplication);
-        setShowManageEventModal(true);
-    } else if (eventToManage) {  
+    if (eventToManage) { // Editing existing or opening for management
         setEditingEvent({
-          ...eventToManage,
-          maxAttendance: calculateMaxAttendance(eventToManage.ticketTypes) 
-        }); 
+            ...eventToManage,
+            maxAttendance: calculateMaxAttendance(eventToManage.ticketTypes) 
+        });
         setShowManageEventModal(true);
-    } else { 
+    } else { // Creating new event flow
         initialEventForm.reset({ 
             name: "", 
             description: "", 
@@ -401,6 +374,33 @@ export default function BusinessEventsPage() {
     }
   };
   
+  const handleDuplicateEvent = (eventToDuplicate: BusinessManagedEntity) => {
+    if (!currentBusinessId) {
+        toast({ title: "Error de Negocio", description: "ID de negocio no disponible para duplicar.", variant: "destructive" });
+        return;
+    }
+    setIsDuplicatingEvent(true);
+    const { id, generatedCodes, ticketTypes = [], eventBoxes = [], assignedPromoters = [], createdAt, ...eventDataToDuplicate } = eventToDuplicate;
+    const newEventForDuplication: BusinessManagedEntity = {
+        ...eventDataToDuplicate,
+        id: '', 
+        businessId: currentBusinessId, 
+        type: 'event',
+        name: `${eventToDuplicate.name || 'Evento'} (Copia)`,
+        startDate: eventToDuplicate.startDate, 
+        endDate: eventToDuplicate.endDate,     
+        isActive: true, 
+        ticketTypes: [], 
+        eventBoxes: [],
+        assignedPromoters: [],
+        generatedCodes: [],
+        maxAttendance: 0,
+        createdAt: undefined, 
+    };
+    setEditingEvent(newEventForDuplication);
+    setShowManageEventModal(true);
+  };
+
   const handleInitialEventSubmit = async (data: InitialEventFormValues) => {
     if (!currentBusinessId) {
         toast({ title: "Error de Negocio", description: "Tu perfil de usuario no está asociado a un negocio. No se puede crear el evento.", variant: "destructive", duration: 7000 });
@@ -414,21 +414,14 @@ export default function BusinessEventsPage() {
     const tempStartDate = data.startDate; 
     const tempEndDate = data.endDate; 
     
-    const newEventToSave: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId' | 'startDate' | 'endDate' | 'maxAttendance' | 'ticketTypes'> & {startDate: Date, endDate: Date, ticketTypes: TicketType[], maxAttendance: number} = {
+    const newEventToSaveBase: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId' | 'startDate' | 'endDate' | 'maxAttendance' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'generatedCodes'> = {
       type: "event",
       name: data.name,
       description: data.description || "",
       termsAndConditions: "", 
-      startDate: tempStartDate,
-      endDate: tempEndDate,
       isActive: true,
       imageUrl: `https://placehold.co/600x400.png?text=${encodeURIComponent(data.name.substring(0,10))}`,
       aiHint: data.name.split(' ').slice(0,2).join(' '),
-      ticketTypes: [], 
-      eventBoxes: [],
-      assignedPromoters: [],
-      generatedCodes: [],
-      maxAttendance: 0, 
     };
     
     const defaultTicketData: Omit<TicketType, 'id' | 'eventId' | 'businessId'> = {
@@ -437,59 +430,61 @@ export default function BusinessEventsPage() {
       quantity: 0, 
       description: "Entrada estándar para el evento."
     };
-    
-    const defaultTicketWithTempId: TicketType = {
-      ...defaultTicketData,
-      id: `tt-new-${Date.now()}-${Math.random().toString(36).slice(2)}E`,
-      eventId: '', // Will be set after event is created
-      businessId: currentBusinessId,
-    };
-    newEventToSave.ticketTypes = [defaultTicketWithTempId];
-    newEventToSave.maxAttendance = calculateMaxAttendance(newEventToSave.ticketTypes);
-      
-    const eventPayloadForFirestore: any = {
-        ...sanitizeObjectForFirestore(newEventToSave), // Sanitize before Timestamp conversion
-        businessId: currentBusinessId, 
-        startDate: Timestamp.fromDate(tempStartDate),
-        endDate: Timestamp.fromDate(tempEndDate),
-        createdAt: serverTimestamp(),
-        ticketTypes: newEventToSave.ticketTypes.map(tt => sanitizeObjectForFirestore(tt)), // Sanitize tickets as well
-    };
-    // Remove the 'id' from tickets if they are temporary client-side IDs, Firestore will generate its own if these were subcollections
-    // For arrays, ensure IDs are consistent or handled by your update logic.
-    // For this setup, we are generating IDs on client for array items.
 
-    console.log("handleInitialEventSubmit: Event payload for Firestore:", eventPayloadForFirestore);
     let docRef;
     try {
-      docRef = await addDoc(collection(db, "businessEntities"), eventPayloadForFirestore);
+      const eventPayloadForFirestore: any = {
+          ...newEventToSaveBase,
+          businessId: currentBusinessId, 
+          startDate: Timestamp.fromDate(tempStartDate),
+          endDate: Timestamp.fromDate(tempEndDate),
+          ticketTypes: [], // Will be updated after event creation
+          eventBoxes: [],
+          assignedPromoters: [],
+          generatedCodes: [],
+          maxAttendance: 0,
+          createdAt: serverTimestamp(),
+      };
+      console.log("handleInitialEventSubmit: Event payload for Firestore:", eventPayloadForFirestore);
+      docRef = await addDoc(collection(db, "businessEntities"), sanitizeObjectForFirestore(eventPayloadForFirestore));
       console.log("Events Page: Event created with ID:", docRef.id);
       
-      const finalNewEvent: BusinessManagedEntity = {
-        ...(newEventToSave as Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId' | 'startDate' | 'endDate'>),
-        id: docRef.id, 
+      // Now create the default ticket and update the event
+      const defaultTicketWithEventId: TicketType = {
+        ...defaultTicketData,
+        id: `tt-${docRef.id}-${Date.now()}-${Math.random().toString(36).slice(2)}E`,
+        eventId: docRef.id,
         businessId: currentBusinessId,
-        startDate: newEventToSave.startDate.toISOString(),
-        endDate: newEventToSave.endDate.toISOString(),
-        createdAt: new Date().toISOString(), 
-        ticketTypes: newEventToSave.ticketTypes.map(tt => ({...tt, eventId: docRef!.id })), // Link ticket to new event ID
-        maxAttendance: calculateMaxAttendance(newEventToSave.ticketTypes),
       };
       
-      // Update the event in Firestore with the linked ticketTypes (with eventId)
-      // This step is optional if you manage eventId linking on client or if sub-elements don't need it.
-      // However, for consistency, it's good practice.
-      await updateDoc(doc(db, "businessEntities", docRef.id), sanitizeObjectForFirestore({
-        ticketTypes: finalNewEvent.ticketTypes,
-        maxAttendance: finalNewEvent.maxAttendance // Ensure maxAttendance is also updated if calculated from tickets
-      }));
+      const updatedTicketTypes = [sanitizeObjectForFirestore(defaultTicketWithEventId)];
+      const calculatedAtt = calculateMaxAttendance(updatedTicketTypes);
+
+      await updateDoc(doc(db, "businessEntities", docRef.id), {
+        ticketTypes: updatedTicketTypes,
+        maxAttendance: calculatedAtt
+      });
+      
+      const finalNewEventForState: BusinessManagedEntity = {
+        ...newEventToSaveBase,
+        id: docRef.id, 
+        businessId: currentBusinessId,
+        startDate: tempStartDate.toISOString(),
+        endDate: tempEndDate.toISOString(),
+        createdAt: new Date().toISOString(), 
+        ticketTypes: updatedTicketTypes,
+        eventBoxes: [],
+        assignedPromoters: [],
+        generatedCodes: [],
+        maxAttendance: calculatedAtt,
+      };
       
       if (currentBusinessId) fetchBusinessEvents(currentBusinessId); 
       
-      toast({ title: "Evento Creado Inicialmente", description: `El evento "${finalNewEvent.name}" ha sido creado. Ahora puedes configurar más detalles.` });
+      toast({ title: "Evento Creado Inicialmente", description: `El evento "${finalNewEventForState.name}" ha sido creado. Ahora puedes configurar más detalles.` });
       setShowInitialEventModal(false);
       initialEventForm.reset();
-      setEditingEvent(finalNewEvent); 
+      setEditingEvent(finalNewEventForState); 
       setShowManageEventModal(true); 
     } catch (error: any) {
       console.error("Events Page: Error creating event:", error.code, error.message, error);
@@ -518,17 +513,17 @@ export default function BusinessEventsPage() {
             name: data.name,
             description: data.description || "",
             termsAndConditions: data.termsAndConditions || "",
-            startDate: data.startDate.toISOString(),
-            endDate: data.endDate.toISOString(),
+            startDate: data.startDate.toISOString(), // Convert Date to ISO string
+            endDate: data.endDate.toISOString(),   // Convert Date to ISO string
             isActive: data.isActive,
             imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/600x400.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingEvent.imageUrl || `https://placehold.co/600x400.png`),
             aiHint: data.aiHint || "",
+            // maxAttendance is calculated from tickets, so it's not directly set here
         };
         setEditingEvent(prev => {
             if (!prev) return null;
-            // Max attendance is now calculated from tickets, so don't update it directly from this form's submit
-            // It will be recalculated when the main event is saved.
-            return { ...prev, ...updatedEventDetails };
+            const newMaxAtt = calculateMaxAttendance(prev.ticketTypes); // Recalculate in case tickets changed
+            return { ...prev, ...updatedEventDetails, maxAttendance: newMaxAtt };
         });
         toast({ title: "Detalles del Evento Actualizados", description: `Los cambios en "${data.name}" han sido aplicados en el editor. Guarda el evento para persistir.` });
     }
@@ -575,6 +570,7 @@ export default function BusinessEventsPage() {
         type: "event" as "event", 
       };
       
+      // Ensure sub-collections also have businessId and eventId (if new)
       const finalTicketTypes = (eventToSave.ticketTypes || []).map((tt, index) => ({
         ...tt,
         id: tt.id || `tt-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}F`, 
@@ -590,6 +586,7 @@ export default function BusinessEventsPage() {
 
       const finalAssignedPromoters = (eventToSave.assignedPromoters || []).map(ap => ({
         ...ap,
+        // promoterProfileId is critical and should be set during assignment
         promoterProfileId: ap.promoterProfileId || `unknown-promoter-${Date.now()}-${Math.random().toString(36).slice(2)}H`,
         commissionRules: (ap.commissionRules || []).map((cr, crIndex) => ({
           ...cr,
@@ -599,32 +596,32 @@ export default function BusinessEventsPage() {
       
       const finalGeneratedCodes = Array.isArray(eventToSave.generatedCodes) ? eventToSave.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [];
 
-      const sanitizedEventForFirestore = sanitizeObjectForFirestore({
+      const payloadForFirestore: any = sanitizeObjectForFirestore({
           ...eventToSave,
           ticketTypes: finalTicketTypes.map(tt => sanitizeObjectForFirestore(tt)),
           eventBoxes: finalEventBoxes.map(eb => sanitizeObjectForFirestore(eb)),
           assignedPromoters: finalAssignedPromoters.map(ap => sanitizeObjectForFirestore(ap)),
-          generatedCodes: finalGeneratedCodes
+          generatedCodes: finalGeneratedCodes,
+          startDate: Timestamp.fromDate(new Date(eventToSave.startDate)),
+          endDate: Timestamp.fromDate(new Date(eventToSave.endDate)),
       });
       
-      const payloadForFirestore: any = {
-        ...sanitizedEventForFirestore, 
-        startDate: Timestamp.fromDate(new Date(sanitizedEventForFirestore.startDate)),
-        endDate: Timestamp.fromDate(new Date(sanitizedEventForFirestore.endDate)),
-      };
+      // Delete createdAt for updates, keep it for creation (handled by serverTimestamp during addDoc)
+      if (editingEvent.id && !isDuplicatingEvent) {
+        delete payloadForFirestore.createdAt;
+      }
       
       if (isDuplicatingEvent || !editingEvent.id || editingEvent.id === '') { 
           delete payloadForFirestore.id; 
           payloadForFirestore.createdAt = serverTimestamp();
           console.log("Events Page (SaveManaged - Duplicating/New): Creating event with payload:", payloadForFirestore);
           const docRef = await addDoc(collection(db, "businessEntities"), payloadForFirestore);
-          toast({ title: isDuplicatingEvent ? "Evento Duplicado Exitosamente" : "Evento Creado Exitosamente", description: `El evento "${sanitizedEventForFirestore.name}" ha sido guardado con ID: ${docRef.id}.` });
+          toast({ title: isDuplicatingEvent ? "Evento Duplicado Exitosamente" : "Evento Creado Exitosamente", description: `El evento "${payloadForFirestore.name}" ha sido guardado con ID: ${docRef.id}.` });
 
       } else { 
-          delete payloadForFirestore.createdAt; // Do not update createdAt on existing events
           console.log("Events Page (SaveManaged - Updating): Updating event with ID",editingEvent.id, "Payload:", payloadForFirestore);
           await updateDoc(doc(db, "businessEntities", editingEvent.id), payloadForFirestore);
-          toast({ title: "Evento Guardado", description: `Los cambios en "${sanitizedEventForFirestore.name}" han sido guardados.` });
+          toast({ title: "Evento Guardado", description: `Los cambios en "${payloadForFirestore.name}" han sido guardados.` });
       }
       
       setShowManageEventModal(false);
@@ -745,8 +742,8 @@ export default function BusinessEventsPage() {
             setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
         }
     } catch (error: any) {
-        console.error("Events Page: Error saving updated codes to Firestore:", error.code, error.message, error);
-        toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
+      console.error("Events Page: Error saving updated codes to Firestore:", error.code, error.message, error);
+      toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
         setIsSubmitting(false);
     }
@@ -868,7 +865,7 @@ export default function BusinessEventsPage() {
     const sanitizedData = sanitizeObjectForFirestore(data) as EventBoxFormData;
 
     if (editingBoxInEventModal && editingBoxInEventModal.id) {
-      updatedBoxes = currentBoxes.map(b => b.id === editingBoxInEventModal.id ? { ...b, ...sanitizedData, businessId: currentBusinessId, eventId: editingEvent.id } : b);
+      updatedBoxes = currentBoxes.map(b => b.id === editingBoxInEventModal.id ? { ...b, ...sanitizedData, businessId: currentBusinessId, eventId: editingEvent.id || "" } : b);
       toast({ title: "Box Actualizado", description: `El box "${sanitizedData.name}" ha sido actualizado.` });
     } else {
       const newBox: EventBox = {
@@ -1120,7 +1117,7 @@ export default function BusinessEventsPage() {
                     <TableRow>
                       <TableHead className="w-[30%] min-w-[250px]">Evento y Gestión</TableHead>
                       <TableHead className="min-w-[140px]">Vigencia</TableHead>
-                      <TableHead className="min-w-[180px]">QRs Entrada</TableHead>
+                      <TableHead className="min-w-[180px]">Rendimiento QRs</TableHead>
                       <TableHead className="min-w-[150px]">Códigos Creados</TableHead>
                       <TableHead className="text-left min-w-[120px]">Acciones Adicionales</TableHead>
                     </TableRow>
@@ -1165,12 +1162,12 @@ export default function BusinessEventsPage() {
                                <div className="flex flex-col text-xs space-y-0.5">
                                     <span>QRs Generados (0)</span>
                                     <span>QRs Usados ({codesRedeemedCount})</span>
-                                    <span>Aforo Máximo ({event.maxAttendance || 'Ilimitado'})</span>
+                                    <span>Aforo Máximo ({event.maxAttendance === 0 || !event.maxAttendance ? 'Ilimitado' : event.maxAttendance})</span>
                                </div>
                           </TableCell>
                           <TableCell className="align-top py-3">
                               <div className="flex flex-col items-start gap-1">
-                                <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(event)} disabled={!isEntityCurrentlyActivatable(event) || isSubmitting} className="bg-accent hover:bg-accent/90 text-accent-foreground px-2 py-1 h-auto text-xs">
+                                <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(event)} disabled={!isEntityCurrentlyActivatable(event) || isSubmitting} className="px-2 py-1 h-auto text-xs">
                                     <QrCodeIcon className="h-3 w-3 mr-1" /> Crear
                                 </Button>
                                 <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(event)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
@@ -1180,7 +1177,7 @@ export default function BusinessEventsPage() {
                           </TableCell>
                           <TableCell className="align-top py-3">
                              <div className="flex flex-col items-start gap-1">
-                                <Button variant="outline" size="xs" onClick={() => handleOpenManageEventModal(event, true)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                <Button variant="outline" size="xs" onClick={() => handleDuplicateEvent(event)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
                                 <Copy className="h-3 w-3 mr-1" /> Duplicar
                                 </Button>
                                 <AlertDialog>
@@ -1546,7 +1543,7 @@ export default function BusinessEventsPage() {
     }}>
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>{editingTicketInEventModal ? "Editar Tipo de Entrada" : "Añadir Nuevo Tipo de Entrada"}</DialogTitle>
+                <DialogTitle>{editingTicketInEventModal ? "Editar Entrada" : "Añadir Nueva Entrada"}</DialogTitle>
                 <UIDialogDescription>Para el evento: {editingEvent?.name}</UIDialogDescription>
             </DialogHeader>
             <TicketTypeForm 
@@ -1789,3 +1786,5 @@ export default function BusinessEventsPage() {
   );
 }
 
+
+    
