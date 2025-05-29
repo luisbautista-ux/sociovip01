@@ -43,16 +43,16 @@ export default function PromoterEntitiesPage() {
 
 
   const fetchAssignedEntities = useCallback(async () => {
-    if (!userProfile || !userProfile.uid) {
-      console.log("Promoter Entities Page: No userProfile or UID, skipping fetch.");
+    if (!userProfile || (!userProfile.uid && !userProfile.dni) ) { 
+      console.log("Promoter Entities Page: No userProfile or identifying promoter ID (uid/dni), skipping fetch.");
       setIsLoading(false);
       setEntities([]);
       return;
     }
     setIsLoading(true);
     try {
-      const promoterUid = userProfile.uid;
-      console.log("Promoter Entities Page: Fetching for promoter UID:", promoterUid);
+      const promoterIdentifier = userProfile.uid || userProfile.dni; 
+      console.log("Promoter Entities Page: Fetching for promoterIdentifier:", promoterIdentifier);
       
       const entitiesSnap = await getDocs(collection(db, "businessEntities"));
       
@@ -60,7 +60,9 @@ export default function PromoterEntitiesPage() {
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data() as Omit<BusinessManagedEntity, 'id'>; 
         
-        const isAssignedToThisPromoter = data.assignedPromoters?.some(ap => ap.promoterProfileId === promoterUid);
+        const isAssignedToThisPromoter = data.assignedPromoters?.some(
+          ap => ap.promoterProfileId === promoterIdentifier
+        );
         
         if (isAssignedToThisPromoter) {
             const nowISO = new Date().toISOString();
@@ -149,6 +151,7 @@ export default function PromoterEntitiesPage() {
  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
     if (!userProfile || !userProfile.name) {
         toast({title: "Error", description: "Nombre de promotor no disponible.", variant: "destructive"});
+        setIsSubmitting(false);
         return;
     }
     setIsSubmitting(true);
@@ -232,13 +235,13 @@ export default function PromoterEntitiesPage() {
       const promoterCodes = entity.generatedCodes?.filter(c => c.generatedByName === userProfile?.name) || [];
       const utilizedCount = promoterCodes.filter(c => c.status === 'redeemed').length;
       
-      const assignment = entity.assignedPromoters?.find(ap => ap.promoterProfileId === userProfile?.uid);
+      const assignment = entity.assignedPromoters?.find(ap => ap.promoterProfileId === (userProfile?.uid || userProfile?.dni));
       let commissionPerCode = 0.50; 
 
       if (assignment && assignment.commissionRules && assignment.commissionRules.length > 0) {
         const generalRule = assignment.commissionRules.find(
             r => r.appliesTo === (entity.type === 'promotion' ? 'promotion_general' : 'event_general') && 
-                 r.commissionType === 'fixed'
+                 r.commissionType === 'fixed' 
         );
         if (generalRule) {
             commissionPerCode = generalRule.commissionValue;
@@ -287,12 +290,12 @@ export default function PromoterEntitiesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[30%]">Nombre y Estado</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="hidden md:table-cell">Vigencia</TableHead>
-                  <TableHead className="text-center">Mis Códigos (Promotor)</TableHead>
-                  <TableHead className="text-center hidden lg:table-cell">Comisión Estimada</TableHead>
-                  <TableHead className="text-left">Generar/Ver Códigos</TableHead>
+                  <TableHead className="w-[30%] min-w-[200px]">Entidad y Estado</TableHead>
+                  <TableHead className="min-w-[80px]">Tipo</TableHead>
+                  <TableHead className="hidden md:table-cell min-w-[120px]">Vigencia</TableHead>
+                  <TableHead className="text-center min-w-[150px]">Mis Códigos (Promotor)</TableHead>
+                  <TableHead className="text-center hidden lg:table-cell min-w-[120px]">Comisión Estimada</TableHead>
+                  <TableHead className="text-left min-w-[180px]">Gestionar Mis Códigos</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -318,12 +321,12 @@ export default function PromoterEntitiesPage() {
                       <Badge variant="outline">{entity.type === 'promotion' ? 'Promoción' : 'Evento'}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell align-top py-3 text-xs">
-                      {entity.startDate ? format(parseISO(entity.startDate), "P p", { locale: es }) : 'N/A'} - {entity.endDate ? format(parseISO(entity.endDate), "P p", { locale: es }) : 'N/A'}
+                      {entity.startDate ? format(parseISO(entity.startDate), "P p", { locale: es }) : 'N/A'} - <br/>{entity.endDate ? format(parseISO(entity.endDate), "P p", { locale: es }) : 'N/A'}
                     </TableCell>
                     <TableCell className="text-center align-top py-3">
                         <div className="flex flex-col text-xs">
-                            <span>Mis Códigos Generados ({promoterStats.created})</span>
-                            <span>Mis Códigos Usados ({promoterStats.used})</span>
+                            <span>Mis Códigos Creados: ({promoterStats.created})</span>
+                            <span>Mis Códigos Usados: ({promoterStats.used})</span>
                         </div>
                     </TableCell>
                     <TableCell className="text-center hidden lg:table-cell align-top py-3">{getMockCommission(entity)}</TableCell>
@@ -356,7 +359,7 @@ export default function PromoterEntitiesPage() {
           ) : (
              !isLoading && <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
                 <AlertTriangle className="h-10 w-10 mb-2 text-yellow-500"/>
-                <p className="font-semibold">No tienes promociones o eventos asignados que coincidan con tu búsqueda o que estén activos.</p>
+                <p className="font-semibold">No tienes promociones o eventos asignados que coincidan con tu búsqueda.</p>
                 <p className="text-sm">Si esperabas ver alguna, contacta al administrador del negocio correspondiente.</p>
             </div>
           )}
@@ -385,9 +388,9 @@ export default function PromoterEntitiesPage() {
           }}
           entity={selectedEntityForViewingCodes ? { 
             ...selectedEntityForViewingCodes,
-            generatedCodes: selectedEntityForViewingCodes.generatedCodes?.filter(
+            generatedCodes: (selectedEntityForViewingCodes.generatedCodes || []).filter(
               c => c.generatedByName === userProfile.name 
-            ) || []
+            )
           } : null }
           onCodesUpdated={handleCodesUpdatedFromManageDialog}
           onRequestCreateNewCodes={() => { 
@@ -417,8 +420,8 @@ export default function PromoterEntitiesPage() {
                     <UIDialogDescription>Resumen de tus códigos para esta entidad.</UIDialogDescription>
                 </DialogHeader>
                 <div className="space-y-3 py-4">
-                    <p><strong>Mis Códigos Creados:</strong> ({selectedEntityForStats.generatedCodes?.filter(c=> c.generatedByName === userProfile.name).length || 0})</p>
-                    <p><strong>Mis Códigos Usados:</strong> ({selectedEntityForStats.generatedCodes?.filter(c => c.generatedByName === userProfile.name && c.status === 'redeemed').length || 0})</p>
+                    <p><strong>Mis Códigos Creados:</strong> ({(selectedEntityForStats.generatedCodes?.filter(c=> c.generatedByName === userProfile.name).length || 0)})</p>
+                    <p><strong>Mis Códigos Usados:</strong> ({(selectedEntityForStats.generatedCodes?.filter(c => c.generatedByName === userProfile.name && c.status === 'redeemed').length || 0)})</p>
                     <p><strong>Mi Tasa de Canje:</strong> 
                         {(() => {
                             const promoterCodes = selectedEntityForStats.generatedCodes?.filter(c => c.generatedByName === userProfile.name) || [];
@@ -438,5 +441,3 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
-    
-

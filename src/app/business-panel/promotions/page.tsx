@@ -79,43 +79,43 @@ export default function BusinessPromotionsPage() {
   const [selectedPromotionForStats, setSelectedPromotionForStats] = useState<BusinessManagedEntity | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
- useEffect(() => {
-    if (!loadingAuth && !loadingProfile) {
-      if (userProfile) {
-        if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
-          setCurrentBusinessId(userProfile.businessId);
-        } else {
-          setCurrentBusinessId(null);
-          setPromotions([]);
-          setIsLoading(false); 
-          if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
-            toast({
-              title: "Error de Negocio",
-              description: "Tu perfil de usuario no está asociado a un negocio. No se pueden cargar promociones.",
-              variant: "destructive",
-              duration: 7000,
-            });
-          }
-        }
-      } else { 
+  useEffect(() => {
+    if (loadingAuth || loadingProfile) {
+      setIsLoading(true); 
+      return;
+    }
+    if (userProfile) {
+      if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
+        setCurrentBusinessId(userProfile.businessId);
+      } else {
         setCurrentBusinessId(null);
         setPromotions([]);
-        setIsLoading(false);
+        setIsLoading(false); 
+        if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
+          toast({
+            title: "Error de Negocio",
+            description: "Tu perfil de usuario no está asociado a un negocio. No se pueden cargar promociones.",
+            variant: "destructive",
+            duration: 7000,
+          });
+        }
       }
+    } else { 
+      setCurrentBusinessId(null);
+      setPromotions([]);
+      setIsLoading(false);
     }
   }, [userProfile, loadingAuth, loadingProfile, toast]);
 
+
   const fetchBusinessPromotions = useCallback(async (businessIdToFetch: string) => {
-    console.log("Promotions Page: Attempting to fetch for businessId:", businessIdToFetch);
-    if (!businessIdToFetch) {
-      console.log("Promotions Page: No valid businessId, skipping fetch.");
+     if (!businessIdToFetch) {
       setPromotions([]);
       setIsLoading(false);
       return;
     }
     
     setIsLoading(true);
-    console.log("Promotions Page: Querying promotions with businessId:", businessIdToFetch);
     try {
       const q = query(
         collection(db, "businessEntities"),
@@ -159,7 +159,6 @@ export default function BusinessPromotionsPage() {
          return 0;
       });
       setPromotions(sortedPromotions);
-      console.log("Promotions Page: Fetched promotions data:", sortedPromotions);
     } catch (error: any) {
       console.error("Promotions Page: Error fetching promotions:", error.code, error.message, error);
       toast({
@@ -169,17 +168,16 @@ export default function BusinessPromotionsPage() {
       });
       setPromotions([]); 
     } finally {
-        console.log("Promotions Page: fetchBusinessPromotions finished, setting isLoading to false.");
         setIsLoading(false);
     }
   }, [toast]); 
 
- useEffect(() => {
+  useEffect(() => {
     if (currentBusinessId && !loadingAuth && !loadingProfile) {
-        fetchBusinessPromotions(currentBusinessId);
+      fetchBusinessPromotions(currentBusinessId);
     } else if (!currentBusinessId && !loadingAuth && !loadingProfile) {
-        setPromotions([]);
-        setIsLoading(false);
+      setPromotions([]);
+      setIsLoading(false); 
     }
   }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile]);
 
@@ -205,7 +203,7 @@ export default function BusinessPromotionsPage() {
     setIsSubmitting(false); 
     setIsDuplicating(duplicate);
     if (duplicate && promotion) {
-      const { id, generatedCodes, createdAt, ...promoToDuplicate } = sanitizeObjectForFirestore(promotion) as BusinessManagedEntity; 
+      const { id, generatedCodes, createdAt, ticketTypes, eventBoxes, assignedPromoters, maxAttendance, ...promoToDuplicate } = sanitizeObjectForFirestore(promotion) as BusinessManagedEntity; 
       setEditingPromotion({
         ...promoToDuplicate,
         id: '', 
@@ -238,7 +236,6 @@ export default function BusinessPromotionsPage() {
       setIsSubmitting(false);
       return;
     }
-    console.log("Promotions Page: handleFormSubmit called. Current Business ID:", currentBusinessId, "EditingPromo:", editingPromotion, "IsDuplicating:", isDuplicating);
     setIsSubmitting(true);
 
     const promotionPayloadBase = {
@@ -253,7 +250,7 @@ export default function BusinessPromotionsPage() {
       aiHint: data.aiHint || data.name.split(' ').slice(0,2).join(' '),
     };
     
-    const fullPayloadForFirestore: Omit<BusinessManagedEntity, 'id' | 'createdAt'> & { startDate: Timestamp, endDate: Timestamp, createdAt?: any, generatedCodes: GeneratedCode[] } = {
+    const fullPayloadForFirestore: Omit<BusinessManagedEntity, 'id' | 'createdAt'> & { startDate: Timestamp, endDate: Timestamp, createdAt?: any, generatedCodes?: GeneratedCode[] } = {
         ...promotionPayloadBase,
         businessId: currentBusinessId,
         type: "promotion" as "promotion",
@@ -323,15 +320,13 @@ export default function BusinessPromotionsPage() {
   };
   
   const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
-    if (!userProfile?.name) {
-        toast({title: "Error", description: "Nombre de usuario no disponible para registrar quién creó los códigos.", variant: "destructive"});
+    if (isSubmitting) return;
+    if (!currentBusinessId || !userProfile?.name) {
+        toast({ title: "Error", description: "ID de negocio o nombre de usuario no disponible.", variant: "destructive" });
         return;
     }
-    if (isSubmitting) {
-      console.log("Promotions Page: Submission already in progress, skipping new codes creation.");
-      return;
-    }
-    setIsSubmitting(true); 
+    
+    setIsSubmitting(true);
     const targetPromotionRef = doc(db, "businessEntities", entityId);
     try {
         const targetPromotionSnap = await getDoc(targetPromotionRef);
@@ -345,8 +340,8 @@ export default function BusinessPromotionsPage() {
 
         const newCodesWithDetails = newCodes.map(code => sanitizeObjectForFirestore({
             ...code,
-            generatedByName: userProfile?.name || "Sistema", 
-            observation: (observation && observation.trim() !== "") ? observation.trim() : null,
+            generatedByName: userProfile.name, 
+            observation: (observation && observation.trim() !== "") ? observation.trim() : null, 
             redemptionDate: null, 
             redeemedByInfo: null, 
             isVipCandidate: false,
@@ -364,8 +359,12 @@ export default function BusinessPromotionsPage() {
         if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
             setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
         }
+        if (editingPromotion && editingPromotion.id === entityId) {
+            setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
+        }
+
     } catch (error: any) {
-        console.error("Promotions Page: Error saving new codes to Firestore:", error.code, error.message, error);
+        console.error("Promotions Page: Error saving new codes to Firestore:", error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
         setIsSubmitting(false);
@@ -397,12 +396,15 @@ export default function BusinessPromotionsPage() {
         if (currentBusinessId) {
           fetchBusinessPromotions(currentBusinessId);
         }
-         if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
             setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
         }
+        if (editingPromotion && editingPromotion.id === entityId) {
+            setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
+        }
     } catch (error: any) {
-        console.error("Promotions Page: Error saving updated codes to Firestore:", error.code, error.message, error);
-        toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
+      console.error("Promotions Page: Error saving updated codes to Firestore:", error);
+      toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
@@ -518,16 +520,16 @@ export default function BusinessPromotionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[30%] min-w-[250px]">Promoción y Gestión</TableHead>
-                      <TableHead className="min-w-[140px]">Vigencia</TableHead>
-                      <TableHead className="min-w-[180px]">QRs Promocionales</TableHead>
-                      <TableHead className="min-w-[150px]">Códigos</TableHead>
-                      <TableHead className="text-left min-w-[120px]">Acciones</TableHead>
+                      <TableHead className="w-[30%] min-w-[200px]">Promoción y Gestión</TableHead>
+                      <TableHead className="min-w-[120px]">Vigencia</TableHead>
+                      <TableHead className="min-w-[180px]">Rendimiento QRs</TableHead>
+                      <TableHead className="min-w-[130px]">Códigos Creados</TableHead>
+                      <TableHead className="text-left min-w-[110px]">Acciones Adicionales</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredPromotions.length > 0 ? filteredPromotions.map((promo) => {
-                      const codesGeneratedCount = promo.generatedCodes?.length || 0;
+                      const codesCreatedCount = promo.generatedCodes?.length || 0;
                       const codesUsedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
                       const usageLimitDisplay = promo.usageLimit === undefined || promo.usageLimit === null || promo.usageLimit <= 0 ? 'Ilimitado' : promo.usageLimit;
                       
@@ -566,9 +568,9 @@ export default function BusinessPromotionsPage() {
                         </TableCell>
                         <TableCell className="align-top py-3">
                            <div className="flex flex-col text-xs space-y-0.5">
-                                <span>Códigos Generados ({codesGeneratedCount})</span>
-                                <span>Códigos Canjeados ({codesUsedCount})</span>
-                                <span>Máximo Promociones ({usageLimitDisplay})</span>
+                                <span>QRs Generados (Clientes): N/A (Requiere Backend)</span>
+                                <span>Códigos Canjeados: ({codesUsedCount})</span>
+                                <span>Límite de Canjes: ({usageLimitDisplay})</span>
                            </div>
                          </TableCell>
                          <TableCell className="align-top py-3">
@@ -589,7 +591,7 @@ export default function BusinessPromotionsPage() {
                                     disabled={isSubmitting} 
                                     className="px-2 py-1 h-auto text-xs"
                                 >
-                                    <ListChecks className="h-3 w-3 mr-1" /> Ver ({codesGeneratedCount})
+                                    <ListChecks className="h-3 w-3 mr-1" /> Ver ({codesCreatedCount})
                                 </Button>
                             </div>
                           </TableCell>
@@ -736,4 +738,3 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
-
