@@ -1,10 +1,12 @@
 
-"use client"; 
+"use client"; // This file will now effectively become a client component entry due to the logic moved.
+              // However, the shell `BusinessPublicPageById` can remain a server component if it *only* passes props.
+              // For simplicity and to ensure all hooks work as expected, let's make the primary logic client-side.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // Asegurar que useRouter esté importado
+import { useParams, useRouter } from "next/navigation"; // useRouter for client-side navigation
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,16 +14,16 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter,
+  CardFooter
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types";
-import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit, LogOut, UserCircle, Camera } from "lucide-react";
-import { SocioVipLogo } from "@/components/icons"; // Para el footer
+import { SocioVipLogo } from "@/components/icons";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle as UIDialogTitleComponent, DialogDescription as UIDialogDescriptionComponent, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle as UIAlertTitleComponent } from "@/components/ui/alert";
@@ -45,30 +47,19 @@ import {
   AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
   AlertDialogTitle as UIAlertDialogTitleAliased,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 
 // Server Component Shell
 export default function BusinessPublicPageById({ params }: { params: { businessId: string } }) {
-  if (!params.businessId) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
-          <p className="text-muted-foreground mt-2">La URL no especificó un ID de negocio.</p>
-          <Link href="/" passHref>
-            <Button variant="link" className="mt-6 text-primary">Volver a la Página Principal</Button>
-          </Link>
-      </div>
-    );
-  }
+  // The server component now only passes the businessId string to the client component
+  // The check for !params.businessId will be done in the client component
   return (
     <BusinessPageClientComponent businessIdFromParams={params.businessId} />
   );
 }
 
-// Schemas
+// Schemas (remain the same)
 const specificCodeFormSchema = z.object({
   specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
 });
@@ -125,11 +116,6 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   });
 
   const fetchBusinessDataById = useCallback(async (id: string) => {
-    if (!id || id.trim() === "") {
-        setError("ID de negocio inválido.");
-        setIsLoading(false);
-        return;
-    }
     setIsLoading(true);
     setError(null);
     console.log("BusinessPage (Client - by ID): Fetching business with ID:", id);
@@ -144,25 +130,18 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
       } else {
-        const bizData = businessSnap.data();
+        const bizData = businessSnap.data() as Omit<Business, 'id'>;
         const fetchedBusiness: Business = {
           id: businessSnap.id,
-          name: bizData.name || "Nombre de Negocio Desconocido",
-          contactEmail: bizData.contactEmail || "",
-          joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : (bizData.joinDate ? String(bizData.joinDate) : new Date().toISOString()),
-          customUrlPath: bizData.customUrlPath || undefined,
-          logoUrl: bizData.logoUrl || undefined,
-          publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
-          slogan: bizData.slogan || undefined,
-          publicContactEmail: bizData.publicContactEmail || undefined,
-          publicPhone: bizData.publicPhone || undefined,
-          publicAddress: bizData.publicAddress || undefined,
+          ...bizData,
+          joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate),
         };
         
-        if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "" && fetchedBusiness.id === id) {
+        if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
            console.log(`BusinessPage (Client - by ID): Business ${id} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
            router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-           return; // Stop further processing as we are redirecting
+           // Do not setIsLoading(false) here as the component will unmount due to redirection
+           return; 
         }
       
         setBusinessDetails(fetchedBusiness);
@@ -178,7 +157,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         
         const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
-            const entityData = docSnap.data();
+            const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
             
             let startDateStr: string;
             let endDateStr: string;
@@ -188,7 +167,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                 startDateStr = entityData.startDate.toDate().toISOString();
             } else if (typeof entityData.startDate === 'string') {
                 startDateStr = entityData.startDate;
-            } else if (entityData.startDate instanceof Date) {
+            } else if (entityData.startDate instanceof Date) { // Should not happen if data comes from Firestore Timestamps
                 startDateStr = entityData.startDate.toISOString();
             } else {
                 console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
@@ -208,22 +187,9 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             
             const entityForCheck: BusinessManagedEntity = {
               id: docSnap.id,
-              businessId: entityData.businessId,
-              type: entityData.type,
-              name: entityData.name || "Entidad sin nombre",
-              description: entityData.description || "",
+              ...entityData,
               startDate: startDateStr,
               endDate: endDateStr,
-              isActive: entityData.isActive === undefined ? true : entityData.isActive,
-              usageLimit: entityData.usageLimit || 0,
-              maxAttendance: entityData.maxAttendance || 0,
-              ticketTypes: Array.isArray(entityData.ticketTypes) ? entityData.ticketTypes.map((tt: any) => sanitizeObjectForFirestore({...tt})) : [],
-              eventBoxes: Array.isArray(entityData.eventBoxes) ? entityData.eventBoxes.map((eb: any) => sanitizeObjectForFirestore({...eb})) : [],
-              assignedPromoters: Array.isArray(entityData.assignedPromoters) ? entityData.assignedPromoters.map((ap: any) => sanitizeObjectForFirestore({...ap})) : [],
-              generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes.map((gc: any) => sanitizeObjectForFirestore({...gc})) : [],
-              imageUrl: entityData.imageUrl,
-              aiHint: entityData.aiHint,
-              termsAndConditions: entityData.termsAndConditions,
               createdAt: entityData.createdAt instanceof Timestamp 
                 ? entityData.createdAt.toDate().toISOString() 
                 : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
@@ -241,9 +207,12 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       setBusinessDetails(null);
       setActiveEntitiesForBusiness([]);
     } finally {
-      setIsLoading(false);
+      // Only set loading to false if not redirecting
+      if (!(businessDetails?.customUrlPath && businessDetails.customUrlPath.trim() !== "")) {
+          setIsLoading(false);
+      }
     }
-  }, [router]); // Removed toast from dependencies, as it's stable
+  }, [router, businessDetails?.customUrlPath]); 
 
   useEffect(() => {
     if (businessIdFromParams) {
@@ -264,7 +233,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         toast({title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive"});
         return;
     }
-    if (!entity.generatedCodes || entity.generatedCodes.length === 0) { // Check if array exists and is not empty
+    if (!entity.generatedCodes || entity.generatedCodes.length === 0) {
       toast({title: "Sin Códigos", description: `Esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} no tiene códigos creados.`, variant: "destructive"});
       return;
     }
@@ -484,7 +453,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     const maxLogoHeight = 50;
     const spacingAfterLogo = 20;
     const businessNameFontSize = 14; 
-    const spacingAfterBusinessName = 15; 
+    const spacingAfterBusinessName = 40; 
     const entityTitleFontSize = 20; 
     const spacingAfterEntityTitle = 15; 
     const userDetailsFontSize = 16;
@@ -496,13 +465,59 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     const businessLogo = new Image();
     businessLogo.crossOrigin = "anonymous";
     
-    let initialEstimatedHeight = padding + maxLogoHeight + spacingAfterLogo + businessNameFontSize + spacingAfterBusinessName + entityTitleFontSize + spacingAfterEntityTitle + qrSize + padding + userDetailsFontSize + lineSpacing + userDetailsFontSize + padding + smallTextFontSize + lineSpacing + padding;
-    if (qrData.promotion.termsAndConditions) {
-      initialEstimatedHeight += 50;
-    }
-    canvas.height = initialEstimatedHeight; 
+    const textLines = (text: string, maxWidth: number, font: string): string[] => {
+      ctx.font = font;
+      const words = text.split(' ');
+      const lines: string[] = [];
+      let currentLine = words[0];
+      for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        const width = ctx.measureText(currentLine + " " + word).width;
+        if (width < maxWidth) {
+          currentLine += " " + word;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      lines.push(currentLine);
+      return lines;
+    };
+
+    const calculateDynamicHeight = () => {
+      let estimatedHeight = padding; // Top padding
+
+      // Header part
+      estimatedHeight += maxLogoHeight + spacingAfterLogo + businessNameFontSize + spacingAfterBusinessName;
+
+      // Entity Title
+      estimatedHeight += entityTitleFontSize + spacingAfterEntityTitle;
+      
+      // QR Code
+      estimatedHeight += qrSize + padding;
+
+      // User Details
+      estimatedHeight += (userDetailsFontSize + 2) + lineSpacing; // Name
+      estimatedHeight += (userDetailsFontSize - 2) + padding; // DNI
+
+      // Valid Until
+      estimatedHeight += smallTextFontSize + lineSpacing + 15;
+      
+      // Terms and Conditions
+      if (qrData.promotion.termsAndConditions) {
+          const termsFont = `italic ${smallTextFontSize -1}px Arial`;
+          const termsLines = textLines(qrData.promotion.termsAndConditions, canvasWidth - 2 * padding, termsFont);
+          estimatedHeight += termsLines.length * (smallTextFontSize + 2) + padding / 2;
+      }
+      estimatedHeight += padding; // Bottom padding
+      return estimatedHeight;
+    };
+
 
     const drawContent = () => {
+      canvas.height = calculateDynamicHeight();
+      canvas.width = canvasWidth;
+
       ctx.fillStyle = 'hsl(280, 13%, 96%)'; 
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       currentY = 0;
@@ -521,20 +536,20 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           logoHeight = maxLogoHeight;
           logoWidth = logoHeight * aspectRatio;
         }
-        if (logoWidth > canvas.width / 2 - padding) { 
-            logoWidth = canvas.width / 2 - padding;
+        if (logoWidth > canvasWidth - 2 * padding) { 
+            logoWidth = canvasWidth - 2 * padding;
             logoHeight = logoWidth / aspectRatio;
         }
-        ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight); 
-        currentY += logoHeight + spacingAfterLogo / 2 ; 
+        ctx.drawImage(businessLogo, (canvasWidth - logoWidth) / 2, currentY, logoWidth, logoHeight); 
+        currentY += logoHeight + spacingAfterLogo; 
       } else {
-        currentY += maxLogoHeight + spacingAfterLogo / 2; 
+        currentY += maxLogoHeight + spacingAfterLogo; 
       }
       
       ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
       ctx.font = `bold ${businessNameFontSize}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
+      ctx.fillText(businessDetails.name, canvasWidth / 2, currentY);
       currentY += businessNameFontSize + padding / 2; 
       
       currentY = headerBgHeight; 
@@ -543,12 +558,12 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       ctx.fillStyle = 'hsl(var(--primary))';
       ctx.font = `bold ${entityTitleFontSize}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
+      ctx.fillText(qrData.promotion.title, canvasWidth / 2, currentY);
       currentY += entityTitleFontSize + spacingAfterEntityTitle;
 
       const qrImage = new Image();
       qrImage.onload = () => {
-        const qrX = (canvas.width - qrSize) / 2;
+        const qrX = (canvasWidth - qrSize) / 2;
         ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
         ctx.strokeStyle = 'hsl(var(--primary))';
         ctx.lineWidth = 2;
@@ -558,81 +573,34 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         ctx.fillStyle = 'hsl(var(--primary))';
         ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
+        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvasWidth / 2, currentY);
         currentY += (userDetailsFontSize + 2) + lineSpacing;
 
         ctx.fillStyle = 'hsl(var(--foreground))';
         ctx.font = `${userDetailsFontSize - 2}px Arial`;
-        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvasWidth / 2, currentY);
         currentY += (userDetailsFontSize - 2) + padding;
 
         ctx.font = `italic ${smallTextFontSize}px Arial`;
         ctx.fillStyle = 'hsl(var(--muted-foreground))';
         ctx.textAlign = 'center';
-        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvasWidth / 2, currentY);
         currentY += smallTextFontSize + lineSpacing + 15;
         
         if (qrData.promotion.termsAndConditions) {
-            ctx.font = `italic ${smallTextFontSize -1}px Arial`;
+            const termsFont = `italic ${smallTextFontSize -1}px Arial`;
+            const termsLinesToDraw = textLines(qrData.promotion.termsAndConditions, canvasWidth - 2 * padding, termsFont);
+            ctx.font = termsFont;
             ctx.fillStyle = 'hsl(var(--muted-foreground))';
-            ctx.textAlign = 'center';
-            const termsLines = qrData.promotion.termsAndConditions.split('\n');
-            termsLines.forEach(line => {
-                ctx.fillText(line, canvas.width / 2, currentY);
+            termsLinesToDraw.forEach(line => {
+                ctx.fillText(line, canvasWidth / 2, currentY);
                 currentY += smallTextFontSize + 2;
             });
             currentY += padding / 2;
         }
         
-        canvas.height = currentY;
-        ctx.fillStyle = 'hsl(280, 13%, 96%)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'hsl(var(--primary))';
-        ctx.fillRect(0, 0, canvas.width, headerBgHeight);
-        let redrawY = padding;
-        if (businessDetails.logoUrl) {
-             const aspectRatio = businessLogo.width / businessLogo.height;
-            let logoHeight = businessLogo.height;
-            let logoWidth = businessLogo.width;
-            if (logoHeight > maxLogoHeight) { logoHeight = maxLogoHeight; logoWidth = logoHeight * aspectRatio; }
-            if (logoWidth > canvas.width / 2 - padding) { logoWidth = canvas.width / 2 - padding; logoHeight = logoWidth / aspectRatio; }
-            ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, redrawY, logoWidth, logoHeight);
-            redrawY += logoHeight + spacingAfterLogo / 2;
-        } else { redrawY += maxLogoHeight + spacingAfterLogo / 2; }
-        ctx.fillStyle = 'hsl(var(--primary-foreground))';
-        ctx.font = `bold ${businessNameFontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText(businessDetails.name, canvas.width / 2, redrawY);
-        redrawY = headerBgHeight + spacingAfterBusinessName;
-        ctx.fillStyle = 'hsl(var(--primary))';
-        ctx.font = `bold ${entityTitleFontSize}px Arial`;
-        ctx.fillText(qrData.promotion.title, canvas.width / 2, redrawY);
-        redrawY += entityTitleFontSize + spacingAfterEntityTitle;
-        ctx.drawImage(qrImage, qrX, redrawY, qrSize, qrSize);
-        ctx.strokeStyle = 'hsl(var(--primary))';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(qrX - 2, redrawY - 2, qrSize + 4, qrSize + 4);
-        redrawY += qrSize + padding;
-        ctx.fillStyle = 'hsl(var(--primary))';
-        ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
-        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, redrawY);
-        redrawY += (userDetailsFontSize + 2) + lineSpacing;
-        ctx.fillStyle = 'hsl(var(--foreground))';
-        ctx.font = `${userDetailsFontSize - 2}px Arial`;
-        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, redrawY);
-        redrawY += (userDetailsFontSize - 2) + padding;
-        ctx.font = `italic ${smallTextFontSize}px Arial`;
-        ctx.fillStyle = 'hsl(var(--muted-foreground))';
-        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, redrawY);
-        redrawY += smallTextFontSize + lineSpacing + 15;
-        if (qrData.promotion.termsAndConditions) {
-            ctx.font = `italic ${smallTextFontSize -1}px Arial`;
-            ctx.fillStyle = 'hsl(var(--muted-foreground))';
-            termsLines.forEach(line => {
-                ctx.fillText(line, canvas.width / 2, redrawY);
-                redrawY += smallTextFontSize + 2;
-            });
-        }
+        // No need to redraw if calculateDynamicHeight was accurate
+        // If not, a second pass with the new currentY as canvas.height would be needed.
 
         const dataUrl = canvas.toDataURL('image/png');
         const linkElement = document.createElement('a');
@@ -652,16 +620,21 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     };
 
     if (businessDetails.logoUrl) {
-      businessLogo.onload = drawContent;
+      businessLogo.onload = () => {
+         console.log("Business logo loaded successfully for download image.");
+         drawContent();
+      };
       businessLogo.onerror = () => {
-        console.warn("Logo del negocio no se pudo cargar para la descarga. Se procederá sin él.");
+        console.warn("Business logo could not be loaded for download. Proceeding without it.");
         drawContent(); 
       };
       businessLogo.src = businessDetails.logoUrl;
     } else {
+      console.log("No business logo URL provided. Proceeding without logo for download image.");
       drawContent(); 
     }
   };
+
 
   const resetQrFlow = () => {
     setPageViewState('entityList');
@@ -675,6 +648,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     setShowDniModal(false);
   };
 
+  // Local component for code entry per entity
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
     const form = useForm<SpecificCodeFormValues>({
       resolver: zodResolver(specificCodeFormSchema),
@@ -683,7 +657,10 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   
     return (
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(data => handleSpecificCodeSubmit(entity, data.specificCode))} className="space-y-2 mt-2">
+        <form 
+            onSubmit={form.handleSubmit(data => handleSpecificCodeSubmit(entity, data.specificCode))} 
+            className="space-y-3 mt-2 flex flex-col"
+        >
           <FormField
             control={form.control}
             name="specificCode"
@@ -705,7 +682,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
               </FormItem>
             )}
           />
-          <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-9" disabled={isLoadingQrFlow}>
+          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-10" disabled={isLoadingQrFlow}>
             {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />}
             Generar QR
           </Button>
@@ -714,12 +691,13 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     );
   };
 
-  if (!businessIdFromParams && !isLoading) {
-     return (
+
+  if (!businessIdFromParams) {
+    return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
           <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no recibido por el componente cliente</h1>
-          <p className="text-muted-foreground mt-2">El componente que muestra esta página no recibió un ID de negocio.</p>
+          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
+          <p className="text-muted-foreground mt-2">La URL no especificó un ID de negocio.</p>
           <Link href="/" passHref>
             <Button variant="link" className="mt-6 text-primary">Volver a la Página Principal</Button>
           </Link>
@@ -727,61 +705,166 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     );
   }
 
-
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full flex items-center justify-between">
-           {/* Header mínimo durante la carga */}
-        </div>
-        <div className="flex flex-col items-center justify-center flex-grow pt-12">
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+           {/* Minimal header during load */}
+        </header>
+        <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
             <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
-        </div>
+        </main>
+        <footer className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
+            {/* Minimal footer during load */}
+        </footer>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-        <div className="flex items-center justify-between w-full max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-         {/* Header mínimo en error */}
-        </div>
-        <div className="flex flex-col items-center justify-center flex-grow pt-12">
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            {/* Header remains minimal or shows SocioVIP branding if business data failed */}
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <Link href="/" passHref className="flex items-center gap-2 group">
+                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                    <div>
+                        <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
+                    </div>
+                </Link>
+            </div>
+        </header>
+        <main className="flex-grow flex flex-col items-center justify-center text-center p-4 md:p-8">
             <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-destructive">{error}</h1>
             <p className="text-muted-foreground mt-2">ID de Negocio intentado: {businessIdFromParams}</p>
             <Link href="/" passHref>
               <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
-        </div>
+        </main>
+         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div className="flex items-center gap-3">
+                    {/* Auth buttons */}
+                     {!loadingAuth && !loadingProfile && (
+                        <>
+                            {currentUser ? (
+                            <>
+                                <span className="text-foreground flex items-center">
+                                <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                                Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
+                                </span>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                                        <ShadcnAlertDialogFooterAliased>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                                        </ShadcnAlertDialogFooterAliased>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                                <Link href="/auth/dispatcher" passHref>
+                                <Button variant="outline" size="sm">Ir a Administración</Button>
+                                </Link>
+                            </>
+                            ) : (
+                            <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                                Iniciar Sesión
+                            </Button>
+                            )}
+                        </>
+                        )}
+                        {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                </div>
+                <div className="text-muted-foreground">
+                    <Link href="/" className="hover:text-primary hover:underline">
+                    Plataforma de sociosvip.app
+                    </Link>
+                </div>
+            </div>
+        </footer>
       </div>
     );
   }
 
   if (!businessDetails && !isLoading && !error) { 
      return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-         <div className="flex items-center justify-between w-full max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          {/* Header mínimo */}
-         </div>
-        <div className="flex flex-col items-center justify-center flex-grow pt-12">
-            <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
-            <p className="text-muted-foreground mt-2">No se encontró un negocio con el ID: "{businessIdFromParams}". Verifica que la URL sea correcta.</p>
-            <Link href="/" passHref>
-              <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
-            </Link>
+        <div className="min-h-screen bg-background text-foreground flex flex-col">
+             <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+                 <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <Link href="/" passHref className="flex items-center gap-2 group">
+                        <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                        <div>
+                            <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
+                        </div>
+                    </Link>
+                </div>
+            </header>
+            <main className="flex-grow flex flex-col items-center justify-center text-center p-4 md:p-8">
+                <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
+                <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
+                <p className="text-muted-foreground mt-2">No se encontró un negocio con el ID: "{businessIdFromParams}". Verifica que la URL sea correcta.</p>
+                <Link href="/" passHref>
+                <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
+                </Link>
+            </main>
+            <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
+                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div className="flex items-center gap-3">
+                        {/* Auth buttons */}
+                        {!loadingAuth && !loadingProfile && (
+                        <>
+                            {currentUser ? (
+                            <>
+                                <span className="text-foreground flex items-center">
+                                <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                                Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
+                                </span>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                                        <ShadcnAlertDialogFooterAliased>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                                        </ShadcnAlertDialogFooterAliased>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                                <Link href="/auth/dispatcher" passHref>
+                                <Button variant="outline" size="sm">Ir a Administración</Button>
+                                </Link>
+                            </>
+                            ) : (
+                            <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                                Iniciar Sesión
+                            </Button>
+                            )}
+                        </>
+                        )}
+                        {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                    </div>
+                    <div className="text-muted-foreground">
+                        <Link href="/" className="hover:text-primary hover:underline">
+                        Plataforma de sociosvip.app
+                        </Link>
+                    </div>
+                </div>
+            </footer>
         </div>
-      </div>
     );
   }
 
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
-             <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
                 <div className="max-w-7xl mx-auto flex items-center justify-start">
                     {businessDetails.logoUrl && (
                         <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
@@ -833,53 +916,60 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             </main>
              <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-                <div className="flex items-center gap-3">
-                    {!loadingAuth && !loadingProfile && (
-                    <>
-                        {currentUser && userProfile ? (
+                    <div className="flex items-center gap-3">
+                        {!loadingAuth && !loadingProfile && (
                         <>
-                            <span className="text-foreground flex items-center">
-                            <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                            Hola, {userProfile.name || currentUser.email?.split('@')[0]}
-                            </span>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
-                                    <ShadcnAlertDialogFooterAliased>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
-                                    </ShadcnAlertDialogFooterAliased>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                            <Link href="/auth/dispatcher" passHref>
-                            <Button variant="outline" size="sm">Ir a Administración</Button>
-                            </Link>
+                            {currentUser ? (
+                            <>
+                                <span className="text-foreground flex items-center">
+                                <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                                Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
+                                </span>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                                        <ShadcnAlertDialogFooterAliased>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                                        </ShadcnAlertDialogFooterAliased>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                                <Link href="/auth/dispatcher" passHref>
+                                <Button variant="outline" size="sm">Ir a Administración</Button>
+                                </Link>
+                            </>
+                            ) : (
+                            <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                                Iniciar Sesión
+                            </Button>
+                            )}
                         </>
-                        ) : (
-                        <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
-                            Iniciar Sesión
-                        </Button>
                         )}
-                    </>
-                    )}
-                    {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-                </div>
-                <div className="text-muted-foreground">
-                    <Link href="/" className="hover:text-primary hover:underline">
-                     Plataforma de sociosvip.app
-                    </Link>
-                </div>
+                        {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                    </div>
+                    <div className="text-muted-foreground">
+                        <Link href="/" className="hover:text-primary hover:underline">
+                        Plataforma de sociosvip.app
+                        </Link>
+                    </div>
                 </div>
             </footer>
         </div>
     );
   }
 
-  if (!businessDetails) { // Debería estar cubierto por el !businessDetails && !isLoading arriba
-    return null; 
+  // Fallback para asegurar que businessDetails no es null antes de usarlo extensivamente
+  if (!businessDetails) {
+    // This case should ideally be covered by isLoading or error states
+    return (
+         <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+            <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+            <p className="text-xl text-muted-foreground">Cargando...</p>
+        </div>
+    );
   }
 
   const events = activeEntitiesForBusiness.filter(e => e.type === 'event');
@@ -986,11 +1076,11 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           <div className="flex items-center gap-3">
             {!loadingAuth && !loadingProfile && (
               <>
-                {currentUser && userProfile ? (
+                {currentUser ? (
                   <>
                     <span className="text-foreground flex items-center">
                       <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                      Hola, {userProfile.name || currentUser.email?.split('@')[0]}
+                      Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
                     </span>
                      <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -1141,7 +1231,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             </AlertDialogDescription>
            </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
-            <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", ""); }}>No, corregir DNI</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", formDataForDniWarning?.dni || ""); /* Restore DNI field to what it was before the blur that triggered the warning, or clear if no previous data */ }}>No, corregir DNI</AlertDialogCancel>
             <AlertDialogAction onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</AlertDialogAction>
           </ShadcnAlertDialogFooterAliased>
         </AlertDialogContent>
