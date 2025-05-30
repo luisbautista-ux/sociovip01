@@ -37,52 +37,64 @@ export default function HomePage() {
   const fetchPublicEntitiesAndBusinesses = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    console.log("HomePage: Fetching public entities and businesses...");
     try {
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
       businessesSnapshot.forEach(docSnap => {
-        const bizData = docSnap.data() as Omit<Business, 'id'>;
-        businessesMap.set(docSnap.id, { id: docSnap.id, ...bizData });
+        const data = docSnap.data();
+        const businessProfile: Business = {
+          id: docSnap.id,
+          name: data.name || "Nombre Desconocido",
+          contactEmail: data.contactEmail || "",
+          joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : String(data.joinDate || new Date().toISOString()),
+          ruc: data.ruc || undefined,
+          razonSocial: data.razonSocial || undefined,
+          department: data.department || undefined,
+          province: data.province || undefined,
+          district: data.district || undefined,
+          address: data.address || undefined,
+          managerName: data.managerName || undefined,
+          managerDni: data.managerDni || undefined,
+          businessType: data.businessType || undefined,
+          logoUrl: data.logoUrl || undefined,
+          publicCoverImageUrl: data.publicCoverImageUrl || undefined,
+          slogan: data.slogan || undefined,
+          publicContactEmail: data.publicContactEmail || undefined,
+          publicPhone: data.publicPhone || undefined,
+          publicAddress: data.publicAddress || undefined,
+          customUrlPath: data.customUrlPath || undefined,
+        };
+        businessesMap.set(docSnap.id, businessProfile);
       });
-      console.log(`HomePage: Fetched ${businessesMap.size} businesses.`);
 
       const entitiesQuery = query(collection(db, "businessEntities"), where("isActive", "==", true));
       const entitiesSnapshot = await getDocs(entitiesQuery);
-      console.log(`HomePage: Fetched ${entitiesSnapshot.docs.length} active business entities initially.`);
-
+      
       const allActiveEntities: PublicDisplayEntity[] = [];
       entitiesSnapshot.forEach(docSnap => {
-        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & {
-          startDate: Timestamp | string;
-          endDate: Timestamp | string;
-          createdAt?: Timestamp | string;
-        };
-
+        const entityData = docSnap.data();
         let startDateStr: string;
         let endDateStr: string;
         const nowStr = new Date().toISOString();
 
         if (entityData.startDate instanceof Timestamp) {
-          startDateStr = entityData.startDate.toDate().toISOString();
+            startDateStr = entityData.startDate.toDate().toISOString();
         } else if (typeof entityData.startDate === 'string') {
-          startDateStr = entityData.startDate;
+            startDateStr = entityData.startDate;
         } else if (entityData.startDate instanceof Date) {
-          startDateStr = entityData.startDate.toISOString();
+            startDateStr = entityData.startDate.toISOString();
         } else {
-          console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
-          startDateStr = nowStr;
+            startDateStr = nowStr; 
         }
 
         if (entityData.endDate instanceof Timestamp) {
-          endDateStr = entityData.endDate.toDate().toISOString();
+            endDateStr = entityData.endDate.toDate().toISOString();
         } else if (typeof entityData.endDate === 'string') {
-          endDateStr = entityData.endDate;
+            endDateStr = entityData.endDate;
         } else if (entityData.endDate instanceof Date) {
-          endDateStr = entityData.endDate.toISOString();
+            endDateStr = entityData.endDate.toISOString();
         } else {
-          console.warn(`HomePage: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
-          endDateStr = nowStr;
+            endDateStr = nowStr; 
         }
         
         const entityForCheck: BusinessManagedEntity = {
@@ -110,21 +122,15 @@ export default function HomePage() {
 
         if (isEntityCurrentlyActivatable(entityForCheck)) {
           const business = businessesMap.get(entityForCheck.businessId);
-          if (business) {
-            allActiveEntities.push({
-              ...entityForCheck,
-              businessName: business.name,
-              businessLogoUrl: business.logoUrl,
-              businessCustomUrlPath: business.customUrlPath,
-            });
-          } else {
-            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}.`);
-            allActiveEntities.push(entityForCheck); 
-          }
+          allActiveEntities.push({
+            ...entityForCheck,
+            businessName: business?.name || "Negocio Desconocido",
+            businessLogoUrl: business?.logoUrl,
+            businessCustomUrlPath: business?.customUrlPath,
+          });
         }
       });
       
-      console.log(`HomePage: Filtered to ${allActiveEntities.length} currently activatable entities with business info.`);
       const sortedEntities = allActiveEntities.sort((a, b) => {
         if (a.type === 'event' && b.type !== 'event') return -1;
         if (a.type !== 'event' && b.type === 'event') return 1;
@@ -140,7 +146,6 @@ export default function HomePage() {
       setPublicEntities([]);
     } finally {
       setIsLoading(false);
-      console.log("HomePage: Fetching complete. isLoading set to false.");
     }
   }, []);
 
@@ -153,19 +158,18 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* <h1 className="text-3xl text-center font-bold text-orange-500 p-4">VERIFICACIÓN CAMBIO GLOBAL - HomePage</h1> */}
-      <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <Link href="/" passHref className="flex items-center gap-2 group">
-                <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                <div>
-                  <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
-                  <p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p>
-                </div>
-            </Link>
-            <PublicHeaderAuth />
-        </div>
-      </header>
+      <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <Link href="/" passHref className="flex items-center gap-2 group">
+                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                    <div>
+                      <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
+                      <p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p>
+                    </div>
+                </Link>
+                <PublicHeaderAuth />
+            </div>
+        </header>
 
       <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         {isLoading && (
@@ -200,10 +204,9 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events.map((event) => {
-                    const businessLink = event.businessCustomUrlPath && event.businessCustomUrlPath.trim() !== ""
-                      ? `/b/${event.businessCustomUrlPath}`
-                      : null; // No fallback link if customUrlPath is missing
-                    console.log(`HomePage Event: ${event.name}, CustomPath: ${event.businessCustomUrlPath}, GeneratedLink: ${businessLink}`);
+                    const hasValidCustomUrl = event.businessCustomUrlPath && event.businessCustomUrlPath.trim() !== "";
+                    const businessLink = hasValidCustomUrl ? `/b/${event.businessCustomUrlPath.trim()}` : null;
+                    
                     return (
                     <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                       <div className="relative aspect-[16/9] w-full">
@@ -228,7 +231,7 @@ export default function HomePage() {
                             </Link>
                           ) : (
                             <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {event.businessName} (Página no disponible)
+                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {event.businessName}
                             </p>
                           )
                         )}
@@ -243,12 +246,13 @@ export default function HomePage() {
                          {businessLink ? (
                             <Link href={businessLink} passHref className="w-full">
                               <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                                Ver Detalles del Evento <ExternalLink className="ml-2 h-4 w-4" />
+                                Ver Detalles del Evento
+                                <ExternalLink className="ml-2 h-4 w-4" />
                               </Button>
                             </Link>
                          ) : (
-                            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
-                                Ver Detalles del Evento
+                            <Button className="w-full" disabled>
+                                Página del Negocio No Disponible
                             </Button>
                          )}
                       </CardFooter>
@@ -266,10 +270,9 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {promotions.map((promo) => {
-                     const businessLink = promo.businessCustomUrlPath && promo.businessCustomUrlPath.trim() !== ""
-                      ? `/b/${promo.businessCustomUrlPath}`
-                      : null;
-                    console.log(`HomePage Promo: ${promo.name}, CustomPath: ${promo.businessCustomUrlPath}, GeneratedLink: ${businessLink}`);
+                    const hasValidCustomUrl = promo.businessCustomUrlPath && promo.businessCustomUrlPath.trim() !== "";
+                    const businessLink = hasValidCustomUrl ? `/b/${promo.businessCustomUrlPath.trim()}` : null;
+
                     return (
                     <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                        <div className="relative aspect-[16/9] w-full">
@@ -294,7 +297,7 @@ export default function HomePage() {
                             </Link>
                           ) : (
                              <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {promo.businessName} (Página no disponible)
+                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {promo.businessName}
                             </p>
                           )
                          )}
@@ -309,12 +312,13 @@ export default function HomePage() {
                          {businessLink ? (
                            <Link href={businessLink} passHref className="w-full">
                             <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                              Ver Detalles de la Promoción <ExternalLink className="ml-2 h-4 w-4" />
+                              Ver Detalles de la Promoción
+                              <ExternalLink className="ml-2 h-4 w-4" />
                             </Button>
                           </Link>
                          ) : (
-                            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled>
-                                Ver Detalles de la Promoción
+                            <Button className="w-full" disabled>
+                                Página del Negocio No Disponible
                             </Button>
                          )}
                       </CardFooter>
@@ -327,10 +331,8 @@ export default function HomePage() {
         )}
       </main>
 
-      <footer className="mt-12 py-8 bg-muted/50 text-center">
-        <p className="text-sm text-muted-foreground">
-          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
-        </p>
+      <footer className="w-full mt-12 py-8 bg-muted/50 text-center">
+          <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
       </footer>
     </div>
   );

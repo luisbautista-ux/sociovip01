@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation"; // Import useParams
+import { useParams, useRouter } from "next/navigation"; // Added useRouter
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,8 +15,8 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
-import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types";
+import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit } from "firebase/firestore";
+import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData, PromotionDetails } from "@/lib/types";
 import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
@@ -33,13 +33,13 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from 'qrcode';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as ShadcnCalendar } from "@/components/ui/calendar"; // Renamed to avoid conflict
+import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
-const specificCodeSchema = z.object({
+const specificCodeFormSchema = z.object({
   specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
 });
-type SpecificCodeFormValues = z.infer<typeof specificCodeSchema>;
+type SpecificCodeFormValues = z.infer<typeof specificCodeFormSchema>;
 
 const dniSchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
@@ -53,18 +53,20 @@ const newQrClientSchema = z.object({
   dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
   dniConfirm: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
+type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
 
 
 export default function BusinessPublicPageByUrl() {
-  const params = useParams<{ customUrlPath: string }>(); // Use useParams
+  const params = useParams<{ customUrlPath: string }>();
   const { customUrlPath } = params;
+  const router = useRouter();
+  const { toast } = useToast();
 
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const [activeEntitiesForBusiness, setActiveEntitiesForBusiness] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-
+  
   const [pageViewState, setPageViewState] = useState<'entityList' | 'qrDisplay'>('entityList');
   const [showDniModal, setShowDniModal] = useState(false);
   const [currentStepInModal, setCurrentStepInModal] = useState<'enterDni' | 'newUserForm'>('enterDni');
@@ -75,9 +77,7 @@ export default function BusinessPublicPageByUrl() {
   const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
-  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
-
-  type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
+  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormValues | null>(null);
 
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(dniSchema),
@@ -88,17 +88,18 @@ export default function BusinessPublicPageByUrl() {
     resolver: zodResolver(newQrClientSchema),
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dniConfirm: "" },
   });
-  
+
   const fetchBusinessData = useCallback(async () => {
-    console.log("BusinessPublicPage: customUrlPath from params:", customUrlPath);
     if (!customUrlPath) {
-      setError("URL de negocio inválida o no proporcionada.");
+      console.error("BusinessPage by URL: customUrlPath is missing.");
+      setError("URL de negocio no especificada.");
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     setError(null);
     console.log("BusinessPage by URL: Fetching business with customUrlPath:", customUrlPath);
+
     try {
       const businessQuery = query(
         collection(db, "businesses"),
@@ -109,16 +110,16 @@ export default function BusinessPublicPageByUrl() {
 
       if (businessSnap.empty) {
         console.error("BusinessPage by URL: No business found for customUrlPath:", customUrlPath);
-        setError("Negocio no encontrado. Verifica que la URL sea correcta.");
+        setError("Negocio no encontrado. Verifica que la URL sea correcta o que el negocio exista y tenga una URL personalizada configurada.");
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
       } else {
         const businessDoc = businessSnap.docs[0];
-        const bizData = businessDoc.data() as Omit<Business, 'id'>;
+        const bizData = businessDoc.data();
         const fetchedBusiness: Business = {
           id: businessDoc.id,
-          name: bizData.name,
-          contactEmail: bizData.contactEmail, // Keep internal contact email if needed
+          name: bizData.name || "Nombre de Negocio Desconocido",
+          contactEmail: bizData.contactEmail || "",
           joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
           customUrlPath: bizData.customUrlPath || customUrlPath,
           logoUrl: bizData.logoUrl || undefined,
@@ -141,12 +142,7 @@ export default function BusinessPublicPageByUrl() {
         
         const allActiveEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & {
-            startDate: Timestamp | string;
-            endDate: Timestamp | string;
-            createdAt?: Timestamp | string;
-          };
-          
+          const entityData = docSnap.data();
           let startDateStr: string;
           let endDateStr: string;
           const nowStr = new Date().toISOString();
@@ -158,7 +154,7 @@ export default function BusinessPublicPageByUrl() {
           } else if (entityData.startDate instanceof Date) {
               startDateStr = entityData.startDate.toISOString();
           } else {
-              console.warn(`BusinessPage by URL (Client): Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
+              console.warn(`BusinessPage by URL: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
               startDateStr = nowStr; 
           }
 
@@ -169,7 +165,7 @@ export default function BusinessPublicPageByUrl() {
           } else if (entityData.endDate instanceof Date) {
               endDateStr = entityData.endDate.toISOString();
           } else {
-              console.warn(`BusinessPage by URL (Client): Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
+              console.warn(`BusinessPage by URL: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
               endDateStr = nowStr; 
           }
           
@@ -211,50 +207,48 @@ export default function BusinessPublicPageByUrl() {
   }, [customUrlPath]);
 
   useEffect(() => {
-    if (customUrlPath) { // Ensure customUrlPath is available from params
+    if (typeof customUrlPath === 'string' && customUrlPath.trim() !== "") {
         fetchBusinessData();
+    } else if (typeof customUrlPath === 'string' && customUrlPath.trim() === ""){
+        setError("URL de negocio inválida.");
+        setIsLoading(false);
     }
   }, [customUrlPath, fetchBusinessData]);
 
-
-  const handleSpecificCodeSubmit = (entity: BusinessManagedEntity, codeValue: string) => {
-    setIsLoadingQrFlow(true);
-    const codeToValidate = codeValue.toUpperCase().trim();
-
-    if (!entity.generatedCodes || entity.generatedCodes.length === 0) {
-        toast({
-            title: "Error de Configuración",
-            description: `Esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} no tiene códigos de 9 dígitos configurados por el negocio.`,
-            variant: "destructive",
-        });
-        setIsLoadingQrFlow(false);
+  // Restauración del flujo de Generar QR
+  const handleInitiateQrFlow = (entity: BusinessManagedEntity, codeInputValue: string) => {
+    const codeToValidate = codeInputValue.trim().toUpperCase();
+    if (!codeToValidate) {
+        toast({title: "Código Requerido", description: "Por favor, ingresa el código de 9 dígitos.", variant: "destructive"});
+        return;
+    }
+    if (codeToValidate.length !== 9) {
+        toast({title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive"});
         return;
     }
 
-    const foundCodeObject = entity.generatedCodes.find(
+    const foundCodeObject = entity.generatedCodes?.find(
       (gc) => gc.value.toUpperCase() === codeToValidate && gc.status === 'available'
     );
 
     if (foundCodeObject) {
       setActiveEntityForQr(entity);
-      setValidatedSpecificCode(codeToValidate); 
+      setValidatedSpecificCode(codeToValidate);
       setCurrentStepInModal('enterDni');
       dniForm.reset({ dni: "" });
       setShowDniModal(true);
     } else {
       toast({
         title: "Código Inválido o No Disponible",
-        description: `El código de 9 dígitos ingresado no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} o ya fue utilizado.`,
+        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} o ya fue utilizado.`,
         variant: "destructive",
       });
     }
-    setIsLoadingQrFlow(false);
   };
-
 
   const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     if (!activeEntityForQr || !validatedSpecificCode) {
-      toast({title: "Error interno", description:"Falta promoción activa o código validado.", variant: "destructive"});
+      toast({title: "Error interno", description:"Falta entidad activa o código validado.", variant: "destructive"});
       return;
     }
     setIsLoadingQrFlow(true);
@@ -267,7 +261,7 @@ export default function BusinessPublicPageByUrl() {
 
         if (!querySnapshot.empty) {
           const existingClientDoc = querySnapshot.docs[0];
-          const clientData = existingClientDoc.data() as Omit<QrClient, 'id'>;
+          const clientData = existingClientDoc.data();
           const qrClient: QrClient = {
             id: existingClientDoc.id,
             dni: clientData.dni,
@@ -278,22 +272,19 @@ export default function BusinessPublicPageByUrl() {
             registrationDate: clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate().toISOString() : String(clientData.registrationDate),
           };
           
-          setQrData({
-            user: qrClient,
-            promotion: { 
-                id: activeEntityForQr.id,
-                title: activeEntityForQr.name,
-                description: activeEntityForQr.description,
-                validUntil: activeEntityForQr.endDate,
-                imageUrl: activeEntityForQr.imageUrl || "",
-                promoCode: validatedSpecificCode, 
-                type: activeEntityForQr.type as 'promotion' | 'event',
-                termsAndConditions: activeEntityForQr.termsAndConditions,
-                aiHint: activeEntityForQr.aiHint || "",
-            },
-            code: validatedSpecificCode, 
-            status: 'available', 
-          });
+          const promotionDetails: PromotionDetails = {
+            id: activeEntityForQr.id,
+            title: activeEntityForQr.name,
+            description: activeEntityForQr.description,
+            validUntil: activeEntityForQr.endDate,
+            imageUrl: activeEntityForQr.imageUrl || "",
+            promoCode: validatedSpecificCode, // This is the 9-digit specific code for the QR
+            type: activeEntityForQr.type,
+            termsAndConditions: activeEntityForQr.termsAndConditions,
+            aiHint: activeEntityForQr.aiHint || "",
+          };
+
+          setQrData({ user: qrClient, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
           setShowDniModal(false);
           setPageViewState('qrDisplay');
           toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
@@ -321,12 +312,12 @@ export default function BusinessPublicPageByUrl() {
       name: formData.name,
       surname: formData.surname,
       phone: formData.phone,
-      dob: Timestamp.fromDate(formData.dob), // Convert Date to Firestore Timestamp
+      dob: Timestamp.fromDate(formData.dob), 
       registrationDate: serverTimestamp(),
     };
 
     try {
-      const docRef = await addDoc(collection(db, "qrClients"), newClientDataToSave);
+      const docRef = await addDoc(collection(db, "qrClients"), sanitizeObjectForFirestore(newClientDataToSave));
       const registeredClient: QrClient = {
         id: docRef.id,
         dni: newClientDataToSave.dni,
@@ -336,22 +327,18 @@ export default function BusinessPublicPageByUrl() {
         dob: newClientDataToSave.dob.toDate().toISOString(),
         registrationDate: new Date().toISOString(), 
       };
-      setQrData({
-        user: registeredClient,
-        promotion: {
+       const promotionDetails: PromotionDetails = {
             id: activeEntityForQr.id,
             title: activeEntityForQr.name,
             description: activeEntityForQr.description,
             validUntil: activeEntityForQr.endDate,
             imageUrl: activeEntityForQr.imageUrl || "",
-            promoCode: validatedSpecificCode,
-            type: activeEntityForQr.type as 'promotion' | 'event',
+            promoCode: validatedSpecificCode, // This is the 9-digit specific code
+            type: activeEntityForQr.type,
             termsAndConditions: activeEntityForQr.termsAndConditions,
             aiHint: activeEntityForQr.aiHint || "",
-        },
-        code: validatedSpecificCode,
-        status: 'available',
-      });
+        };
+      setQrData({ user: registeredClient, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
       setShowDniModal(false);
       setPageViewState('qrDisplay');
       toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
@@ -402,9 +389,13 @@ export default function BusinessPublicPageByUrl() {
   };
 
   const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormValues> = async (data) => {
-      const dniIsValidForCreation = await handleNewUserDniChangeDuringRegistration(data.dniConfirm, data);
-      if (dniIsValidForCreation) {
-          processNewQrClientRegistration(data);
+      if (data.dniConfirm.trim() !== enteredDni.trim()) {
+        const dniIsValidForCreation = await handleNewUserDniChangeDuringRegistration(data.dniConfirm, data);
+        if (dniIsValidForCreation) {
+            processNewQrClientRegistration(data);
+        }
+      } else {
+        processNewQrClientRegistration(data);
       }
   };
   
@@ -452,7 +443,7 @@ export default function BusinessPublicPageByUrl() {
     const canvasWidth = 320; 
 
     canvas.width = canvasWidth;
-    canvas.height = 600; // Initial estimate, will be adjusted
+    canvas.height = 600; 
     ctx.fillStyle = 'hsl(280, 13%, 96%)'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -463,7 +454,7 @@ export default function BusinessPublicPageByUrl() {
     
     const drawContent = () => {
         currentY = padding;
-        const headerBgHeightReduction = 15;
+        const headerBgHeightReduction = 15; 
         const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - headerBgHeightReduction;
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.fillRect(0, 0, canvas.width, headerBgHeight);
@@ -496,6 +487,7 @@ export default function BusinessPublicPageByUrl() {
         
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.font = `bold ${promoTitleFontSize}px Arial`;
+        ctx.textAlign = 'center';
         ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
         currentY += promoTitleFontSize + spacingAfterPromoTitle;
 
@@ -506,10 +498,11 @@ export default function BusinessPublicPageByUrl() {
             ctx.strokeStyle = 'hsl(var(--primary))'; 
             ctx.lineWidth = 2;
             ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-            currentY += qrSize + padding + 5; // Added more space after QR
+            currentY += qrSize + padding + 5; 
 
             ctx.fillStyle = 'hsl(var(--primary))';
-            ctx.font = `bold ${userDetailsFontSize + 2}px Arial`; // Larger name
+            ctx.font = `bold ${userDetailsFontSize + 2}px Arial`; 
+            ctx.textAlign = 'center';
             ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
             currentY += (userDetailsFontSize + 2) + lineSpacing;
 
@@ -520,12 +513,13 @@ export default function BusinessPublicPageByUrl() {
 
             ctx.font = `italic ${smallTextFontSize}px Arial`;
             ctx.fillStyle = 'hsl(var(--muted-foreground))'; 
+            ctx.textAlign = 'center';
             ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
             currentY += smallTextFontSize + lineSpacing;
 
             if (qrData.promotion.termsAndConditions) {
               ctx.font = `${smallTextFontSize}px Arial`;
-              const lines = [];
+              const lines: string[] = [];
               let currentLineText = "Términos: ";
               const words = qrData.promotion.termsAndConditions.split(" ");
               for (const word of words) {
@@ -593,15 +587,16 @@ export default function BusinessPublicPageByUrl() {
     setShowDniModal(false);
   };
 
-  // Specific Code Entry Form Component for each entity
+  // Componente de formulario para el código específico de 9 dígitos
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
     const form = useForm<SpecificCodeFormValues>({
-      resolver: zodResolver(specificCodeSchema),
+      resolver: zodResolver(specificCodeFormSchema),
       defaultValues: { specificCode: "" },
     });
+  
     return (
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(data => handleSpecificCodeSubmit(entity, data.specificCode))} className="space-y-2 mt-2">
+        <form onSubmit={form.handleSubmit(data => handleInitiateQrFlow(entity, data.specificCode))} className="space-y-2 mt-2">
           <FormField
             control={form.control}
             name="specificCode"
@@ -616,6 +611,7 @@ export default function BusinessPublicPageByUrl() {
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                     maxLength={9}
                     className="text-sm h-9"
+                    disabled={isLoadingQrFlow}
                   />
                 </FormControl>
                 <FormMessage />
@@ -630,6 +626,7 @@ export default function BusinessPublicPageByUrl() {
       </Form>
     );
   };
+
 
   if (isLoading) {
     return (
@@ -768,7 +765,6 @@ export default function BusinessPublicPageByUrl() {
     );
   }
 
-  // Fallback to entity list view if businessDetails is not null
   if (!businessDetails) return null;
 
   const events = activeEntitiesForBusiness.filter(e => e.type === 'event');
@@ -776,7 +772,6 @@ export default function BusinessPublicPageByUrl() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* <h1 className="text-3xl text-center font-bold text-blue-500 p-4">VERIFICACIÓN CAMBIO NEGOCIO - BusinessPublicPage</h1> */}
       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <Link href="/" passHref className="flex items-center gap-2 group">
@@ -905,10 +900,8 @@ export default function BusinessPublicPageByUrl() {
         ) : null }
       </main>
 
-      <footer className="mt-12 py-8 bg-muted/50 text-center">
-        <p className="text-sm text-muted-foreground">
-          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
-        </p>
+      <footer className="w-full mt-12 py-8 bg-muted/50 text-center">
+        <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
       </footer>
       
       <Dialog open={showDniModal} onOpenChange={(isOpen) => { if (!isOpen) { dniForm.reset(); newQrClientForm.reset(); } setShowDniModal(isOpen); }}>
@@ -1016,7 +1009,7 @@ export default function BusinessPublicPageByUrl() {
               El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
           </UIDialogDescription>
           <ShadcnDialogFooter>
-            <Button variant="outline" onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dniConfirm", ""); /* Limpiar DNI del form para que re-ingrese */ }}>No, corregir DNI</Button>
+            <Button variant="outline" onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dniConfirm", ""); }}>No, corregir DNI</Button>
             <Button onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</Button>
           </ShadcnDialogFooter>
         </AlertDialogContent>
