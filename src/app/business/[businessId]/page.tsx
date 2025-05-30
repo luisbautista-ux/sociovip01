@@ -1,15 +1,10 @@
 
-"use client";
-
-// This file serves as the fallback if a business doesn't have a customUrlPath,
-// or if accessed directly via its ID.
-// It renders the business page content. If the business has a customUrlPath,
-// it will redirect to /b/[customUrlPath].
+"use client"; // Mover "use client" al componente que realmente lo necesita
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation"; // Added useRouter import
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -42,6 +37,7 @@ import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
 
+// --- Esquemas Zod ---
 const specificCodeFormSchema = z.object({
   specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
 });
@@ -62,11 +58,13 @@ const newQrClientSchema = z.object({
 type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
 
 
+// Wrapper Server Component
 export default function BusinessPublicPageById({ params }: { params: { businessId: string } }) {
-  // This outer component is a Server Component by default in App Router if no "use client"
-  // It immediately renders the client component below.
-  // The "use client" directive is in BusinessPageClientComponent.
-  console.log("Business Public Page by ID - Server Component Shell. businessId from params:", params.businessId);
+  // No usar React.use(params) aquí si solo pasamos el ID.
+  // El console.log que accedía directamente a params.businessId causaba la advertencia.
+  // Lo eliminamos o lo dejamos sabiendo que puede generar una advertencia en dev.
+  // console.log("Business Public Page by ID - Server Component Shell. businessId from params:", params.businessId);
+
   if (!params.businessId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
@@ -84,7 +82,7 @@ export default function BusinessPublicPageById({ params }: { params: { businessI
   );
 }
 
-// The actual page content is a client component to handle state and interactivity
+
 function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromParams: string }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -106,6 +104,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormValues | null>(null);
 
+
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(dniSchema),
     defaultValues: { dni: "" },
@@ -118,21 +117,21 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
 
   const fetchBusinessDataById = useCallback(async () => {
     if (!businessIdFromParams) {
-      console.error("BusinessPage (Client): businessIdFromParams is missing.");
+      console.error("BusinessPage (Client - by ID): businessIdFromParams is missing.");
       setError("ID de negocio no proporcionado para cargar la página.");
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     setError(null);
-    console.log("BusinessPage (Client): Fetching business with ID:", businessIdFromParams);
+    console.log("BusinessPage (Client - by ID): Fetching business with ID:", businessIdFromParams);
 
     try {
       const businessDocRef = doc(db, "businesses", businessIdFromParams);
       const businessSnap = await getDoc(businessDocRef);
 
       if (!businessSnap.exists()) {
-        console.error("BusinessPage (Client): No business found for ID:", businessIdFromParams);
+        console.error("BusinessPage (Client - by ID): No business found for ID:", businessIdFromParams);
         setError("Negocio no encontrado. Verifica que el ID sea correcto.");
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
@@ -150,7 +149,6 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
           publicAddress: bizData.publicAddress || undefined,
-          // Include other fields as needed
           ruc: bizData.ruc,
           razonSocial: bizData.razonSocial,
           department: bizData.department,
@@ -162,15 +160,14 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           businessType: bizData.businessType,
         };
         
-        // Canonical URL redirection
         if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
-          console.log(`BusinessPage (Client): Business ${businessIdFromParams} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
+          console.log(`BusinessPage (Client - by ID): Business ${businessIdFromParams} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
           router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-          return; // Stop further execution as we are redirecting
+          return; 
         }
         
         setBusinessDetails(fetchedBusiness);
-        console.log("BusinessPage (Client): Business data found (no customUrlPath, rendering here):", fetchedBusiness.name, "ID:", fetchedBusiness.id);
+        console.log("BusinessPage (Client - by ID): Business data found (no customUrlPath, rendering here):", fetchedBusiness.name, "ID:", fetchedBusiness.id);
 
         const entitiesQuery = query(
           collection(db, "businessEntities"),
@@ -178,12 +175,10 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           where("isActive", "==", true)
         );
         const entitiesSnapshot = await getDocs(entitiesQuery);
-        console.log(`BusinessPage (Client): Fetched ${entitiesSnapshot.docs.length} active entities for business ${fetchedBusiness.id}.`);
         
         const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
-          
+          const entityData = docSnap.data();
           let startDateStr: string;
           let endDateStr: string;
           const nowStr = new Date().toISOString();
@@ -195,7 +190,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           } else if (entityData.startDate instanceof Date) {
               startDateStr = entityData.startDate.toISOString();
           } else {
-              console.warn(`BusinessPage (Client): Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
+              console.warn(`BusinessPage by ID: Entity ${docSnap.id} missing or invalid startDate. Using fallback.`);
               startDateStr = nowStr; 
           }
 
@@ -206,7 +201,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           } else if (entityData.endDate instanceof Date) {
               endDateStr = entityData.endDate.toISOString();
           } else {
-              console.warn(`BusinessPage (Client): Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
+              console.warn(`BusinessPage by ID: Entity ${docSnap.id} missing or invalid endDate. Using fallback.`);
               endDateStr = nowStr; 
           }
           
@@ -240,7 +235,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         setActiveEntitiesForBusiness(allActiveAndCurrentEntities.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
       }
     } catch (err: any) {
-      console.error("BusinessPage (Client): Error fetching business data by ID:", err);
+      console.error("BusinessPage (Client - by ID): Error fetching business data by ID:", err);
       setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
       setBusinessDetails(null);
       setActiveEntitiesForBusiness([]);
@@ -271,7 +266,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
 
     if (foundCodeObject) {
       setActiveEntityForQr(entity);
-      setValidatedSpecificCode(codeToValidate); // Store the validated 9-digit code
+      setValidatedSpecificCode(codeToValidate);
       setCurrentStepInModal('enterDni');
       dniForm.reset({ dni: "" });
       setShowDniModal(true);
@@ -527,7 +522,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                 logoHeight = logoWidth / aspectRatio;
             }
             ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
-            currentY += logoHeight + spacingAfterLogo / 2; 
+            currentY += logoHeight + spacingAfterLogo; // Full spacing after logo
         } else {
             currentY += padding; 
         }
@@ -542,7 +537,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         ctx.font = `bold ${promoTitleFontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
-        currentY += promoTitleFontSize + spacingAfterPromoTitle;
+        currentY += promoTitleFontSize + spacingAfterPromoTitle; // spacing after promo title
 
         const qrImage = new Image();
         qrImage.onload = () => {
@@ -551,7 +546,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             ctx.strokeStyle = 'hsl(var(--primary))'; 
             ctx.lineWidth = 2;
             ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-            currentY += qrSize + padding + 10;
+            currentY += qrSize + padding + 10; // Spacing after QR
 
             ctx.fillStyle = 'hsl(var(--primary))';
             ctx.font = `bold ${userDetailsFontSize + 2}px Arial`; 
@@ -655,10 +650,10 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             name="specificCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel htmlFor={`specificCode-${entity.id}`} className="text-xs text-muted-foreground">Código (9 dígitos) <span className="text-destructive">*</span></FormLabel>
+                <FormLabel htmlFor={`specificCode-${entity.id}-${businessIdFromParams}`} className="text-xs text-muted-foreground">Código (9 dígitos) <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <Input
-                    id={`specificCode-${entity.id}`}
+                    id={`specificCode-${entity.id}-${businessIdFromParams}`}
                     placeholder="ABC123XYZ"
                     {...field}
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
@@ -1076,5 +1071,3 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     </div>
   );
 }
-
-    
