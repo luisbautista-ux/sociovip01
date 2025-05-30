@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -18,7 +18,7 @@ import {
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, getDoc, updateDoc, addDoc, serverTimestamp, limit } from "firebase/firestore";
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData, SpecificCodeFormValues } from "@/lib/types";
-import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
+import { format, parseISO, startOfDay, endOfDay, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, PackageOpen, LogOut, UserCircle, AlertTriangle, Info, Download, Edit, UserCheck as UserCheckIcon } from "lucide-react";
@@ -42,10 +42,11 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as ShadcnAlertDialogDescription, // Alias this to avoid conflict if DialogDescription is also used
-  AlertDialogFooter as ShadcnAlertDialogFooterAliased, // Alias this
+  AlertDialogDescription,
+  AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
-  AlertDialogTitle as UIAlertDialogTitleAliased, // Alias this
+  AlertDialogTitle as UIAlertDialogTitleAliased,
+  AlertDialogTrigger, // Added AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 
 
@@ -67,6 +68,7 @@ const newQrClientSchema = z.object({
 });
 
 
+// This page is now a Client Component.
 export default function BusinessPublicPageById() {
   const params = useParams<{ businessId?: string }>();
   const businessIdFromParams = params?.businessId;
@@ -84,9 +86,9 @@ export default function BusinessPublicPageById() {
   const [showDniModal, setShowDniModal] = useState(false);
   const [currentStepInModal, setCurrentStepInModal] = useState<'enterDni' | 'newUserForm'>('enterDni');
   const [activeEntityForQr, setActiveEntityForQr] = useState<BusinessManagedEntity | null>(null);
-  const [validatedSpecificCode, setValidatedSpecificCode] = useState<string | null>(null); // To store the 9-digit code
+  const [validatedSpecificCode, setValidatedSpecificCode] = useState<string | null>(null);
   const [enteredDni, setEnteredDni] = useState<string>("");
-  const [qrData, setQrData] = useState<QrCodeData | null>(null); // Holds user + promo + code for QR display
+  const [qrData, setQrData] = useState<QrCodeData | null>(null);
   const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
@@ -101,6 +103,7 @@ export default function BusinessPublicPageById() {
     resolver: zodResolver(newQrClientSchema),
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
+
 
   const fetchBusinessDataById = useCallback(async (id: string) => {
     setIsLoadingPage(true);
@@ -124,8 +127,8 @@ export default function BusinessPublicPageById() {
       const fetchedBusiness: Business = {
         id: businessSnap.id,
         name: bizData.name || "Nombre de Negocio Desconocido",
-        contactEmail: bizData.contactEmail || "", // Added default
-        joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
+        contactEmail: bizData.contactEmail || "",
+        joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : (bizData.joinDate ? String(bizData.joinDate) : new Date().toISOString()),
         customUrlPath: bizData.customUrlPath || undefined,
         logoUrl: bizData.logoUrl || undefined,
         publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
@@ -133,12 +136,21 @@ export default function BusinessPublicPageById() {
         publicContactEmail: bizData.publicContactEmail || undefined,
         publicPhone: bizData.publicPhone || undefined,
         publicAddress: bizData.publicAddress || undefined,
+        ruc: bizData.ruc,
+        razonSocial: bizData.razonSocial,
+        department: bizData.department,
+        province: bizData.province,
+        district: bizData.district,
+        address: bizData.address,
+        managerName: bizData.managerName,
+        managerDni: bizData.managerDni,
+        businessType: bizData.businessType,
       };
       
       if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
          console.log(`BusinessPage by ID (Client): Business ${id} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
          router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-         return; 
+         return; // Stop further processing as we are redirecting
       }
     
       setBusinessDetails(fetchedBusiness);
@@ -154,7 +166,7 @@ export default function BusinessPublicPageById() {
       
       const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
       entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data();
+          const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & {startDate: Timestamp | string, endDate: Timestamp | string, createdAt?: Timestamp | string };
           
           let startDateStr: string;
           let endDateStr: string;
@@ -224,7 +236,7 @@ export default function BusinessPublicPageById() {
     } finally {
       setIsLoadingPage(false);
     }
-  }, [router, toast]); // No incluir 'toast' si no se usa aquí
+  }, [router, toast]); // Added toast
 
   useEffect(() => {
     if (businessIdFromParams) {
@@ -323,7 +335,7 @@ export default function BusinessPublicPageById() {
           description: activeEntityForQr.description,
           validUntil: activeEntityForQr.endDate,
           imageUrl: activeEntityForQr.imageUrl || "",
-          promoCode: validatedSpecificCode, // This is the 9-digit code for the QR
+          promoCode: validatedSpecificCode, 
           aiHint: activeEntityForQr.aiHint || "",
           type: activeEntityForQr.type,
           termsAndConditions: activeEntityForQr.termsAndConditions,
@@ -475,12 +487,12 @@ export default function BusinessPublicPageById() {
 
     const padding = 20;
     const qrSize = 180; 
-    const maxLogoHeight = 50; 
-    const spacingAfterLogo = 20; 
-    const businessNameFontSize = 14; 
-    const spacingAfterBusinessName = 40; 
-    const entityTitleFontSize = 20; 
-    const spacingAfterEntityTitle = 15; 
+    const maxLogoHeight = 40; 
+    const spacingAfterLogo = 5; 
+    const businessNameFontSize = 12; 
+    const spacingAfterBusinessName = 25; 
+    const entityTitleFontSize = 18; 
+    const spacingAfterEntityTitle = 10; 
     const userDetailsFontSize = 16;
     const smallTextFontSize = 10;
     const lineSpacing = 5;
@@ -511,13 +523,14 @@ export default function BusinessPublicPageById() {
     
     const calculateDynamicHeight = () => {
       let estimatedHeight = padding; 
-      const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 -15; 
+      const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding;
       estimatedHeight = headerBgHeight;
       estimatedHeight += spacingAfterBusinessName; 
 
       ctx.font = `bold ${entityTitleFontSize}px Arial`;
-      const entityTitleLines = textLines(qrData.promotion.title, canvasWidth - 2 * padding, `bold ${entityTitleFontSize}px Arial`);
-      estimatedHeight += entityTitleLines.length * (entityTitleFontSize + lineSpacing) + spacingAfterEntityTitle;
+      const entityTitleLinesToCalc = textLines(qrData.promotion.title, canvasWidth - 2 * padding, `bold ${entityTitleFontSize}px Arial`);
+      estimatedHeight += entityTitleLinesToCalc.length * (entityTitleFontSize + lineSpacing);
+      estimatedHeight += spacingAfterEntityTitle;
       
       estimatedHeight += qrSize + padding;
       estimatedHeight += (userDetailsFontSize + 2) + lineSpacing; 
@@ -542,10 +555,10 @@ export default function BusinessPublicPageById() {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       currentY = 0;
 
-      const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - 15; 
+      const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding;
       ctx.fillStyle = 'hsl(var(--primary))'; 
       ctx.fillRect(0, currentY, canvas.width, headerBgHeight);
-      currentY += padding; 
+      currentY += padding / 2; 
 
       if (businessDetails.logoUrl) {
         const aspectRatio = businessLogo.width / businessLogo.height;
@@ -580,6 +593,7 @@ export default function BusinessPublicPageById() {
       });
       currentY += spacingAfterEntityTitle - lineSpacing;
 
+
       const qrImage = new Image();
       qrImage.onload = () => {
         const qrX = (canvasWidth - qrSize) / 2;
@@ -587,7 +601,7 @@ export default function BusinessPublicPageById() {
         ctx.strokeStyle = 'hsl(var(--primary))';
         ctx.lineWidth = 2;
         ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-        currentY += qrSize + padding;
+        currentY += qrSize + padding * 0.75; // Reduced padding after QR
 
         ctx.fillStyle = 'hsl(var(--primary))';
         ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
@@ -604,10 +618,19 @@ export default function BusinessPublicPageById() {
         ctx.fillStyle = 'hsl(var(--muted-foreground))';
         ctx.textAlign = 'center';
         ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvasWidth / 2, currentY);
-        currentY += smallTextFontSize + lineSpacing + 15;
+        currentY += smallTextFontSize + lineSpacing + 10;
         
-        // Terms and conditions (already removed from display, ensuring it's not in download either)
-        // if (qrData.promotion.termsAndConditions) { ... }
+        if (qrData.promotion.termsAndConditions) {
+            ctx.font = `italic ${smallTextFontSize -1}px Arial`;
+            ctx.fillStyle = 'hsl(var(--muted-foreground))';
+            const termsLinesToDraw = textLines(qrData.promotion.termsAndConditions, canvasWidth - 2 * padding, `italic ${smallTextFontSize -1}px Arial`);
+            termsLinesToDraw.forEach(line => {
+                ctx.fillText(line, canvasWidth / 2, currentY);
+                currentY += smallTextFontSize + 2;
+            });
+             currentY += padding / 2;
+        }
+
 
         const dataUrl = canvas.toDataURL('image/png');
         const linkElement = document.createElement('a');
@@ -676,7 +699,7 @@ export default function BusinessPublicPageById() {
                 <FormControl>
                   <Input
                     id={`specificCode-${entity.id}-${businessIdFromParams}`}
-                    placeholder="Ingresa código (9 dígitos)"
+                    placeholder="Ingresa código de 9 dígitos"
                     {...field}
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                     maxLength={9}
@@ -697,6 +720,7 @@ export default function BusinessPublicPageById() {
     );
   };
 
+
   if (!businessIdFromParams && !isLoadingPage && !pageError) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
@@ -709,13 +733,18 @@ export default function BusinessPublicPageById() {
       </div>
     );
   }
-
+  
   if (isLoadingPage || loadingAuth || loadingProfile) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-start">
-                {/* Placeholder for business logo and name if needed in header later */}
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-background/95 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                 <div className="flex items-center gap-2">
+                    <Link href="/" passHref className="flex items-center gap-2 group">
+                        <SocioVipLogo className="h-8 w-8 text-primary group-hover:animate-pulse" />
+                    </Link>
+                 </div>
+                 {/* PublicHeaderAuth moved to footer */}
             </div>
         </header>
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
@@ -725,7 +754,7 @@ export default function BusinessPublicPageById() {
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
               <div className="flex items-center gap-3">
-                {/* User Auth Section (placeholder or actual if needed) */}
+                {/* User Auth Section in footer */}
               </div>
               <div className="text-muted-foreground">
                   <Link href="/" className="hover:text-primary hover:underline">
@@ -741,9 +770,13 @@ export default function BusinessPublicPageById() {
   if (pageError) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-             <div className="max-w-7xl mx-auto flex items-center justify-start">
-                {/* Placeholder */}
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-background/95 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+             <div className="max-w-7xl mx-auto flex items-center justify-between">
+                 <div className="flex items-center gap-2">
+                    <Link href="/" passHref className="flex items-center gap-2 group">
+                        <SocioVipLogo className="h-8 w-8 text-primary group-hover:animate-pulse" />
+                    </Link>
+                 </div>
             </div>
         </header>
         <main className="flex-grow flex flex-col items-center justify-center text-center p-4 md:p-8">
@@ -757,7 +790,7 @@ export default function BusinessPublicPageById() {
          <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
                 <div className="flex items-center gap-3">
-                  {/* Footer Auth Section */}
+                {/* Auth section */}
                 </div>
                 <div className="text-muted-foreground">
                      <Link href="/" className="hover:text-primary hover:underline">
@@ -773,9 +806,13 @@ export default function BusinessPublicPageById() {
   if (!businessDetails && !isLoadingPage && !pageError) { 
      return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
-            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-                <div className="max-w-7xl mx-auto flex items-center justify-start">
-                   {/* Placeholder */}
+            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-background/95 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Link href="/" passHref className="flex items-center gap-2 group">
+                            <SocioVipLogo className="h-8 w-8 text-primary group-hover:animate-pulse" />
+                        </Link>
+                    </div>
                 </div>
             </header>
             <main className="flex-grow flex flex-col items-center justify-center text-center p-4 md:p-8">
@@ -789,38 +826,7 @@ export default function BusinessPublicPageById() {
             <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
                  <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
                     <div className="flex items-center gap-3">
-                       {!loadingAuth && !loadingProfile && (
-                        <>
-                            {currentUser && userProfile ? (
-                            <>
-                                <span className="text-foreground flex items-center">
-                                <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                                Hola, {userProfile.name || currentUser.email?.split('@')[0]}
-                                </span>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
-                                        <ShadcnAlertDialogFooterAliased>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
-                                        </ShadcnAlertDialogFooterAliased>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                                <Link href="/auth/dispatcher" passHref>
-                                <Button variant="outline" size="sm">Ir a Administración</Button>
-                                </Link>
-                            </>
-                            ) : (
-                            <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
-                                Iniciar Sesión
-                            </Button>
-                            )}
-                        </>
-                        )}
-                        {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                       {/* Auth elements will be here */}
                     </div>
                     <div className="text-muted-foreground">
                         <Link href="/" className="hover:text-primary hover:underline">
@@ -836,7 +842,7 @@ export default function BusinessPublicPageById() {
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
-            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-background/95 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
                 <div className="max-w-7xl mx-auto flex items-center justify-start">
                     {businessDetails.logoUrl && (
                         <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
@@ -902,7 +908,7 @@ export default function BusinessPublicPageById() {
                                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><UIDialogDescriptionComponent>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescriptionComponent></AlertDialogHeader>
                                         <ShadcnAlertDialogFooterAliased>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                             <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
@@ -935,8 +941,6 @@ export default function BusinessPublicPageById() {
 
   // Fallback para asegurar que businessDetails no es null antes de usarlo extensivamente en la lista
   if (!businessDetails) {
-    // This state should ideally be caught by isLoadingPage or pageError earlier
-    // If it reaches here, it's an unexpected state.
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
@@ -950,7 +954,7 @@ export default function BusinessPublicPageById() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-background/95 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
             <div className="max-w-7xl mx-auto flex items-center justify-start">
                 {businessDetails.logoUrl && (
                   <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3" data-ai-hint="logo business"/>
@@ -1060,7 +1064,7 @@ export default function BusinessPublicPageById() {
                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><UIDialogDescriptionComponent>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescriptionComponent></AlertDialogHeader>
                             <ShadcnAlertDialogFooterAliased>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
@@ -1139,7 +1143,7 @@ export default function BusinessPublicPageById() {
                         {...field} 
                         onBlur={(e) => handleNewUserDniChangeDuringRegistration(e.target.value, newQrClientForm.getValues())}
                         maxLength={15} 
-                        disabled={true} // DNI is disabled after initial entry/verification step
+                        disabled={true} 
                         className="disabled:bg-muted/50"
                       />
                     </FormControl>
@@ -1199,9 +1203,9 @@ export default function BusinessPublicPageById() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
-            <ShadcnAlertDialogDescription>
+            <UIDialogDescriptionComponent>
                 El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
-            </ShadcnAlertDialogDescription>
+            </UIDialogDescriptionComponent>
           </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
             <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", formDataForDniWarning?.dni || ""); }}>No, corregir DNI</AlertDialogCancel>
@@ -1213,5 +1217,3 @@ export default function BusinessPublicPageById() {
     </div>
   );
 }
-
-    
