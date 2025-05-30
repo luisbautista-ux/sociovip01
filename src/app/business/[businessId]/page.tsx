@@ -1,12 +1,12 @@
 
-"use client"; // This file will now effectively become a client component entry due to the logic moved.
-              // However, the shell `BusinessPublicPageById` can remain a server component if it *only* passes props.
-              // For simplicity and to ensure all hooks work as expected, let's make the primary logic client-side.
+// This file demonstrates a Server Component shell exporting a Client Component
+// for the actual interactive page logic.
 
+import * as React from "react"; // Import React for React.use
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation"; // useRouter for client-side navigation
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,15 +19,15 @@ import {
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
-import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit, LogOut, UserCircle, Camera } from "lucide-react";
+import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit, LogOut, UserCircle, Camera, Search } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle as UIDialogTitleComponent, DialogDescription as UIDialogDescriptionComponent, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle as UIAlertTitleComponent } from "@/components/ui/alert";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
@@ -43,21 +43,12 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as ShadcnAlertDialogDescription, // Alias to avoid conflict if local UIDialogDescription is used
   AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
   AlertDialogTitle as UIAlertDialogTitleAliased,
 } from "@/components/ui/alert-dialog";
 
-
-// Server Component Shell
-export default function BusinessPublicPageById({ params }: { params: { businessId: string } }) {
-  // The server component now only passes the businessId string to the client component
-  // The check for !params.businessId will be done in the client component
-  return (
-    <BusinessPageClientComponent businessIdFromParams={params.businessId} />
-  );
-}
 
 // Schemas (remain the same)
 const specificCodeFormSchema = z.object({
@@ -79,8 +70,34 @@ const newQrClientSchema = z.object({
 });
 
 
+// Server Component Shell
+export default function BusinessPublicPageById({ params: paramsPromise }: { params: Promise<{ businessId: string }> }) {
+  // Use React.use to unwrap the params promise, as recommended by Next.js
+  const params = React.use(paramsPromise);
+  const businessId = params.businessId;
+
+  if (!businessId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
+          <p className="text-muted-foreground mt-2">La URL no especificó un ID de negocio.</p>
+          <Link href="/" passHref>
+            <Button variant="link" className="mt-6 text-primary">Volver a la Página Principal</Button>
+          </Link>
+      </div>
+    );
+  }
+  return (
+    <BusinessPageClientComponent businessIdFromParams={businessId} />
+  );
+}
+
+
 // Client Component for actual page logic
 function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromParams?: string }) {
+  "use client";
+
   const router = useRouter();
   const { toast } = useToast();
   const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
@@ -101,7 +118,6 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
-
   const [showLoginModal, setShowLoginModal] = useState(false);
 
 
@@ -130,17 +146,17 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
       } else {
-        const bizData = businessSnap.data() as Omit<Business, 'id'>;
+        const bizData = businessSnap.data() as Omit<Business, 'id' | 'joinDate'>; // Assuming joinDate needs conversion
         const fetchedBusiness: Business = {
           id: businessSnap.id,
           ...bizData,
           joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate),
+          // Ensure other Timestamp fields are converted if they exist on Business type
         };
         
-        if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
+        if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "" && fetchedBusiness.customUrlPath.trim() !== id) {
            console.log(`BusinessPage (Client - by ID): Business ${id} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
            router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-           // Do not setIsLoading(false) here as the component will unmount due to redirection
            return; 
         }
       
@@ -157,8 +173,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         
         const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
-            const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
-            
+            const entityData = docSnap.data();
             let startDateStr: string;
             let endDateStr: string;
             const nowStr = new Date().toISOString();
@@ -167,7 +182,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                 startDateStr = entityData.startDate.toDate().toISOString();
             } else if (typeof entityData.startDate === 'string') {
                 startDateStr = entityData.startDate;
-            } else if (entityData.startDate instanceof Date) { // Should not happen if data comes from Firestore Timestamps
+            } else if (entityData.startDate instanceof Date) {
                 startDateStr = entityData.startDate.toISOString();
             } else {
                 console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
@@ -187,9 +202,22 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             
             const entityForCheck: BusinessManagedEntity = {
               id: docSnap.id,
-              ...entityData,
+              businessId: entityData.businessId,
+              type: entityData.type,
+              name: entityData.name || "Entidad sin nombre",
+              description: entityData.description || "",
               startDate: startDateStr,
               endDate: endDateStr,
+              isActive: entityData.isActive === undefined ? true : entityData.isActive,
+              usageLimit: entityData.usageLimit || 0,
+              maxAttendance: entityData.maxAttendance || 0,
+              ticketTypes: Array.isArray(entityData.ticketTypes) ? entityData.ticketTypes.map((tt: any) => sanitizeObjectForFirestore({...tt})) : [],
+              eventBoxes: Array.isArray(entityData.eventBoxes) ? entityData.eventBoxes.map((eb: any) => sanitizeObjectForFirestore({...eb})) : [],
+              assignedPromoters: Array.isArray(entityData.assignedPromoters) ? entityData.assignedPromoters.map((ap: any) => sanitizeObjectForFirestore({...ap})) : [],
+              generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes.map((gc: any) => sanitizeObjectForFirestore({...gc})) : [],
+              imageUrl: entityData.imageUrl,
+              aiHint: entityData.aiHint,
+              termsAndConditions: entityData.termsAndConditions,
               createdAt: entityData.createdAt instanceof Timestamp 
                 ? entityData.createdAt.toDate().toISOString() 
                 : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
@@ -208,7 +236,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       setActiveEntitiesForBusiness([]);
     } finally {
       // Only set loading to false if not redirecting
-      if (!(businessDetails?.customUrlPath && businessDetails.customUrlPath.trim() !== "")) {
+      if (!(businessDetails?.customUrlPath && businessDetails.customUrlPath.trim() !== "" && businessDetails.customUrlPath.trim() !== id)) {
           setIsLoading(false);
       }
     }
@@ -234,7 +262,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         return;
     }
     if (!entity.generatedCodes || entity.generatedCodes.length === 0) {
-      toast({title: "Sin Códigos", description: `Esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} no tiene códigos creados.`, variant: "destructive"});
+      toast({title: "Sin Códigos", description: `Esta ${entity.type === 'promotion' ? 'promoción' : 'entidad'} no tiene códigos creados. Contacta al negocio.`, variant: "destructive"});
       return;
     }
 
@@ -251,7 +279,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     } else {
       toast({
         title: "Código Inválido o No Disponible",
-        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} o ya fue utilizado/vencido.`,
+        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'entidad'} o ya fue utilizado/vencido.`,
         variant: "destructive",
       });
     }
@@ -331,7 +359,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       phone: formData.phone,
       dob: Timestamp.fromDate(formData.dob), 
       registrationDate: serverTimestamp(),
-      generatedForBusinessId: businessDetails.id,
+      generatedForBusinessId: businessDetails.id, 
       generatedForEntityId: activeEntityForQr.id, 
     };
 
@@ -449,17 +477,17 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     }
 
     const padding = 20;
-    const qrSize = 180; 
-    const maxLogoHeight = 50;
-    const spacingAfterLogo = 20;
+    let qrSize = 180;
+    const maxLogoHeight = 50; 
+    const spacingAfterLogo = 10; 
     const businessNameFontSize = 14; 
-    const spacingAfterBusinessName = 40; 
+    const spacingAfterBusinessName = 20; 
     const entityTitleFontSize = 20; 
     const spacingAfterEntityTitle = 15; 
     const userDetailsFontSize = 16;
     const smallTextFontSize = 10;
     const lineSpacing = 5;
-    const canvasWidth = 320; 
+    const canvasWidth = 320;
 
     let currentY = 0;
     const businessLogo = new Image();
@@ -469,7 +497,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       ctx.font = font;
       const words = text.split(' ');
       const lines: string[] = [];
-      let currentLine = words[0];
+      let currentLine = words[0] || "";
       for (let i = 1; i < words.length; i++) {
         const word = words[i];
         const width = ctx.measureText(currentLine + " " + word).width;
@@ -483,15 +511,19 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       lines.push(currentLine);
       return lines;
     };
-
+    
     const calculateDynamicHeight = () => {
       let estimatedHeight = padding; // Top padding
 
-      // Header part
-      estimatedHeight += maxLogoHeight + spacingAfterLogo + businessNameFontSize + spacingAfterBusinessName;
+      // Header part (Logo and Business Name)
+      const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
+      estimatedHeight = headerBgHeight; // Y after header bg
+      estimatedHeight += spacingAfterBusinessName; // Space after header block
 
       // Entity Title
-      estimatedHeight += entityTitleFontSize + spacingAfterEntityTitle;
+      ctx.font = `bold ${entityTitleFontSize}px Arial`; // Set font to measure
+      const entityTitleLines = textLines(qrData.promotion.title, canvasWidth - 2 * padding, `bold ${entityTitleFontSize}px Arial`);
+      estimatedHeight += entityTitleLines.length * (entityTitleFontSize + lineSpacing) + spacingAfterEntityTitle;
       
       // QR Code
       estimatedHeight += qrSize + padding;
@@ -506,8 +538,8 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       // Terms and Conditions
       if (qrData.promotion.termsAndConditions) {
           const termsFont = `italic ${smallTextFontSize -1}px Arial`;
-          const termsLines = textLines(qrData.promotion.termsAndConditions, canvasWidth - 2 * padding, termsFont);
-          estimatedHeight += termsLines.length * (smallTextFontSize + 2) + padding / 2;
+          const termsLinesToDraw = textLines(qrData.promotion.termsAndConditions, canvasWidth - 2 * padding, termsFont);
+          estimatedHeight += termsLinesToDraw.length * (smallTextFontSize + 2) + padding / 2;
       }
       estimatedHeight += padding; // Bottom padding
       return estimatedHeight;
@@ -522,20 +554,17 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       currentY = 0;
 
+      // Header con logo y nombre del negocio
       const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
-      ctx.fillStyle = 'hsl(var(--primary))'; 
+      ctx.fillStyle = 'hsl(var(--primary))'; // Vibrant Purple
       ctx.fillRect(0, currentY, canvas.width, headerBgHeight);
-      currentY += padding; 
+      currentY += padding; // Padding superior dentro de la cabecera
 
       if (businessDetails.logoUrl) {
         const aspectRatio = businessLogo.width / businessLogo.height;
-        let logoHeight = businessLogo.height;
-        let logoWidth = businessLogo.width;
+        let logoHeight = maxLogoHeight;
+        let logoWidth = logoHeight * aspectRatio;
 
-        if (logoHeight > maxLogoHeight) {
-          logoHeight = maxLogoHeight;
-          logoWidth = logoHeight * aspectRatio;
-        }
         if (logoWidth > canvasWidth - 2 * padding) { 
             logoWidth = canvasWidth - 2 * padding;
             logoHeight = logoWidth / aspectRatio;
@@ -543,24 +572,30 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         ctx.drawImage(businessLogo, (canvasWidth - logoWidth) / 2, currentY, logoWidth, logoHeight); 
         currentY += logoHeight + spacingAfterLogo; 
       } else {
-        currentY += maxLogoHeight + spacingAfterLogo; 
+        currentY += maxLogoHeight + spacingAfterLogo; // Placeholder space if no logo
       }
       
-      ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
-      ctx.font = `bold ${businessNameFontSize}px Arial`;
+      ctx.fillStyle = 'hsl(var(--primary-foreground))'; // White text
+      ctx.font = `${businessNameFontSize}px Arial`;
       ctx.textAlign = 'center';
       ctx.fillText(businessDetails.name, canvasWidth / 2, currentY);
-      currentY += businessNameFontSize + padding / 2; 
+      currentY += businessNameFontSize + padding / 2; // Padding inferior dentro de la cabecera
       
-      currentY = headerBgHeight; 
-      currentY += spacingAfterBusinessName; 
+      currentY = headerBgHeight; // Reset Y to be after the header for next content
+      currentY += spacingAfterBusinessName; // Espacio después de la cabecera
 
+      // Título de la Promoción/Evento
       ctx.fillStyle = 'hsl(var(--primary))';
       ctx.font = `bold ${entityTitleFontSize}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText(qrData.promotion.title, canvasWidth / 2, currentY);
-      currentY += entityTitleFontSize + spacingAfterEntityTitle;
+      const entityTitleLines = textLines(qrData.promotion.title, canvasWidth - 2 * padding, `bold ${entityTitleFontSize}px Arial`);
+      entityTitleLines.forEach(line => {
+        ctx.fillText(line, canvasWidth / 2, currentY);
+        currentY += entityTitleFontSize + lineSpacing;
+      });
+      currentY += spacingAfterEntityTitle - lineSpacing; // Adjust spacing after last line
 
+      // QR Code
       const qrImage = new Image();
       qrImage.onload = () => {
         const qrX = (canvasWidth - qrSize) / 2;
@@ -570,6 +605,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
         currentY += qrSize + padding;
 
+        // Nombre y DNI del Usuario
         ctx.fillStyle = 'hsl(var(--primary))';
         ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
         ctx.textAlign = 'center';
@@ -581,12 +617,14 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvasWidth / 2, currentY);
         currentY += (userDetailsFontSize - 2) + padding;
 
+        // Validez
         ctx.font = `italic ${smallTextFontSize}px Arial`;
         ctx.fillStyle = 'hsl(var(--muted-foreground))';
         ctx.textAlign = 'center';
         ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvasWidth / 2, currentY);
         currentY += smallTextFontSize + lineSpacing + 15;
         
+        // Terms and conditions
         if (qrData.promotion.termsAndConditions) {
             const termsFont = `italic ${smallTextFontSize -1}px Arial`;
             const termsLinesToDraw = textLines(qrData.promotion.termsAndConditions, canvasWidth - 2 * padding, termsFont);
@@ -594,14 +632,11 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             ctx.fillStyle = 'hsl(var(--muted-foreground))';
             termsLinesToDraw.forEach(line => {
                 ctx.fillText(line, canvasWidth / 2, currentY);
-                currentY += smallTextFontSize + 2;
+                currentY += smallTextFontSize + 2; // line height for terms
             });
             currentY += padding / 2;
         }
         
-        // No need to redraw if calculateDynamicHeight was accurate
-        // If not, a second pass with the new currentY as canvas.height would be needed.
-
         const dataUrl = canvas.toDataURL('image/png');
         const linkElement = document.createElement('a');
         linkElement.href = dataUrl;
@@ -678,7 +713,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                     disabled={isLoadingQrFlow}
                   />
                 </FormControl>
-                <FormMessage />
+                <FormMessageHook />
               </FormItem>
             )}
           />
@@ -692,7 +727,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   };
 
 
-  if (!businessIdFromParams) {
+  if (!businessIdFromParams && !isLoading) { // Added !isLoading here
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
           <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
@@ -709,15 +744,64 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-           {/* Minimal header during load */}
+           {businessDetails?.logoUrl && businessDetails?.name && (
+            <div className="max-w-7xl mx-auto flex items-center justify-start">
+                <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
+                <div>
+                <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
+                {businessDetails.slogan && <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>}
+                </div>
+            </div>
+           )}
         </header>
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
             <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
         </main>
-        <footer className="w-full py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
-            {/* Minimal footer during load */}
+         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div className="flex items-center gap-3">
+                    {!loadingAuth && !loadingProfile && (
+                    <>
+                        {currentUser && userProfile ? (
+                        <>
+                            <span className="text-foreground flex items-center">
+                            <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                            Hola, {userProfile.name || currentUser.email?.split('@')[0]}
+                            </span>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
+                                    <ShadcnAlertDialogFooterAliased>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                                    </ShadcnAlertDialogFooterAliased>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                            <Link href="/auth/dispatcher" passHref>
+                            <Button variant="outline" size="sm">Ir a Administración</Button>
+                            </Link>
+                        </>
+                        ) : (
+                        <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                            Iniciar Sesión
+                        </Button>
+                        )}
+                    </>
+                    )}
+                    {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                </div>
+                <div className="text-muted-foreground">
+                    <Link href="/" className="hover:text-primary hover:underline">
+                    Plataforma de sociosvip.app
+                    </Link>
+                </div>
+            </div>
         </footer>
+        <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
       </div>
     );
   }
@@ -726,15 +810,15 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
          <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-            {/* Header remains minimal or shows SocioVIP branding if business data failed */}
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div>
-                        <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
-                    </div>
-                </Link>
+            {businessDetails?.logoUrl && businessDetails?.name && (
+            <div className="max-w-7xl mx-auto flex items-center justify-start">
+                <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
+                <div>
+                <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
+                {businessDetails.slogan && <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>}
+                </div>
             </div>
+           )}
         </header>
         <main className="flex-grow flex flex-col items-center justify-center text-center p-4 md:p-8">
             <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
@@ -747,21 +831,20 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
          <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
                 <div className="flex items-center gap-3">
-                    {/* Auth buttons */}
-                     {!loadingAuth && !loadingProfile && (
+                    {!loadingAuth && !loadingProfile && (
                         <>
-                            {currentUser ? (
+                            {currentUser && userProfile ? (
                             <>
                                 <span className="text-foreground flex items-center">
                                 <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                                Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
+                                Hola, {userProfile.name || currentUser.email?.split('@')[0]}
                                 </span>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
                                         <ShadcnAlertDialogFooterAliased>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                             <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
@@ -788,6 +871,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                 </div>
             </div>
         </footer>
+         <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
       </div>
     );
   }
@@ -801,8 +885,43 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                         <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
                         <div>
                             <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
+                            <p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p>
                         </div>
                     </Link>
+                     <div className="flex items-center gap-3">
+                        {!loadingAuth && !loadingProfile && (
+                        <>
+                            {currentUser && userProfile ? (
+                            <>
+                                <span className="text-foreground flex items-center">
+                                <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                                Hola, {userProfile.name || currentUser.email?.split('@')[0]}
+                                </span>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
+                                        <ShadcnAlertDialogFooterAliased>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                                        </ShadcnAlertDialogFooterAliased>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                                <Link href="/auth/dispatcher" passHref>
+                                <Button variant="outline" size="sm">Ir a Administración</Button>
+                                </Link>
+                            </>
+                            ) : (
+                            <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                                Iniciar Sesión
+                            </Button>
+                            )}
+                        </>
+                        )}
+                        {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                    </div>
                 </div>
             </header>
             <main className="flex-grow flex flex-col items-center justify-center text-center p-4 md:p-8">
@@ -816,21 +935,20 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
                  <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
                     <div className="flex items-center gap-3">
-                        {/* Auth buttons */}
                         {!loadingAuth && !loadingProfile && (
                         <>
-                            {currentUser ? (
+                            {currentUser && userProfile ? (
                             <>
                                 <span className="text-foreground flex items-center">
                                 <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                                Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
+                                Hola, {userProfile.name || currentUser.email?.split('@')[0]}
                                 </span>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
                                         <ShadcnAlertDialogFooterAliased>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                             <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
@@ -857,6 +975,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                     </div>
                 </div>
             </footer>
+             <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
         </div>
     );
   }
@@ -864,16 +983,16 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
-            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-                <div className="max-w-7xl mx-auto flex items-center justify-start">
-                    {businessDetails.logoUrl && (
+           <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+                {businessDetails.logoUrl && (
+                    <div className="max-w-7xl mx-auto flex items-center justify-start">
                         <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
-                    )}
-                    <div>
+                        <div>
                         <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
                         {businessDetails.slogan && <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>}
+                        </div>
                     </div>
-                </div>
+                )}
             </header>
             <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
                 <Card className="w-full max-w-md shadow-xl">
@@ -902,6 +1021,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                             <p className="text-muted-foreground">
                                 Válido hasta: {format(parseISO(activeEntityForQr.endDate), "dd MMMM yyyy", { locale: es })}
                             </p>
+                            {/* Terms and conditions removed from display as per previous request */}
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col sm:flex-row gap-2">
@@ -919,18 +1039,18 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                     <div className="flex items-center gap-3">
                         {!loadingAuth && !loadingProfile && (
                         <>
-                            {currentUser ? (
+                            {currentUser && userProfile ? (
                             <>
                                 <span className="text-foreground flex items-center">
                                 <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                                Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
+                                Hola, {userProfile.name || currentUser.email?.split('@')[0]}
                                 </span>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
                                         <ShadcnAlertDialogFooterAliased>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                             <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
@@ -957,13 +1077,13 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                     </div>
                 </div>
             </footer>
+             <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
         </div>
     );
   }
 
   // Fallback para asegurar que businessDetails no es null antes de usarlo extensivamente
   if (!businessDetails) {
-    // This case should ideally be covered by isLoading or error states
     return (
          <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
@@ -978,18 +1098,20 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            {businessDetails.logoUrl && (
             <div className="max-w-7xl mx-auto flex items-center justify-start">
-                {businessDetails.logoUrl && (
-                  <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
-                )}
+                <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={50} height={50} className="h-12 w-auto object-contain rounded mr-3"/>
                 <div>
-                  <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
-                  {businessDetails.slogan && <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>}
+                <h1 className="font-semibold text-2xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
+                {businessDetails.slogan && <p className="text-sm text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>}
                 </div>
             </div>
+            )}
         </header>
         
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
+        {/* Removed large business name display from here */}
+        
         {events.length > 0 && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
@@ -1051,7 +1173,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                     <CardTitle className="mt-2">No hay Actividad por Ahora</CardTitle>
                 </CardHeader>
                 <CardContent className="text-center">
-                    <CardDescription>Este negocio no tiene eventos o promociones activos en este momento. ¡Vuelve pronto!</CardDescription>
+                    <UIDialogDescriptionComponent>Este negocio no tiene eventos o promociones activos en este momento. ¡Vuelve pronto!</UIDialogDescriptionComponent>
                 </CardContent>
             </Card>
         )}
@@ -1076,18 +1198,18 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           <div className="flex items-center gap-3">
             {!loadingAuth && !loadingProfile && (
               <>
-                {currentUser ? (
+                {currentUser && userProfile ? (
                   <>
                     <span className="text-foreground flex items-center">
                       <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                      Hola, {userProfile?.name || currentUser.email?.split('@')[0]}
+                      Hola, {userProfile.name || currentUser.email?.split('@')[0]}
                     </span>
                      <AlertDialog>
                         <AlertDialogTrigger asChild>
                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><ShadcnAlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</ShadcnAlertDialogDescription></AlertDialogHeader>
                             <ShadcnAlertDialogFooterAliased>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
@@ -1143,7 +1265,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                   <FormItem>
                     <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input placeholder="Número de documento" {...field} maxLength={15} disabled={isLoadingQrFlow} autoFocus /></FormControl>
-                    <FormMessage />
+                    <FormMessageHook />
                   </FormItem>
                 )} />
                 <ShadcnDialogFooter className="pt-2">
@@ -1170,17 +1292,17 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                         className="disabled:bg-muted/30"
                       />
                     </FormControl>
-                    <FormMessage />
+                    <FormMessageHook />
                   </FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus nombres" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus nombres" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessageHook /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="surname" render={({ field }) => (
-                  <FormItem><FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessageHook /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessageHook /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="dob" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
@@ -1207,7 +1329,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage />
+                    <FormMessageHook />
                   </FormItem>
                 )} />
                 <ShadcnDialogFooter className="pt-3">
@@ -1223,15 +1345,15 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       </Dialog>
 
       <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
-         <AlertDialogContent>
-           <AlertDialogHeader>
+        <AlertDialogContent>
+          <AlertDialogHeader>
             <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
-            <AlertDialogDescription>
+            <ShadcnAlertDialogDescription>
                 El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
-            </AlertDialogDescription>
-           </AlertDialogHeader>
+            </ShadcnAlertDialogDescription>
+          </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
-            <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", formDataForDniWarning?.dni || ""); /* Restore DNI field to what it was before the blur that triggered the warning, or clear if no previous data */ }}>No, corregir DNI</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", formDataForDniWarning?.dni || ""); }}>No, corregir DNI</AlertDialogCancel>
             <AlertDialogAction onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</AlertDialogAction>
           </ShadcnAlertDialogFooterAliased>
         </AlertDialogContent>
