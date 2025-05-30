@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -38,6 +39,17 @@ service cloud.firestore {
              userData.businessId : null;
     }
 
+    function isPromoterAssignedToThisEntity(entityData) {
+      return isAuthenticated() && 
+             isPromoter() &&
+             entityData != null &&
+             'assignedPromoters' in entityData &&
+             entityData.assignedPromoters is list &&
+             // Ensure promoterProfileId in assignedPromoters matches request.auth.uid
+             // This assumes promoterProfileId IS the Firebase Auth UID for PlatformUser promoters
+             entityData.assignedPromoters.exists(p => p.promoterProfileId == request.auth.uid);
+    }
+
     // PLATFORM USERS
     match /platformUsers/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin() || isBusinessUser());
@@ -45,7 +57,7 @@ service cloud.firestore {
       allow update, delete: if isSuperAdmin();
     }
     match /platformUsers {
-      allow list: if isSuperAdmin() || isBusinessUser();
+      allow list: if isSuperAdmin() || isBusinessUser(); 
     }
 
     // BUSINESSES
@@ -63,42 +75,49 @@ service cloud.firestore {
       allow write: if isSuperAdmin(); 
     }
     match /socioVipMembers {
-      allow list: if isSuperAdmin() || isBusinessUser();
+      allow list: if isSuperAdmin() || isBusinessUser(); 
     }
 
     // QR CLIENTS
     match /qrClients/{clientId} {
       allow create: if true; 
-      allow read: if isSuperAdmin() || isBusinessUser();
+      allow read: if isSuperAdmin() || isBusinessUser(); 
     }
     match /qrClients {
-      allow list: if isSuperAdmin() || isBusinessUser();
+      allow list: if isSuperAdmin() || isBusinessUser(); 
     }
     
     // BUSINESS ENTITIES (Promotions, Events)
     match /businessEntities/{entityId} {
-      allow read: if resource.data.isActive == true || isBusinessUser() || isPromoter(); // Promoters need to read assigned entities
+      allow read: if (resource.data.isActive == true) || isBusinessUser() || isPromoter();
       
       allow create: if isBusinessUser() &&
                        request.resource.data.businessId != null &&
                        request.resource.data.businessId == getBusinessIdForAuthenticatedUser();
                        
-      // Allow update if:
-      // 1. User is a business_admin or staff for THAT business.
-      // OR
-      // 2. User is a promoter AND is only trying to modify the 'generatedCodes' field, 
-      //    AND their UID is in the assignedPromoters list for this entity (complex to check purely in rules, often done with backend).
-      //    For simplicity here, we'll allow promoters to update 'generatedCodes' if they can read the entity.
-      //    A more secure rule would verify assignment.
-      allow update: if (isBusinessUser() && resource.data.businessId == getBusinessIdForAuthenticatedUser()) ||
-                       (isPromoter() && request.resource.diff(resource).affectedKeys().hasOnly(['generatedCodes']));
-                               
+      allow update: if 
+        // Business users can update their own entities
+        (isBusinessUser() && 
+         resource.data.businessId == getBusinessIdForAuthenticatedUser() &&
+         request.resource.data.businessId == getBusinessIdForAuthenticatedUser() // Ensure businessId is not changed by businessUser
+        ) ||
+        // Promoters can update an entity IF:
+        // 1. They are an assigned promoter to this entity (checked against existing document's data)
+        // 2. They are ONLY trying to modify the 'generatedCodes' field
+        // 3. They are only ADDING codes (new array size is >= old array size), 
+        //    and the non-generatedCodes fields are identical to the existing document.
+        (isPromoter() &&
+         isPromoterAssignedToThisEntity(resource.data) && // Check against existing document
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['generatedCodes']) &&
+         request.resource.data.generatedCodes.size() >= resource.data.generatedCodes.size()
+        );
+                       
       allow delete: if isBusinessUser() &&
                                resource.data.businessId != null &&
                                resource.data.businessId == getBusinessIdForAuthenticatedUser();
     }
     match /businessEntities {
-      allow list: if isBusinessUser() || isPromoter(); // Promoters list all, client filters
+      allow list: if isBusinessUser() || isPromoter() || (request.query.resource == null || request.query.resource.data.isActive == true);
     }
 
     // PROMOTER PROFILES (Global list)
@@ -125,3 +144,5 @@ service cloud.firestore {
      }
   }
 }
+
+    
