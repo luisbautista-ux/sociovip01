@@ -12,7 +12,7 @@ import {
   DialogHeader as ShadcnDialogHeader,
   DialogTitle as ShadcnDialogTitle,
   DialogDescription as ShadcnDialogDescription,
-  DialogFooter as ShadcnDialogFooter,
+  DialogFooter as ShadcnDialogFooter, // Alias para el footer del diálogo de estadísticas
 } from "@/components/ui/dialog";
 import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
@@ -27,7 +27,7 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter as UIAlertDialogFooter,
+  AlertDialogFooter as UIAlertDialogFooter, // Alias para el footer de AlertDialog
   AlertDialogHeader,
   AlertDialogTitle as UIAlertDialogTitle,
   AlertDialogTrigger,
@@ -67,24 +67,23 @@ export default function BusinessPromotionsPage() {
   const [selectedPromotionForStats, setSelectedPromotionForStats] = useState<BusinessManagedEntity | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Determine currentBusinessId once auth and profile are loaded
- useEffect(() => {
-    console.log("Promotions Page: Auth/Profile loading state changed. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
+  useEffect(() => {
+    console.log("Promotions Page: Auth/Profile loading state. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
     if (loadingAuth || loadingProfile) {
-      setIsLoading(true); // Keep main page loading
+      setIsLoading(true); 
       return;
     }
 
     if (userProfile) {
+      console.log("Promotions Page: UserProfile loaded:", userProfile);
       if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
-        console.log("Promotions Page: User profile loaded with businessId:", userProfile.businessId);
         setCurrentBusinessId(userProfile.businessId);
         // setIsLoading(true) will be handled by fetchBusinessPromotions if currentBusinessId is set
       } else {
         console.warn("Promotions Page: User is business_admin/staff but has no valid businessId.");
         setCurrentBusinessId(null);
         setPromotions([]);
-        setIsLoading(false); // Stop loading if no businessId to fetch for
+        setIsLoading(false);
         if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
           toast({
             title: "Error de Negocio",
@@ -98,16 +97,15 @@ export default function BusinessPromotionsPage() {
       console.log("Promotions Page: No userProfile found after auth/profile load.");
       setCurrentBusinessId(null);
       setPromotions([]);
-      setIsLoading(false); // Stop loading if no user profile
+      setIsLoading(false);
     }
   }, [userProfile, loadingAuth, loadingProfile, toast]);
-
 
   const fetchBusinessPromotions = useCallback(async () => {
     if (!currentBusinessId) {
       console.log("Promotions Page: fetchBusinessPromotions - No currentBusinessId, skipping fetch.");
       setPromotions([]);
-      setIsLoading(false); 
+      setIsLoading(false);
       return;
     }
     
@@ -157,7 +155,7 @@ export default function BusinessPromotionsPage() {
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
           createdAt: createdAtStr,
           ticketTypes: [], 
-          eventBoxes: [], 
+          eventBoxes: [],  
           assignedPromoters: [], 
           maxAttendance: 0, 
         };
@@ -187,19 +185,18 @@ export default function BusinessPromotionsPage() {
         setIsLoading(false);
         console.log("Promotions Page: fetchBusinessPromotions finished, isLoading set to false.");
     }
-  }, [currentBusinessId, toast]); 
+  }, [currentBusinessId, toast]);
 
   useEffect(() => {
     if (currentBusinessId && !loadingAuth && !loadingProfile) {
-        console.log("Promotions Page: Valid currentBusinessId, calling fetchBusinessPromotions.");
-        fetchBusinessPromotions();
+      console.log("Promotions Page: Valid currentBusinessId, calling fetchBusinessPromotions.");
+      fetchBusinessPromotions();
     } else if (!loadingAuth && !loadingProfile && !currentBusinessId) {
-        console.log("Promotions Page: No valid currentBusinessId after auth/profile load, setting isLoading to false.");
-        setIsLoading(false);
-        setPromotions([]);
+      console.log("Promotions Page: No valid currentBusinessId after auth/profile load, setting isLoading to false.");
+      setIsLoading(false);
+      setPromotions([]);
     }
   }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile]);
-
 
   const filteredPromotions = useMemo(() => {
     return promotions.filter(promo =>
@@ -337,55 +334,53 @@ export default function BusinessPromotionsPage() {
   };
   
   const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
-    console.log("Promotions Page: handleNewCodesCreated called for entityId:", entityId, "New codes count:", newCodes.length, "Observation:", observation);
-    if (isSubmitting) {
-        console.log("Promotions Page: Submission already in progress, skipping new codes creation.");
-        setIsSubmitting(false); 
-        return;
-    }
     if (!userProfile?.name) {
-        toast({ title: "Error de Usuario", description: "No se pudo obtener el nombre del usuario para registrar los códigos.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
+      toast({ title: "Error de Usuario", description: "No se pudo obtener el nombre del usuario para registrar los códigos.", variant: "destructive" });
+      setIsSubmitting(false);
+      return;
     }
-    
     setIsSubmitting(true);
     const targetPromotionRef = doc(db, "businessEntities", entityId);
     try {
-        const targetPromotionSnap = await getDoc(targetPromotionRef);
-        if (!targetPromotionSnap.exists()) {
-            toast({title:"Error", description:"Promoción no encontrada para añadir códigos.", variant: "destructive"});
-            setIsSubmitting(false);
-            return;
-        }
-        const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
+      const targetPromotionSnap = await getDoc(targetPromotionRef);
+      if (!targetPromotionSnap.exists()) {
+        toast({title:"Error", description:"Promoción no encontrada para añadir códigos.", variant: "destructive"});
+        setIsSubmitting(false);
+        return;
+      }
+      const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
+      
+      const newCodesWithDetails = newCodes.map(code => {
+        let cleanCode: any = { ...code }; // Start with a mutable copy
         
-        const newCodesWithDetails = newCodes.map(code => {
-            const cleanCode = { ...code };
-            if (cleanCode.observation === undefined) cleanCode.observation = null;
-            if (cleanCode.redemptionDate === undefined) cleanCode.redemptionDate = null;
-            if (cleanCode.redeemedByInfo === undefined) cleanCode.redeemedByInfo = null;
-            if (cleanCode.isVipCandidate === undefined) cleanCode.isVipCandidate = false;
-            return sanitizeObjectForFirestore({
-                ...cleanCode,
-                generatedByName: userProfile.name, 
-                generatedDate: new Date().toISOString(),
-                status: 'available' as GeneratedCode['status'], 
-            });
+        // Ensure optional fields are explicitly null if undefined or empty string for observation
+        cleanCode.observation = (observation && observation.trim() !== "") ? observation.trim() : null;
+        cleanCode.redemptionDate = cleanCode.redemptionDate || null;
+        cleanCode.redeemedByInfo = cleanCode.redeemedByInfo || null;
+        cleanCode.isVipCandidate = cleanCode.isVipCandidate || false;
+        
+        return sanitizeObjectForFirestore({ // Sanitize after ensuring fields are null or defined
+          ...cleanCode,
+          generatedByName: userProfile.name, 
+          generatedDate: new Date().toISOString(),
+          status: 'available' as GeneratedCode['status'], 
         });
+      });
+      
+      const updatedCodes = [...(targetPromotionData.generatedCodes || []), ...newCodesWithDetails];
+      
+      await updateDoc(targetPromotionRef, { generatedCodes: updatedCodes });
+      toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}. Guardados en la base de datos.`});
+      
+      fetchBusinessPromotions();
+      
+      if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
+      }
+      if (editingPromotion && editingPromotion.id === entityId) {
+        setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
+      }
 
-
-        const updatedCodes = [...(targetPromotionData.generatedCodes || []), ...newCodesWithDetails];
-        
-        console.log("Promotions Page: Updating Firestore with new codes for entityId:", entityId, "Updated codes count:", updatedCodes.length);
-        await updateDoc(targetPromotionRef, { generatedCodes: updatedCodes });
-        toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}. Guardados en la base de datos.`});
-        
-        fetchBusinessPromotions();
-        
-        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-            setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-        }
     } catch (error: any) {
         console.error("Promotions Page: Error saving new codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
@@ -395,41 +390,46 @@ export default function BusinessPromotionsPage() {
   }; 
 
   const handleCodesUpdatedFromManageDialog = async (entityId: string, updatedCodesFromDialog: GeneratedCode[]) => {
-    console.log("Promotions Page: handleCodesUpdatedFromManageDialog called for entityId:", entityId);
     if (isSubmitting) {
+      setIsSubmitting(false);
       return;
     }
     if (!currentBusinessId) {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
+      setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
     const targetPromotionRef = doc(db, "businessEntities", entityId);
     try {
-        const targetPromotionSnap = await getDoc(targetPromotionRef);
-        if (!targetPromotionSnap.exists()) {
-            toast({title:"Error", description:"Promoción no encontrada para actualizar códigos.", variant: "destructive"});
-            setIsSubmitting(false); 
-            return;
-        }
-        const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
-    
-        const updatedCodesForFirestore = updatedCodesFromDialog.map(code => {
-             const cleanCode = { ...code };
-            if (cleanCode.observation === undefined) cleanCode.observation = null;
-            if (cleanCode.redemptionDate === undefined) cleanCode.redemptionDate = null;
-            if (cleanCode.redeemedByInfo === undefined) cleanCode.redeemedByInfo = null;
-            if (cleanCode.isVipCandidate === undefined) cleanCode.isVipCandidate = false;
-            return sanitizeObjectForFirestore(cleanCode);
-        });
+      const targetPromotionSnap = await getDoc(targetPromotionRef);
+      if (!targetPromotionSnap.exists()) {
+        toast({title:"Error", description:"Promoción no encontrada para actualizar códigos.", variant: "destructive"});
+        setIsSubmitting(false); 
+        return;
+      }
+      const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
+  
+      const updatedCodesForFirestore = updatedCodesFromDialog.map(code => {
+        let cleanCode: any = { ...code };
+        // Ensure optional fields are explicitly null if undefined
+        cleanCode.observation = cleanCode.observation || null;
+        cleanCode.redemptionDate = cleanCode.redemptionDate || null;
+        cleanCode.redeemedByInfo = cleanCode.redeemedByInfo || null;
+        cleanCode.isVipCandidate = cleanCode.isVipCandidate || false;
+        return sanitizeObjectForFirestore(cleanCode);
+      });
 
-        await updateDoc(targetPromotionRef, { generatedCodes: updatedCodesForFirestore });
-        toast({title: "Códigos Actualizados", description: `Los códigos para "${targetPromotionData.name}" han sido guardados en la base de datos.`});
-        
-        fetchBusinessPromotions();
-        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-             setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
-        }
+      await updateDoc(targetPromotionRef, { generatedCodes: updatedCodesForFirestore });
+      toast({title: "Códigos Actualizados", description: `Los códigos para "${targetPromotionData.name}" han sido guardados en la base de datos.`});
+      
+      fetchBusinessPromotions();
+      if (editingPromotion && editingPromotion.id === entityId) {
+           setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
+      }
+       if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+          setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
+      }
     } catch (error: any) {
         console.error("Promotions Page: Error saving updated codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
@@ -538,9 +538,11 @@ export default function BusinessPromotionsPage() {
                     <p className="ml-4 text-lg text-muted-foreground">Cargando promociones...</p>
                 </div>
             ) : promotions.length === 0 && !searchTerm ? (
-              <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
-                No hay promociones registradas. Haz clic en "Crear Promoción" para empezar.
-              </p>
+              <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
+                <AlertTriangle className="h-10 w-10 mb-2 text-yellow-500"/>
+                <p className="font-semibold">No hay promociones registradas.</p>
+                <p className="text-sm">Haz clic en "Crear Promoción" para empezar.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -561,7 +563,7 @@ export default function BusinessPromotionsPage() {
                       <TableRow key={promo.id || `promo-fallback-${Math.random()}`}>
                         <TableCell className="font-medium align-top py-3">
                             <div className="font-semibold text-base">{promo.name}</div>
-                            <div className="flex items-center space-x-2 mt-1.5">
+                             <div className="flex items-center space-x-2 mt-1.5">
                                 <Switch
                                     checked={promo.isActive}
                                     onCheckedChange={() => handleTogglePromotionStatus(promo)}
@@ -673,26 +675,26 @@ export default function BusinessPromotionsPage() {
           }
           setShowCreateEditPromotionModal(isOpen);
       }}>
-        
-        <ShadcnDialogContent className="sm:max-w-2xl">
-          <ShadcnDialogHeader>
-            <ShadcnDialogTitle>{isDuplicating ? `Duplicar Promoción: ${(editingPromotion?.name || 'Promoción').replace(' (Copia)','')} (Copia)` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</ShadcnDialogTitle>
-            <ShadcnDialogDescription>
-              {isDuplicating ? "Creando una copia. Ajusta los detalles necesarios." : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
-            </ShadcnDialogDescription>
-          </ShadcnDialogHeader>
-          <BusinessPromotionForm
-            promotion={editingPromotion || undefined} 
-            onSubmit={handleFormSubmit} 
-            onCancel={() => {
-                setShowCreateEditPromotionModal(false);
-                setEditingPromotion(null);
-                setIsDuplicating(false);
-            }}
-            isSubmitting={isSubmitting}
-          />
-        </ShadcnDialogContent>
-        
+        {showCreateEditPromotionModal && ( // Conditionally render content
+            <ShadcnDialogContent className="sm:max-w-2xl">
+            <ShadcnDialogHeader>
+                <ShadcnDialogTitle>{isDuplicating ? `Duplicar Promoción: ${(editingPromotion?.name || 'Promoción').replace(' (Copia)','')} (Copia)` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</ShadcnDialogTitle>
+                <ShadcnDialogDescription>
+                {isDuplicating ? "Creando una copia. Ajusta los detalles necesarios." : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
+                </ShadcnDialogDescription>
+            </ShadcnDialogHeader>
+            <BusinessPromotionForm
+                promotion={editingPromotion || undefined} 
+                onSubmit={handleFormSubmit} 
+                onCancel={() => {
+                    setShowCreateEditPromotionModal(false);
+                    setEditingPromotion(null);
+                    setIsDuplicating(false);
+                }}
+                isSubmitting={isSubmitting}
+            />
+            </ShadcnDialogContent>
+        )}
       </ShadcnDialog>
 
       {selectedEntityForCreatingCodes && userProfile && (
@@ -740,10 +742,8 @@ export default function BusinessPromotionsPage() {
       )}
 
     <ShadcnDialog open={showStatsModal} onOpenChange={(isOpen) => { if(!isOpen) setSelectedPromotionForStats(null); setShowStatsModal(isOpen);}}>
-      
-        <ShadcnDialogContent className="sm:max-w-md">
-            {selectedPromotionForStats && (
-              <>
+        {showStatsModal && selectedPromotionForStats && ( // Conditionally render content
+            <ShadcnDialogContent className="sm:max-w-md">
                 <ShadcnDialogHeader>
                     <ShadcnDialogTitle>Estadísticas para: {selectedPromotionForStats.name}</ShadcnDialogTitle>
                     <ShadcnDialogDescription>Resumen del rendimiento de la promoción.</ShadcnDialogDescription>
@@ -757,13 +757,11 @@ export default function BusinessPromotionsPage() {
                     </p>
                      <p><strong>Límite de Canjes:</strong> ({selectedPromotionForStats.usageLimit && selectedPromotionForStats.usageLimit > 0 ? selectedPromotionForStats.usageLimit : 'Ilimitado'})</p>
                 </div>
-              </>
-            )}
-            <ShadcnDialogFooter> 
-                <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedPromotionForStats(null);}}>Cerrar</Button>
-            </ShadcnDialogFooter>
-        </ShadcnDialogContent>
-      
+                <ShadcnDialogFooter> 
+                    <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedPromotionForStats(null);}}>Cerrar</Button>
+                </ShadcnDialogFooter>
+            </ShadcnDialogContent>
+        )}
     </ShadcnDialog>
     </div>
   );
