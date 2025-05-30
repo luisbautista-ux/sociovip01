@@ -57,7 +57,7 @@ export default function AdminBusinessesPage() {
           publicPhone: data.publicPhone || undefined,
           publicAddress: data.publicAddress || undefined,
           customUrlPath: data.customUrlPath || undefined,
-          activePromotions: 0, // Placeholder, no longer directly on business
+          activePromotions: 0, 
         };
         fetchedBusinesses.push(businessData);
         if (data.customUrlPath) {
@@ -109,7 +109,7 @@ export default function AdminBusinessesPage() {
     ]);
     let csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
-      + rows.map(e => e.join(",")).join("\n");
+      + rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n"); // Handle commas in data
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -152,7 +152,7 @@ export default function AdminBusinessesPage() {
       }
     }
 
-    const businessPayload: Partial<Omit<Business, 'id' | 'joinDate' | 'activePromotions'>> & { joinDate?: any } = {
+    const businessPayload: Omit<Partial<Business>, 'id' | 'joinDate' | 'activePromotions'> & { joinDate?: any, customUrlPath?: string | null } = {
         name: data.name,
         contactEmail: data.contactEmail,
         ruc: data.ruc || null,
@@ -163,7 +163,7 @@ export default function AdminBusinessesPage() {
         address: data.address || null,
         managerName: data.managerName || null,
         managerDni: data.managerDni || null,
-        businessType: data.businessType || null,
+        businessType: data.businessType || null, // Ensure this is one of the enum values
         logoUrl: data.logoUrl || null,
         publicCoverImageUrl: data.publicCoverImageUrl || null,
         slogan: data.slogan || null,
@@ -172,6 +172,15 @@ export default function AdminBusinessesPage() {
         publicAddress: data.publicAddress || null,
         customUrlPath: cleanedCustomUrlPath || null,
     };
+
+    // Remove undefined fields as Firestore does not support them
+    Object.keys(businessPayload).forEach(key => {
+      const typedKey = key as keyof typeof businessPayload;
+      if (businessPayload[typedKey] === undefined) {
+        delete businessPayload[typedKey];
+      }
+    });
+
 
     try {
       if (currentBusinessId) { 
@@ -201,7 +210,6 @@ export default function AdminBusinessesPage() {
     
     setIsSubmitting(true); 
     try {
-      // TODO: Consider deleting related entities (promotions, events, etc.) in businessEntities
       await deleteDoc(doc(db, "businesses", businessId));
       toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
       fetchBusinesses(); 
@@ -354,3 +362,5 @@ export default function AdminBusinessesPage() {
     </div>
   );
 }
+
+    
