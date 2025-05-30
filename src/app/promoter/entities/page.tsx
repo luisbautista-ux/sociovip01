@@ -25,8 +25,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogDescription as UIDialogDescription, // Alias to avoid conflict
-  DialogFooter as UIDialogFooterAliased // Alias to avoid conflict
+  DialogDescription as UIDialogDescription,
+  DialogFooter as UIDialogFooterAliased
 } from "@/components/ui/dialog";
 
 export default function PromoterEntitiesPage() {
@@ -49,10 +49,11 @@ export default function PromoterEntitiesPage() {
   const fetchAssignedEntities = useCallback(async () => {
     if (loadingAuth || loadingProfile) {
       console.log("Promoter Entities Page: Auth or profile still loading, skipping fetch.");
+      if (!isLoading) setIsLoading(true); // Ensure loading state if we might fetch later
       return;
     }
-    if (!userProfile || !userProfile.uid) { 
-      console.log("Promoter Entities Page: No userProfile or userProfile.uid, skipping fetch.");
+    if (!userProfile || !(userProfile.uid || userProfile.name)) { 
+      console.log("Promoter Entities Page: No userProfile or missing UID/Name, skipping fetch.");
       setEntities([]);
       setIsLoading(false);
       return;
@@ -63,6 +64,7 @@ export default function PromoterEntitiesPage() {
       const entitiesQuery = query(
         collection(db, "businessEntities"), 
         where("isActive", "==", true)
+        // We fetch all active entities and filter client-side for promoter assignment
       ); 
       const entitiesSnap = await getDocs(entitiesQuery);
       console.log("Promoter Entities Page: Fetched all active businessEntities snapshot size:", entitiesSnap.size);
@@ -71,8 +73,9 @@ export default function PromoterEntitiesPage() {
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data();
         
+        // Check if the current promoter (by UID if available, otherwise by name) is in assignedPromoters
         const isAssignedToThisPromoter = data.assignedPromoters?.some(
-          (ap: any) => ap.promoterProfileId === userProfile.uid || ap.promoterName === userProfile.name // Match by UID or Name for flexibility
+          (ap: any) => (userProfile.uid && ap.promoterProfileId === userProfile.uid) || (!userProfile.uid && ap.promoterName === userProfile.name)
         );
         
         if (isAssignedToThisPromoter) {
@@ -122,16 +125,16 @@ export default function PromoterEntitiesPage() {
               assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map(ap => sanitizeObjectForFirestore(ap as any)) : [],
               createdAt: createdAtStr,
             };
-             if (isEntityCurrentlyActivatable(entityToAdd)) { // Also filter by date validity here
+             if (isEntityCurrentlyActivatable(entityToAdd)) { 
                 fetchedEntities.push(entityToAdd);
             }
         }
       });
       
       setEntities(fetchedEntities.sort((a,b) => {
-        if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        if (a.startDate && b.startDate) return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-        return 0;
+        const aDate = a.createdAt ? new Date(a.createdAt).getTime() : (a.startDate ? new Date(a.startDate).getTime() : 0);
+        const bDate = b.createdAt ? new Date(b.createdAt).getTime() : (b.startDate ? new Date(b.startDate).getTime() : 0);
+        return bDate - aDate;
       }));
       console.log("Promoter Entities Page: Fetched and filtered entities assigned to promoter:", fetchedEntities.length);
 
@@ -142,23 +145,22 @@ export default function PromoterEntitiesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [userProfile, loadingAuth, loadingProfile, toast]);
+  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]); // Added isLoading to prevent re-fetch if already loading
 
   useEffect(() => {
     console.log("Promoter Entities Page: Effect for fetching data. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "userProfile:", userProfile);
-    if (!loadingAuth && !loadingProfile) { // Only proceed if auth and profile loading are complete
+    if (!loadingAuth && !loadingProfile) { 
         fetchAssignedEntities();
-    } else if (!loadingAuth && !loadingProfile && !userProfile) { // Handles case where user logs out or profile fails to load
+    } else if (!loadingAuth && !loadingProfile && !userProfile) { 
         setIsLoading(false);
         setEntities([]);
     }
-  }, [userProfile, fetchAssignedEntities, loadingAuth, loadingProfile]);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile, loadingAuth, loadingProfile]); // fetchAssignedEntities is useCallback dep
 
   const filteredEntities = useMemo(() => {
     return entities.filter(entity =>
         (entity.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-        // isEntityCurrentlyActivatable is already applied during fetch
     );
   }, [entities, searchTerm]);
   
@@ -180,114 +182,120 @@ export default function PromoterEntitiesPage() {
     setShowManageCodesModal(true);
   };
 
-  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string, creatorUid?: string) => {
+  // SIMULATED CODE CREATION FOR PROMOTER (LOCAL STATE UPDATE ONLY)
+  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
     if (!userProfile?.name || !userProfile.uid) {
         toast({title: "Error de Usuario", description: "Nombre o UID de promotor no disponible para registrar los códigos.", variant: "destructive"});
         return;
     }
-    setIsSubmitting(true);
-
-    const targetEntityRef = doc(db, "businessEntities", entityId);
-    try {
-        console.log(`Promoter Entities Page: Promoter ${userProfile.name} (UID: ${userProfile.uid}) attempting to add ${newCodes.length} codes for entityId: ${entityId}`);
-        const targetEntitySnap = await getDoc(targetEntityRef);
-        if (!targetEntitySnap.exists()) {
-            toast({title:"Error", description:"Entidad no encontrada para añadir códigos.", variant: "destructive"});
-            setIsSubmitting(false);
-            return;
-        }
-        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
-        
-        const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
-            ...code,
-            id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            entityId: entityId,
-            generatedByName: userProfile.name, 
-            generatedByUid: userProfile.uid, // Store promoter's UID
-            generatedDate: code.generatedDate || new Date().toISOString(),
-            status: code.status || 'available', 
-            observation: observation || null, 
-            redemptionDate: null, 
-            redeemedByInfo: null, 
-            isVipCandidate: false,
-        }) as GeneratedCode));
-        
-        const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
+    setIsSubmitting(true); 
+    console.log(`Promoter Entities Page: Promoter ${userProfile.name} (UID: ${userProfile.uid}) SIMULATING adding ${newCodes.length} codes for entityId: ${entityId}`);
     
-        await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
-        toast({title: "Códigos Creados Exitosamente", description: `${newCodes.length} código(s) añadido(s) a "${targetEntityData.name}".`});
-        
-        fetchAssignedEntities(); // Re-fetch to update the list and counts
-        
-        // Update local state for immediate UI reflection in ManageCodesDialog if open
-        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-          setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-        }
-         if (selectedEntityForCreatingCodes && selectedEntityForCreatingCodes.id === entityId) {
-          setSelectedEntityForCreatingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-        }
+    const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => ({
+        ...code,
+        id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`, // Ensure ID if not present
+        entityId: entityId,
+        generatedByName: userProfile.name, 
+        generatedByUid: userProfile.uid, // Store promoter's UID
+        generatedDate: code.generatedDate || new Date().toISOString(),
+        status: code.status || 'available', 
+        observation: observation || null, 
+        redemptionDate: null, 
+        redeemedByInfo: null, 
+        isVipCandidate: false,
+    }));
 
-    } catch (error: any) {
-        console.error("Promoter Entities Page: Error saving new codes to Firestore:", error.code, error.message, error);
-        toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
-    } finally {
-      setIsSubmitting(false);
+    // Update local state
+    setEntities(prevEntities => 
+        prevEntities.map(entity => {
+            if (entity.id === entityId) {
+                const existingCodes = (entity.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+                const updatedEntityCodes = [...existingCodes, ...newCodesWithDetails.map(c => sanitizeObjectForFirestore(c as GeneratedCode))];
+                return { ...entity, generatedCodes: updatedEntityCodes };
+            }
+            return entity;
+        })
+    );
+    
+    const targetEntity = entities.find(e => e.id === entityId);
+    toast({
+        title: "Códigos Generados (Simulado)", 
+        description: `${newCodes.length} código(s) añadido(s) localmente para "${targetEntity?.name}". El negocio debe reflejar estos cambios en el sistema.`,
+        duration: 7000,
+    });
+        
+    // Update local state for modals if they are showing the same entity
+    if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+      setSelectedEntityForViewingCodes(prev => {
+        if (!prev) return null;
+        const existingCodes = (prev.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+        const updatedEntityCodes = [...existingCodes, ...newCodesWithDetails.map(c => sanitizeObjectForFirestore(c as GeneratedCode))];
+        return { ...prev, generatedCodes: updatedEntityCodes };
+      });
     }
+    if (selectedEntityForCreatingCodes && selectedEntityForCreatingCodes.id === entityId) {
+      setSelectedEntityForCreatingCodes(prev => {
+        if (!prev) return null;
+        const existingCodes = (prev.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+        const updatedEntityCodes = [...existingCodes, ...newCodesWithDetails.map(c => sanitizeObjectForFirestore(c as GeneratedCode))];
+        return { ...prev, generatedCodes: updatedEntityCodes };
+      });
+    }
+    setIsSubmitting(false);
   };
   
+  // SIMULATED CODE UPDATE/DELETE FOR PROMOTER (LOCAL STATE UPDATE ONLY)
   const handleCodesUpdatedFromManageDialog = async (entityId: string, updatedCodesFromDialog: GeneratedCode[]) => {
-    if (isSubmitting) return;
     if (!userProfile || !userProfile.uid) {
       toast({ title: "Error de Usuario", description: "UID de promotor no disponible.", variant: "destructive" });
       return;
     }
     setIsSubmitting(true);
-    console.log(`Promoter Entities Page: Promoter ${userProfile.name} attempting to update codes for entityId: ${entityId}`);
+    console.log(`Promoter Entities Page: Promoter ${userProfile.name} SIMULATING updating codes for entityId: ${entityId}`);
 
-    const targetEntityRef = doc(db, "businessEntities", entityId);
-    try {
-        const targetEntitySnap = await getDoc(targetEntityRef);
-        if (!targetEntitySnap.exists()) {
-            toast({title:"Error", description:"Entidad no encontrada para actualizar códigos.", variant: "destructive"});
-            setIsSubmitting(false);
-            return;
-        }
-        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
+    // Since this is promoter view, updatedCodesFromDialog should *only* contain codes generated by this promoter.
+    // We need to merge these with codes generated by others for this entity.
+    setEntities(prevEntities => 
+        prevEntities.map(entity => {
+            if (entity.id === entityId) {
+                const otherPromotersCodes = (entity.generatedCodes || []).filter(
+                    c => c.generatedByUid !== userProfile.uid
+                ).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+                
+                const thisPromotersUpdatedCodes = updatedCodesFromDialog.map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+                const finalCodesToSave = [...otherPromotersCodes, ...thisPromotersUpdatedCodes];
+                return { ...entity, generatedCodes: finalCodesToSave };
+            }
+            return entity;
+        })
+    );
     
-        // Get all codes NOT generated by this promoter from Firestore data
-        const otherPromotersCodes = (targetEntityData.generatedCodes || []).filter(
-            c => c.generatedByUid !== userProfile.uid 
+    const targetEntity = entities.find(e => e.id === entityId);
+    toast({
+        title: "Mis Códigos Actualizados (Simulado)", 
+        description: `Tus códigos para "${targetEntity?.name}" han sido actualizados localmente.`,
+        duration: 7000,
+    });
+        
+    if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+        const otherPromotersCodes = (selectedEntityForViewingCodes.generatedCodes || []).filter(
+            c => c.generatedByUid !== userProfile.uid
         ).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-        
-        // updatedCodesFromDialog should ONLY contain this promoter's codes (filtered in ManageCodesDialog)
         const thisPromotersUpdatedCodes = updatedCodesFromDialog.map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-
         const finalCodesToSave = [...otherPromotersCodes, ...thisPromotersUpdatedCodes];
-
-        await updateDoc(targetEntityRef, { generatedCodes: finalCodesToSave });
-        toast({title: "Mis Códigos Actualizados", description: `Tus códigos para "${targetEntityData.name}" han sido actualizados.`});
-        
-        fetchAssignedEntities(); // Re-fetch
-        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-            setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: finalCodesToSave} : null);
-        }
-    } catch (error: any) {
-        console.error("Promoter Entities Page: Error updating codes in Firestore:", error.code, error.message, error);
-        toast({title: "Error al Actualizar Códigos", description: `No se pudieron actualizar tus códigos. ${error.message}`, variant: "destructive"});
-    } finally {
-        setIsSubmitting(false);
+        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: finalCodesToSave} : null);
     }
+    setIsSubmitting(false);
   };
   
-  const getPromoterCodeStats = (entity: BusinessManagedEntity) => {
-    if (!userProfile?.name) return { created: 0, used: 0 };
+  const getPromoterCodeStats = useCallback((entity: BusinessManagedEntity) => {
+    if (!userProfile?.uid) return { created: 0, used: 0 };
     const promoterCodes = (entity.generatedCodes || []).filter(c => c.generatedByUid === userProfile.uid);
     return {
       created: promoterCodes.length,
       used: promoterCodes.filter(c => c.status === 'redeemed').length,
     };
-  };
+  }, [userProfile?.uid]);
 
   const openStatsModal = (entity: BusinessManagedEntity) => {
     setSelectedEntityForStats(entity);
@@ -295,11 +303,10 @@ export default function PromoterEntitiesPage() {
   };
 
   // Mock commission calculation
-  const getMockCommission = (entity: BusinessManagedEntity): string => {
+  const getMockCommission = useCallback((entity: BusinessManagedEntity): string => {
     const stats = getPromoterCodeStats(entity);
-    // Example: S/ 0.50 per used code by this promoter
-    return (stats.used * 0.50).toFixed(2);
-  };
+    return (stats.used * 0.50).toFixed(2); // Example: S/ 0.50 per used code
+  }, [getPromoterCodeStats]);
 
 
   if (isLoading) {
@@ -339,12 +346,9 @@ export default function PromoterEntitiesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[25%] min-w-[200px]">Entidad y Estado</TableHead>
-                    <TableHead className="w-[10%] min-w-[100px]">Tipo</TableHead>
-                    <TableHead className="w-[15%] min-w-[150px]">Vigencia</TableHead>
-                    <TableHead className="w-[20%] min-w-[180px]">Mis Códigos (Promotor)</TableHead>
-                    <TableHead className="w-[15%] min-w-[130px]">Comisión Estimada</TableHead>
-                    <TableHead className="w-[15%] min-w-[180px]">Gestionar Mis Códigos</TableHead>
+                    <TableHead className="min-w-[250px]">Entidad y Gestión</TableHead>
+                    <TableHead className="min-w-[200px]">Mis Códigos (Promotor)</TableHead>
+                    <TableHead className="min-w-[180px]">Acciones de Códigos</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -356,8 +360,13 @@ export default function PromoterEntitiesPage() {
                       <TableCell className="font-medium align-top py-3">
                           <div className="font-semibold text-base">{entity.name}</div>
                           <div className="flex items-center space-x-2 mt-1.5 mb-2">
-                              <Badge variant={entity.isActive && isActivatable ? "default" : "outline"} 
-                                     className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : "bg-slate-500 hover:bg-slate-600 text-white", "text-xs")}>
+                              <Badge 
+                                     variant={entity.isActive && isActivatable ? "default" : "outline"} 
+                                     className={cn(
+                                         entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : "bg-slate-500 hover:bg-slate-600 text-white", 
+                                         "text-xs"
+                                     )}
+                                >
                                   {entity.isActive && isActivatable ? "Vigente para ti" : (entity.isActive ? "Activa (Fuera de Fecha)" : "Inactiva por Negocio")}
                               </Badge>
                           </div>
@@ -367,19 +376,12 @@ export default function PromoterEntitiesPage() {
                               </Button>
                           </div>
                       </TableCell>
-                      <TableCell className="align-top py-3 text-xs">{entity.type === 'promotion' ? 'Promoción' : 'Evento'}</TableCell>
-                      <TableCell className="align-top py-3 text-xs">
-                        {entity.startDate ? format(parseISO(entity.startDate), "P", { locale: es }) : 'N/A'}
-                        <br />
-                        {entity.endDate ? format(parseISO(entity.endDate), "P", { locale: es }) : 'N/A'}
-                      </TableCell>
                       <TableCell className="align-top py-3 text-left">
                           <div className="flex flex-col text-xs space-y-0.5">
                             <span>Mis Códigos Creados ({promoterCodeStats.created})</span>
                             <span>Mis Códigos Usados ({promoterCodeStats.used})</span>
                           </div>
                       </TableCell>
-                       <TableCell className="align-top py-3 text-xs">S/ {getMockCommission(entity)}</TableCell>
                       <TableCell className="align-top py-3">
                           <div className="flex flex-col items-start gap-1">
                               <Button 
@@ -424,7 +426,7 @@ export default function PromoterEntitiesPage() {
           entityName={selectedEntityForCreatingCodes.name}
           entityId={selectedEntityForCreatingCodes.id!}
           existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
-          onCodesCreated={handleNewCodesCreated}
+          onCodesCreated={(entityId, newCodes, observation) => handleNewCodesCreated(entityId, newCodes, observation)}
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
@@ -491,5 +493,3 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
-
-    
