@@ -26,14 +26,17 @@ import { SocioVipLogo } from "@/components/icons";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle as UIDialogTitleComponent, DialogDescription as UIDialogDescriptionComponent, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription as UIAlertDescriptionComponent, AlertTitle as UIAlertTitleComponent } from "@/components/ui/alert";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"; // Changed FormMessageHook to FormMessage
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from 'qrcode';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
+// import { Calendar as ShadcnCalendar } from "@/components/ui/calendar"; // No longer using ShadcnCalendar here
+import { DayPicker } from "react-day-picker"; // Import DayPicker directly
+import "react-day-picker/dist/style.css"; // Import DayPicker styles
+
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
@@ -46,7 +49,7 @@ import {
   AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
   AlertDialogTitle as UIAlertDialogTitleAliased,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 
@@ -150,7 +153,7 @@ export default function BusinessPublicPageById() {
       if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
          console.log(`BusinessPage by ID (Client): Business ${id} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
          router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-         return; // Stop further processing as we are redirecting
+         return; 
       }
     
       setBusinessDetails(fetchedBusiness);
@@ -236,7 +239,7 @@ export default function BusinessPublicPageById() {
     } finally {
       setIsLoadingPage(false);
     }
-  }, [router, toast]); // Added toast
+  }, [router, toast]); 
 
   useEffect(() => {
     if (businessIdFromParams) {
@@ -388,7 +391,7 @@ export default function BusinessPublicPageById() {
             description: activeEntityForQr.description,
             validUntil: activeEntityForQr.endDate,
             imageUrl: activeEntityForQr.imageUrl || "",
-            promoCode: validatedSpecificCode, // 9-digit code
+            promoCode: validatedSpecificCode, 
             aiHint: activeEntityForQr.aiHint || "",
             type: activeEntityForQr.type,
             termsAndConditions: activeEntityForQr.termsAndConditions,
@@ -458,7 +461,6 @@ export default function BusinessPublicPageById() {
     const generateQrImage = async () => {
       if (pageViewState === 'qrDisplay' && qrData?.code) { 
         try {
-          // The 'code' property in qrData is the 9-digit alphanumeric code
           const dataUrl = await QRCode.toDataURL(qrData.code, { width: 250, errorCorrectionLevel: 'H', margin: 2 });
           setGeneratedQrDataUrl(dataUrl);
         } catch (err) {
@@ -601,7 +603,7 @@ export default function BusinessPublicPageById() {
         ctx.strokeStyle = 'hsl(var(--primary))';
         ctx.lineWidth = 2;
         ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-        currentY += qrSize + padding * 0.75; // Reduced padding after QR
+        currentY += qrSize + padding * 0.75; 
 
         ctx.fillStyle = 'hsl(var(--primary))';
         ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
@@ -618,7 +620,7 @@ export default function BusinessPublicPageById() {
         ctx.fillStyle = 'hsl(var(--muted-foreground))';
         ctx.textAlign = 'center';
         ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvasWidth / 2, currentY);
-        currentY += smallTextFontSize + lineSpacing + 10;
+        currentY += smallTextFontSize + lineSpacing + 15;
         
         if (qrData.promotion.termsAndConditions) {
             ctx.font = `italic ${smallTextFontSize -1}px Arial`;
@@ -677,7 +679,6 @@ export default function BusinessPublicPageById() {
     setShowDniModal(false);
   };
 
-  // Componente local para el formulario de código específico por entidad
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
     const form = useForm<SpecificCodeFormValues>({
       resolver: zodResolver(specificCodeFormSchema),
@@ -707,7 +708,7 @@ export default function BusinessPublicPageById() {
                     disabled={isLoadingQrFlow}
                   />
                 </FormControl>
-                <FormMessageHook />
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -744,7 +745,6 @@ export default function BusinessPublicPageById() {
                         <SocioVipLogo className="h-8 w-8 text-primary group-hover:animate-pulse" />
                     </Link>
                  </div>
-                 {/* PublicHeaderAuth moved to footer */}
             </div>
         </header>
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
@@ -754,7 +754,6 @@ export default function BusinessPublicPageById() {
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
               <div className="flex items-center gap-3">
-                {/* User Auth Section in footer */}
               </div>
               <div className="text-muted-foreground">
                   <Link href="/" className="hover:text-primary hover:underline">
@@ -790,7 +789,6 @@ export default function BusinessPublicPageById() {
          <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
                 <div className="flex items-center gap-3">
-                {/* Auth section */}
                 </div>
                 <div className="text-muted-foreground">
                      <Link href="/" className="hover:text-primary hover:underline">
@@ -826,7 +824,6 @@ export default function BusinessPublicPageById() {
             <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
                  <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
                     <div className="flex items-center gap-3">
-                       {/* Auth elements will be here */}
                     </div>
                     <div className="text-muted-foreground">
                         <Link href="/" className="hover:text-primary hover:underline">
@@ -939,7 +936,6 @@ export default function BusinessPublicPageById() {
     );
   }
 
-  // Fallback para asegurar que businessDetails no es null antes de usarlo extensivamente en la lista
   if (!businessDetails) {
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -1120,7 +1116,7 @@ export default function BusinessPublicPageById() {
                   <FormItem>
                     <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input placeholder="Número de documento" {...field} maxLength={15} disabled={isLoadingQrFlow} autoFocus /></FormControl>
-                    <FormMessageHook />
+                    <FormMessage />
                   </FormItem>
                 )} />
                 <ShadcnDialogFooter className="pt-2">
@@ -1147,17 +1143,17 @@ export default function BusinessPublicPageById() {
                         className="disabled:bg-muted/50"
                       />
                     </FormControl>
-                    <FormMessageHook />
+                    <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus nombres" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessageHook /></FormItem>
+                  <FormItem><FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus nombres" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="surname" render={({ field }) => (
-                  <FormItem><FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessageHook /></FormItem>
+                  <FormItem><FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessageHook /></FormItem>
+                  <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="dob" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
@@ -1171,20 +1167,23 @@ export default function BusinessPublicPageById() {
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <ShadcnCalendar 
-                            mode="single" 
-                            selected={field.value} 
-                            onSelect={field.onChange} 
-                            disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1920-01-01")} 
-                            captionLayout="dropdown-buttons" 
-                            fromYear={1920} 
-                            toYear={new Date().getFullYear() -10} 
-                            locale={es} 
-                            initialFocus 
-                        />
+                        <DayPicker
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            locale={es}
+                            captionLayout="dropdown"
+                            fromYear={1920}
+                            toYear={new Date().getFullYear() - 10}
+                            disabled={(date) =>
+                              date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) ||
+                              date < new Date("1920-01-01")
+                            }
+                            initialFocus
+                          />
                       </PopoverContent>
                     </Popover>
-                    <FormMessageHook />
+                    <FormMessage />
                   </FormItem>
                 )} />
                 <ShadcnDialogFooter className="pt-3">
@@ -1217,3 +1216,4 @@ export default function BusinessPublicPageById() {
     </div>
   );
 }
+
