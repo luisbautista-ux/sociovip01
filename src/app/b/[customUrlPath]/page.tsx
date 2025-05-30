@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -16,16 +15,15 @@ import {
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
-import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData, PromotionDetails } from "@/lib/types";
+import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types";
 import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
-import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit } from "lucide-react";
+import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit, LogOut, UserCircle } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
-import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
-import { Alert, AlertDescription, AlertTitle as UIAlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle as UIDialogTitleComponent, DialogDescription as UIDialogDescriptionComponent, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle as UIAlertTitleComponent } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -35,6 +33,19 @@ import QRCode from 'qrcode';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { LoginModal } from "@/components/auth/LoginModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter as ShadcnAlertDialogFooter, // Alias for footer within AlertDialog
+  AlertDialogHeader,
+  AlertDialogTitle as UIAlertDialogTitle, // Alias for title within AlertDialog
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 const specificCodeFormSchema = z.object({
@@ -52,7 +63,7 @@ const newQrClientSchema = z.object({
   surname: z.string().min(2, { message: "Apellido es requerido." }),
   phone: z.string().min(7, { message: "Celular es requerido." }).regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
   dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
-  dniConfirm: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
 
@@ -62,6 +73,8 @@ export default function BusinessPublicPageByUrl() {
   const { customUrlPath } = params;
   const router = useRouter();
   const { toast } = useToast();
+  const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const [activeEntitiesForBusiness, setActiveEntitiesForBusiness] = useState<BusinessManagedEntity[]>([]);
@@ -87,10 +100,10 @@ export default function BusinessPublicPageByUrl() {
 
   const newQrClientForm = useForm<NewQrClientFormValues>({
     resolver: zodResolver(newQrClientSchema),
-    defaultValues: { name: "", surname: "", phone: "", dob: undefined, dniConfirm: "" },
+    defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
 
-  const fetchBusinessData = useCallback(async () => {
+  const fetchBusinessDataByCustomUrl = useCallback(async () => {
     if (!customUrlPath) {
       console.error("BusinessPage by URL: customUrlPath is missing.");
       setError("URL de negocio no especificada. Por favor, verifica la dirección.");
@@ -120,10 +133,9 @@ export default function BusinessPublicPageByUrl() {
         const fetchedBusiness: Business = {
           id: businessDoc.id,
           name: bizData.name || "Nombre de Negocio Desconocido",
-          contactEmail: bizData.contactEmail || "", // Campo interno, no necesariamente público
+          contactEmail: bizData.contactEmail || "", 
           joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
           customUrlPath: bizData.customUrlPath || customUrlPath,
-          // Campos públicos
           logoUrl: bizData.logoUrl || undefined,
           publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
           slogan: bizData.slogan || undefined,
@@ -144,7 +156,7 @@ export default function BusinessPublicPageByUrl() {
         
         const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
+          const entityData = docSnap.data();
           
           let startDateStr: string;
           let endDateStr: string;
@@ -186,7 +198,7 @@ export default function BusinessPublicPageByUrl() {
             ticketTypes: entityData.ticketTypes || [],
             eventBoxes: entityData.eventBoxes || [],
             assignedPromoters: entityData.assignedPromoters || [],
-            generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes : [],
+            generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
             imageUrl: entityData.imageUrl,
             aiHint: entityData.aiHint,
             termsAndConditions: entityData.termsAndConditions,
@@ -213,15 +225,15 @@ export default function BusinessPublicPageByUrl() {
 
   useEffect(() => {
     if (typeof customUrlPath === 'string' && customUrlPath.trim() !== "") {
-        fetchBusinessData();
+        fetchBusinessDataByCustomUrl();
     } else if (typeof customUrlPath === 'string' && customUrlPath.trim() === ""){
         setError("URL de negocio inválida.");
         setIsLoading(false);
     }
-  }, [customUrlPath, fetchBusinessData]);
+  }, [customUrlPath, fetchBusinessDataByCustomUrl]);
 
 
-  const handleInitiateQrFlow = (entity: BusinessManagedEntity, codeInputValue: string) => {
+  const handleSpecificCodeSubmit = (entity: BusinessManagedEntity, codeInputValue: string) => {
     const codeToValidate = codeInputValue.trim().toUpperCase();
     if (!codeToValidate) {
         toast({title: "Código Requerido", description: "Por favor, ingresa el código de 9 dígitos.", variant: "destructive"});
@@ -238,14 +250,14 @@ export default function BusinessPublicPageByUrl() {
 
     if (foundCodeObject) {
       setActiveEntityForQr(entity);
-      setValidatedSpecificCode(codeToValidate);
+      setValidatedSpecificCode(codeToValidate); // Store the 9-digit code
       setCurrentStepInModal('enterDni');
       dniForm.reset({ dni: "" });
       setShowDniModal(true);
     } else {
       toast({
         title: "Código Inválido o No Disponible",
-        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} o ya fue utilizado.`,
+        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} o ya fue utilizado/vencido.`,
         variant: "destructive",
       });
     }
@@ -281,31 +293,31 @@ export default function BusinessPublicPageByUrl() {
           toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
           setShowDniModal(false);
         } else {
-          newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dniConfirm: data.dni });
+          newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: data.dni });
           setCurrentStepInModal('newUserForm');
-          setIsLoadingQrFlow(false); // Stop loading here, wait for new user form submit
+          setIsLoadingQrFlow(false); 
           return; 
         }
         
-        const promotionDetails: PromotionDetails = {
+        const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
           id: activeEntityForQr.id,
           title: activeEntityForQr.name,
           description: activeEntityForQr.description,
           validUntil: activeEntityForQr.endDate,
           imageUrl: activeEntityForQr.imageUrl || "",
-          promoCode: validatedSpecificCode, 
+          promoCode: validatedSpecificCode, // Use the 9-digit code here
           type: activeEntityForQr.type,
           termsAndConditions: activeEntityForQr.termsAndConditions,
           aiHint: activeEntityForQr.aiHint || "",
         };
 
-        setQrData({ user: clientForQr, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
+        setQrData({ user: clientForQr, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
         setPageViewState('qrDisplay');
     } catch(e: any) {
         console.error("Error verificando DNI:", e);
         toast({ title: "Error de Verificación", description: "No se pudo verificar el DNI. " + e.message, variant: "destructive" });
     } finally {
-        if (currentStepInModal !== 'newUserForm') { // Only stop loading if not switching to new user form
+        if (currentStepInModal !== 'newUserForm') { 
             setIsLoadingQrFlow(false);
         }
     }
@@ -325,8 +337,8 @@ export default function BusinessPublicPageByUrl() {
       phone: formData.phone,
       dob: Timestamp.fromDate(formData.dob), 
       registrationDate: serverTimestamp(),
-      generatedForBusinessId: businessDetails.id, // Track which business this QR client was generated for
-      generatedForEntityId: activeEntityForQr.id, // Track for which promo/event
+      generatedForBusinessId: businessDetails.id, 
+      generatedForEntityId: activeEntityForQr.id, 
     };
 
     try {
@@ -340,7 +352,7 @@ export default function BusinessPublicPageByUrl() {
         dob: newClientDataToSave.dob.toDate().toISOString(),
         registrationDate: new Date().toISOString(), 
       };
-       const promotionDetails: PromotionDetails = {
+       const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
             id: activeEntityForQr.id,
             title: activeEntityForQr.name,
             description: activeEntityForQr.description,
@@ -351,7 +363,7 @@ export default function BusinessPublicPageByUrl() {
             termsAndConditions: activeEntityForQr.termsAndConditions,
             aiHint: activeEntityForQr.aiHint || "",
         };
-      setQrData({ user: registeredClient, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
+      setQrData({ user: registeredClient, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
       setShowDniModal(false);
       setPageViewState('qrDisplay');
       toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
@@ -367,10 +379,10 @@ export default function BusinessPublicPageByUrl() {
       const newDniCleaned = newDniValue.trim();
       if (newDniCleaned === enteredDni) return true; 
       if (newDniCleaned.length < 7 || newDniCleaned.length > 15) {
-          newQrClientForm.setError("dniConfirm", { type: "manual", message: "DNI/CE debe tener entre 7 y 15 caracteres."});
+          newQrClientForm.setError("dni", { type: "manual", message: "DNI/CE debe tener entre 7 y 15 caracteres."});
           return false;
       }
-      newQrClientForm.clearErrors("dniConfirm");
+      newQrClientForm.clearErrors("dni");
 
       try {
         setIsLoadingQrFlow(true);
@@ -402,8 +414,8 @@ export default function BusinessPublicPageByUrl() {
   };
 
   const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormValues> = async (data) => {
-      if (data.dniConfirm.trim() !== enteredDni.trim()) {
-        const dniIsValidForCreation = await handleNewUserDniChangeDuringRegistration(data.dniConfirm, data);
+      if (data.dni.trim() !== enteredDni.trim()) {
+        const dniIsValidForCreation = await handleNewUserDniChangeDuringRegistration(data.dni, data);
         if (dniIsValidForCreation) {
             await processNewQrClientRegistration(data);
         }
@@ -414,7 +426,7 @@ export default function BusinessPublicPageByUrl() {
   
   useEffect(() => {
     const generateQrImage = async () => {
-      if (pageViewState === 'qrDisplay' && qrData?.code) { // Use qrData.code (the 9-digit code)
+      if (pageViewState === 'qrDisplay' && qrData?.code) { 
         try {
           const dataUrl = await QRCode.toDataURL(qrData.code, { width: 250, errorCorrectionLevel: 'H', margin: 2 });
           setGeneratedQrDataUrl(dataUrl);
@@ -456,7 +468,7 @@ export default function BusinessPublicPageByUrl() {
     const canvasWidth = 320; 
 
     canvas.width = canvasWidth;
-    canvas.height = 600; // Initial height, will be adjusted
+    canvas.height = 600; 
     ctx.fillStyle = 'hsl(280, 13%, 96%)'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -465,16 +477,33 @@ export default function BusinessPublicPageByUrl() {
     const businessLogo = new Image();
     businessLogo.crossOrigin = "anonymous";
     
+    const drawWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number, font: string, color: string, textAlign: "center" | "left" | "right" = "center") => {
+        ctx.font = font;
+        ctx.fillStyle = color;
+        ctx.textAlign = textAlign;
+        const words = text.split(' ');
+        let line = '';
+        let currentTextY = y;
+
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line.trim(), x, currentTextY);
+                line = words[n] + ' ';
+                currentTextY += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line.trim(), x, currentTextY);
+        return currentTextY + lineHeight; 
+    };
+
     const drawContent = () => {
         currentY = padding;
-        const headerBgHeightReduction = 15; 
-        let headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - headerBgHeightReduction;
-        
-        if (businessDetails.logoUrl) {
-           headerBgHeight = maxLogoHeight + (businessNameFontSize + 5) + padding * 2; // Adjusted for logo + name below
-        } else {
-           headerBgHeight = (businessNameFontSize + 5) + padding * 2; // Only name
-        }
+        let headerBgHeight = (businessDetails.logoUrl ? maxLogoHeight + spacingAfterLogo : 0) + (businessNameFontSize + 5) + padding;
 
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.fillRect(0, 0, canvas.width, headerBgHeight);
@@ -494,9 +523,9 @@ export default function BusinessPublicPageByUrl() {
                 logoHeight = logoWidth / aspectRatio;
             }
             ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
-            currentY += logoHeight + spacingAfterLogo / 2; // Reduced spacing
+            currentY += logoHeight + spacingAfterLogo / 2;
         } else {
-            currentY += padding; // Space if no logo
+           // currentY += maxLogoHeight / 2; // Placeholder space if no logo but name is still in header
         }
         
         ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
@@ -518,7 +547,7 @@ export default function BusinessPublicPageByUrl() {
             ctx.strokeStyle = 'hsl(var(--primary))'; 
             ctx.lineWidth = 2;
             ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-            currentY += qrSize + padding + 10; // Increased space after QR
+            currentY += qrSize + padding + 10; 
 
             ctx.fillStyle = 'hsl(var(--primary))';
             ctx.font = `bold ${userDetailsFontSize + 2}px Arial`; 
@@ -536,28 +565,8 @@ export default function BusinessPublicPageByUrl() {
             ctx.textAlign = 'center';
             ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
             currentY += smallTextFontSize + lineSpacing + 5;
-
-            if (qrData.promotion.termsAndConditions) {
-              ctx.font = `${smallTextFontSize}px Arial`;
-              const lines: string[] = [];
-              let currentLineText = "Términos: ";
-              const words = qrData.promotion.termsAndConditions.split(" ");
-              for (const word of words) {
-                  const testLine = currentLineText + word + " ";
-                  if (ctx.measureText(testLine).width > canvas.width - 2 * padding && currentLineText !== "Términos: ") {
-                      lines.push(currentLineText.trim());
-                      currentLineText = word + " ";
-                  } else {
-                      currentLineText = testLine;
-                  }
-              }
-              lines.push(currentLineText.trim());
-              
-              for (const line of lines) {
-                  ctx.fillText(line, canvas.width / 2, currentY);
-                  currentY += smallTextFontSize + lineSpacing;
-              }
-            }
+            
+            // Terms and conditions removed based on previous request
             
             const finalHeight = currentY + padding;
             const tempCanvas = document.createElement('canvas');
@@ -565,7 +574,7 @@ export default function BusinessPublicPageByUrl() {
             if (!tempCtx) return;
             tempCanvas.width = canvas.width;
             tempCanvas.height = finalHeight;
-            tempCtx.drawImage(canvas, 0, 0, canvas.width, finalHeight, 0,0, canvas.width, finalHeight); // Ensure correct cropping
+            tempCtx.drawImage(canvas, 0, 0, canvas.width, finalHeight, 0,0, canvas.width, finalHeight);
             
             const dataUrl = tempCanvas.toDataURL('image/png');
             const linkElement = document.createElement('a');
@@ -607,7 +616,6 @@ export default function BusinessPublicPageByUrl() {
     setShowDniModal(false);
   };
 
-  // Componente de formulario para el código específico de 9 dígitos
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
     const form = useForm<SpecificCodeFormValues>({
       resolver: zodResolver(specificCodeFormSchema),
@@ -616,7 +624,7 @@ export default function BusinessPublicPageByUrl() {
   
     return (
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(data => handleInitiateQrFlow(entity, data.specificCode))} className="space-y-2 mt-2">
+        <form onSubmit={form.handleSubmit(data => handleSpecificCodeSubmit(entity, data.specificCode))} className="space-y-2 mt-2">
           <FormField
             control={form.control}
             name="specificCode"
@@ -630,7 +638,7 @@ export default function BusinessPublicPageByUrl() {
                     {...field}
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                     maxLength={9}
-                    className="text-sm h-9"
+                    className="text-sm h-9 w-full" 
                     disabled={isLoadingQrFlow}
                   />
                 </FormControl>
@@ -651,22 +659,10 @@ export default function BusinessPublicPageByUrl() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
         <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
             <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
         </div>
-         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-        </footer>
       </div>
     );
   }
@@ -674,15 +670,6 @@ export default function BusinessPublicPageByUrl() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
         <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-destructive">{error}</h1>
@@ -691,25 +678,13 @@ export default function BusinessPublicPageByUrl() {
               <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
-         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-        </footer>
       </div>
     );
   }
 
-  if (!businessDetails && !isLoading) { // Caso de negocio no encontrado después de la carga
+  if (!businessDetails && !isLoading) { 
      return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
         <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
@@ -718,9 +693,6 @@ export default function BusinessPublicPageByUrl() {
               <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
-        <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-        </footer>
       </div>
     );
   }
@@ -729,15 +701,6 @@ export default function BusinessPublicPageByUrl() {
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
-            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                     <Link href="/" passHref className="flex items-center gap-2 group">
-                        <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                        <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                    </Link>
-                    <PublicHeaderAuth />
-                </div>
-            </header>
             <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
                 <Card className="w-full max-w-md shadow-xl">
                     <CardHeader className="text-center">
@@ -765,11 +728,7 @@ export default function BusinessPublicPageByUrl() {
                             <p className="text-muted-foreground">
                                 Válido hasta: {format(parseISO(activeEntityForQr.endDate), "dd MMMM yyyy", { locale: es })}
                             </p>
-                            {activeEntityForQr.termsAndConditions && (
-                                <p className="text-xs text-muted-foreground pt-1">
-                                    Términos: {activeEntityForQr.termsAndConditions}
-                                </p>
-                            )}
+                            {/* Terms and conditions removed based on previous request */}
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col sm:flex-row gap-2">
@@ -782,29 +741,19 @@ export default function BusinessPublicPageByUrl() {
                     </CardFooter>
                 </Card>
             </main>
-             <footer className="py-8 bg-muted/50 text-center">
-                <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-            </footer>
         </div>
     );
   }
 
-  if (!businessDetails) return null; // Should be caught by the loading/error/not found states
+  if (!businessDetails) return null; 
 
   const events = activeEntitiesForBusiness.filter(e => e.type === 'event');
   const promotions = activeEntitiesForBusiness.filter(e => e.type === 'promotion');
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+        {/* Header with SocioVIP logo and name removed */}
+        {/* Auth elements moved to footer */}
 
         {businessDetails.publicCoverImageUrl && (
           <div className="relative h-48 md:h-64 lg:h-80 w-full">
@@ -840,7 +789,7 @@ export default function BusinessPublicPageByUrl() {
           </Card>
         </div>
       
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow">
         {events.length > 0 && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
@@ -858,7 +807,7 @@ export default function BusinessPublicPageByUrl() {
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
                     <p className="text-xs text-muted-foreground">Del {format(parseISO(event.startDate), "dd MMM", { locale: es })} al {format(parseISO(event.endDate), "dd MMM, yyyy", { locale: es })}</p>
-                    {event.termsAndConditions && <p className="text-xs text-muted-foreground pt-1 line-clamp-2">Términos: {event.termsAndConditions}</p>}
+                    {/* Terms and conditions removed from here */}
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t">
                      <SpecificCodeEntryForm entity={event} />
@@ -886,7 +835,7 @@ export default function BusinessPublicPageByUrl() {
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
                     <p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p>
-                     {promo.termsAndConditions && <p className="text-xs text-muted-foreground pt-1 line-clamp-2">Términos: {promo.termsAndConditions}</p>}
+                     {/* Terms and conditions removed from here */}
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t">
                     <SpecificCodeEntryForm entity={promo} />
@@ -897,7 +846,7 @@ export default function BusinessPublicPageByUrl() {
           </section>
         )}
         
-        {!isLoading && !error && events.length === 0 && promotions.length === 0 && (
+        {!isLoading && !error && events.length === 0 && promotions.length === 0 && pageViewState === 'entityList' && (
             <Card className="col-span-full">
                 <CardHeader className="text-center">
                     <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -924,24 +873,70 @@ export default function BusinessPublicPageByUrl() {
         ) : null }
       </main>
 
-      <footer className="w-full mt-12 py-8 bg-muted/50 text-center">
-        <p className="text-sm text-muted-foreground">
-          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
-        </p>
+      <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div className="flex items-center gap-3">
+            {!loadingAuth && !loadingProfile && (
+              <>
+                {currentUser && userProfile ? (
+                  <>
+                    <span className="text-foreground flex items-center">
+                      <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                      {userProfile.name || currentUser.email?.split('@')[0]}
+                    </span>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader><UIAlertDialogTitle>¿Cerrar Sesión?</UIAlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                            <ShadcnAlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                            </ShadcnAlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                    <Link href="/auth/dispatcher" passHref>
+                       <Button variant="outline" size="sm">Ir a Administración</Button>
+                    </Link>
+                  </>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                    Iniciar Sesión
+                  </Button>
+                )}
+              </>
+            )}
+            {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+          </div>
+          <div className="text-muted-foreground">
+            <Link href="/" className="hover:text-primary hover:underline">
+              Plataforma de sociosvip.app
+            </Link>
+          </div>
+        </div>
       </footer>
       
-      <Dialog open={showDniModal} onOpenChange={(isOpen) => { if (!isOpen) { dniForm.reset(); newQrClientForm.reset(); } setShowDniModal(isOpen); }}>
+      <Dialog open={showDniModal} onOpenChange={(isOpen) => { 
+          if (!isOpen) { 
+            dniForm.reset(); 
+            newQrClientForm.reset(); 
+            setEnteredDni(""); 
+            setCurrentStepInModal('enterDni'); 
+          }
+          setShowDniModal(isOpen); 
+        }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <UIDialogTitleComponent>
               {currentStepInModal === 'enterDni' ? "Ingresa tu DNI/CE" : "Completa tus Datos"}
-            </DialogTitle>
-            <UIDialogDescription>
+            </UIDialogTitleComponent>
+            <UIDialogDescriptionComponent>
               {currentStepInModal === 'enterDni' 
                 ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
                 : "Necesitamos algunos datos para generar tu QR."
               }
-            </UIDialogDescription>
+            </UIDialogDescriptionComponent>
           </DialogHeader>
           {currentStepInModal === 'enterDni' ? (
             <Form {...dniForm}>
@@ -964,7 +959,7 @@ export default function BusinessPublicPageByUrl() {
           ) : ( 
             <Form {...newQrClientForm}>
               <form onSubmit={newQrClientForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-1 max-h-[60vh] overflow-y-auto pr-2">
-                <FormField control={newQrClientForm.control} name="dniConfirm" render={({ field }) => (
+                <FormField control={newQrClientForm.control} name="dni" render={({ field }) => (
                   <FormItem>
                     <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
@@ -980,13 +975,13 @@ export default function BusinessPublicPageByUrl() {
                   </FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus nombres" {...field} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus nombres" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="surname" render={({ field }) => (
-                  <FormItem><FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ''} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={newQrClientForm.control} name="dob" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
@@ -1017,7 +1012,7 @@ export default function BusinessPublicPageByUrl() {
                   </FormItem>
                 )} />
                 <ShadcnDialogFooter className="pt-3">
-                  <Button type="button" variant="outline" onClick={() => {setCurrentStepInModal('enterDni'); newQrClientForm.reset(); dniForm.setValue('dni', enteredDni);}} disabled={isLoadingQrFlow}>Volver</Button>
+                  <Button type="button" variant="outline" onClick={() => {setCurrentStepInModal('enterDni'); newQrClientForm.reset({dni: enteredDni}); dniForm.setValue('dni', enteredDni);}} disabled={isLoadingQrFlow}>Volver</Button>
                   <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isLoadingQrFlow}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Registrar y Generar QR"}
                   </Button>
@@ -1030,16 +1025,17 @@ export default function BusinessPublicPageByUrl() {
 
       <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
         <AlertDialogContent>
-          <UIAlertTitle className="font-semibold">DNI Ya Registrado</UIAlertTitle>
-          <UIDialogDescription>
+          <UIAlertDialogTitle className="font-semibold">DNI Ya Registrado</UIAlertDialogTitle>
+          <AlertDialogDescription>
               El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
-          </UIDialogDescription>
-          <ShadcnDialogFooter>
-            <Button variant="outline" onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dniConfirm", ""); }}>No, corregir DNI</Button>
-            <Button onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</Button>
-          </ShadcnDialogFooter>
+          </AlertDialogDescription>
+          <ShadcnAlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", ""); }}>No, corregir DNI</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</AlertDialogAction>
+          </ShadcnAlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
     </div>
   );
 }

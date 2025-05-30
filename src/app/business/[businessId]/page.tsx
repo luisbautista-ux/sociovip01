@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation"; // Corrected: Added useRouter import
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,16 +15,15 @@ import {
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
-import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types"; // Removed PromotionDetails as it's part of BusinessManagedEntity
+import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types";
 import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
-import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit } from "lucide-react";
+import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit, LogOut, UserCircle } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
-import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescriptionComponent, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog"; // Aliased DialogDescription
-import { Alert, AlertDescription, AlertTitle as UIAlertTitleComponent } from "@/components/ui/alert"; // Aliased AlertTitle
+import { Dialog, DialogContent, DialogHeader, DialogTitle as UIDialogTitleComponent, DialogDescription as UIDialogDescriptionComponent, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle as UIAlertTitleComponent } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -35,41 +33,45 @@ import QRCode from 'qrcode';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { LoginModal } from "@/components/auth/LoginModal";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
+  AlertDialogFooter as ShadcnAlertDialogFooterAliased, // Alias for footer within AlertDialog
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle as UIAlertDialogTitleAliased, // Alias for title within AlertDialog
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 
-// Server Component Shell (No React.use needed if just passing params)
-export default function BusinessPublicPageById({ params: paramsFromShell }: { params: { businessId: string } }) {
-  // console.log("Business Public Page by ID - Server Component Shell. businessId from params:", paramsFromShell.businessId);
-  
-  // The actual logic and client-side interactivity are in BusinessPageClientComponent.
-  // This shell primarily handles routing and ensures the page is a Server Component if no client hooks are used here.
-  // If paramsFromShell.businessId itself needs to be awaited (if params were a Promise),
-  // then this component would need to be async and use React.use(paramsPromise).
-  // But for basic param passing, direct access in the shell (even with a warning) or passing
-  // the whole params object to the client component is okay.
-  // To strictly avoid the warning without making it async, we pass the whole params object.
-
+// Server Component Shell
+export default function BusinessPublicPageById({ params }: { params: { businessId: string } }) {
+  if (!params.businessId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
+          <Link href="/" passHref>
+            <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
+          </Link>
+      </div>
+    );
+  }
   return (
-    <BusinessPageClientComponent paramsFromShell={paramsFromShell} />
+    <BusinessPageClientComponent businessIdFromParams={params.businessId} />
   );
 }
 
 // Client Component for actual page logic
-function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { businessId?: string } }) {
-  const { businessId: businessIdFromParams } = paramsFromShell;
+function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromParams?: string }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const [activeEntitiesForBusiness, setActiveEntitiesForBusiness] = useState<BusinessManagedEntity[]>([]);
@@ -86,11 +88,12 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
   const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
-  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
+  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormValues | null>(null);
 
   const specificCodeFormSchema = z.object({
     specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
   });
+  type SpecificCodeFormValues = z.infer<typeof specificCodeFormSchema>;
 
   const dniSchema = z.object({
     dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
@@ -133,7 +136,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
 
       if (!businessSnap.exists()) {
         console.error("BusinessPage (Client - by ID): No business found for ID:", businessIdFromParams);
-        setError(`Negocio con ID "${businessIdFromParams}" no encontrado.`);
+        setError(`Negocio no encontrado. Verifica que el ID sea correcto.`);
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
       } else {
@@ -161,11 +164,10 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
           businessType: bizData.businessType,
         };
         
-        // Canonical URL redirect
         if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
           console.log(`BusinessPage (Client - by ID): Business ${businessIdFromParams} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
           router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-          return; // Stop further processing as we are redirecting
+          return; 
         }
         
         setBusinessDetails(fetchedBusiness);
@@ -245,7 +247,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
     } finally {
       setIsLoading(false);
     }
-  }, [businessIdFromParams, router, toast]); // Added toast
+  }, [businessIdFromParams, router, toast]); 
 
   useEffect(() => {
     if (businessIdFromParams) {
@@ -274,14 +276,14 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
 
     if (foundCodeObject) {
       setActiveEntityForQr(entity);
-      setValidatedSpecificCode(codeToValidate);
+      setValidatedSpecificCode(codeToValidate); 
       setCurrentStepInModal('enterDni');
       dniForm.reset({ dni: "" });
       setShowDniModal(true);
     } else {
       toast({
         title: "Código Inválido o No Disponible",
-        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'entrada'} o ya fue utilizado.`,
+        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} o ya fue utilizado/vencido.`,
         variant: "destructive",
       });
     }
@@ -323,19 +325,19 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
           return; 
         }
         
-        const qrCodeDetails: QrCodeData['promotion'] = { // Corrected type usage
+        const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
           id: activeEntityForQr.id,
           title: activeEntityForQr.name,
           description: activeEntityForQr.description,
           validUntil: activeEntityForQr.endDate,
           imageUrl: activeEntityForQr.imageUrl || "",
-          promoCode: validatedSpecificCode, 
+          promoCode: validatedSpecificCode,
           type: activeEntityForQr.type,
           termsAndConditions: activeEntityForQr.termsAndConditions,
           aiHint: activeEntityForQr.aiHint || "",
         };
 
-        setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedSpecificCode, status: 'available' });
+        setQrData({ user: clientForQr, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
         setPageViewState('qrDisplay');
     } catch(e: any) {
         console.error("Error verificando DNI:", e);
@@ -376,7 +378,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
         dob: newClientDataToSave.dob.toDate().toISOString(),
         registrationDate: new Date().toISOString(), 
       };
-       const qrCodeDetails: QrCodeData['promotion'] = { // Corrected type usage
+       const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
             id: activeEntityForQr.id,
             title: activeEntityForQr.name,
             description: activeEntityForQr.description,
@@ -387,7 +389,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
             termsAndConditions: activeEntityForQr.termsAndConditions,
             aiHint: activeEntityForQr.aiHint || "",
         };
-      setQrData({ user: registeredClient, promotion: qrCodeDetails, code: validatedSpecificCode, status: 'available' });
+      setQrData({ user: registeredClient, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
       setShowDniModal(false);
       setPageViewState('qrDisplay');
       toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
@@ -514,28 +516,20 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
             const metrics = ctx.measureText(testLine);
             const testWidth = metrics.width;
             if (testWidth > maxWidth && n > 0) {
-                ctx.fillText(line, x, currentTextY);
+                ctx.fillText(line.trim(), x, currentTextY);
                 line = words[n] + ' ';
                 currentTextY += lineHeight;
             } else {
                 line = testLine;
             }
         }
-        ctx.fillText(line, x, currentTextY);
-        return currentTextY + lineHeight; // Return the Y position after the last line
+        ctx.fillText(line.trim(), x, currentTextY);
+        return currentTextY + lineHeight; 
     };
-
 
     const drawContent = () => {
         currentY = padding;
-        const headerBgHeightReduction = 15; 
-        let headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - headerBgHeightReduction;
-        
-        if (businessDetails.logoUrl) {
-           headerBgHeight = maxLogoHeight + (businessNameFontSize + 5) + padding * 2;
-        } else {
-           headerBgHeight = (businessNameFontSize + 5) + padding * 2; 
-        }
+        let headerBgHeight = (businessDetails.logoUrl ? maxLogoHeight + spacingAfterLogo : 0) + (businessNameFontSize + 5) + padding;
 
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.fillRect(0, 0, canvas.width, headerBgHeight);
@@ -555,16 +549,14 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
                 logoHeight = logoWidth / aspectRatio;
             }
             ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
-            currentY += logoHeight + spacingAfterLogo; 
-        } else {
-            currentY += padding; 
+            currentY += logoHeight + spacingAfterLogo / 2;
         }
         
         ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
         ctx.font = `bold ${businessNameFontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
-        currentY += businessNameFontSize - (businessNameFontSize / 2) + spacingAfterBusinessName; 
+        currentY += businessNameFontSize + spacingAfterBusinessName; 
         
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.font = `bold ${promoTitleFontSize}px Arial`;
@@ -597,19 +589,6 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
             ctx.textAlign = 'center';
             ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
             currentY += smallTextFontSize + lineSpacing + 5;
-
-            if (qrData.promotion.termsAndConditions) {
-              currentY = drawWrappedText(
-                `Términos: ${qrData.promotion.termsAndConditions}`,
-                canvas.width / 2,
-                currentY,
-                canvas.width - 2 * padding,
-                smallTextFontSize + lineSpacing,
-                `${smallTextFontSize}px Arial`,
-                'hsl(var(--muted-foreground))',
-                'center'
-              );
-            }
             
             const finalHeight = currentY + padding;
             const tempCanvas = document.createElement('canvas');
@@ -660,7 +639,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
   };
 
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
-    const form = useForm<z.infer<typeof specificCodeFormSchema>>({ // Explicit type for form
+    const form = useForm<SpecificCodeFormValues>({
       resolver: zodResolver(specificCodeFormSchema),
       defaultValues: { specificCode: "" },
     });
@@ -681,7 +660,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
                     {...field}
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                     maxLength={9}
-                    className="text-sm h-9"
+                    className="text-sm h-9 w-full" // Added w-full
                     disabled={isLoadingQrFlow}
                   />
                 </FormControl>
@@ -702,22 +681,10 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
         <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
             <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
         </div>
-         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-        </footer>
       </div>
     );
   }
@@ -725,15 +692,6 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
         <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-destructive">{error}</h1>
@@ -742,9 +700,6 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
               <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
-         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-        </footer>
       </div>
     );
   }
@@ -752,15 +707,6 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
   if (!businessDetails && !isLoading && !error) { 
      return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
         <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
@@ -769,9 +715,6 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
               <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
-        <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
-            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-        </footer>
       </div>
     );
   }
@@ -780,15 +723,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
-            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                     <Link href="/" passHref className="flex items-center gap-2 group">
-                        <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                        <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                    </Link>
-                    <PublicHeaderAuth />
-                </div>
-            </header>
+             {/* Header removed as per user request for auth elements to be in footer */}
             <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
                 <Card className="w-full max-w-md shadow-xl">
                     <CardHeader className="text-center">
@@ -816,11 +751,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
                             <p className="text-muted-foreground">
                                 Válido hasta: {format(parseISO(activeEntityForQr.endDate), "dd MMMM yyyy", { locale: es })}
                             </p>
-                            {activeEntityForQr.termsAndConditions && (
-                                <p className="text-xs text-muted-foreground pt-1">
-                                    Términos: {activeEntityForQr.termsAndConditions}
-                                </p>
-                            )}
+                            {/* Terms and conditions removed from UI display */}
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col sm:flex-row gap-2">
@@ -833,9 +764,6 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
                     </CardFooter>
                 </Card>
             </main>
-             <footer className="py-8 bg-muted/50 text-center">
-                <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
-            </footer>
         </div>
     );
   }
@@ -846,17 +774,8 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
   const promotions = activeEntitiesForBusiness.filter(e => e.type === 'promotion');
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                 <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
-                </Link>
-                <PublicHeaderAuth />
-            </div>
-        </header>
-
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+        {/* Main page header (SocioVIP branding) removed from business specific page */}
         {businessDetails.publicCoverImageUrl && (
           <div className="relative h-48 md:h-64 lg:h-80 w-full">
             <Image
@@ -891,7 +810,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
           </Card>
         </div>
       
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow">
         {events.length > 0 && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
@@ -909,7 +828,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
                     <p className="text-xs text-muted-foreground">Del {format(parseISO(event.startDate), "dd MMM", { locale: es })} al {format(parseISO(event.endDate), "dd MMM, yyyy", { locale: es })}</p>
-                    {event.termsAndConditions && <p className="text-xs text-muted-foreground pt-1 line-clamp-2">Términos: {event.termsAndConditions}</p>}
+                    {/* Terms and conditions removed from display */}
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t">
                      <SpecificCodeEntryForm entity={event} />
@@ -937,7 +856,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
                     <p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p>
-                     {promo.termsAndConditions && <p className="text-xs text-muted-foreground pt-1 line-clamp-2">Términos: {promo.termsAndConditions}</p>}
+                     {/* Terms and conditions removed from display */}
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t">
                     <SpecificCodeEntryForm entity={promo} />
@@ -948,7 +867,7 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
           </section>
         )}
         
-        {!isLoading && !error && events.length === 0 && promotions.length === 0 && (
+        {!isLoading && !error && events.length === 0 && promotions.length === 0 && pageViewState === 'entityList' && (
             <Card className="col-span-full">
                 <CardHeader className="text-center">
                     <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -975,32 +894,71 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
         ) : null }
       </main>
 
-      <footer className="w-full mt-12 py-8 bg-muted/50 text-center">
-        <p className="text-sm text-muted-foreground">
-          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
-        </p>
+      <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div className="flex items-center gap-3">
+            {!loadingAuth && !loadingProfile && (
+              <>
+                {currentUser && userProfile ? (
+                  <>
+                    <span className="text-foreground flex items-center">
+                      <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                      {userProfile.name || currentUser.email?.split('@')[0]}
+                    </span>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                            <ShadcnAlertDialogFooterAliased>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                            </ShadcnAlertDialogFooterAliased>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                    <Link href="/auth/dispatcher" passHref>
+                       <Button variant="outline" size="sm">Ir a Administración</Button>
+                    </Link>
+                  </>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                    Iniciar Sesión
+                  </Button>
+                )}
+              </>
+            )}
+            {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+          </div>
+          <div className="text-muted-foreground">
+            <Link href="/" className="hover:text-primary hover:underline">
+              Plataforma de sociosvip.app
+            </Link>
+          </div>
+        </div>
       </footer>
       
       <Dialog open={showDniModal} onOpenChange={(isOpen) => { 
           if (!isOpen) { 
             dniForm.reset(); 
             newQrClientForm.reset(); 
-            setEnteredDni(""); // Ensure DNI is cleared
-            setCurrentStepInModal('enterDni'); // Reset step
-            // Do NOT reset activeEntityForQr here, it's needed if user cancels from new user form
+            setEnteredDni(""); 
+            setCurrentStepInModal('enterDni'); 
           }
           setShowDniModal(isOpen); 
         }}>
         <DialogContent className="sm:max-w-md">
-          <UIDialogTitle>
-            {currentStepInModal === 'enterDni' ? "Ingresa tu DNI/CE" : "Completa tus Datos"}
-          </UIDialogTitle>
-          <UIDialogDescriptionComponent> {/* Use alias */}
-            {currentStepInModal === 'enterDni' 
-              ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
-              : "Necesitamos algunos datos para generar tu QR."
-            }
-          </UIDialogDescriptionComponent>
+          <DialogHeader>
+            <UIDialogTitleComponent>
+              {currentStepInModal === 'enterDni' ? "Ingresa tu DNI/CE" : "Completa tus Datos"}
+            </UIDialogTitleComponent>
+            <UIDialogDescriptionComponent>
+              {currentStepInModal === 'enterDni' 
+                ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
+                : "Necesitamos algunos datos para generar tu QR."
+              }
+            </UIDialogDescriptionComponent>
+          </DialogHeader>
           {currentStepInModal === 'enterDni' ? (
             <Form {...dniForm}>
               <form onSubmit={dniForm.handleSubmit(handleDniSubmitInModal)} className="space-y-4 py-2">
@@ -1088,18 +1046,17 @@ function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { b
 
       <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
         <AlertDialogContent>
-          <AlertDialogTitle className="font-semibold">DNI Ya Registrado</AlertDialogTitle>
+          <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
           <AlertDialogDescription>
               El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
           </AlertDialogDescription>
-          <AlertDialogFooter>
+          <ShadcnAlertDialogFooterAliased>
             <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", ""); }}>No, corregir DNI</AlertDialogCancel>
             <AlertDialogAction onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</AlertDialogAction>
-          </AlertDialogFooter>
+          </ShadcnAlertDialogFooterAliased>
         </AlertDialogContent>
       </AlertDialog>
+      <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
     </div>
   );
 }
-
-    
