@@ -1,7 +1,7 @@
 
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
-import type { BUSINESS_TYPES } from "./constants"; 
+import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
 
 export interface PromotionDetails { 
   id: string;
@@ -9,9 +9,9 @@ export interface PromotionDetails {
   description: string;
   validUntil: string; 
   imageUrl: string;
-  promoCode: string; // El código general de la campaña/promoción (ej. MARTES2X1)
+  promoCode: string; 
   aiHint: string;
-  type: 'promotion' | 'event'; // Para diferenciar en la UI pública
+  type: 'promotion' | 'event';
   termsAndConditions?: string;
 }
 
@@ -27,11 +27,11 @@ export interface QrClient {
   registrationDate: Timestamp | string; 
 }
 
-export interface QrCodeData { // Para la data que se muestra con el QR al cliente final
+export interface QrCodeData { 
   user: QrClient;
-  promotion: PromotionDetails; // La promoción/evento a la que aplica
-  code: string; // El código que se codifica en el QR (puede ser el promoCode general o un GeneratedCode.value único)
-  status: QrCodeStatusGenerated; // Estado del código de 9 dígitos si este es el que se codifica
+  promotion: PromotionDetails; 
+  code: string; 
+  status: QrCodeStatusGenerated;
 }
 
 export type BusinessType = typeof BUSINESS_TYPES[number];
@@ -42,7 +42,6 @@ export interface Business {
   name: string; 
   contactEmail: string;
   joinDate: Timestamp | string; 
-  // activePromotions: number; // Este campo puede ser calculado dinámicamente
   ruc?: string;
   razonSocial?: string; 
   department?: string;
@@ -52,26 +51,25 @@ export interface Business {
   managerName?: string;
   managerDni?: string;
   businessType?: BusinessType;
-  // Campos públicos
   logoUrl?: string;
   publicCoverImageUrl?: string;
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
   publicAddress?: string;
-  customUrlPath?: string; 
+  customUrlPath?: string | null; 
 }
 
-export type PlatformUserRole = 'superadmin' | 'business_admin' | 'staff' | 'promoter' | 'host';
+export type PlatformUserRole = typeof ALL_PLATFORM_USER_ROLES[number];
 
 export interface PlatformUser {
-  id: string; // ID del documento en Firestore (puede ser igual al uid)
-  uid: string; // UID de Firebase Authentication
+  id: string; 
+  uid: string; 
   dni: string;
   name: string;
   email: string;
   roles: PlatformUserRole[];
-  businessId?: string | null; // ID del negocio al que pertenece (si aplica)
+  businessId?: string | null; 
   lastLogin: Timestamp | string; 
 }
 
@@ -88,9 +86,9 @@ export interface SocioVipMember {
   preferences?: string[];
   loyaltyPoints: number;
   membershipStatus: 'active' | 'inactive' | 'pending_payment' | 'cancelled';
-  staticQrCodeUrl?: string; // URL a un QR estático para su membresía VIP
+  staticQrCodeUrl?: string; 
   joinDate: Timestamp | string; 
-  authUid?: string; // UID de Firebase Auth si tiene cuenta en la plataforma
+  authUid?: string; 
 }
 
 
@@ -98,33 +96,42 @@ export interface AdminDashboardStats {
   totalBusinesses: number;
   totalPlatformUsers: number;
   totalPromotionsActive: number;
-  totalQrCodesGenerated: number; // Total de códigos de 9 dígitos generados
-  totalQrClients: number;       // Total de clientes QR únicos registrados
+  totalCodesCreated: number; // Renombrado de totalQrCodesGenerated
+  totalQrClients: number;       
   totalSocioVipMembers: number;
 }
+
+export interface BusinessDashboardStats {
+  activePromotions: number;
+  upcomingEvents: number;
+  totalRedemptionsToday: number; 
+  newCustomersThisWeek: number; // Placeholder
+}
+
 
 export interface PromotionAnalyticsData { 
   month: string;
   promotionsCreated: number; 
-  qrCodesGenerated: number; 
-  qrCodesUtilized: number; 
+  codesCreated: number; // Renombrado de qrCodesGenerated
+  codesRedeemed: number; // Renombrado de qrCodesUtilized
 }
 
-export interface RegisteredClient { // Este tipo se usó para el dashboard, podría ser QrClient
+export interface RegisteredClient { 
   date: string; 
   newRegistrations: number;
 }
 
 export type BusinessEntityType = 'promotion' | 'event' | 'survey';
 
-export interface GeneratedCode { // Código único de 9 dígitos
+export interface GeneratedCode { 
   id: string; 
-  entityId: string; // ID de la BusinessManagedEntity a la que pertenece
-  value: string; // El código alfanumérico de 9 dígitos
+  entityId: string; 
+  value: string; 
   status: QrCodeStatusGenerated;
-  generatedByName: string; // Nombre del usuario (negocio/staff/promotor) que lo generó
-  generatedDate: string; // ISO string
-  redemptionDate?: string | null; // ISO string
+  generatedByName: string; 
+  generatedByUid?: string; // UID del PlatformUser (promotor o staff/admin negocio) que lo creó
+  generatedDate: string; 
+  redemptionDate?: string | null; 
   redeemedByInfo?: {
     dni: string;
     name: string;
@@ -135,7 +142,7 @@ export interface GeneratedCode { // Código único de 9 dígitos
 }
 
 export type CommissionRuleType = 'fixed' | 'percentage';
-export type CommissionRuleTarget = 'event_general' | 'promotion_general' | 'ticket_type' | 'box_type';
+export type CommissionRuleTarget = 'event_general' | 'ticket_type' | 'box_type';
 
 export interface CommissionRule {
   id: string;
@@ -146,8 +153,8 @@ export interface CommissionRule {
   commissionValue: number;
   description?: string;
 }
-export interface EventPromoterAssignment { // Almacenado dentro de BusinessManagedEntity (evento o promoción)
-  promoterProfileId: string; // ID del BusinessPromoterLink o UID del PlatformUser promotor
+export interface EventPromoterAssignment { 
+  promoterProfileId: string; // ID del BusinessPromoterLink.platformUserUid o DNI del promotor
   promoterName: string; 
   promoterEmail?: string;
   commissionRules?: CommissionRule[];
@@ -178,58 +185,57 @@ export interface EventBox {
   ownerDni?: string;
 }
 
-export interface BusinessManagedEntity { // Promociones, Eventos, Encuestas creadas por el negocio
+export interface BusinessManagedEntity { 
   id: string; 
   businessId: string;
   type: BusinessEntityType;
   name: string;
   description: string;
-  startDate: string; // ISO string
-  endDate: string; // ISO string
-  usageLimit?: number; // Para promociones: límite de canjes.
-  maxAttendance?: number; // Para eventos: calculado de tickets o fijo.
+  startDate: string; 
+  endDate: string; 
+  usageLimit?: number; 
+  maxAttendance?: number; 
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
-  // Event specific
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
   assignedPromoters?: EventPromoterAssignment[];
-  // Para UI pública (denormalizado)
   businessName?: string; 
   businessLogoUrl?: string;
-  businessCustomUrlPath?: string;
-  createdAt?: string; // ISO string
+  businessCustomUrlPath?: string | null;
+  createdAt?: string; 
 }
 
-export interface PromoterProfile { // Perfil global de un promotor (si se decide gestionarlos globalmente)
+export interface PromoterProfile { 
   id: string; 
   name: string;
   email: string;
   phone?: string;
   dni?: string;
+  // Otros campos relevantes para un perfil de promotor global
 }
 
-export interface BusinessPromoterLink { // Vínculo entre un negocio y un promotor
+export interface BusinessPromoterLink { 
   id: string; 
   businessId: string;
   promoterDni: string; 
   promoterName: string; 
   promoterEmail: string; 
   promoterPhone?: string;
-  commissionRate?: string; // Tasa general de comisión para este promotor en este negocio
+  commissionRate?: string; 
   isActive: boolean;
-  isPlatformUser: boolean; // True si el DNI del promotor corresponde a un PlatformUser con rol 'promoter'
-  platformUserUid?: string; // UID de Firebase Auth si isPlatformUser es true
+  isPlatformUser: boolean; 
+  platformUserUid?: string; 
   joinDate: Timestamp | string; 
 }
 
 
 export type BusinessClientType = 'qr' | 'vip';
 
-export interface BusinessClientView { // Para la vista de clientes del negocio
+export interface BusinessClientView { 
   id: string;
   clientType: BusinessClientType;
   name: string;
@@ -237,9 +243,8 @@ export interface BusinessClientView { // Para la vista de clientes del negocio
   dni: string;
   phone?: string;
   email?: string;
-  relevantDate: string; // registrationDate para QrClient, joinDate para SocioVipMember
+  relevantDate: string; 
   isVip: boolean;
-  // Campos específicos de VIP
   loyaltyPoints?: number;
   membershipStatus?: SocioVipMember['membershipStatus'];
 }
@@ -258,22 +263,21 @@ export interface BusinessFormData {
   managerName?: string;
   managerDni?: string;
   businessType?: BusinessType;
-  // Campos públicos
   logoUrl?: string;
   publicCoverImageUrl?: string;
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
   publicAddress?: string;
-  customUrlPath?: string;
+  customUrlPath?: string | null;
 }
 
 export interface PlatformUserFormData {
-  uid?: string; // Solo para creación, UID de Firebase Auth
+  uid?: string; 
   dni: string;
   name: string;
   email: string;
-  roles: PlatformUserRole[]; // Array de roles
+  roles: PlatformUserRole[]; 
   businessId?: string | null;
 }
 
@@ -304,7 +308,7 @@ export interface BusinessPromotionFormData {
   description: string;
   startDate: Date;
   endDate: Date;
-  usageLimit?: number;
+  usageLimit?: number | string; // Allow string for empty input
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
@@ -316,19 +320,26 @@ export interface BusinessEventFormData {
   description: string;
   startDate: Date;
   endDate: Date;
-  maxAttendance?: number; // Calculado, pero puede estar en el form state para mostrar
+  // maxAttendance is calculated
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
   termsAndConditions?: string;
 }
 
-export interface BusinessPromoterFormData { // Para el formulario de vincular/editar promotor al negocio
-  // DNI se maneja en el paso previo de verificación
+export interface BusinessPromoterFormData { 
   promoterName: string;
   promoterEmail: string;
   promoterPhone?: string;
   commissionRate?: string; 
+}
+ 
+export interface SpecificCodeFormValues { // Para el input de código de 9 dígitos en la página pública del negocio
+  specificCode: string;
+}
+
+export interface DniEntryValues { // Para el input de DNI en varios flujos
+  dni: string;
 }
 
 export interface PromoterCommissionEntry { 
@@ -336,11 +347,13 @@ export interface PromoterCommissionEntry {
     businessName: string;
     entityName: string;
     entityType: 'promotion' | 'event';
-    codesRedeemedByPromoter: number; 
-    commissionRate: string; 
+    promoterCodesRedeemed: number; 
+    commissionRateApplied: string; // Ej: "10%" o "S/ 5.00 por código"
     commissionEarned: number;
     paymentStatus: 'Pendiente' | 'Pagado';
-    period: string; 
+    period: string; // Ej: "Mayo 2025"
+    entityId: string;
+    promoterId: string;
 }
 
 export interface TicketTypeFormData {
@@ -372,20 +385,15 @@ export interface BatchBoxFormData {
 }
 
 // Para el flujo "DNI-primero"
-export interface DniCheckResultBase {
-  dni: string;
-  existsAsPlatformUser?: PlatformUser;
-  existsAsSocioVip?: SocioVipMember;
-  existsAsQrClient?: QrClient;
-}
-
 export interface InitialDataForPlatformUserCreation {
   dni: string;
   name?: string;
   email?: string;
-  existingUserIsPlatformUser?: boolean; // True si el DNI ya es un PlatformUser
-  existingPlatformUserRoles?: PlatformUserRole[]; 
-  preExistingUserType?: 'QrClient' | 'SocioVipMember'; // Si se encontró como otro tipo pero no como PlatformUser
+  existingPlatformUser?: PlatformUser; 
+  existingPlatformUserRoles?: PlatformUserRole[];
+  preExistingUserType?: 'QrClient' | 'SocioVipMember';
+  qrClientData?: QrClient;
+  socioVipData?: SocioVipMember;
 }
 
 export interface InitialDataForSocioVipCreation {
@@ -393,15 +401,17 @@ export interface InitialDataForSocioVipCreation {
   name?: string;
   surname?: string;
   phone?: string;
-  dob?: string; // ISO string
+  dob?: string; 
   email?: string;
-  existingUserType?: 'QrClient' | 'PlatformUser'; // Tipo de usuario preexistente si lo hay
+  existingUserType?: 'QrClient' | 'PlatformUser'; 
+  platformUserData?: PlatformUser; 
+  qrClientData?: QrClient;     
 }
 
 export interface InitialDataForPromoterLink {
   dni: string;
   existingLink?: BusinessPromoterLink; 
-  existingPlatformUserPromoter?: PlatformUser; // Si el DNI es un PlatformUser con rol 'promoter'
+  existingPlatformUserPromoter?: PlatformUser; 
   qrClientData?: QrClient; 
   socioVipData?: SocioVipMember; 
 }

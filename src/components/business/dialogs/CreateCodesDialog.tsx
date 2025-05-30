@@ -25,10 +25,11 @@ interface CreateCodesDialogProps {
   onOpenChange: (open: boolean) => void;
   entityName: string;
   entityId: string;
-  onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string) => void; // observation es string o undefined
+  onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string, creatorUid?: string) => void; 
   existingCodesValues: string[]; 
   isSubmittingMain?: boolean; 
   currentUserProfileName?: string;
+  currentUserProfileUid?: string; // UID del promotor o usuario de negocio
 }
 
 export function CreateCodesDialog({ 
@@ -40,6 +41,7 @@ export function CreateCodesDialog({
     existingCodesValues,
     isSubmittingMain = false, 
     currentUserProfileName,
+    currentUserProfileUid,
 }: CreateCodesDialogProps) {
   const [numCodes, setNumCodes] = useState(1);
   const [observation, setObservation] = useState("");
@@ -92,22 +94,23 @@ export function CreateCodesDialog({
       }
 
       currentAndNewCodes.add(newCodeValue);
-      const codeObservation = observation.trim() === "" ? undefined : observation.trim(); // Use undefined if empty
+      const codeObservation = observation.trim() === "" ? undefined : observation.trim();
       newCodesBatch.push({
         id: `code-${entityId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
         entityId: entityId,
         value: newCodeValue,
         status: "available",
         generatedByName: currentUserProfileName || "Sistema",
+        generatedByUid: currentUserProfileUid || undefined,
         generatedDate: new Date().toISOString(),
-        observation: codeObservation,
-        redemptionDate: null,
-        redeemedByInfo: null,
+        observation: codeObservation || null, // Ensure null if empty
+        redemptionDate: null, 
+        redeemedByInfo: null, 
         isVipCandidate: false,
       });
     }
     
-    onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim());
+    onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim(), currentUserProfileUid);
     setJustCreatedCodes(newCodesBatch);
     setShowSuccess(true);
     setIsCreating(false);
@@ -190,10 +193,6 @@ export function CreateCodesDialog({
             )}
              <p className="text-sm text-muted-foreground">
               Estos códigos se han añadido a '{entityName}'.
-              {currentUserProfileName?.toLowerCase().includes("promotor") 
-                ? "" // No mostrar mensaje de simulación si el promotor ahora guarda en Firestore
-                : " Puedes verlos y gestionarlos en la sección 'Ver Códigos'."
-              }
             </p>
           </div>
         )}
