@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
+import NextImage from "next/image"; // Renamed import
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,8 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from 'qrcode';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { LoginModal } from "@/components/auth/LoginModal";
@@ -161,7 +162,7 @@ export default function BusinessPublicPageByUrl() {
           
           let startDateStr: string;
           let endDateStr: string;
-          const nowStr = new Date().toISOString();
+          const nowStr = new Date().toISOString(); 
 
           if (entityData.startDate instanceof Timestamp) {
               startDateStr = entityData.startDate.toDate().toISOString();
@@ -472,7 +473,7 @@ export default function BusinessPublicPageByUrl() {
     const canvasWidth = 320; 
 
     let currentY = 0;
-    const businessLogo = new Image();
+    const businessLogo = document.createElement('img');
     businessLogo.crossOrigin = "anonymous";
     
     let initialEstimatedHeight = padding + maxLogoHeight + spacingAfterLogo + businessNameFontSize + spacingAfterBusinessName + entityTitleFontSize + spacingAfterEntityTitle + qrSize + padding + userDetailsFontSize + lineSpacing + userDetailsFontSize + padding + smallTextFontSize + lineSpacing + padding;
@@ -528,7 +529,8 @@ export default function BusinessPublicPageByUrl() {
       currentY += entityTitleFontSize + spacingAfterEntityTitle;
 
       // QR Code
-      const qrImage = new Image();
+      const qrImage = document.createElement('img');
+      qrImage.crossOrigin = "anonymous";
       qrImage.onload = () => {
         const qrX = (canvas.width - qrSize) / 2;
         ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
@@ -557,12 +559,11 @@ export default function BusinessPublicPageByUrl() {
         currentY += smallTextFontSize + lineSpacing + 15;
         
         // Terms and conditions
+        const termsLines = qrData.promotion.termsAndConditions ? qrData.promotion.termsAndConditions.split('\n') : [];
         if (qrData.promotion.termsAndConditions) {
             ctx.font = `italic ${smallTextFontSize -1}px Arial`;
             ctx.fillStyle = 'hsl(var(--muted-foreground))';
             ctx.textAlign = 'center';
-            // Simple wrap (replace with more sophisticated if needed)
-            const termsLines = qrData.promotion.termsAndConditions.split('\n');
             termsLines.forEach(line => {
                 ctx.fillText(line, canvas.width / 2, currentY);
                 currentY += smallTextFontSize + 2;
@@ -763,7 +764,7 @@ export default function BusinessPublicPageByUrl() {
             <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     {businessDetails.logoUrl && (
-                        <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded"/>
+                        <NextImage src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded"/>
                     )}
                     <div className="ml-3">
                         <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
@@ -783,7 +784,7 @@ export default function BusinessPublicPageByUrl() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {generatedQrDataUrl ? (
-                            <Image src={generatedQrDataUrl} alt="Código QR" width={250} height={250} className="mx-auto border rounded-md shadow-md p-1 bg-white" />
+                            <NextImage src={generatedQrDataUrl} alt="Código QR" width={250} height={250} className="mx-auto border rounded-md shadow-md p-1 bg-white" />
                         ) : (
                             <div className="h-[250px] w-[250px] mx-auto flex items-center justify-center border rounded-md bg-muted text-muted-foreground">
                                 <Loader2 className="h-8 w-8 animate-spin" /> <span className="ml-2">Generando QR...</span>
@@ -870,7 +871,7 @@ export default function BusinessPublicPageByUrl() {
         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
             <div className="max-w-7xl mx-auto flex items-center justify-start"> {/* Cambiado a justify-start */}
                 {businessDetails.logoUrl && (
-                  <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
+                  <NextImage src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
                 )}
                 <div>
                   <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
@@ -889,7 +890,7 @@ export default function BusinessPublicPageByUrl() {
               {events.map((event) => (
                 <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                   <div className="relative aspect-[16/9] w-full">
-                    <Image src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" data-ai-hint={event.aiHint || "event party"} />
+                    <NextImage src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" data-ai-hint={event.aiHint || "event party"} />
                   </div>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xl">{event.name}</CardTitle>
@@ -916,7 +917,7 @@ export default function BusinessPublicPageByUrl() {
               {promotions.map((promo) => (
                  <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                   <div className="relative aspect-[16/9] w-full">
-                    <Image src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} alt={promo.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" data-ai-hint={promo.aiHint || "discount offer"} />
+                    <NextImage src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} alt={promo.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" data-ai-hint={promo.aiHint || "discount offer"} />
                   </div>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xl">{promo.name}</CardTitle>
@@ -1084,17 +1085,20 @@ export default function BusinessPublicPageByUrl() {
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <ShadcnCalendar 
-                            mode="single" 
-                            selected={field.value} 
-                            onSelect={field.onChange} 
-                            disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1920-01-01")} 
-                            captionLayout="dropdown-buttons" 
-                            fromYear={1920} 
-                            toYear={new Date().getFullYear() -10} 
-                            locale={es} 
-                            initialFocus 
-                        />
+                        <DayPicker
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            locale={es}
+                            captionLayout="dropdown"
+                            fromYear={1920}
+                            toYear={new Date().getFullYear() - 10}
+                            disabled={(date) =>
+                              date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) ||
+                              date < new Date("1920-01-01")
+                            }
+                            initialFocus
+                          />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -1130,3 +1134,5 @@ export default function BusinessPublicPageByUrl() {
     </div>
   );
 }
+
+    
