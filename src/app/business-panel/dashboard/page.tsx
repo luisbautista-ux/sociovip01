@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import type { BusinessManagedEntity } from "@/lib/types";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { isToday, startOfDay, endOfDay, isFuture, parseISO } from "date-fns";
+import { startOfDay, endOfDay, parseISO } from "date-fns"; // Removed isToday, isFuture as we use isEntityCurrentlyActivatable or direct date comparisons
 import { useToast } from "@/hooks/use-toast";
 
 interface BusinessDashboardStats {
@@ -32,27 +32,24 @@ export default function BusinessDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Effect to set currentBusinessId based on userProfile
   useEffect(() => {
     console.log("BusinessDashboardPage: Auth/Profile loading state. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
     if (loadingAuth || loadingProfile) {
-      if (!isLoading) setIsLoading(true); // Keep loading indicator if auth/profile is still processing
+      if (!isLoading) setIsLoading(true);
       return;
     }
 
-    // Auth and profile loading is complete here
     if (userProfile) {
       console.log("BusinessDashboardPage: UserProfile loaded in useEffect:", userProfile);
-      const bid = userProfile.businessId;
-      if (bid && typeof bid === 'string' && bid.trim() !== '') {
-        const trimmedBid = bid.trim();
+      if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
+        const trimmedBid = userProfile.businessId.trim();
         setCurrentBusinessId(trimmedBid);
-        // setIsLoading(true); // Fetch will handle its own loading state
+        // setIsLoading will be handled by the fetchBusinessStats call or if no businessId
       } else {
         console.warn("BusinessDashboardPage: UserProfile does not have a valid businessId. User roles:", userProfile.roles);
         setCurrentBusinessId(null);
         setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
-        setIsLoading(false); // Not loading if no valid businessId
+        setIsLoading(false);
         if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
            toast({
             title: "Error de Configuración del Negocio",
@@ -62,27 +59,26 @@ export default function BusinessDashboardPage() {
           });
         }
       }
-    } else { // No userProfile found after auth/profile load
+    } else { 
       console.log("BusinessDashboardPage: No userProfile found after auth/profile load. Cannot fetch business stats.");
       setCurrentBusinessId(null);
       setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
-      setIsLoading(false); // Not loading if no user profile
+      setIsLoading(false);
     }
-  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]);
+  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]); // isLoading added to dependencies though might not be strictly necessary if logic is correct.
 
 
   const fetchBusinessStats = useCallback(async (businessIdForQuery: string) => {
     console.log("BusinessDashboardPage: fetchBusinessStats called for businessId:", businessIdForQuery);
     
-    if (!businessIdForQuery || typeof businessIdForQuery !== 'string' || businessIdForQuery.trim() === '') {
-        console.error("BusinessDashboardPage: fetchBusinessStats called with invalid businessIdForQuery:", businessIdForQuery, "UserProfile:", userProfile);
-        setIsLoading(false); 
+    if (typeof businessIdForQuery !== 'string' || businessIdForQuery.trim() === '') {
+        console.error("BusinessDashboardPage: fetchBusinessStats called with invalid businessIdForQuery:", businessIdForQuery, "UserProfile for context:", userProfile);
         setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
-        // No toast here, the other useEffect handles missing businessId for the profile
+        setIsLoading(false); 
         return;
     }
 
-    setIsLoading(true);
+    setIsLoading(true); // Set loading true at the beginning of fetch
     try {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
@@ -124,7 +120,10 @@ export default function BusinessDashboardPage() {
           maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
           isActive: data.isActive === undefined ? true : data.isActive,
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
-          // Omitting other fields not directly used in this dashboard calculation for brevity
+          ticketTypes: [], // Not strictly needed for these dashboard stats
+          eventBoxes: [], // Not strictly needed
+          assignedPromoters: [], // Not strictly needed
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
         } as BusinessManagedEntity);
       });
       console.log("BusinessDashboardPage: Processed entities for dashboard:", entities.length);
@@ -141,7 +140,8 @@ export default function BusinessDashboardPage() {
         }
         if (entity.type === 'event' && entity.isActive) {
           try {
-            if (entity.startDate && isFuture(parseISO(entity.startDate))) {
+            // Check if start date is in the future relative to the start of today
+            if (entity.startDate && parseISO(entity.startDate) > todayEndObj) {
               upcomingEventsCount++;
             }
           } catch (e) {
@@ -179,38 +179,40 @@ export default function BusinessDashboardPage() {
       setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
       toast({
         title: "Error al Cargar las Estadísticas del Negocio",
-        description: `Permiso denegado (${error.code || 'desconocido'}). Asegúrate de que tu perfil en Firestore (colección 'platformUsers', documento con tu UID de Auth) tenga el campo 'roles' como un array con 'business_admin' o 'staff', y un campo 'businessId' válido. Revisa las reglas de seguridad de Firestore.`,
+        description: `Permiso denegado (${error.code || 'desconocido'}). Asegúrate de que tu perfil en Firestore (colección 'platformUsers', documento con tu UID de Auth) tenga un campo 'roles' como un array con 'business_admin' o 'staff', y un campo 'businessId' válido. Revisa las reglas de seguridad de Firestore.`,
         variant: "destructive",
         duration: 15000,
       });
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Ensure isLoading is set to false in finally
       console.log("BusinessDashboardPage: fetchBusinessStats finished, isLoading set to false.");
     }
-  }, [toast, userProfile]); // userProfile is needed here for the console.error if businessIdForQuery is invalid.
+  }, [toast, userProfile]); // userProfile included for console.error context
 
-  // useEffect to trigger data fetching when currentBusinessId is ready and auth is complete
-   useEffect(() => {
+  useEffect(() => {
     console.log("BusinessDashboardPage: Effect for fetching data. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "currentBusinessId:", currentBusinessId);
     if (loadingAuth || loadingProfile) {
-      if (!isLoading) setIsLoading(true);
+      // Still loading auth or profile, do nothing until that's complete.
+      // isLoading should ideally be true from initial state or set by the other effect.
+      if (!isLoading) setIsLoading(true); // Ensure loading spinner shows if somehow missed
       return;
     }
 
-    if (currentBusinessId) { // currentBusinessId is now guaranteed to be a non-empty string if not null
+    if (currentBusinessId) {
       console.log("BusinessDashboardPage: Valid currentBusinessId, calling fetchBusinessStats:", currentBusinessId);
       fetchBusinessStats(currentBusinessId);
     } else {
-      // This case (no currentBusinessId after auth/profile loaded) should be handled by the first useEffect.
-      // If it's reached, it means no valid businessId was found for the user.
+      // This case means no valid businessId was found for the user after auth/profile loaded.
+      // The first useEffect should have handled setting isLoading to false.
       console.log("BusinessDashboardPage: No currentBusinessId for fetching stats. Ensuring isLoading is false.");
-      if (isLoading) setIsLoading(false); // Ensure loading is off if we are not fetching.
+      if (isLoading) setIsLoading(false);
       setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
     }
-  }, [currentBusinessId, fetchBusinessStats, loadingAuth, loadingProfile, isLoading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
+  }, [currentBusinessId, fetchBusinessStats, loadingAuth, loadingProfile]); // Removed isLoading from here to prevent re-triggering fetchBusinessStats when it sets isLoading itself.
 
 
-  if (isLoading) {
+  if (isLoading) { // This covers initial auth loading and data fetching loading
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -220,8 +222,6 @@ export default function BusinessDashboardPage() {
   }
 
   if (!currentBusinessId && !isLoading && userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'))) {
-    // This case is specifically for when auth/profile is loaded, user *should* have a businessId, but it's missing/invalid.
-    // The toast for this is handled in the first useEffect. This is a fallback display.
     return (
         <div className="flex flex-col items-center justify-center h-64 p-4 border border-dashed rounded-md">
             <CardTitle className="text-xl text-destructive">Configuración de Negocio Incompleta</CardTitle>
@@ -274,5 +274,4 @@ export default function BusinessDashboardPage() {
     </div>
   );
 }
-
     
