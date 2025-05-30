@@ -2,132 +2,117 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart2, CheckCircle, QrCode, DollarSign, Gift, Building, ScanLine } from "lucide-react"; // Added Building, ScanLine
-import { StatCard } from "@/components/admin/StatCard"; 
-import type { BusinessManagedEntity, PromoterProfile } from "@/lib/types";
-import { isEntityCurrentlyActivatable } from "@/lib/utils"; // Import the utility
+import { Building, CheckCircle, QrCode, ScanLine, Gift, BarChart2, Info } from "lucide-react";
+import { StatCard } from "@/components/admin/StatCard";
+import type { BusinessManagedEntity } from "@/lib/types";
+import { useAuth } from "@/context/AuthContext";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { isEntityCurrentlyActivatable } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 
-// Mock Data for Promoter Dashboard
-const mockLoggedInPromoter: PromoterProfile = {
-  id: "pp1",
-  uid: "promoterTestUid123", // Assuming promoter has a PlatformUser UID
-  name: "Carlos Santana (Promotor)",
-  email: "carlos.santana@promo.com",
-  phone: "+51911223344"
-};
-
-// Using a more realistic structure for assigned entities, similar to how Firestore might store them
-const mockAssignedEntities: BusinessManagedEntity[] = [
-  { 
-    id: "bp1", 
-    businessId: "biz1", // Pandora Lounge Bar
-    type: "promotion", 
-    name: "Jueves de Alitas BBQ (Asignada a Carlos)", 
-    description: "Todas las alitas BBQ a S/1 cada una.", 
-    startDate: "2025-01-01T12:00:00", 
-    endDate: "2025-12-31T12:00:00", 
-    usageLimit: 0, 
-    isActive: true, 
-    imageUrl: "https://placehold.co/300x200.png", 
-    aiHint: "chicken wings",
-    termsAndConditions: "Válido solo para consumo en local.",
-    generatedCodes: [ 
-        { id: "codePromo1-1", entityId: "bp1", value: "ALITAS001", status: "available", generatedByName: "Admin Negocio Pandora", generatedDate: "2025-07-20T10:00:00Z", observation: "Códigos iniciales" },
-        { id: "pp1bp1cd1", entityId: "bp1", value: "PROMOALAS", status: "available", generatedByName: mockLoggedInPromoter.name, generatedByUid: mockLoggedInPromoter.uid, generatedDate: "2025-08-02T10:00:00Z", observation: "Códigos Promotor Carlos" },
-        { id: "pp1bp1cd2", entityId: "bp1", value: "WINGKING1", status: "redeemed", generatedByName: mockLoggedInPromoter.name, generatedByUid: mockLoggedInPromoter.uid, generatedDate: "2025-08-03T11:00:00Z", redemptionDate: "2025-08-03T19:00:00Z", redeemedByInfo: { dni:"111", name:"Cliente Alas"} },
-    ],
-    ticketTypes: [], eventBoxes: [], assignedPromoters: []
-  },
-  { 
-    id: "evt1", 
-    businessId: "biz1", // Pandora Lounge Bar
-    type: "event", 
-    name: "Noche de Karaoke Estelar (Asignada a Carlos)", 
-    description: "Saca la estrella que llevas dentro.", 
-    startDate: "2025-08-15T12:00:00", 
-    endDate: "2025-08-15T23:59:59", 
-    maxAttendance: 100, 
-    isActive: true, 
-    imageUrl: "https://placehold.co/300x200.png", 
-    aiHint: "karaoke night",
-    generatedCodes: [
-        { id: "pp1evt1cd1", entityId: "evt1", value: "VOZSTAR01", status: "redeemed", generatedByName: mockLoggedInPromoter.name, generatedByUid: mockLoggedInPromoter.uid, generatedDate: "2025-08-05T10:00:00Z", redemptionDate: "2025-08-15T21:00:00Z", redeemedByInfo: {dni: "222", name: "Cliente Karaoke"} },
-        { id: "pp1evt1cd2", entityId: "evt1", value: "STARSHOW2", status: "available", generatedByName: mockLoggedInPromoter.name, generatedByUid: mockLoggedInPromoter.uid, generatedDate: "2025-08-06T10:00:00Z" },
-    ],
-    ticketTypes: [], eventBoxes: [], assignedPromoters: []
-  },
-   { 
-    id: "bpInactive", 
-    businessId: "biz2", // Another Business
-    type: "promotion", 
-    name: "Promo Pasada (Asignada a Carlos)", 
-    description: "Esta promoción ya no está activa.", 
-    startDate: "2024-06-01T12:00:00", 
-    endDate: "2024-06-30T12:00:00", 
-    usageLimit: 0, 
-    isActive: false, // This will be filtered out by isEntityCurrentlyActivatable
-    imageUrl: "https://placehold.co/300x200.png", 
-    aiHint: "old deal",
-    generatedCodes: [],
-    ticketTypes: [], eventBoxes: [], assignedPromoters: []
-  },
-  { 
-    id: "evtFuture", 
-    businessId: "biz2", // Another Business
-    type: "event", 
-    name: "Evento Futuro Lejano (Asignada a Carlos)", 
-    description: "Planeando con anticipación.", 
-    startDate: "2026-01-10T12:00:00", 
-    endDate: "2026-01-11T12:00:00", 
-    maxAttendance: 50, 
-    isActive: true, 
-    imageUrl: "https://placehold.co/300x200.png", 
-    aiHint: "planning future",
-    generatedCodes: [],
-    ticketTypes: [], eventBoxes: [], assignedPromoters: []
-  },
-];
-
-
-const mockRecentActivity = [
-  { id: 1, text: "Generaste 10 códigos para 'Noche de Karaoke Estelar'.", date: "Hace 2 horas" },
-  { id: 2, text: "Se canjeó un código (VOZSTAR01) que generaste.", date: "Ayer" },
-  { id: 3, text: "Asignada nueva promoción: 'Martes de Alitas'.", date: "Hace 2 días" },
-];
+interface PromoterDashboardStats {
+  totalBusinessesAssigned: number;
+  totalCodesGeneratedByPromoter: number;
+  qrGeneratedWithPromoterCodes: number; // Nuevo contador
+  totalCodesRedeemedByPromoter: number;
+}
 
 export default function PromoterDashboardPage() {
+  const { userProfile, loadingAuth, loadingProfile } = useAuth();
+  const [assignedEntities, setAssignedEntities] = useState<BusinessManagedEntity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const calculatePromoterStats = () => {
-    const activeEntitiesForPromoter = mockAssignedEntities.filter(
-      entity => entity.isActive && isEntityCurrentlyActivatable(entity) && 
-                (entity.assignedPromoters?.some(ap => ap.promoterProfileId === mockLoggedInPromoter.uid) || 
-                 entity.generatedCodes?.some(gc => gc.generatedByUid === mockLoggedInPromoter.uid)) // Simplified check for assignment
-    );
-    
-    const uniqueBusinessIds = new Set(activeEntitiesForPromoter.map(entity => entity.businessId));
+  const fetchAssignedEntitiesForPromoter = useCallback(async (promoterName: string) => {
+    if (!promoterName) {
+      setAssignedEntities([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    console.log("Promoter Dashboard: Fetching entities where promoterName is assigned:", promoterName);
+    try {
+      const entitiesQuery = query(
+        collection(db, "businessEntities"),
+        where("isActive", "==", true)
+        // No podemos filtrar por `assignedPromoters` array directamente de forma eficiente.
+        // Se obtiene todo y se filtra en cliente o se necesitaría una estructura de datos diferente.
+      );
+      const entitiesSnap = await getDocs(entitiesQuery);
+      const allActiveEntities: BusinessManagedEntity[] = [];
+      entitiesSnap.forEach(docSnap => {
+        const data = docSnap.data();
+        const entity: BusinessManagedEntity = {
+          id: docSnap.id,
+          // ... (resto de los campos mapeados como en promoter/entities/page.tsx)
+          businessId: data.businessId,
+          type: data.type as "promotion" | "event",
+          name: data.name,
+          description: data.description,
+          startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : String(data.startDate),
+          endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : String(data.endDate),
+          usageLimit: data.usageLimit,
+          maxAttendance: data.maxAttendance,
+          isActive: data.isActive,
+          imageUrl: data.imageUrl,
+          aiHint: data.aiHint,
+          termsAndConditions: data.termsAndConditions,
+          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
+          ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes : [],
+          eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes : [],
+          assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+        };
+        if (entity.assignedPromoters?.some(ap => ap.promoterName === promoterName) && isEntityCurrentlyActivatable(entity)) {
+          allActiveEntities.push(entity);
+        }
+      });
+      setAssignedEntities(allActiveEntities);
+      console.log("Promoter Dashboard: Fetched and filtered assigned entities:", allActiveEntities.length);
+    } catch (error) {
+      console.error("Promoter Dashboard: Error fetching assigned entities:", error);
+      setAssignedEntities([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-    let codesGeneratedByPromoter = 0;
-    let codesRedeemedByPromoter = 0;
-    
-    // Calculate stats based on ALL assigned entities, not just active ones, for historical totals
-    mockAssignedEntities.forEach(entity => {
-      const promoterCodes = entity.generatedCodes?.filter(c => c.generatedByUid === mockLoggedInPromoter.uid) || [];
-      codesGeneratedByPromoter += promoterCodes.length;
-      codesRedeemedByPromoter += promoterCodes.filter(c => c.status === 'redeemed').length;
+  useEffect(() => {
+    if (!loadingAuth && !loadingProfile && userProfile?.name) {
+      fetchAssignedEntitiesForPromoter(userProfile.name);
+    } else if (!loadingAuth && !loadingProfile) {
+      setIsLoading(false); // No user or name, stop loading
+    }
+  }, [userProfile, loadingAuth, loadingProfile, fetchAssignedEntitiesForPromoter]);
+
+  const promoterStats = useMemo((): PromoterDashboardStats => {
+    const uniqueBusinessIds = new Set(assignedEntities.map(entity => entity.businessId));
+    let codesGenerated = 0;
+    let codesRedeemed = 0;
+
+    assignedEntities.forEach(entity => {
+      const promoterCodes = entity.generatedCodes?.filter(c => c.generatedByName === userProfile?.name) || [];
+      codesGenerated += promoterCodes.length;
+      codesRedeemed += promoterCodes.filter(c => c.status === 'redeemed').length;
     });
-
-    // Commission is mock, not based on granular rules here
-    const commissionEarned = codesRedeemedByPromoter * 0.50; 
 
     return {
       totalBusinessesAssigned: uniqueBusinessIds.size,
-      totalCodesGeneratedByPromoter: codesGeneratedByPromoter,
-      totalCodesRedeemedByPromoter: codesRedeemedByPromoter,
-      totalCommissionEarned: commissionEarned, // This will be hidden
+      totalCodesGeneratedByPromoter: codesGenerated,
+      qrGeneratedWithPromoterCodes: 0, // Placeholder, se actualizará con lógica de backend
+      totalCodesRedeemedByPromoter: codesRedeemed,
     };
-  };
+  }, [assignedEntities, userProfile?.name]);
 
-  const promoterStats = calculatePromoterStats();
+  if (loadingAuth || loadingProfile || isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-muted-foreground">Cargando dashboard del promotor...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -135,12 +120,12 @@ export default function PromoterDashboardPage() {
         <BarChart2 className="h-8 w-8 mr-2" /> Dashboard del Promotor
       </h1>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Adjusted for 3 cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Ajustado para 3 tarjetas visibles inicialmente */}
         <StatCard title="Negocios Asignados (Activos)" value={promoterStats.totalBusinessesAssigned} icon={Building} />
-        <StatCard title="Códigos Generados por Ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
-        <StatCard title="QRs generados con tus códigos" value={promoterStats.totalCodesGeneratedByPromoter} icon={ScanLine} description="Dato de ejemplo"/>
+        <StatCard title="Códigos Creados por Ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
+        <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} />
         <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesRedeemedByPromoter} icon={CheckCircle} />
-        {/* Comisión Estimada card is now removed */}
+        {/* Comisión Estimada ha sido ocultada */}
       </div>
 
       <Card className="shadow-lg">
@@ -148,19 +133,11 @@ export default function PromoterDashboardPage() {
           <CardTitle>Actividad Reciente</CardTitle>
           <CardDescription>Últimas acciones relacionadas con tus códigos y entidades.</CardDescription>
         </CardHeader>
-        <CardContent>
-          {mockRecentActivity.length > 0 ? (
-            <ul className="space-y-3">
-              {mockRecentActivity.map(activity => (
-                <li key={activity.id} className="text-sm text-muted-foreground border-b pb-2 last:border-b-0">
-                  <span className="block text-foreground">{activity.text}</span>
-                  <span className="text-xs">{activity.date}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground">No hay actividad reciente.</p>
-          )}
+        <CardContent className="min-h-[150px] flex flex-col items-center justify-center text-center">
+          <Info className="h-12 w-12 text-primary/60 mb-3" />
+          <p className="text-muted-foreground">
+            La actividad reciente se mostrará aquí una vez que se integre con el sistema de registro de eventos del backend.
+          </p>
         </CardContent>
       </Card>
       

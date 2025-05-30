@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard"; 
-import { Ticket, Calendar, Users, BarChart3, ScanLine, Loader2 } from "lucide-react";
+import { Ticket, Calendar, Users, BarChart3, ScanLine, Loader2, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useCallback } from "react";
@@ -10,14 +10,14 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import type { BusinessManagedEntity } from "@/lib/types";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { startOfDay, endOfDay, parseISO } from "date-fns"; // Removed isToday, isFuture as we use isEntityCurrentlyActivatable or direct date comparisons
+import { startOfDay, endOfDay, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 interface BusinessDashboardStats {
   activePromotions: number;
   upcomingEvents: number;
-  totalRedemptionsToday: number;
-  newCustomersThisWeek: number; 
+  totalRedemptionsToday: number; 
+  qrGeneratedWithCodes: number; // Placeholder
 }
 
 export default function BusinessDashboardPage() {
@@ -27,7 +27,7 @@ export default function BusinessDashboardPage() {
     activePromotions: 0,
     upcomingEvents: 0,
     totalRedemptionsToday: 0,
-    newCustomersThisWeek: 0, // Kept as 0, will be placeholder
+    qrGeneratedWithCodes: 0, // Placeholder
   });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -41,15 +41,14 @@ export default function BusinessDashboardPage() {
 
     if (userProfile) {
       console.log("BusinessDashboardPage: UserProfile loaded in useEffect:", userProfile);
-      if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
-        const trimmedBid = userProfile.businessId.trim();
-        setCurrentBusinessId(trimmedBid);
-        // setIsLoading will be handled by the fetchBusinessStats call or if no businessId
+      const fetchedBusinessId = userProfile.businessId;
+      if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
+        setCurrentBusinessId(fetchedBusinessId.trim());
       } else {
         console.warn("BusinessDashboardPage: UserProfile does not have a valid businessId. User roles:", userProfile.roles);
         setCurrentBusinessId(null);
-        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
-        setIsLoading(false);
+        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
+        setIsLoading(false); 
         if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
            toast({
             title: "Error de Configuración del Negocio",
@@ -62,10 +61,10 @@ export default function BusinessDashboardPage() {
     } else { 
       console.log("BusinessDashboardPage: No userProfile found after auth/profile load. Cannot fetch business stats.");
       setCurrentBusinessId(null);
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
       setIsLoading(false);
     }
-  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]); // isLoading added to dependencies though might not be strictly necessary if logic is correct.
+  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]);
 
 
   const fetchBusinessStats = useCallback(async (businessIdForQuery: string) => {
@@ -73,12 +72,12 @@ export default function BusinessDashboardPage() {
     
     if (typeof businessIdForQuery !== 'string' || businessIdForQuery.trim() === '') {
         console.error("BusinessDashboardPage: fetchBusinessStats called with invalid businessIdForQuery:", businessIdForQuery, "UserProfile for context:", userProfile);
-        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
         setIsLoading(false); 
         return;
     }
 
-    setIsLoading(true); // Set loading true at the beginning of fetch
+    setIsLoading(true);
     try {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
@@ -95,23 +94,25 @@ export default function BusinessDashboardPage() {
         let startDateStr: string;
         if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
         else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-        else {
-            console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid startDate. Using fallback.`);
-            startDateStr = nowISO;
+        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
+        else { 
+          console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid startDate. Using fallback.`);
+          startDateStr = nowISO;
         }
 
         let endDateStr: string;
         if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
         else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-        else {
-            console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid endDate. Using fallback.`);
-            endDateStr = nowISO;
+        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
+        else { 
+          console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid endDate. Using fallback.`);
+          endDateStr = nowISO;
         }
         
         entities.push({
           id: docSnap.id,
           businessId: data.businessId,
-          type: data.type,
+          type: data.type as "promotion" | "event",
           name: data.name || "Entidad sin nombre",
           description: data.description || "",
           startDate: startDateStr,
@@ -120,9 +121,10 @@ export default function BusinessDashboardPage() {
           maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
           isActive: data.isActive === undefined ? true : data.isActive,
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
-          ticketTypes: [], // Not strictly needed for these dashboard stats
-          eventBoxes: [], // Not strictly needed
-          assignedPromoters: [], // Not strictly needed
+          // No necesitamos cargar sub-arrays completos aquí para las stats básicas
+          ticketTypes: [], 
+          eventBoxes: [],
+          assignedPromoters: [], 
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
         } as BusinessManagedEntity);
       });
@@ -140,7 +142,6 @@ export default function BusinessDashboardPage() {
         }
         if (entity.type === 'event' && entity.isActive) {
           try {
-            // Check if start date is in the future relative to the start of today
             if (entity.startDate && parseISO(entity.startDate) > todayEndObj) {
               upcomingEventsCount++;
             }
@@ -172,11 +173,12 @@ export default function BusinessDashboardPage() {
         activePromotions: activePromotionsCount,
         upcomingEvents: upcomingEventsCount,
         totalRedemptionsToday: redemptionsTodayCount,
+        qrGeneratedWithCodes: 0, // Mantener como 0, no hay lógica de backend para este contador aún
       }));
 
     } catch (error: any) {
       console.error("BusinessDashboardPage: Error fetching business dashboard stats:", error.code, error.message, error);
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
       toast({
         title: "Error al Cargar las Estadísticas del Negocio",
         description: `Permiso denegado (${error.code || 'desconocido'}). Asegúrate de que tu perfil en Firestore (colección 'platformUsers', documento con tu UID de Auth) tenga un campo 'roles' como un array con 'business_admin' o 'staff', y un campo 'businessId' válido. Revisa las reglas de seguridad de Firestore.`,
@@ -184,17 +186,14 @@ export default function BusinessDashboardPage() {
         duration: 15000,
       });
     } finally {
-      setIsLoading(false); // Ensure isLoading is set to false in finally
+      setIsLoading(false); 
       console.log("BusinessDashboardPage: fetchBusinessStats finished, isLoading set to false.");
     }
-  }, [toast, userProfile]); // userProfile included for console.error context
+  }, [toast, userProfile]);
 
   useEffect(() => {
     console.log("BusinessDashboardPage: Effect for fetching data. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "currentBusinessId:", currentBusinessId);
     if (loadingAuth || loadingProfile) {
-      // Still loading auth or profile, do nothing until that's complete.
-      // isLoading should ideally be true from initial state or set by the other effect.
-      if (!isLoading) setIsLoading(true); // Ensure loading spinner shows if somehow missed
       return;
     }
 
@@ -202,19 +201,17 @@ export default function BusinessDashboardPage() {
       console.log("BusinessDashboardPage: Valid currentBusinessId, calling fetchBusinessStats:", currentBusinessId);
       fetchBusinessStats(currentBusinessId);
     } else {
-      // This case means no valid businessId was found for the user after auth/profile loaded.
-      // The first useEffect should have handled setting isLoading to false.
       console.log("BusinessDashboardPage: No currentBusinessId for fetching stats. Ensuring isLoading is false.");
       if (isLoading) setIsLoading(false);
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [currentBusinessId, fetchBusinessStats, loadingAuth, loadingProfile]); // Removed isLoading from here to prevent re-triggering fetchBusinessStats when it sets isLoading itself.
+  }, [currentBusinessId, loadingAuth, loadingProfile]); // fetchBusinessStats se quita de aquí porque está en useCallback con userProfile
 
 
-  if (isLoading) { // This covers initial auth loading and data fetching loading
+  if (isLoading) { 
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-4 text-muted-foreground">Cargando estadísticas del negocio...</p>
       </div>
@@ -242,7 +239,7 @@ export default function BusinessDashboardPage() {
         <StatCard title="Promociones Activas" value={stats.activePromotions} icon={Ticket} />
         <StatCard title="Eventos Próximos" value={stats.upcomingEvents} icon={Calendar} />
         <StatCard title="Canjes Hoy" value={stats.totalRedemptionsToday} icon={ScanLine} />
-        <StatCard title="Nuevos Clientes (Semana)" value={stats.newCustomersThisWeek} icon={Users} description="Dato de ejemplo" />
+        <StatCard title="QRs generados con tus códigos" value={stats.qrGeneratedWithCodes} icon={Users} />
       </div>
 
       <Card className="shadow-lg">
@@ -254,24 +251,21 @@ export default function BusinessDashboardPage() {
           <CardDescription>Visualiza cómo están funcionando tus promociones. (Datos de ejemplo para el gráfico)</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px] flex items-center justify-center">
-          {/* TODO: Connect this chart to real, aggregated data */}
           <p className="text-muted-foreground">Aquí iría un gráfico de rendimiento de promociones.</p>
         </CardContent>
       </Card>
 
        <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Actividad Reciente (Datos de ejemplo)</CardTitle>
+          <CardTitle>Actividad Reciente de tu Negocio</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><span className="font-semibold text-foreground">Promo "Happy Hour"</span> - 5 nuevos canjes.</li>
-            <li><span className="font-semibold text-foreground">Juan Pérez (Promotor)</span> generó 10 nuevos códigos.</li>
-            <li>Nuevo evento <span className="font-semibold text-foreground">"Noche de Salsa"</span> publicado.</li>
-          </ul>
+        <CardContent className="min-h-[150px] flex flex-col items-center justify-center text-center">
+          <Info className="h-12 w-12 text-primary/60 mb-3" />
+           <p className="text-muted-foreground">
+            La actividad reciente de tu negocio se mostrará aquí una vez que se integre el sistema de registro de eventos del backend.
+          </p>
         </CardContent>
       </Card>
     </div>
   );
 }
-    
