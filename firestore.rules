@@ -1,0 +1,138 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Gets the platformUser document data for a given userId
+    function getUserData(userId) {
+      let userPath = /databases/$(database)/documents/platformUsers/$(userId);
+      return exists(userPath) ? get(userPath).data : null;
+    }
+
+    // Gets the roles array for a given userId
+    function getUserRoles(userId) {
+      let userData = getUserData(userId);
+      return userData != null && 'roles' in userData && userData.roles is list ? userData.roles : [];
+    }
+
+    // Checks if the currently authenticated user is a Super Admin
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserRoles(request.auth.uid).hasAny(['superadmin']);
+    }
+
+    // Checks if the currently authenticated user is a Business User (Admin or Staff)
+    function isBusinessUser() {
+      let userRoles = getUserRoles(request.auth.uid);
+      return isAuthenticated() && userRoles.hasAny(['business_admin', 'staff']);
+    }
+
+    // Gets the businessId for the currently authenticated user from their platformUsers profile
+    function getBusinessIdForAuthenticatedUser() {
+      let userData = getUserData(request.auth.uid);
+      return userData != null && 'businessId' in userData && userData.businessId is string && userData.businessId != "" ?
+             userData.businessId : null;
+    }
+    // --- End Helper Functions ---
+
+    // PLATFORM USERS Collection
+    match /platformUsers/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin() || isBusinessUser());
+      allow create: if isAuthenticated(); // For user self-signup or SuperAdmin creation
+      allow update, delete: if isSuperAdmin();
+      // Allow users to update limited fields of their own profile (e.g., name, phone) can be added here later.
+    }
+    match /platformUsers {
+      allow list: if isSuperAdmin() || isBusinessUser(); // Business users might need to list to find users by DNI
+      allow get: if isSuperAdmin() || isBusinessUser(); // For direct collection doc access if needed
+    }
+
+    // BUSINESSES Collection
+    match /businesses/{businessId} {
+      allow read: if true; // Publicly readable for business pages
+      allow create, update, delete: if isSuperAdmin();
+    }
+    match /businesses {
+      allow list: if isAuthenticated(); // SuperAdmins or BusinessAdmins listing businesses
+      allow get: if isAuthenticated();
+    }
+
+    // SOCIO VIP MEMBERS Collection
+    match /socioVipMembers/{memberId} {
+      allow read: if isSuperAdmin() || isBusinessUser(); // Business users might check DNI for VIP status
+      allow write: if isSuperAdmin(); // SuperAdmin manages VIPs
+    }
+    match /socioVipMembers {
+      allow list: if isSuperAdmin() || isBusinessUser(); // For DNI checks
+    }
+
+    // QR CLIENTS Collection
+    match /qrClients/{clientId} {
+      allow create: if true; // Publicly creatable
+      allow read: if isSuperAdmin() || isBusinessUser(); // Business users might check DNI
+      // No general update/delete for qrClients from client-side for now
+    }
+    match /qrClients {
+      allow list: if isSuperAdmin() || isBusinessUser(); // For DNI checks
+    }
+
+    // BUSINESS ENTITIES (Promotions, Events) Collection
+    match /businessEntities/{entityId} {
+      // Public read if entity is active (client must filter, or server component must check)
+      // Business users can read any entity for their business
+      allow read: if (resource.data.isActive == true) || 
+                     (isBusinessUser() && resource.data.businessId == getBusinessIdForAuthenticatedUser());
+      
+      allow create: if isBusinessUser() &&
+                       request.resource.data.businessId != null &&
+                       request.resource.data.businessId == getBusinessIdForAuthenticatedUser();
+                       
+      allow update, delete: if isBusinessUser() &&
+                               resource.data.businessId != null &&
+                               resource.data.businessId == getBusinessIdForAuthenticatedUser();
+    }
+    match /businessEntities {
+      // Business users can list entities (client MUST filter by businessId and ideally isActive)
+      // Public listing needs to be handled carefully; usually via a backend or strict client queries.
+      // For development, allowing business users to list is a start.
+      // Public page should ideally query active entities only.
+      allow list: if isBusinessUser() || 
+                     (request.query.resource == null || request.query.resource.data.isActive == true); // Tentative for public listing of active entities
+      // A simpler (but more open) rule for public listing for now, if the above is too complex or fails:
+      // allow list: if true; // CAUTION: Client MUST filter for isActive and relevant businessId on public pages.
+    }
+
+    // PROMOTER PROFILES (Global list of potential promoters)
+    match /promoterProfiles/{promoterId} {
+      allow read: if isAuthenticated(); // Business users can read to see available promoters for linking
+      allow create, update, delete: if isSuperAdmin(); // SuperAdmin manages global promoter pool
+    }
+    match /promoterProfiles {
+      allow list: if isAuthenticated(); // Business users can list available promoters
+    }
+
+    // BUSINESS PROMOTER LINKS (Links between a Business and a Promoter)
+    match /businessPromoterLinks/{linkId} {
+      allow read: if isAuthenticated(); // Business user reads links for their business, promoter reads their own links
+      
+      allow create: if isBusinessUser() &&
+                       request.resource.data.businessId != null &&
+                       request.resource.data.businessId == getBusinessIdForAuthenticatedUser();
+                       
+      allow update, delete: if isBusinessUser() &&
+                               resource.data.businessId != null &&
+                               resource.data.businessId == getBusinessIdForAuthenticatedUser();
+    }
+     match /businessPromoterLinks {
+      // Business users can list links for their specific business
+      allow list: if isBusinessUser(); 
+     }
+  }
+}
+
+    
