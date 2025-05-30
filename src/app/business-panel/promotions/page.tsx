@@ -12,7 +12,7 @@ import {
   DialogHeader as ShadcnDialogHeader,
   DialogTitle as ShadcnDialogTitle,
   DialogDescription as ShadcnDialogDescription,
-  DialogFooter as ShadcnDialogFooter,
+  DialogFooter as ShadcnDialogFooter, // Added explicit import
 } from "@/components/ui/dialog";
 import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
@@ -27,7 +27,7 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter as UIAlertDialogFooter,
+  AlertDialogFooter as UIAlertDialogFooter, // Alias this one
   AlertDialogHeader,
   AlertDialogTitle as UIAlertDialogTitle,
   AlertDialogTrigger,
@@ -70,22 +70,21 @@ export default function BusinessPromotionsPage() {
   useEffect(() => {
     console.log("Promotions Page: Auth/Profile loading state changed. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
     if (loadingAuth || loadingProfile) {
-      // Ensure isLoading is true if critical auth/profile data is still loading
-      if (!isLoading) setIsLoading(true);
+      if (!isLoading) setIsLoading(true); // Ensure loading spinner shows
       return;
     }
 
     if (userProfile) {
       console.log("Promotions Page: UserProfile loaded:", userProfile);
       if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
-        setCurrentBusinessId(userProfile.businessId);
+        setCurrentBusinessId(userProfile.businessId.trim());
         // fetchBusinessPromotions will be called by the next useEffect
       } else {
-        console.warn("Promotions Page: UserProfile does not have a valid businessId or user is not business_admin/staff.");
+        console.warn("Promotions Page: UserProfile does not have a valid businessId. User roles:", userProfile.roles);
         setCurrentBusinessId(null);
         setPromotions([]);
-        setIsLoading(false); 
-        if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
+        if (isLoading) setIsLoading(false); 
+        if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
           toast({
             title: "Error de Negocio",
             description: "Tu perfil de usuario no está asociado a un negocio. No se pueden cargar promociones.",
@@ -98,9 +97,10 @@ export default function BusinessPromotionsPage() {
       console.log("Promotions Page: No userProfile found after auth/profile load.");
       setCurrentBusinessId(null);
       setPromotions([]);
-      setIsLoading(false);
+      if (isLoading) setIsLoading(false);
     }
-  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]); // Added isLoading to dependencies to re-evaluate if it was set to false prematurely
+  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]);
+
 
   const fetchBusinessPromotions = useCallback(async (businessIdToFetch: string) => {
     console.log("Promotions Page: fetchBusinessPromotions called with businessId:", businessIdToFetch);
@@ -119,7 +119,7 @@ export default function BusinessPromotionsPage() {
         where("type", "==", "promotion")
       );
       const querySnapshot = await getDocs(q);
-      console.log("Promotions Page: Firestore query executed. Snapshot size:", querySnapshot.size);
+      console.log("Promotions Page: Firestore query executed for promotions. Snapshot size:", querySnapshot.size);
 
       const fetchedPromotions: BusinessManagedEntity[] = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
@@ -128,18 +128,12 @@ export default function BusinessPromotionsPage() {
         let startDateStr: string;
         if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
         else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-        else {
-            console.warn(`Promotions Page: Entity ${docSnap.id} missing or invalid startDate. Using fallback.`);
-            startDateStr = nowISO;
-        }
+        else { startDateStr = nowISO; }
 
         let endDateStr: string;
         if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
         else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-        else {
-            console.warn(`Promotions Page: Entity ${docSnap.id} missing or invalid endDate. Using fallback.`);
-            endDateStr = nowISO;
-        }
+        else { endDateStr = nowISO; }
         
         let createdAtStr: string | undefined;
         if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
@@ -161,7 +155,6 @@ export default function BusinessPromotionsPage() {
           aiHint: data.aiHint || "",
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
           createdAt: createdAtStr,
-          // Fields not relevant to promotion, but part of BusinessManagedEntity
           ticketTypes: [], 
           eventBoxes: [],  
           assignedPromoters: [], 
@@ -194,17 +187,22 @@ export default function BusinessPromotionsPage() {
   }, [toast]);
 
   useEffect(() => {
-    // This effect calls fetchBusinessPromotions when currentBusinessId is valid and auth is not loading
-    if (!loadingAuth && !loadingProfile && currentBusinessId) {
-        console.log("Promotions Page: currentBusinessId is set and auth/profile loaded, calling fetchBusinessPromotions.", currentBusinessId);
-        fetchBusinessPromotions(currentBusinessId);
-    } else if (!loadingAuth && !loadingProfile && !currentBusinessId) {
-        // If auth/profile loaded but no businessId, ensure loading stops and data is empty
-        console.log("Promotions Page: No currentBusinessId, and auth/profile loaded. Setting isLoading to false and promotions to empty.");
-        setIsLoading(false);
-        setPromotions([]);
+    console.log("Promotions Page: Effect for fetching data. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "currentBusinessId:", currentBusinessId);
+    if (loadingAuth || loadingProfile) {
+      if (!isLoading) setIsLoading(true);
+      return;
     }
-  }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile]);
+
+    if (currentBusinessId) {
+      console.log("Promotions Page: Valid currentBusinessId, calling fetchBusinessPromotions:", currentBusinessId);
+      fetchBusinessPromotions(currentBusinessId);
+    } else {
+      console.log("Promotions Page: No currentBusinessId for fetching promotions. Ensuring isLoading is false.");
+      if (isLoading) setIsLoading(false);
+      setPromotions([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
+  }, [currentBusinessId, loadingAuth, loadingProfile, fetchBusinessPromotions]);
 
 
   const filteredPromotions = useMemo(() => {
@@ -228,8 +226,8 @@ export default function BusinessPromotionsPage() {
     setIsSubmitting(false); 
     setIsDuplicating(duplicate);
     if (duplicate && promotion) {
-      const { id, generatedCodes, createdAt, ...promoToDuplicateRaw } = promotion;
-      const promoToDuplicate = sanitizeObjectForFirestore(promoToDuplicateRaw) as Omit<BusinessManagedEntity, 'id' | 'generatedCodes' | 'createdAt'>;
+      const { id, generatedCodes, createdAt, ticketTypes, eventBoxes, assignedPromoters, maxAttendance, ...promoToDuplicateRaw } = promotion;
+      const promoToDuplicate = sanitizeObjectForFirestore(promoToDuplicateRaw) as Omit<BusinessManagedEntity, 'id' | 'generatedCodes' | 'createdAt' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'maxAttendance'>;
       
       const now = new Date();
       const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -246,7 +244,6 @@ export default function BusinessPromotionsPage() {
         startDate: promoToDuplicate.startDate ? new Date(promoToDuplicate.startDate).toISOString() : now.toISOString(),
         endDate: promoToDuplicate.endDate ? new Date(promoToDuplicate.endDate).toISOString() : oneWeekFromNow.toISOString(),
         usageLimit: promoToDuplicate.usageLimit === undefined ? 0 : promoToDuplicate.usageLimit,
-        // Ensure all optional fields from BusinessManagedEntity are handled
         imageUrl: promoToDuplicate.imageUrl || "",
         aiHint: promoToDuplicate.aiHint || "",
         termsAndConditions: promoToDuplicate.termsAndConditions || "",
@@ -272,7 +269,7 @@ export default function BusinessPromotionsPage() {
     console.log("Promotions Page: Submitting form with data:", data);
     console.log("Promotions Page: Editing promotion ID:", editingPromotion?.id, "Is Duplicating:", isDuplicating);
 
-    const promotionPayloadBase: Omit<BusinessPromotionFormData, 'startDate' | 'endDate'> & {startDate: Date | string, endDate: Date | string} = {
+    const promotionPayloadBase = {
       name: data.name,
       description: data.description,
       termsAndConditions: data.termsAndConditions || "",
@@ -284,27 +281,31 @@ export default function BusinessPromotionsPage() {
       aiHint: data.aiHint || data.name.split(' ').slice(0,2).join(' '),
     };
     
-    const fullPayloadForFirestore: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'startDate' | 'endDate' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'maxAttendance'> & { startDate: Timestamp, endDate: Timestamp, createdAt?: any, generatedCodes?: GeneratedCode[] } = {
+    const fullPayload: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'startDate' | 'endDate' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'maxAttendance'> & { startDate: Timestamp, endDate: Timestamp, createdAt?: any, generatedCodes?: GeneratedCode[] } = {
         ...promotionPayloadBase,
         businessId: currentBusinessId,
         type: "promotion" as "promotion",
         startDate: Timestamp.fromDate(new Date(promotionPayloadBase.startDate)),
         endDate: Timestamp.fromDate(new Date(promotionPayloadBase.endDate)),
         generatedCodes: (editingPromotion && !isDuplicating ? editingPromotion.generatedCodes : []) || [],
+        // Ensure other BusinessManagedEntity fields are present even if empty for promotions
+        ticketTypes: [],
+        eventBoxes: [],
+        assignedPromoters: [],
+        maxAttendance: 0,
     };
     
-    // Ensure all fields are either defined or explicitly null for Firestore
-    const sanitizedPayload = sanitizeObjectForFirestore(fullPayloadForFirestore);
-    console.log('Promotions Page: Saving promotion with payload:', sanitizedPayload);
+    const promotionPayloadForFirestore = sanitizeObjectForFirestore(fullPayload);
+    console.log('Promotions Page: Saving promotion with payload:', promotionPayloadForFirestore);
     
     try {
       if (editingPromotion && !isDuplicating && editingPromotion.id) { 
-        const { createdAt, ...updateData } = sanitizedPayload; 
+        const { createdAt, ...updateData } = promotionPayloadForFirestore; 
         console.log("Promotions Page: Updating promotion with ID", editingPromotion.id, "Payload:", updateData);
         await updateDoc(doc(db, "businessEntities", editingPromotion.id), updateData);
         toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
       } else { 
-        const createData = { ...sanitizedPayload, createdAt: serverTimestamp() };
+        const createData = { ...promotionPayloadForFirestore, createdAt: serverTimestamp() };
         console.log("Promotions Page: Creating promotion with payload:", createData);
         const docRef = await addDoc(collection(db, "businessEntities"), createData);
         toast({ title: isDuplicating ? "Promoción Duplicada" : "Promoción Creada", description: `La promoción "${data.name}" ha sido creada con ID: ${docRef.id}.` });
@@ -319,7 +320,7 @@ export default function BusinessPromotionsPage() {
       if (error.code === 'permission-denied') {
         errorDesc = `Error de permisos al guardar promoción. (Negocio ID: ${currentBusinessId}, Usuario: ${userProfile?.email})`;
       } else if (error.code === 'invalid-argument' && error.message.includes("Unsupported field value: undefined")) {
-        errorDesc = `Error al guardar: Uno de los campos tiene un valor indefinido no soportado. Revisa los datos del formulario, especialmente opcionales. Detalle: ${error.message}`;
+        errorDesc = `Error al guardar: Uno de los campos tiene un valor indefinido no soportado. Revisa los datos del formulario. Detalle: ${error.message}`;
       }
       toast({ title: "Error al Guardar Promoción", description: errorDesc, variant: "destructive", duration: 10000});
     } finally {
@@ -347,53 +348,50 @@ export default function BusinessPromotionsPage() {
     }
   };
   
-  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
-    if (isSubmitting) {
-      setIsSubmitting(false);
-      return;
-    }
+  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observationFromDialog?: string) => {
     if (!userProfile?.name) {
-      toast({ title: "Error de Usuario", description: "No se pudo obtener el nombre del usuario para registrar los códigos.", variant: "destructive" });
-      setIsSubmitting(false);
-      return;
-    }
-    setIsSubmitting(true);
-    const targetPromotionRef = doc(db, "businessEntities", entityId);
-    try {
-      const targetPromotionSnap = await getDoc(targetPromotionRef);
-      if (!targetPromotionSnap.exists()) {
-        toast({title:"Error", description:"Promoción no encontrada para añadir códigos.", variant: "destructive"});
+        toast({title: "Error de Usuario", description: "No se pudo obtener el nombre del usuario para registrar los códigos.", variant: "destructive"});
         setIsSubmitting(false);
         return;
-      }
-      const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
-      
-      const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => ({
-        ...code,
-        id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        entityId: entityId,
-        generatedByName: userProfile.name, 
-        generatedDate: code.generatedDate || new Date().toISOString(),
-        status: code.status || 'available', 
-        observation: (observation && observation.trim() !== "") ? observation.trim() : null,
-        redemptionDate: code.redemptionDate || null, 
-        redeemedByInfo: code.redeemedByInfo || null, 
-        isVipCandidate: code.isVipCandidate || false,
-      }));
-      
-      const updatedCodes = [...(targetPromotionData.generatedCodes || []), ...newCodesWithDetails.map(c => sanitizeObjectForFirestore(c))];
-      
-      await updateDoc(targetPromotionRef, { generatedCodes: updatedCodes });
-      toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}. Guardados en la base de datos.`});
-      
-      if (currentBusinessId) fetchBusinessPromotions(currentBusinessId); 
-      
-      if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-      }
-      if (editingPromotion && editingPromotion.id === entityId) {
-        setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-      }
+    }
+    setIsSubmitting(true);
+    const targetEntityRef = doc(db, "businessEntities", entityId);
+    try {
+        const targetEntitySnap = await getDoc(targetEntityRef);
+        if (!targetEntitySnap.exists()) {
+            toast({title:"Error", description:"Promoción no encontrada para añadir códigos.", variant: "destructive"});
+            setIsSubmitting(false);
+            return;
+        }
+        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
+        
+        const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
+            ...code,
+            id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            entityId: entityId,
+            generatedByName: userProfile.name, 
+            generatedDate: code.generatedDate || new Date().toISOString(),
+            status: code.status || 'available', 
+            observation: observationFromDialog || null, 
+            redemptionDate: null, 
+            redeemedByInfo: null, 
+            isVipCandidate: false,
+        }) as GeneratedCode));
+        
+        const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
+    
+        await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
+        toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEntityData.name}. Guardados en la base de datos.`});
+        
+        if (currentBusinessId) fetchBusinessPromotions(currentBusinessId); 
+        
+        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
+          setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
+        }
+         if (editingPromotion && editingPromotion.id === entityId) { // If codes are added while main edit modal is open
+            setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
+        }
 
     } catch (error: any) {
         console.error("Promotions Page: Error saving new codes to Firestore:", error.code, error.message, error);
@@ -404,30 +402,26 @@ export default function BusinessPromotionsPage() {
   }; 
 
   const handleCodesUpdatedFromManageDialog = async (entityId: string, updatedCodesFromDialog: GeneratedCode[]) => {
-    if (isSubmitting) {
-      setIsSubmitting(false);
-      return;
-    }
     if (!currentBusinessId) {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
-    const targetPromotionRef = doc(db, "businessEntities", entityId);
+    const targetEntityRef = doc(db, "businessEntities", entityId);
      try {
-        const targetPromotionSnap = await getDoc(targetPromotionRef);
-        if (!targetPromotionSnap.exists()) {
+        const targetEntitySnap = await getDoc(targetEntityRef);
+        if (!targetEntitySnap.exists()) {
             toast({title:"Error", description:"Promoción no encontrada para actualizar códigos.", variant: "destructive"});
             setIsSubmitting(false);
             return;
         }
-        const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
+        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
     
         const updatedCodesForFirestore = updatedCodesFromDialog.map(code => sanitizeObjectForFirestore(code));
 
-        await updateDoc(targetPromotionRef, { generatedCodes: updatedCodesForFirestore });
-        toast({title: "Códigos Actualizados", description: `Los códigos para "${targetPromotionData.name}" han sido guardados en la base de datos.`});
+        await updateDoc(targetEntityRef, { generatedCodes: updatedCodesForFirestore });
+        toast({title: "Códigos Actualizados", description: `Los códigos para "${targetEntityData.name}" han sido guardados en la base de datos.`});
         
         if (currentBusinessId) fetchBusinessPromotions(currentBusinessId);
         if (editingPromotion && editingPromotion.id === entityId) {
@@ -437,8 +431,8 @@ export default function BusinessPromotionsPage() {
             setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
         }
     } catch (error: any) {
-        console.error("Promotions Page: Error saving updated codes to Firestore:", error.code, error.message, error);
-        toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
+      console.error("Promotions Page: Error saving updated codes to Firestore:", error.code, error.message, error);
+      toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
         setIsSubmitting(false);
     }
@@ -601,7 +595,7 @@ export default function BusinessPromotionsPage() {
                         </TableCell>
                          <TableCell className="align-top py-3 text-xs">
                            <div className="flex flex-col">
-                                <span>QRs Generados (0)</span>
+                                <span>QRs Generados ({0})</span> 
                                 <span>QRs Usados ({codesRedeemedCount})</span>
                                 <span>Máximo Promociones ({promo.usageLimit || 'Ilimitado'})</span>
                            </div>
@@ -663,7 +657,7 @@ export default function BusinessPromotionsPage() {
                             </div>
                         </TableCell>
                       </TableRow>
-                    )
+                    );
                     }) : (
                         !isLoading && <TableRow><TableCell colSpan={5} className="text-center h-24">No se encontraron promociones con los filtros aplicados.</TableCell></TableRow>
                     )}
