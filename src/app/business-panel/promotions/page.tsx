@@ -43,7 +43,6 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 
-
 export default function BusinessPromotionsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
@@ -67,10 +66,10 @@ export default function BusinessPromotionsPage() {
   const [selectedPromotionForStats, setSelectedPromotionForStats] = useState<BusinessManagedEntity | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
+ useEffect(() => {
     console.log("Promotions Page: Auth/Profile loading state changed. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
     if (loadingAuth || loadingProfile) {
-      if (!isLoading) setIsLoading(true); // Ensure loading is true if auth/profile is still pending
+      if (!isLoading) setIsLoading(true);
       return;
     }
 
@@ -79,12 +78,11 @@ export default function BusinessPromotionsPage() {
       const fetchedBusinessId = userProfile.businessId;
       if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
         setCurrentBusinessId(fetchedBusinessId.trim());
-        // isLoading will be handled by the effect that calls fetchBusinessPromotions
       } else {
         console.warn("Promotions Page: UserProfile does not have a valid businessId. User roles:", userProfile.roles);
         setCurrentBusinessId(null);
         setPromotions([]);
-        setIsLoading(false); 
+        setIsLoading(false);
         if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
           toast({
             title: "Error de Negocio",
@@ -94,7 +92,7 @@ export default function BusinessPromotionsPage() {
           });
         }
       }
-    } else { 
+    } else {
       console.log("Promotions Page: No userProfile found after auth/profile load. Cannot fetch promotions.");
       setCurrentBusinessId(null);
       setPromotions([]);
@@ -107,12 +105,12 @@ export default function BusinessPromotionsPage() {
     if (!currentBusinessId) {
       console.log("Promotions Page: fetchBusinessPromotions - no currentBusinessId, aborting. Setting isLoading to false.");
       setPromotions([]);
-      setIsLoading(false); 
+      setIsLoading(false);
       return;
     }
     
     setIsLoading(true);
-    console.log("Promotions Page: UserProfile for query:", userProfile);
+    console.log("Promotions Page: UserProfile for query (inside fetch):", userProfile);
     console.log("Promotions Page: Querying promotions with businessId:", currentBusinessId);
     try {
       const q = query(
@@ -166,7 +164,6 @@ export default function BusinessPromotionsPage() {
           aiHint: data.aiHint || "",
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore(gc as GeneratedCode)) : [],
           createdAt: createdAtStr,
-          // Campos de evento no aplican
           ticketTypes: [], 
           eventBoxes: [],  
           assignedPromoters: [], 
@@ -199,19 +196,17 @@ export default function BusinessPromotionsPage() {
   useEffect(() => {
     console.log("Promotions Page: Effect for fetching data. currentBusinessId:", currentBusinessId, "loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
     if (loadingAuth || loadingProfile) {
-      // Still waiting for auth/profile to load
       return; 
     }
     if (currentBusinessId) {
       console.log("Promotions Page: currentBusinessId is set and auth/profile loaded, calling fetchBusinessPromotions.", currentBusinessId);
       fetchBusinessPromotions();
     } else {
-      // No currentBusinessId, but auth/profile has loaded (or failed to load profile), so stop loading UI.
       console.log("Promotions Page: No currentBusinessId for fetching. Ensuring isLoading is false.");
-      setIsLoading(false);
+      if (isLoading) setIsLoading(false); // Ensure isLoading is false if no fetch is attempted
       setPromotions([]);
     }
-  }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile]);
+  }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile, isLoading]);
 
 
   const filteredPromotions = useMemo(() => {
@@ -374,7 +369,7 @@ export default function BusinessPromotionsPage() {
         }
         const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
         
-        const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => ({
+        const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
             ...code,
             id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
             entityId: entityId,
@@ -386,10 +381,10 @@ export default function BusinessPromotionsPage() {
             redemptionDate: null, 
             redeemedByInfo: null, 
             isVipCandidate: false,
-        }));
+        }) as GeneratedCode));
         
         const existingSanitizedCodes = (targetPromotionData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails.map(c => sanitizeObjectForFirestore(c))];
+        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
             
         await updateDoc(targetPromotionRef, { generatedCodes: updatedCodes });
         toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}. Guardados en la base de datos.`});
@@ -468,7 +463,7 @@ export default function BusinessPromotionsPage() {
         title: "Estado Actualizado",
         description: `La promoción "${promotionName}" ahora está ${newStatus ? "Activa" : "Inactiva"}.`
       });
-      // Optimistic update of local state
+      
       setPromotions(prev => prev.map(p => p.id === promotionToToggle.id ? {...p, isActive: newStatus} : p));
       if (editingPromotion && editingPromotion.id === promotionToToggle.id) { 
           setEditingPromotion(prev => prev ? {...prev, isActive: newStatus} : null);
@@ -532,7 +527,7 @@ export default function BusinessPromotionsPage() {
         </Button>
       </div>
       
-      {!currentBusinessId && !isLoading && (userProfile?.roles.includes('business_admin') || userProfile?.roles.includes('staff')) && (
+      {!currentBusinessId && !isLoading && userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && (
         <Card className="shadow-lg">
           <CardHeader><UIAlertDialogTitle className="text-destructive">Error de Configuración del Negocio</UIAlertDialogTitle></CardHeader>
           <CardContent><p className="text-muted-foreground">Tu perfil de usuario no está asociado a un negocio o el ID del negocio no está disponible. No se pueden cargar ni crear promociones.</p></CardContent>
@@ -568,7 +563,7 @@ export default function BusinessPromotionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[25%] min-w-[250px]">Promoción y Gestión</TableHead>
+                      <TableHead className="w-[25%] min-w-[200px]">Promoción y Gestión</TableHead>
                       <TableHead className="w-[15%] min-w-[160px]">Vigencia</TableHead>
                       <TableHead className="w-[20%] min-w-[200px]">QRs Promocionales</TableHead>
                       <TableHead className="w-[15%] min-w-[160px]">Códigos Creados</TableHead>
@@ -617,9 +612,9 @@ export default function BusinessPromotionsPage() {
                         </TableCell>
                          <TableCell className="align-top py-3 text-xs">
                            <div className="flex flex-col">
-                                <span>QRs Generados (Clientes): (0)</span> 
-                                <span>QRs Usados (Canjeados): ({codesRedeemedCount})</span>
-                                <span>Límite de Canjes: ({promo.usageLimit || 'Ilimitado'})</span>
+                                <span>QRs Generados (Clientes) ({0})</span> 
+                                <span>QRs Usados (Canjeados) ({codesRedeemedCount})</span>
+                                <span>Límite de Canjes ({promo.usageLimit || 'Ilimitado'})</span>
                            </div>
                          </TableCell>
                          <TableCell className="align-top py-3">
@@ -691,7 +686,6 @@ export default function BusinessPromotionsPage() {
         </Card>
       )}
       
-      {/* Modal para Crear/Editar Promoción */}
       <ShadcnDialog open={showCreateEditPromotionModal} onOpenChange={(isOpen) => {
         if (!isOpen) {
           setEditingPromotion(null);
@@ -729,7 +723,6 @@ export default function BusinessPromotionsPage() {
       )}
       </ShadcnDialog>
 
-      {/* Modal para Crear Códigos */}
       {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
           open={showCreateCodesModal}
@@ -747,7 +740,6 @@ export default function BusinessPromotionsPage() {
         />
       )}
 
-      {/* Modal para Ver/Gestionar Códigos */}
       {selectedEntityForViewingCodes && userProfile && (
         <ManageCodesDialog
           open={showManageCodesModal}
@@ -779,7 +771,6 @@ export default function BusinessPromotionsPage() {
         />
       )}
 
-      {/* Modal para Estadísticas */}
       <ShadcnDialog open={showStatsModal} onOpenChange={(isOpen) => { if(!isOpen) setSelectedPromotionForStats(null); setShowStatsModal(isOpen);}}>
       {showStatsModal && selectedPromotionForStats && (
         <ShadcnDialogContent className="sm:max-w-md">
@@ -789,7 +780,7 @@ export default function BusinessPromotionsPage() {
             </ShadcnDialogHeader>
             <div className="space-y-3 py-4">
                 <p><strong>Códigos Creados:</strong> ({selectedPromotionForStats.generatedCodes?.length || 0})</p>
-                <p><strong>Códigos Canjeados:</strong> ({selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0})</p>
+                <p><strong>QRs Usados (Canjeados):</strong> ({selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0})</p>
                 <p><strong>Tasa de Canje:</strong> 
                     {(() => {
                         const total = selectedPromotionForStats.generatedCodes?.length || 0;
@@ -797,7 +788,7 @@ export default function BusinessPromotionsPage() {
                         return total > 0 ? `${((redeemed / total) * 100).toFixed(1)}%` : '0%';
                     })()}
                 </p>
-                  <p><strong>Límite de Canjes:</strong> ({selectedPromotionForStats.usageLimit && selectedPromotionForStats.usageLimit > 0 ? selectedPromotionForStats.usageLimit : 'Ilimitado'})</p>
+                  <p><strong>Límite de Canjes:</strong> ({(selectedPromotionForStats.usageLimit && selectedPromotionForStats.usageLimit > 0) ? selectedPromotionForStats.usageLimit : 'Ilimitado'})</p>
             </div>
             <ShadcnDialogFooter> 
                 <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedPromotionForStats(null);}}>Cerrar</Button>
@@ -808,3 +799,6 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
+
+
+    
