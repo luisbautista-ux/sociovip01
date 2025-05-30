@@ -2,9 +2,9 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building, CheckCircle, QrCode, ScanLine, Gift, BarChart2, Info } from "lucide-react";
+import { Building, CheckCircle, QrCode, ScanLine, DollarSign, BarChart2, Info, Gift } from "lucide-react"; // Added Gift back for consistency, though not used in stat cards if "Entidades" is removed
 import { StatCard } from "@/components/admin/StatCard";
-import type { BusinessManagedEntity } from "@/lib/types";
+import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { db } from "@/lib/firebase";
@@ -15,8 +15,9 @@ import { Loader2 } from "lucide-react";
 interface PromoterDashboardStats {
   totalBusinessesAssigned: number;
   totalCodesGeneratedByPromoter: number;
-  qrGeneratedWithPromoterCodes: number; // Nuevo contador
+  qrGeneratedWithPromoterCodes: number;
   totalCodesRedeemedByPromoter: number;
+  // totalCommissionEarned: number; // Ocultado
 }
 
 export default function PromoterDashboardPage() {
@@ -24,48 +25,80 @@ export default function PromoterDashboardPage() {
   const [assignedEntities, setAssignedEntities] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchAssignedEntitiesForPromoter = useCallback(async (promoterName: string) => {
-    if (!promoterName) {
+  const fetchAssignedEntitiesForPromoter = useCallback(async () => {
+    if (!userProfile || !(userProfile.uid || userProfile.name)) {
+      console.warn("Promoter Dashboard: No userProfile UID or Name, cannot fetch entities for stats.");
       setAssignedEntities([]);
       setIsLoading(false);
       return;
     }
+    
     setIsLoading(true);
-    console.log("Promoter Dashboard: Fetching entities where promoterName is assigned:", promoterName);
+    const promoterIdentifierField = userProfile.uid ? "promoterProfileId" : "promoterName";
+    const promoterIdentifierValue = userProfile.uid || userProfile.name;
+
+    console.log(`Promoter Dashboard: Fetching entities where ${promoterIdentifierField} is assigned to:`, promoterIdentifierValue);
+    
     try {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
-        where("isActive", "==", true)
-        // No podemos filtrar por `assignedPromoters` array directamente de forma eficiente.
-        // Se obtiene todo y se filtra en cliente o se necesitaría una estructura de datos diferente.
+        where("isActive", "==", true),
+        // Firestore no permite filtrar por un elemento dentro de un array de objetos directamente
+        // where("assignedPromoters", "array-contains", { promoterProfileId: promoterIdentifierValue }) // Esto no funciona así
       );
       const entitiesSnap = await getDocs(entitiesQuery);
       const allActiveEntities: BusinessManagedEntity[] = [];
+      
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data();
-        const entity: BusinessManagedEntity = {
-          id: docSnap.id,
-          // ... (resto de los campos mapeados como en promoter/entities/page.tsx)
-          businessId: data.businessId,
-          type: data.type as "promotion" | "event",
-          name: data.name,
-          description: data.description,
-          startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : String(data.startDate),
-          endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : String(data.endDate),
-          usageLimit: data.usageLimit,
-          maxAttendance: data.maxAttendance,
-          isActive: data.isActive,
-          imageUrl: data.imageUrl,
-          aiHint: data.aiHint,
-          termsAndConditions: data.termsAndConditions,
-          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
-          ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes : [],
-          eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes : [],
-          assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-        };
-        if (entity.assignedPromoters?.some(ap => ap.promoterName === promoterName) && isEntityCurrentlyActivatable(entity)) {
-          allActiveEntities.push(entity);
+        const isAssignedToThisPromoter = (data.assignedPromoters as any[])?.some(
+          (ap: any) => (userProfile.uid && ap.promoterProfileId === userProfile.uid) || 
+                       (!userProfile.uid && ap.promoterName === userProfile.name)
+        );
+
+        if (isAssignedToThisPromoter) {
+            const nowISO = new Date().toISOString();
+            let startDateStr: string;
+            if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
+            else if (typeof data.startDate === 'string') startDateStr = data.startDate;
+            else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
+            else startDateStr = nowISO;
+
+            let endDateStr: string;
+            if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
+            else if (typeof data.endDate === 'string') endDateStr = data.endDate;
+            else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
+            else endDateStr = nowISO;
+            
+            let createdAtStr: string | undefined;
+            if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
+            else if (typeof data.createdAt === 'string') createdAtStr = data.createdAt;
+            else if (data.createdAt instanceof Date) createdAtStr = data.createdAt.toISOString();
+            else createdAtStr = undefined;
+
+            const entity: BusinessManagedEntity = {
+              id: docSnap.id,
+              businessId: data.businessId || "N/A",
+              type: data.type as "promotion" | "event",
+              name: data.name || "Entidad sin nombre",
+              description: data.description || "",
+              startDate: startDateStr,
+              endDate: endDateStr,
+              usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : Number(data.usageLimit),
+              maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
+              isActive: data.isActive === undefined ? true : data.isActive,
+              imageUrl: data.imageUrl || "",
+              aiHint: data.aiHint || "",
+              termsAndConditions: data.termsAndConditions || "",
+              generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
+              ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes : [],
+              eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes : [],
+              assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
+              createdAt: createdAtStr,
+            };
+            if (isEntityCurrentlyActivatable(entity)) {
+              allActiveEntities.push(entity);
+            }
         }
       });
       setAssignedEntities(allActiveEntities);
@@ -76,34 +109,38 @@ export default function PromoterDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [userProfile]);
 
   useEffect(() => {
-    if (!loadingAuth && !loadingProfile && userProfile?.name) {
-      fetchAssignedEntitiesForPromoter(userProfile.name);
+    if (!loadingAuth && !loadingProfile && userProfile) {
+      fetchAssignedEntitiesForPromoter();
     } else if (!loadingAuth && !loadingProfile) {
-      setIsLoading(false); // No user or name, stop loading
+      setIsLoading(false); 
     }
   }, [userProfile, loadingAuth, loadingProfile, fetchAssignedEntitiesForPromoter]);
 
   const promoterStats = useMemo((): PromoterDashboardStats => {
     const uniqueBusinessIds = new Set(assignedEntities.map(entity => entity.businessId));
-    let codesGenerated = 0;
-    let codesRedeemed = 0;
+    let codesGeneratedByPromoter = 0;
+    let codesRedeemedByPromoter = 0;
 
     assignedEntities.forEach(entity => {
-      const promoterCodes = entity.generatedCodes?.filter(c => c.generatedByName === userProfile?.name) || [];
-      codesGenerated += promoterCodes.length;
-      codesRedeemed += promoterCodes.filter(c => c.status === 'redeemed').length;
+      const promoterCodes = (entity.generatedCodes || []).filter(c => 
+        (userProfile?.uid && c.generatedByUid === userProfile.uid) || 
+        (!userProfile?.uid && c.generatedByName === userProfile.name)
+      );
+      codesGeneratedByPromoter += promoterCodes.length;
+      codesRedeemedByPromoter += promoterCodes.filter(c => c.status === 'redeemed').length;
     });
 
     return {
       totalBusinessesAssigned: uniqueBusinessIds.size,
-      totalCodesGeneratedByPromoter: codesGenerated,
-      qrGeneratedWithPromoterCodes: 0, // Placeholder, se actualizará con lógica de backend
-      totalCodesRedeemedByPromoter: codesRedeemed,
+      totalCodesGeneratedByPromoter: codesGeneratedByPromoter,
+      qrGeneratedWithPromoterCodes: 0, // Este se actualizará con lógica de backend. Por ahora, 0.
+      totalCodesRedeemedByPromoter: codesRedeemedByPromoter,
+      // totalCommissionEarned: codesRedeemedByPromoter * 0.50, // Ejemplo, ocultado por ahora
     };
-  }, [assignedEntities, userProfile?.name]);
+  }, [assignedEntities, userProfile]);
 
   if (loadingAuth || loadingProfile || isLoading) {
     return (
@@ -120,31 +157,31 @@ export default function PromoterDashboardPage() {
         <BarChart2 className="h-8 w-8 mr-2" /> Dashboard del Promotor
       </h1>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Ajustado para 3 tarjetas visibles inicialmente */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"> {/* Cambiado a lg:grid-cols-4 para acomodar 4 tarjetas */}
         <StatCard title="Negocios Asignados (Activos)" value={promoterStats.totalBusinessesAssigned} icon={Building} />
         <StatCard title="Códigos Creados por Ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
         <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} />
         <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesRedeemedByPromoter} icon={CheckCircle} />
-        {/* Comisión Estimada ha sido ocultada */}
+        {/* <StatCard title="Comisión Estimada" value={`S/ ${promoterStats.totalCommissionEarned.toFixed(2)}`} icon={DollarSign} /> */}
       </div>
 
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Actividad Reciente</CardTitle>
-          <CardDescription>Últimas acciones relacionadas con tus códigos y entidades.</CardDescription>
+          <CardDescription>Próximamente: Aquí verás las últimas acciones relacionadas con tus códigos y entidades asignadas.</CardDescription>
         </CardHeader>
         <CardContent className="min-h-[150px] flex flex-col items-center justify-center text-center">
           <Info className="h-12 w-12 text-primary/60 mb-3" />
           <p className="text-muted-foreground">
-            La actividad reciente se mostrará aquí una vez que se integre con el sistema de registro de eventos del backend.
+            Pronto podrás ver un registro detallado de las actividades de tus clientes.
           </p>
         </CardContent>
       </Card>
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Rendimiento por Entidad (Próximamente)</CardTitle>
-          <CardDescription>Aquí verás cuántos de tus códigos se han usado por promoción/evento.</CardDescription>
+          <CardTitle>Rendimiento por Negocio (Próximamente)</CardTitle>
+          <CardDescription>Aquí verás cuántos de tus códigos se han usado por promoción/evento para cada negocio.</CardDescription>
         </CardHeader>
         <CardContent className="h-40 flex items-center justify-center">
           <p className="text-muted-foreground">Gráficos y tablas de rendimiento aquí.</p>
