@@ -23,19 +23,35 @@ function Calendar({
 
   // Custom Caption to use Shadcn Select for month/year
   function CustomCaption(captionProps: CaptionProps) {
-    const { goToMonth, displayMonth } = captionProps; // Use displayMonth reliably
+    const { goToMonth, displayMonth } = captionProps; 
     const { fromYear, toYear, fromMonth, toMonth, fromDate, toDate } = props;
 
     const handleYearChange = (value: string) => {
+      if (!displayMonth) {
+        console.error("Calendar CustomCaption: displayMonth is not available in handleYearChange.", captionProps);
+        return;
+      }
       const newDate = new Date(displayMonth);
       newDate.setFullYear(parseInt(value, 10));
-      goToMonth(newDate);
+      if (typeof goToMonth === 'function') {
+        goToMonth(newDate);
+      } else {
+        console.error("Calendar CustomCaption: goToMonth is not available or not a function in handleYearChange.", captionProps);
+      }
     };
 
     const handleMonthChange = (value: string) => {
+      if (!displayMonth) {
+        console.error("Calendar CustomCaption: displayMonth is not available in handleMonthChange.", captionProps);
+        return;
+      }
       const newDate = new Date(displayMonth);
       newDate.setMonth(parseInt(value, 10));
-      goToMonth(newDate);
+      if (typeof goToMonth === 'function') {
+        goToMonth(newDate);
+      } else {
+        console.error("Calendar CustomCaption: goToMonth is not available or not a function in handleMonthChange.", captionProps);
+      }
     };
     
     const S_fromYear = fromYear || fromDate?.getFullYear() || new Date().getFullYear() - 100;
@@ -61,17 +77,18 @@ function Calendar({
           aria-label="Go to previous month"
           disabled={!captionProps.previousMonth}
           className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute left-1"
-          onClick={() => captionProps.previousMonth && goToMonth(captionProps.previousMonth)}
+          onClick={() => captionProps.previousMonth && typeof goToMonth === 'function' && goToMonth(captionProps.previousMonth)}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex gap-1 w-full justify-center">
             <Select
-                value={displayMonth.getMonth().toString()}
+                value={displayMonth ? displayMonth.getMonth().toString() : ""}
                 onValueChange={handleMonthChange}
+                disabled={!displayMonth}
             >
                 <SelectTrigger className="h-7 w-[calc(50%-0.25rem)] max-w-[120px] px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
-                    <SelectValue>{format(displayMonth, "LLLL", { locale: es })}</SelectValue>
+                    <SelectValue>{displayMonth ? format(displayMonth, "LLLL", { locale: es }) : "Mes"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent position="popper">
                     {months.map((month) => (
@@ -82,11 +99,12 @@ function Calendar({
                 </SelectContent>
             </Select>
             <Select
-                value={displayMonth.getFullYear().toString()}
+                value={displayMonth ? displayMonth.getFullYear().toString() : ""}
                 onValueChange={handleYearChange}
+                disabled={!displayMonth}
             >
                 <SelectTrigger className="h-7 w-[calc(50%-0.25rem)] max-w-[80px] px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
-                    <SelectValue>{displayMonth.getFullYear()}</SelectValue>
+                    <SelectValue>{displayMonth ? displayMonth.getFullYear() : "Año"}</SelectValue>
                 </SelectTrigger>
                 <SelectContent position="popper">
                     {years.map((year) => (
@@ -104,7 +122,7 @@ function Calendar({
           aria-label="Go to next month"
           disabled={!captionProps.nextMonth}
           className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute right-1"
-          onClick={() => captionProps.nextMonth && goToMonth(captionProps.nextMonth)}
+          onClick={() => captionProps.nextMonth && typeof goToMonth === 'function' && goToMonth(captionProps.nextMonth)}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
