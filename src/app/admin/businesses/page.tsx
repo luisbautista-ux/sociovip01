@@ -17,6 +17,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { db } from "@/lib/firebase"; 
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit } from "firebase/firestore";
 import Link from "next/link";
+import { sanitizeObjectForFirestore } from "@/lib/utils";
+
 
 export default function AdminBusinessesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -57,7 +59,6 @@ export default function AdminBusinessesPage() {
           publicPhone: data.publicPhone || undefined,
           publicAddress: data.publicAddress || undefined,
           customUrlPath: data.customUrlPath || undefined,
-          activePromotions: 0, 
         };
         fetchedBusinesses.push(businessData);
         if (data.customUrlPath) {
@@ -103,13 +104,13 @@ export default function AdminBusinessesPage() {
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
       biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
       biz.managerName || "N/A", biz.managerDni || "N/A", 
-      biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : "N/A",
+      biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : `sociosvip.app/business/${biz.id}/public-fallback (Por defecto)`,
       biz.logoUrl || "N/A", biz.publicCoverImageUrl || "N/A", biz.slogan || "N/A",
       biz.publicContactEmail || "N/A", biz.publicPhone || "N/A", biz.publicAddress || "N/A",
     ]);
     let csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
-      + rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n"); // Handle commas in data
+      + rows.map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n"); 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -151,8 +152,8 @@ export default function AdminBusinessesPage() {
         return { success: false, error: "La Ruta URL Personalizada ya está en uso." };
       }
     }
-
-    const businessPayload: Omit<Partial<Business>, 'id' | 'joinDate' | 'activePromotions'> & { joinDate?: any, customUrlPath?: string | null } = {
+    
+    const businessPayloadRaw: Omit<Partial<Business>, 'id' | 'joinDate'> & { joinDate?: any } = {
         name: data.name,
         contactEmail: data.contactEmail,
         ruc: data.ruc || null,
@@ -163,23 +164,17 @@ export default function AdminBusinessesPage() {
         address: data.address || null,
         managerName: data.managerName || null,
         managerDni: data.managerDni || null,
-        businessType: data.businessType || null, // Ensure this is one of the enum values
+        businessType: data.businessType || null,
         logoUrl: data.logoUrl || null,
         publicCoverImageUrl: data.publicCoverImageUrl || null,
         slogan: data.slogan || null,
         publicContactEmail: data.publicContactEmail || null,
         publicPhone: data.publicPhone || null,
         publicAddress: data.publicAddress || null,
-        customUrlPath: cleanedCustomUrlPath || null,
+        customUrlPath: cleanedCustomUrlPath || null, // Ensure this is null if empty after cleaning
     };
-
-    // Remove undefined fields as Firestore does not support them
-    Object.keys(businessPayload).forEach(key => {
-      const typedKey = key as keyof typeof businessPayload;
-      if (businessPayload[typedKey] === undefined) {
-        delete businessPayload[typedKey];
-      }
-    });
+    
+    const businessPayload = sanitizeObjectForFirestore(businessPayloadRaw);
 
 
     try {
@@ -271,6 +266,7 @@ export default function AdminBusinessesPage() {
                     <TableHead>Nombre Comercial</TableHead>
                     <TableHead className="hidden xl:table-cell">Razón Social</TableHead>
                     <TableHead className="hidden md:table-cell">RUC</TableHead>
+                    <TableHead className="hidden lg:table-cell">Giro</TableHead>
                     <TableHead>URL Pública</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -282,6 +278,7 @@ export default function AdminBusinessesPage() {
                         <TableCell className="font-medium">{biz.name}</TableCell>
                         <TableCell className="hidden xl:table-cell">{biz.razonSocial || "N/A"}</TableCell>
                         <TableCell className="hidden md:table-cell">{biz.ruc || "N/A"}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{biz.businessType || "N/A"}</TableCell>
                         <TableCell>
                           {biz.customUrlPath ? (
                             <Link href={`/b/${biz.customUrlPath}`} target="_blank" className="text-primary hover:underline text-xs flex items-center">
@@ -329,7 +326,7 @@ export default function AdminBusinessesPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
+                      <TableCell colSpan={6} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -362,5 +359,3 @@ export default function AdminBusinessesPage() {
     </div>
   );
 }
-
-    

@@ -35,13 +35,13 @@ const businessFormSchemaBase = z.object({
   address: z.string().min(5, "La dirección debe tener al menos 5 caracteres.").optional().or(z.literal("")),
   contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }),
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
-  managerDni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^[a-zA-Z0-9]*$/, "Solo debe contener letras y números.").optional().or(z.literal("")),
+  managerDni: z.string().min(8, "Debe tener al menos 8 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^\d+$/, "Solo debe contener números.").optional().or(z.literal("")),
   
   logoUrl: z.string().url("URL de logo inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
   publicCoverImageUrl: z.string().url("URL de imagen de portada inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
   slogan: z.string().max(100, "El slogan no debe exceder 100 caracteres.").optional().or(z.literal("")),
   publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")),
-  publicPhone: z.string().regex(/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3,6}$/im, "Número de teléfono público inválido.").optional().or(z.literal("")), // Adjusted regex for more flexibility
+  publicPhone: z.string().regex(/^[\+]?[(]?[0-9\s-()]{7,20}$/, "Número de teléfono público inválido.").optional().or(z.literal("")),
   publicAddress: z.string().max(200, "La dirección pública no debe exceder 200 caracteres.").optional().or(z.literal("")),
   customUrlPath: z.string()
     .min(3, "La ruta URL debe tener al menos 3 caracteres.")
@@ -71,6 +71,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
   const businessFormSchema = businessFormSchemaBase.refine(data => {
     if (data.customUrlPath && data.customUrlPath.trim() !== "") {
       const currentPath = data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      // If editing, allow the business's own current path
       const isEditingOwnPath = business && business.customUrlPath === currentPath;
       return isEditingOwnPath || !existingCustomUrlPaths.includes(currentPath);
     }
@@ -126,24 +127,25 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       publicAddress: business?.publicAddress || "",
       customUrlPath: business?.customUrlPath || "",
     };
-    form.reset(defaultVals); // Reset the form with new default values
-    setSelectedDepartment(defaultVals.department); // Explicitly set state for dependent dropdowns
+    form.reset(defaultVals); 
+    setSelectedDepartment(defaultVals.department);
     
-    // Trigger province loading if department is set
     if (defaultVals.department && PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]) {
       const currentProvinces = Object.keys(PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]);
       setProvinces(currentProvinces);
-      setSelectedProvince(defaultVals.province); // Explicitly set state
-      // Trigger district loading if province is set and valid
+      setSelectedProvince(defaultVals.province); 
+      
       if (currentProvinces.includes(defaultVals.province)) {
-         // @ts-ignore
-        const districtsForProvince = PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS][defaultVals.province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || [];
+        const departmentKey = defaultVals.department as keyof typeof PERU_LOCATIONS;
+        const provinceKey = defaultVals.province as keyof typeof PERU_LOCATIONS[typeof departmentKey];
+        // @ts-ignore
+        const districtsForProvince = PERU_LOCATIONS[departmentKey][provinceKey] || [];
         setDistricts(districtsForProvince);
         if (!districtsForProvince.includes(defaultVals.district)) {
-          form.setValue("district", ""); // Clear district if not in the new list
+          form.setValue("district", ""); 
         }
       } else {
-        form.setValue("province", ""); // Clear province if not in the new list
+        form.setValue("province", ""); 
         form.setValue("district", "");
         setSelectedProvince("");
         setDistricts([]);
@@ -154,14 +156,13 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       setDistricts([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [business]); // Rerun effect when business prop changes
+  }, [business, form]); 
 
 
   useEffect(() => {
     if (selectedDepartment && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]) {
       const currentProvinces = Object.keys(PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]);
       setProvinces(currentProvinces);
-      // Only reset province if the current one is not valid for the new department
       if (!currentProvinces.includes(form.getValues("province"))) {
          form.setValue("province", "");
          form.setValue("district", "");
@@ -176,12 +177,14 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       setDistricts([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDepartment]); // Rerun only when selectedDepartment changes
+  }, [selectedDepartment, form]); 
 
   useEffect(() => {
     if (selectedDepartment && selectedProvince && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]]) {
+      const departmentKey = selectedDepartment as keyof typeof PERU_LOCATIONS;
+      const provinceKey = selectedProvince as keyof typeof PERU_LOCATIONS[typeof departmentKey];
       // @ts-ignore
-      const currentDistricts = PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS][selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || [];
+      const currentDistricts = PERU_LOCATIONS[departmentKey][provinceKey] || [];
       setDistricts(currentDistricts);
       if (!currentDistricts.includes(form.getValues("district"))) {
          form.setValue("district", "");
@@ -191,7 +194,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       form.setValue("district", "");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvince]); // Rerun only when selectedProvince changes (and selectedDepartment is implicitly part of the chain)
+  }, [selectedProvince, selectedDepartment, form]); 
 
 
   const processSubmit = async (values: BusinessFormValues) => {
@@ -216,7 +219,6 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(processSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-3 pl-1 py-1">
-        {/* Información General del Negocio */}
         <h3 className="text-lg font-semibold pt-2 border-b pb-2 mb-3">Información General</h3>
         <FormField control={form.control} name="name" render={({ field }) => (
           <FormItem><FormLabel>Nombre Comercial <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Pandora Lounge Bar" {...field} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
@@ -282,7 +284,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
                 />
               </FormControl>
             </div>
-            <FormDescription className="text-xs">Solo letras minúsculas, números y guiones. Será único para tu negocio.</FormDescription>
+            <FormDescription className="text-xs">Debe ser único. Solo letras minúsculas, números y guiones. Se usará para la URL pública de tu negocio.</FormDescription>
             <FormMessage />
           </FormItem>
         )}/>
@@ -296,7 +298,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
           <FormItem><FormLabel>URL Imagen de Portada (Pública)</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/portada.jpg" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormDescription className="text-xs">Imagen para la página pública de tu negocio.</FormDescription><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicAddress" render={({ field }) => (
-          <FormItem><FormLabel>Dirección Pública (si difiere de la principal)</FormLabel><FormControl><Input placeholder="Ej: Av. Comercial 456, Referencia..." {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Dirección Pública (si difiere de la principal)</FormLabel><FormControl><Textarea placeholder="Ej: Av. Comercial 456, Referencia..." {...field} value={field.value || ""} disabled={isSubmittingForm} rows={2}/></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicContactEmail" render={({ field }) => (
           <FormItem><FormLabel>Email Público de Contacto</FormLabel><FormControl><Input type="email" placeholder="Ej: info@minegocio.com" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
@@ -316,5 +318,3 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
     </Form>
   );
 }
-
-    

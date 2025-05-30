@@ -1,9 +1,10 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useParams } from "next/navigation"; // Import useParams
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,9 +33,8 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from 'qrcode';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar as ShadcnCalendar } from "@/components/ui/calendar"; // Renamed to avoid conflict
 import { cn } from "@/lib/utils";
-
 
 const specificCodeSchema = z.object({
   specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
@@ -53,10 +53,12 @@ const newQrClientSchema = z.object({
   dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
   dniConfirm: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
-type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
 
 
-export default function BusinessPublicPageByUrl({ params }: { params: { customUrlPath: string } }) {
+export default function BusinessPublicPageByUrl() {
+  const params = useParams<{ customUrlPath: string }>(); // Use useParams
+  const { customUrlPath } = params;
+
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const [activeEntitiesForBusiness, setActiveEntitiesForBusiness] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,13 +69,15 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
   const [showDniModal, setShowDniModal] = useState(false);
   const [currentStepInModal, setCurrentStepInModal] = useState<'enterDni' | 'newUserForm'>('enterDni');
   const [activeEntityForQr, setActiveEntityForQr] = useState<BusinessManagedEntity | null>(null);
-  const [validatedSpecificCode, setValidatedSpecificCode] = useState<string | null>(null); // Este es el código de 9 dígitos
+  const [validatedSpecificCode, setValidatedSpecificCode] = useState<string | null>(null);
   const [enteredDni, setEnteredDni] = useState<string>("");
   const [qrData, setQrData] = useState<QrCodeData | null>(null);
   const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
-  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormValues | null>(null);
+  const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
+
+  type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
 
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(dniSchema),
@@ -84,37 +88,39 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
     resolver: zodResolver(newQrClientSchema),
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dniConfirm: "" },
   });
-
+  
   const fetchBusinessData = useCallback(async () => {
-    if (!params.customUrlPath) {
-      setError("URL de negocio inválida.");
+    console.log("BusinessPublicPage: customUrlPath from params:", customUrlPath);
+    if (!customUrlPath) {
+      setError("URL de negocio inválida o no proporcionada.");
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     setError(null);
-    console.log("BusinessPage by URL: Fetching business with customUrlPath:", params.customUrlPath);
+    console.log("BusinessPage by URL: Fetching business with customUrlPath:", customUrlPath);
     try {
       const businessQuery = query(
         collection(db, "businesses"),
-        where("customUrlPath", "==", params.customUrlPath.toLowerCase().trim()),
+        where("customUrlPath", "==", customUrlPath.toLowerCase().trim()),
         limit(1)
       );
       const businessSnap = await getDocs(businessQuery);
 
       if (businessSnap.empty) {
+        console.error("BusinessPage by URL: No business found for customUrlPath:", customUrlPath);
         setError("Negocio no encontrado. Verifica que la URL sea correcta.");
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
       } else {
         const businessDoc = businessSnap.docs[0];
-        const bizData = businessDoc.data();
+        const bizData = businessDoc.data() as Omit<Business, 'id'>;
         const fetchedBusiness: Business = {
           id: businessDoc.id,
           name: bizData.name,
-          contactEmail: bizData.contactEmail,
+          contactEmail: bizData.contactEmail, // Keep internal contact email if needed
           joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
-          customUrlPath: bizData.customUrlPath || params.customUrlPath,
+          customUrlPath: bizData.customUrlPath || customUrlPath,
           logoUrl: bizData.logoUrl || undefined,
           publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
           slogan: bizData.slogan || undefined,
@@ -123,7 +129,7 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
           publicAddress: bizData.publicAddress || undefined,
         };
         setBusinessDetails(fetchedBusiness);
-        console.log("BusinessPage by URL: Business data found:", fetchedBusiness.name);
+        console.log("BusinessPage by URL: Business data found:", fetchedBusiness.name, "ID:", fetchedBusiness.id);
 
         const entitiesQuery = query(
           collection(db, "businessEntities"),
@@ -135,7 +141,12 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
         
         const allActiveEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data();
+          const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & {
+            startDate: Timestamp | string;
+            endDate: Timestamp | string;
+            createdAt?: Timestamp | string;
+          };
+          
           let startDateStr: string;
           let endDateStr: string;
           const nowStr = new Date().toISOString();
@@ -176,7 +187,7 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
             ticketTypes: entityData.ticketTypes || [],
             eventBoxes: entityData.eventBoxes || [],
             assignedPromoters: entityData.assignedPromoters || [],
-            generatedCodes: entityData.generatedCodes || [],
+            generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes : [],
             imageUrl: entityData.imageUrl,
             aiHint: entityData.aiHint,
             termsAndConditions: entityData.termsAndConditions,
@@ -197,13 +208,13 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
     } finally {
       setIsLoading(false);
     }
-  }, [params.customUrlPath]);
+  }, [customUrlPath]);
 
   useEffect(() => {
-    if (params.customUrlPath) {
+    if (customUrlPath) { // Ensure customUrlPath is available from params
         fetchBusinessData();
     }
-  }, [params.customUrlPath, fetchBusinessData]);
+  }, [customUrlPath, fetchBusinessData]);
 
 
   const handleSpecificCodeSubmit = (entity: BusinessManagedEntity, codeValue: string) => {
@@ -226,7 +237,7 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
 
     if (foundCodeObject) {
       setActiveEntityForQr(entity);
-      setValidatedSpecificCode(codeToValidate); // El código de 9 dígitos validado
+      setValidatedSpecificCode(codeToValidate); 
       setCurrentStepInModal('enterDni');
       dniForm.reset({ dni: "" });
       setShowDniModal(true);
@@ -256,7 +267,7 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
 
         if (!querySnapshot.empty) {
           const existingClientDoc = querySnapshot.docs[0];
-          const clientData = existingClientDoc.data();
+          const clientData = existingClientDoc.data() as Omit<QrClient, 'id'>;
           const qrClient: QrClient = {
             id: existingClientDoc.id,
             dni: clientData.dni,
@@ -275,13 +286,13 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
                 description: activeEntityForQr.description,
                 validUntil: activeEntityForQr.endDate,
                 imageUrl: activeEntityForQr.imageUrl || "",
-                promoCode: validatedSpecificCode, // Usamos el código de 9 dígitos aquí
+                promoCode: validatedSpecificCode, 
                 type: activeEntityForQr.type as 'promotion' | 'event',
                 termsAndConditions: activeEntityForQr.termsAndConditions,
                 aiHint: activeEntityForQr.aiHint || "",
             },
-            code: validatedSpecificCode, // Código de 9 dígitos
-            status: 'available', // Asumimos que si llega aquí, el código estaba disponible
+            code: validatedSpecificCode, 
+            status: 'available', 
           });
           setShowDniModal(false);
           setPageViewState('qrDisplay');
@@ -305,24 +316,24 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
     }
     setIsLoadingQrFlow(true);
 
-    const newClientData: Omit<QrClient, 'id' | 'registrationDate'> & {registrationDate: any, dob: Timestamp} = {
-      dni: enteredDni, // Usar el DNI verificado/confirmado
+    const newClientDataToSave = {
+      dni: enteredDni, 
       name: formData.name,
       surname: formData.surname,
       phone: formData.phone,
-      dob: Timestamp.fromDate(formData.dob),
+      dob: Timestamp.fromDate(formData.dob), // Convert Date to Firestore Timestamp
       registrationDate: serverTimestamp(),
     };
 
     try {
-      const docRef = await addDoc(collection(db, "qrClients"), newClientData);
+      const docRef = await addDoc(collection(db, "qrClients"), newClientDataToSave);
       const registeredClient: QrClient = {
         id: docRef.id,
-        dni: newClientData.dni,
-        name: newClientData.name,
-        surname: newClientData.surname,
-        phone: newClientData.phone,
-        dob: newClientData.dob.toDate().toISOString(),
+        dni: newClientDataToSave.dni,
+        name: newClientDataToSave.name,
+        surname: newClientDataToSave.surname,
+        phone: newClientDataToSave.phone,
+        dob: newClientDataToSave.dob.toDate().toISOString(),
         registrationDate: new Date().toISOString(), 
       };
       setQrData({
@@ -354,7 +365,7 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
   
   const handleNewUserDniChangeDuringRegistration = async (newDniValue: string, currentFormData: NewQrClientFormValues): Promise<boolean> => {
       const newDniCleaned = newDniValue.trim();
-      if (newDniCleaned === enteredDni) return true; // No change, or changed back to original DNI for this flow
+      if (newDniCleaned === enteredDni) return true; 
       if (newDniCleaned.length < 7 || newDniCleaned.length > 15) {
           newQrClientForm.setError("dniConfirm", { type: "manual", message: "DNI/CE debe tener entre 7 y 15 caracteres."});
           return false;
@@ -368,12 +379,12 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-            setFormDataForDniWarning(currentFormData); // Guardar los datos del formulario actual
-            setEnteredDni(newDniCleaned); // Actualizar el DNI que causó la advertencia
+            setFormDataForDniWarning(currentFormData); 
+            setEnteredDni(newDniCleaned); 
             setShowDniExistsWarningDialog(true);
-            return false; // Detener el submit actual del formulario de nuevo usuario
+            return false; 
         }
-        setEnteredDni(newDniCleaned); // Actualizar el DNI principal si es único y ha cambiado
+        setEnteredDni(newDniCleaned); 
         return true; 
       } catch (e: any) {
         toast({ title: "Error al verificar DNI", description: e.message, variant: "destructive"});
@@ -385,11 +396,9 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
 
   const handleDniExistsWarningConfirm = async () => {
       setShowDniExistsWarningDialog(false);
-      // El DNI que causó la advertencia ya está en 'enteredDni'
-      // Simular el flujo de DNI existente
-      dniForm.setValue("dni", enteredDni); // Poner DNI en el form de DNI
+      dniForm.setValue("dni", enteredDni); 
       await handleDniSubmitInModal({ dni: enteredDni });
-      setFormDataForDniWarning(null); // Limpiar datos temporales
+      setFormDataForDniWarning(null); 
   };
 
   const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormValues> = async (data) => {
@@ -430,33 +439,33 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
     }
 
     const padding = 20;
-    let currentY = padding;
-    const qrSize = 180;
+    const qrSize = 180; 
     const maxLogoHeight = 40; 
-    const spacingAfterLogo = 10; 
+    const spacingAfterLogo = 20; 
     const businessNameFontSize = 18;
-    const spacingAfterBusinessName = 15;
+    const spacingAfterBusinessName = 40; 
     const promoTitleFontSize = 20;
-    const spacingAfterPromoTitle = 20; 
+    const spacingAfterPromoTitle = 10; 
     const userDetailsFontSize = 16;
     const smallTextFontSize = 10;
     const lineSpacing = 5;
-    const canvasWidth = 320;
+    const canvasWidth = 320; 
 
     canvas.width = canvasWidth;
-    // Calculate initial height, will be adjusted
-    canvas.height = 550; // Estimate, will be recalculated
-    ctx.fillStyle = 'hsl(var(--background))'; // Light Gray
+    canvas.height = 600; // Initial estimate, will be adjusted
+    ctx.fillStyle = 'hsl(280, 13%, 96%)'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let currentY = padding;
 
     const businessLogo = new Image();
     businessLogo.crossOrigin = "anonymous";
     
-    // Function to draw all content, to be called once logo (if any) is loaded
     const drawContent = () => {
-        currentY = padding; 
-        const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
-        ctx.fillStyle = 'hsl(var(--primary))'; // Vibrant Purple
+        currentY = padding;
+        const headerBgHeightReduction = 15;
+        const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - headerBgHeightReduction;
+        ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.fillRect(0, 0, canvas.width, headerBgHeight);
         currentY += padding / 2;
 
@@ -480,11 +489,11 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
         }
         
         ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
-        ctx.font = `bold ${businessNameFontSize}px Arial`;
+        ctx.font = `bold ${businessNameFontSize - 2}px Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
-        currentY += businessNameFontSize + spacingAfterBusinessName + padding /2 ; 
-
+        currentY += (businessNameFontSize - 2) + spacingAfterBusinessName; 
+        
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.font = `bold ${promoTitleFontSize}px Arial`;
         ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
@@ -497,12 +506,12 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
             ctx.strokeStyle = 'hsl(var(--primary))'; 
             ctx.lineWidth = 2;
             ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-            currentY += qrSize + padding;
+            currentY += qrSize + padding + 5; // Added more space after QR
 
             ctx.fillStyle = 'hsl(var(--primary))';
-            ctx.font = `bold ${userDetailsFontSize}px Arial`;
+            ctx.font = `bold ${userDetailsFontSize + 2}px Arial`; // Larger name
             ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
-            currentY += userDetailsFontSize + lineSpacing;
+            currentY += (userDetailsFontSize + 2) + lineSpacing;
 
             ctx.fillStyle = 'hsl(var(--foreground))'; 
             ctx.font = `${userDetailsFontSize - 2}px Arial`; 
@@ -542,15 +551,15 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
             if (!tempCtx) return;
             tempCanvas.width = canvas.width;
             tempCanvas.height = finalHeight;
-            tempCtx.drawImage(canvas, 0, 0); // Draw the oversized canvas onto the correctly sized one
+            tempCtx.drawImage(canvas, 0, 0); 
             
             const dataUrl = tempCanvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `SocioVIP_QR_${qrData.promotion.type}_${qrData.code}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const linkElement = document.createElement('a');
+            linkElement.href = dataUrl;
+            linkElement.download = `SocioVIP_QR_${qrData.promotion.type}_${qrData.code}.png`;
+            document.body.appendChild(linkElement);
+            linkElement.click();
+            document.body.removeChild(linkElement);
             toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
         };
         qrImage.onerror = () => {
@@ -568,7 +577,7 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
         };
         businessLogo.src = businessDetails.logoUrl;
     } else {
-        drawContent(); // No logo URL, proceed to draw without it
+        drawContent(); 
     }
   };
 
@@ -584,6 +593,7 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
     setShowDniModal(false);
   };
 
+  // Specific Code Entry Form Component for each entity
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
     const form = useForm<SpecificCodeFormValues>({
       resolver: zodResolver(specificCodeSchema),
@@ -621,7 +631,6 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
     );
   };
 
-
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -657,8 +666,9 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
         <div className="pt-24">
             <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-destructive">{error}</h1>
-            <Link href="/" passHref className="mt-6">
-              <Button variant="outline">Volver a la Página Principal</Button>
+            <p className="text-muted-foreground mt-2">Path intentado: /b/{customUrlPath}</p>
+            <Link href="/" passHref>
+              <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
          <footer className="w-full mt-12 py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
@@ -683,9 +693,9 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
         <div className="pt-24">
             <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
-            <p className="text-muted-foreground mt-2">La página del negocio con la URL "/b/{params.customUrlPath}" no existe o la URL es incorrecta.</p>
-            <Link href="/" passHref className="mt-6">
-              <Button variant="outline">Volver a la Página Principal</Button>
+            <p className="text-muted-foreground mt-2">La página del negocio con la URL "/b/{customUrlPath}" no existe o la URL es incorrecta.</p>
+            <Link href="/" passHref>
+              <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
         <footer className="w-full mt-12 py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
@@ -694,7 +704,6 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
       </div>
     );
   }
-
 
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
@@ -760,13 +769,14 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
   }
 
   // Fallback to entity list view if businessDetails is not null
-  if (!businessDetails) return null; // Should be caught by loading or error states above
+  if (!businessDetails) return null;
 
   const events = activeEntitiesForBusiness.filter(e => e.type === 'event');
   const promotions = activeEntitiesForBusiness.filter(e => e.type === 'promotion');
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* <h1 className="text-3xl text-center font-bold text-blue-500 p-4">VERIFICACIÓN CAMBIO NEGOCIO - BusinessPublicPage</h1> */}
       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <Link href="/" passHref className="flex items-center gap-2 group">
@@ -971,7 +981,17 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1920-01-01")} captionLayout="dropdown-buttons" fromYear={1920} toYear={new Date().getFullYear() -10} locale={es} initialFocus />
+                        <ShadcnCalendar 
+                            mode="single" 
+                            selected={field.value} 
+                            onSelect={field.onChange} 
+                            disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1920-01-01")} 
+                            captionLayout="dropdown-buttons" 
+                            fromYear={1920} 
+                            toYear={new Date().getFullYear() -10} 
+                            locale={es} 
+                            initialFocus 
+                        />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -1004,5 +1024,3 @@ export default function BusinessPublicPageByUrl({ params }: { params: { customUr
     </div>
   );
 }
-
-    

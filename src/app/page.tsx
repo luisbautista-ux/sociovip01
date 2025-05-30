@@ -42,7 +42,7 @@ export default function HomePage() {
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
       businessesSnapshot.forEach(docSnap => {
-        const bizData = docSnap.data() as Business;
+        const bizData = docSnap.data() as Omit<Business, 'id'>;
         businessesMap.set(docSnap.id, { id: docSnap.id, ...bizData });
       });
       console.log(`HomePage: Fetched ${businessesMap.size} businesses.`);
@@ -53,8 +53,12 @@ export default function HomePage() {
 
       const allActiveEntities: PublicDisplayEntity[] = [];
       entitiesSnapshot.forEach(docSnap => {
-        const entityData = docSnap.data();
-        
+        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & {
+          startDate: Timestamp | string;
+          endDate: Timestamp | string;
+          createdAt?: Timestamp | string;
+        };
+
         let startDateStr: string;
         let endDateStr: string;
         const nowStr = new Date().toISOString();
@@ -81,7 +85,7 @@ export default function HomePage() {
           endDateStr = nowStr;
         }
         
-        const entity: BusinessManagedEntity = {
+        const entityForCheck: BusinessManagedEntity = {
           id: docSnap.id,
           businessId: entityData.businessId,
           type: entityData.type,
@@ -99,23 +103,23 @@ export default function HomePage() {
           imageUrl: entityData.imageUrl,
           aiHint: entityData.aiHint,
           termsAndConditions: entityData.termsAndConditions,
-          createdAt: entityData.createdAt instanceof Timestamp
-            ? entityData.createdAt.toDate().toISOString()
+          createdAt: entityData.createdAt instanceof Timestamp 
+            ? entityData.createdAt.toDate().toISOString() 
             : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
         };
 
-        if (isEntityCurrentlyActivatable(entity)) {
-          const business = businessesMap.get(entity.businessId);
+        if (isEntityCurrentlyActivatable(entityForCheck)) {
+          const business = businessesMap.get(entityForCheck.businessId);
           if (business) {
             allActiveEntities.push({
-              ...entity,
+              ...entityForCheck,
               businessName: business.name,
               businessLogoUrl: business.logoUrl,
               businessCustomUrlPath: business.customUrlPath,
             });
           } else {
-            console.warn(`HomePage: Business not found for entity ${entity.id} with businessId ${entity.businessId}.`);
-            allActiveEntities.push(entity); // Show entity even if business details are missing for now
+            console.warn(`HomePage: Business not found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}.`);
+            allActiveEntities.push(entityForCheck); 
           }
         }
       });
@@ -126,7 +130,7 @@ export default function HomePage() {
         if (a.type !== 'event' && b.type === 'event') return 1;
         const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
         const bDate = b.startDate ? new Date(b.startDate).getTime() : 0;
-        return bDate - aDate;
+        return bDate - aDate; 
       });
       setPublicEntities(sortedEntities);
 
@@ -149,6 +153,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* <h1 className="text-3xl text-center font-bold text-orange-500 p-4">VERIFICACIÓN CAMBIO GLOBAL - HomePage</h1> */}
       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
             <Link href="/" passHref className="flex items-center gap-2 group">
@@ -163,7 +168,6 @@ export default function HomePage() {
       </header>
 
       <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-       
         {isLoading && (
           <div className="flex justify-center items-center min-h-[300px]">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -196,9 +200,10 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events.map((event) => {
-                    const businessPageUrl = event.businessCustomUrlPath 
-                      ? `/b/${event.businessCustomUrlPath}` 
-                      : (event.businessId ? `/business/${event.businessId}/public-fallback` : null); // Fallback, o no link si no hay businessId
+                    const businessLink = event.businessCustomUrlPath && event.businessCustomUrlPath.trim() !== ""
+                      ? `/b/${event.businessCustomUrlPath}`
+                      : null; // No fallback link if customUrlPath is missing
+                    console.log(`HomePage Event: ${event.name}, CustomPath: ${event.businessCustomUrlPath}, GeneratedLink: ${businessLink}`);
                     return (
                     <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                       <div className="relative aspect-[16/9] w-full">
@@ -215,21 +220,17 @@ export default function HomePage() {
                         <CardTitle className="text-xl hover:text-primary transition-colors">
                           {event.name}
                         </CardTitle>
-                        {event.businessName ? (
-                           businessPageUrl ? (
-                            <Link href={businessPageUrl} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
+                        {event.businessName && (
+                          businessLink ? (
+                            <Link href={businessLink} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> 
                               {event.businessName}
                             </Link>
                           ) : (
                             <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {event.businessName}
+                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {event.businessName} (Página no disponible)
                             </p>
                           )
-                        ) : (
-                            <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> Negocio no especificado
-                            </p>
                         )}
                       </CardHeader>
                       <CardContent className="flex-grow">
@@ -239,8 +240,8 @@ export default function HomePage() {
                         </p>
                       </CardContent>
                        <CardFooter>
-                         {businessPageUrl ? (
-                            <Link href={businessPageUrl} passHref className="w-full">
+                         {businessLink ? (
+                            <Link href={businessLink} passHref className="w-full">
                               <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                                 Ver Detalles del Evento <ExternalLink className="ml-2 h-4 w-4" />
                               </Button>
@@ -265,9 +266,10 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {promotions.map((promo) => {
-                     const businessPageUrl = promo.businessCustomUrlPath 
-                      ? `/b/${promo.businessCustomUrlPath}` 
-                      : (promo.businessId ? `/business/${promo.businessId}/public-fallback` : null);
+                     const businessLink = promo.businessCustomUrlPath && promo.businessCustomUrlPath.trim() !== ""
+                      ? `/b/${promo.businessCustomUrlPath}`
+                      : null;
+                    console.log(`HomePage Promo: ${promo.name}, CustomPath: ${promo.businessCustomUrlPath}, GeneratedLink: ${businessLink}`);
                     return (
                     <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                        <div className="relative aspect-[16/9] w-full">
@@ -284,21 +286,17 @@ export default function HomePage() {
                         <CardTitle className="text-xl hover:text-primary transition-colors">
                            {promo.name}
                         </CardTitle>
-                         {promo.businessName ? (
-                           businessPageUrl ? (
-                            <Link href={businessPageUrl} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
+                         {promo.businessName && (
+                           businessLink ? (
+                            <Link href={businessLink} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> 
                               {promo.businessName}
                             </Link>
                           ) : (
                              <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {promo.businessName}
+                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {promo.businessName} (Página no disponible)
                             </p>
                           )
-                         ) : (
-                             <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> Negocio no especificado
-                            </p>
                          )}
                       </CardHeader>
                       <CardContent className="flex-grow">
@@ -308,8 +306,8 @@ export default function HomePage() {
                         </p>
                       </CardContent>
                        <CardFooter>
-                         {businessPageUrl ? (
-                           <Link href={businessPageUrl} passHref className="w-full">
+                         {businessLink ? (
+                           <Link href={businessLink} passHref className="w-full">
                             <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                               Ver Detalles de la Promoción <ExternalLink className="ml-2 h-4 w-4" />
                             </Button>
@@ -337,5 +335,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    
