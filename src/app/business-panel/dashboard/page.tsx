@@ -8,9 +8,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
-import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
+import type { BusinessManagedEntity } from "@/lib/types";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { isToday, startOfDay, endOfDay, isFuture } from "date-fns";
+import { isToday, startOfDay, endOfDay, isFuture, parseISO } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface BusinessDashboardStats {
   activePromotions: number;
@@ -21,79 +22,124 @@ interface BusinessDashboardStats {
 
 export default function BusinessDashboardPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
+  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
   const [stats, setStats] = useState<BusinessDashboardStats>({
     activePromotions: 0,
     upcomingEvents: 0,
     totalRedemptionsToday: 0,
-    newCustomersThisWeek: 10, // Mock initial value
+    newCustomersThisWeek: 0, // Kept as 0, will be placeholder
   });
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  const fetchBusinessStats = useCallback(async (businessId: string) => {
-    console.log("BusinessDashboardPage: Fetching stats for businessId:", businessId);
+  const fetchBusinessStats = useCallback(async (businessIdForQuery: string) => {
+    console.log("BusinessDashboardPage: Fetching stats for businessId:", businessIdForQuery);
+    if (!businessIdForQuery || typeof businessIdForQuery !== 'string' || businessIdForQuery.trim() === '') {
+        console.error("BusinessDashboardPage: fetchBusinessStats called with invalid businessIdForQuery:", businessIdForQuery);
+        setIsLoading(false);
+        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+        toast({
+            title: "Error Interno",
+            description: "No se pudo determinar el ID del negocio para cargar las estadísticas.",
+            variant: "destructive",
+            duration: 7000,
+        });
+        return;
+    }
     setIsLoading(true);
     try {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
-        where("businessId", "==", businessId)
+        where("businessId", "==", businessIdForQuery)
       );
       const querySnapshot = await getDocs(entitiesQuery);
-      console.log("BusinessDashboardPage: Fetched entities snapshot size:", querySnapshot.size);
+      console.log("BusinessDashboardPage: Fetched businessEntities snapshot size:", querySnapshot.size);
 
       const entities: BusinessManagedEntity[] = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         const nowISO = new Date().toISOString();
+        
+        let startDateStr: string;
+        if (data.startDate instanceof Timestamp) {
+            startDateStr = data.startDate.toDate().toISOString();
+        } else if (typeof data.startDate === 'string') {
+            startDateStr = data.startDate;
+        } else if (data.startDate instanceof Date) { // Should not happen if data is from Firestore directly
+            startDateStr = data.startDate.toISOString();
+        } else {
+            console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid startDate. Using fallback.`);
+            startDateStr = nowISO; 
+        }
+
+        let endDateStr: string;
+        if (data.endDate instanceof Timestamp) {
+            endDateStr = data.endDate.toDate().toISOString();
+        } else if (typeof data.endDate === 'string') {
+            endDateStr = data.endDate;
+        } else if (data.endDate instanceof Date) { // Should not happen
+            endDateStr = data.endDate.toISOString();
+        } else {
+            console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid endDate. Using fallback.`);
+            endDateStr = nowISO; 
+        }
+        
+        let createdAtStr: string | undefined;
+        if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
+        else if (typeof data.createdAt === 'string') createdAtStr = data.createdAt;
+        else createdAtStr = undefined;
+
         return {
           id: docSnap.id,
           businessId: data.businessId,
           type: data.type,
           name: data.name || "Entidad sin nombre",
           description: data.description || "",
-          startDate: data.startDate instanceof Timestamp ? data.startDate.toDate().toISOString() : (typeof data.startDate === 'string' ? data.startDate : nowISO),
-          endDate: data.endDate instanceof Timestamp ? data.endDate.toDate().toISOString() : (typeof data.endDate === 'string' ? data.endDate : nowISO),
-          usageLimit: data.usageLimit === undefined ? 0 : data.usageLimit,
-          maxAttendance: data.maxAttendance === undefined ? 0 : data.maxAttendance,
+          startDate: startDateStr,
+          endDate: endDateStr,
+          usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : Number(data.usageLimit),
+          maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
           isActive: data.isActive === undefined ? true : data.isActive,
-          generatedCodes: data.generatedCodes || [],
-          // Ensure all other optional fields from BusinessManagedEntity are handled or defaulted if necessary
-          ticketTypes: data.ticketTypes || [],
-          eventBoxes: data.eventBoxes || [],
-          assignedPromoters: data.assignedPromoters || [],
+          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
+          ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes : [],
+          eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes : [],
+          assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
           imageUrl: data.imageUrl || "",
           aiHint: data.aiHint || "",
           termsAndConditions: data.termsAndConditions || "",
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
+          createdAt: createdAtStr,
         } as BusinessManagedEntity;
       });
-      console.log("BusinessDashboardPage: Processed entities:", entities.length);
-
+      console.log("BusinessDashboardPage: Processed entities for dashboard:", entities.length);
 
       let activePromotionsCount = 0;
       let upcomingEventsCount = 0;
       let redemptionsTodayCount = 0;
-      const todayStart = startOfDay(new Date());
-      const todayEnd = endOfDay(new Date());
+      const todayStartObj = startOfDay(new Date());
+      const todayEndObj = endOfDay(new Date());
 
       entities.forEach(entity => {
-        // console.log("BusinessDashboardPage: Checking entity:", entity.name, "Type:", entity.type, "Active:", entity.isActive, "Start:", entity.startDate, "End:", entity.endDate);
         if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
           activePromotionsCount++;
         }
-        if (entity.type === 'event' && entity.isActive) { // Check isActive first
-          if (entity.startDate && isFuture(new Date(entity.startDate))) {
-            upcomingEventsCount++;
+        if (entity.type === 'event' && entity.isActive) {
+          try {
+            if (entity.startDate && isFuture(parseISO(entity.startDate))) {
+              upcomingEventsCount++;
+            }
+          } catch (e) {
+            console.warn("BusinessDashboardPage: Invalid startDate format for event:", entity.id, entity.startDate, e);
           }
         }
 
         entity.generatedCodes?.forEach(code => {
           if (code.status === 'redeemed' && code.redemptionDate) {
             try {
-              const redemptionDateObj = new Date(code.redemptionDate);
-              if (redemptionDateObj >= todayStart && redemptionDateObj <= todayEnd) {
+              const redemptionDateObj = parseISO(code.redemptionDate);
+              if (redemptionDateObj >= todayStartObj && redemptionDateObj <= todayEndObj) {
                 redemptionsTodayCount++;
               }
             } catch (e) {
-              console.warn("BusinessDashboardPage: Invalid redemptionDate format for code:", code.id, code.redemptionDate);
+              console.warn("BusinessDashboardPage: Invalid redemptionDate format for code:", code.id, code.redemptionDate, e);
             }
           }
         });
@@ -108,36 +154,65 @@ export default function BusinessDashboardPage() {
         activePromotions: activePromotionsCount,
         upcomingEvents: upcomingEventsCount,
         totalRedemptionsToday: redemptionsTodayCount,
-        // newCustomersThisWeek remains mock for now
+        // newCustomersThisWeek remains placeholder
       }));
 
     } catch (error: any) {
       console.error("BusinessDashboardPage: Error fetching business dashboard stats:", error.code, error.message, error);
       setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+      toast({
+        title: "Error al Cargar Estadísticas del Negocio",
+        description: `Permiso denegado (${error.code || 'desconocido'}). Asegúrate de que tu perfil en Firestore (colección 'platformUsers', documento con tu UID de Auth) tenga el campo 'roles' como un array con 'business_admin' o 'staff', y un campo 'businessId' válido. Revisa las reglas de seguridad de Firestore.`,
+        variant: "destructive",
+        duration: 15000, // Longer duration for more detailed message
+      });
     } finally {
       setIsLoading(false);
       console.log("BusinessDashboardPage: fetchBusinessStats finished.");
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (loadingAuth || loadingProfile) {
-      setIsLoading(true);
+      if (!isLoading) setIsLoading(true); // Ensure loading is true if auth/profile is still loading
       return;
     }
-    if (userProfile && userProfile.businessId) {
-      fetchBusinessStats(userProfile.businessId);
-    } else if (userProfile && !userProfile.businessId && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'))) {
-      console.warn("BusinessDashboardPage: User is business_admin/staff but has no businessId in profile.");
-      setIsLoading(false);
-      // Potentially show an error or a message "No business associated"
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
-    } else {
-      setIsLoading(false); // User might not be a business user or profile not fully loaded
-    }
-  }, [userProfile, loadingAuth, loadingProfile, fetchBusinessStats]);
 
-  if (isLoading || loadingAuth || loadingProfile) {
+    // Auth and profile loading is complete here
+    if (userProfile) {
+      console.log("BusinessDashboardPage: UserProfile loaded in useEffect:", JSON.stringify(userProfile, null, 2));
+      const bid = userProfile.businessId;
+      if (bid && typeof bid === 'string' && bid.trim() !== '') {
+        const trimmedBid = bid.trim();
+        setCurrentBusinessId(trimmedBid);
+        console.log("BusinessDashboardPage: CurrentBusinessId is set from userProfile, calling fetchBusinessStats with:", trimmedBid);
+        fetchBusinessStats(trimmedBid);
+      } else {
+        console.warn("BusinessDashboardPage: UserProfile does not have a valid businessId. User roles:", userProfile.roles);
+        setCurrentBusinessId(null);
+        setIsLoading(false); // Not loading if no valid businessId
+        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+        // Only toast if user *should* have business access
+        if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
+           toast({
+            title: "Error de Configuración del Negocio",
+            description: "Tu perfil de usuario no está asociado a un negocio válido para cargar el dashboard. Contacta al superadministrador.",
+            variant: "destructive",
+            duration: 7000,
+          });
+        }
+      }
+    } else { // No userProfile found after auth/profile load
+      console.log("BusinessDashboardPage: No userProfile found after auth/profile load. Cannot fetch business stats.");
+      setCurrentBusinessId(null);
+      setIsLoading(false); // Not loading if no user profile
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, newCustomersThisWeek: 0 });
+      // No toast here, as the BusinessPanelLayout should handle redirection or access denied message
+    }
+  }, [userProfile, loadingAuth, loadingProfile, fetchBusinessStats, toast, isLoading]); // Added isLoading to deps
+
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -145,6 +220,19 @@ export default function BusinessDashboardPage() {
       </div>
     );
   }
+
+  if (!currentBusinessId && !isLoading) { // Check !isLoading as well
+    return (
+        <div className="flex flex-col items-center justify-center h-64 p-4 border border-dashed rounded-md">
+            <CardTitle className="text-xl text-destructive">No se puede cargar el Dashboard</CardTitle>
+            <CardDescription className="mt-2 text-center">
+                Tu perfil de usuario no está asociado a un negocio específico o no tienes los permisos necesarios.
+                Por favor, contacta al superadministrador para que verifique tu configuración en la colección 'platformUsers'.
+            </CardDescription>
+        </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6">
