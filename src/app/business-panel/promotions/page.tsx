@@ -14,7 +14,7 @@ import {
   DialogDescription as ShadcnDialogDescription,
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
-import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2 } from "lucide-react";
+import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -43,6 +43,7 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 
+
 export default function BusinessPromotionsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
@@ -66,10 +67,11 @@ export default function BusinessPromotionsPage() {
   const [selectedPromotionForStats, setSelectedPromotionForStats] = useState<BusinessManagedEntity | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
+  // Determine currentBusinessId once auth and profile are loaded
+ useEffect(() => {
     console.log("Promotions Page: Auth/Profile loading state changed. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
     if (loadingAuth || loadingProfile) {
-      setIsLoading(true); // Keep loading if auth or profile is still loading
+      setIsLoading(true); // Keep main page loading
       return;
     }
 
@@ -77,7 +79,7 @@ export default function BusinessPromotionsPage() {
       if (userProfile.businessId && typeof userProfile.businessId === 'string' && userProfile.businessId.trim() !== '') {
         console.log("Promotions Page: User profile loaded with businessId:", userProfile.businessId);
         setCurrentBusinessId(userProfile.businessId);
-        // setIsLoading(true); // Defer this to the fetch effect
+        // setIsLoading(true) will be handled by fetchBusinessPromotions if currentBusinessId is set
       } else {
         console.warn("Promotions Page: User is business_admin/staff but has no valid businessId.");
         setCurrentBusinessId(null);
@@ -100,11 +102,12 @@ export default function BusinessPromotionsPage() {
     }
   }, [userProfile, loadingAuth, loadingProfile, toast]);
 
+
   const fetchBusinessPromotions = useCallback(async () => {
     if (!currentBusinessId) {
       console.log("Promotions Page: fetchBusinessPromotions - No currentBusinessId, skipping fetch.");
       setPromotions([]);
-      setIsLoading(false); // Ensure loading stops if no businessId
+      setIsLoading(false); 
       return;
     }
     
@@ -197,6 +200,7 @@ export default function BusinessPromotionsPage() {
     }
   }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile]);
 
+
   const filteredPromotions = useMemo(() => {
     return promotions.filter(promo =>
         (promo.name && typeof promo.name === 'string' ? promo.name.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
@@ -237,10 +241,10 @@ export default function BusinessPromotionsPage() {
         imageUrl: promoToDuplicate.imageUrl || "",
         aiHint: promoToDuplicate.aiHint || "",
         termsAndConditions: promoToDuplicate.termsAndConditions || "",
-        ticketTypes: [], // Reset for duplicated promo
-        eventBoxes: [],  // Reset for duplicated promo
-        assignedPromoters: [], // Reset for duplicated promo
-        maxAttendance: 0, // Reset for duplicated promo
+        ticketTypes: [], 
+        eventBoxes: [],  
+        assignedPromoters: [], 
+        maxAttendance: 0, 
       });
     } else {
       setEditingPromotion(promotion ? sanitizeObjectForFirestore(promotion) as BusinessManagedEntity : null);
@@ -280,7 +284,7 @@ export default function BusinessPromotionsPage() {
     };
     
     const sanitizedPayload = sanitizeObjectForFirestore(fullPayloadForFirestore);
-    console.log('Promotions Page: Saving promotion with sanitized payload:', sanitizedPayload);
+    console.log('Promotions Page: Saving promotion with payload:', sanitizedPayload);
     
     try {
       if (editingPromotion && !isDuplicating && editingPromotion.id) { 
@@ -356,17 +360,20 @@ export default function BusinessPromotionsPage() {
         }
         const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
         
-        const newCodesWithDetails = newCodes.map(code => sanitizeObjectForFirestore({
-            ...code,
-            entityId: entityId,
-            generatedByName: userProfile.name, 
-            generatedDate: new Date().toISOString(),
-            observation: (observation && observation.trim() !== "") ? observation.trim() : null,
-            status: 'available', 
-            redemptionDate: null, 
-            redeemedByInfo: null, 
-            isVipCandidate: false,
-        }));
+        const newCodesWithDetails = newCodes.map(code => {
+            const cleanCode = { ...code };
+            if (cleanCode.observation === undefined) cleanCode.observation = null;
+            if (cleanCode.redemptionDate === undefined) cleanCode.redemptionDate = null;
+            if (cleanCode.redeemedByInfo === undefined) cleanCode.redeemedByInfo = null;
+            if (cleanCode.isVipCandidate === undefined) cleanCode.isVipCandidate = false;
+            return sanitizeObjectForFirestore({
+                ...cleanCode,
+                generatedByName: userProfile.name, 
+                generatedDate: new Date().toISOString(),
+                status: 'available' as GeneratedCode['status'], 
+            });
+        });
+
 
         const updatedCodes = [...(targetPromotionData.generatedCodes || []), ...newCodesWithDetails];
         
@@ -383,7 +390,7 @@ export default function BusinessPromotionsPage() {
         console.error("Promotions Page: Error saving new codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   }; 
 
@@ -398,16 +405,23 @@ export default function BusinessPromotionsPage() {
     }
     setIsSubmitting(true);
     const targetPromotionRef = doc(db, "businessEntities", entityId);
-     try {
+    try {
         const targetPromotionSnap = await getDoc(targetPromotionRef);
         if (!targetPromotionSnap.exists()) {
             toast({title:"Error", description:"Promoción no encontrada para actualizar códigos.", variant: "destructive"});
-            setIsSubmitting(false); // Reset submitting state on error
+            setIsSubmitting(false); 
             return;
         }
         const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
     
-        const updatedCodesForFirestore = updatedCodesFromDialog.map(code => sanitizeObjectForFirestore(code));
+        const updatedCodesForFirestore = updatedCodesFromDialog.map(code => {
+             const cleanCode = { ...code };
+            if (cleanCode.observation === undefined) cleanCode.observation = null;
+            if (cleanCode.redemptionDate === undefined) cleanCode.redemptionDate = null;
+            if (cleanCode.redeemedByInfo === undefined) cleanCode.redeemedByInfo = null;
+            if (cleanCode.isVipCandidate === undefined) cleanCode.isVipCandidate = false;
+            return sanitizeObjectForFirestore(cleanCode);
+        });
 
         await updateDoc(targetPromotionRef, { generatedCodes: updatedCodesForFirestore });
         toast({title: "Códigos Actualizados", description: `Los códigos para "${targetPromotionData.name}" han sido guardados en la base de datos.`});
@@ -417,8 +431,8 @@ export default function BusinessPromotionsPage() {
              setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
         }
     } catch (error: any) {
-      console.error("Promotions Page: Error saving updated codes to Firestore:", error.code, error.message, error);
-      toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
+        console.error("Promotions Page: Error saving updated codes to Firestore:", error.code, error.message, error);
+        toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
         setIsSubmitting(false);
     }
@@ -659,26 +673,26 @@ export default function BusinessPromotionsPage() {
           }
           setShowCreateEditPromotionModal(isOpen);
       }}>
-        {showCreateEditPromotionModal && (
-          <ShadcnDialogContent className="sm:max-w-2xl">
-            <ShadcnDialogHeader>
-              <ShadcnDialogTitle>{isDuplicating ? `Duplicar Promoción: ${(editingPromotion?.name || 'Promoción').replace(' (Copia)','')} (Copia)` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</ShadcnDialogTitle>
-              <ShadcnDialogDescription>
-                {isDuplicating ? "Creando una copia. Ajusta los detalles necesarios." : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
-              </ShadcnDialogDescription>
-            </ShadcnDialogHeader>
-            <BusinessPromotionForm
-              promotion={editingPromotion || undefined} 
-              onSubmit={handleFormSubmit} 
-              onCancel={() => {
-                  setShowCreateEditPromotionModal(false);
-                  setEditingPromotion(null);
-                  setIsDuplicating(false);
-              }}
-              isSubmitting={isSubmitting}
-            />
-          </ShadcnDialogContent>
-        )}
+        
+        <ShadcnDialogContent className="sm:max-w-2xl">
+          <ShadcnDialogHeader>
+            <ShadcnDialogTitle>{isDuplicating ? `Duplicar Promoción: ${(editingPromotion?.name || 'Promoción').replace(' (Copia)','')} (Copia)` : (editingPromotion ? "Editar Promoción" : "Crear Nueva Promoción")}</ShadcnDialogTitle>
+            <ShadcnDialogDescription>
+              {isDuplicating ? "Creando una copia. Ajusta los detalles necesarios." : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
+            </ShadcnDialogDescription>
+          </ShadcnDialogHeader>
+          <BusinessPromotionForm
+            promotion={editingPromotion || undefined} 
+            onSubmit={handleFormSubmit} 
+            onCancel={() => {
+                setShowCreateEditPromotionModal(false);
+                setEditingPromotion(null);
+                setIsDuplicating(false);
+            }}
+            isSubmitting={isSubmitting}
+          />
+        </ShadcnDialogContent>
+        
       </ShadcnDialog>
 
       {selectedEntityForCreatingCodes && userProfile && (
@@ -726,8 +740,10 @@ export default function BusinessPromotionsPage() {
       )}
 
     <ShadcnDialog open={showStatsModal} onOpenChange={(isOpen) => { if(!isOpen) setSelectedPromotionForStats(null); setShowStatsModal(isOpen);}}>
-        {showStatsModal && selectedPromotionForStats && (
-            <ShadcnDialogContent className="sm:max-w-md">
+      
+        <ShadcnDialogContent className="sm:max-w-md">
+            {selectedPromotionForStats && (
+              <>
                 <ShadcnDialogHeader>
                     <ShadcnDialogTitle>Estadísticas para: {selectedPromotionForStats.name}</ShadcnDialogTitle>
                     <ShadcnDialogDescription>Resumen del rendimiento de la promoción.</ShadcnDialogDescription>
@@ -741,11 +757,13 @@ export default function BusinessPromotionsPage() {
                     </p>
                      <p><strong>Límite de Canjes:</strong> ({selectedPromotionForStats.usageLimit && selectedPromotionForStats.usageLimit > 0 ? selectedPromotionForStats.usageLimit : 'Ilimitado'})</p>
                 </div>
-                <ShadcnDialogFooter> 
-                    <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedPromotionForStats(null);}}>Cerrar</Button>
-                </ShadcnDialogFooter>
-            </ShadcnDialogContent>
-        )}
+              </>
+            )}
+            <ShadcnDialogFooter> 
+                <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedPromotionForStats(null);}}>Cerrar</Button>
+            </ShadcnDialogFooter>
+        </ShadcnDialogContent>
+      
     </ShadcnDialog>
     </div>
   );
