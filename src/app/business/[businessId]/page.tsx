@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; // Asegurar que useRouter esté importado
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,13 +15,13 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types";
 import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit, LogOut, UserCircle, Camera } from "lucide-react";
-import { SocioVipLogo } from "@/components/icons";
+import { SocioVipLogo } from "@/components/icons"; // Para el footer
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle as UIDialogTitleComponent, DialogDescription as UIDialogDescriptionComponent, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle as UIAlertTitleComponent } from "@/components/ui/alert";
@@ -68,7 +68,7 @@ export default function BusinessPublicPageById({ params }: { params: { businessI
   );
 }
 
-// Schemas defined at the top level, accessible by the client component
+// Schemas
 const specificCodeFormSchema = z.object({
   specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
 });
@@ -93,8 +93,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   const router = useRouter();
   const { toast } = useToast();
   const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
-  const [showLoginModal, setShowLoginModal] = useState(false);
-
+  
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const [activeEntitiesForBusiness, setActiveEntitiesForBusiness] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,6 +111,9 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
 
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(dniSchema),
     defaultValues: { dni: "" },
@@ -123,6 +125,11 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   });
 
   const fetchBusinessDataById = useCallback(async (id: string) => {
+    if (!id || id.trim() === "") {
+        setError("ID de negocio inválido.");
+        setIsLoading(false);
+        return;
+    }
     setIsLoading(true);
     setError(null);
     console.log("BusinessPage (Client - by ID): Fetching business with ID:", id);
@@ -133,104 +140,101 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
 
       if (!businessSnap.exists()) {
         console.error("BusinessPage (Client - by ID): No business found for ID:", id);
-        setError(`Negocio no encontrado. Verifica que el ID (${id}) sea correcto.`);
+        setError(`Negocio no encontrado.`);
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
-        setIsLoading(false);
-        return;
-      }
-      
-      const bizData = businessSnap.data();
-      const fetchedBusiness: Business = {
-        id: businessSnap.id,
-        name: bizData.name || "Nombre de Negocio Desconocido",
-        contactEmail: bizData.contactEmail || "",
-        joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : (bizData.joinDate ? String(bizData.joinDate) : new Date().toISOString()),
-        customUrlPath: bizData.customUrlPath || undefined,
-        logoUrl: bizData.logoUrl || undefined,
-        publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
-        slogan: bizData.slogan || undefined,
-        publicContactEmail: bizData.publicContactEmail || undefined,
-        publicPhone: bizData.publicPhone || undefined,
-        publicAddress: bizData.publicAddress || undefined,
-      };
-      
-      if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "" && fetchedBusiness.customUrlPath.trim() !== id) {
-         // Only redirect if customUrlPath is different from the current businessId to avoid loops
-        console.log(`BusinessPage (Client - by ID): Business ${id} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
-        router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-        return; 
-      }
-      
-      setBusinessDetails(fetchedBusiness);
-      console.log("BusinessPage (Client - by ID): Business data found (rendering here):", fetchedBusiness.name, "ID:", fetchedBusiness.id);
-
-      const entitiesQuery = query(
-        collection(db, "businessEntities"),
-        where("businessId", "==", fetchedBusiness.id),
-        where("isActive", "==", true)
-      );
-      const entitiesSnapshot = await getDocs(entitiesQuery);
-      console.log(`BusinessPage (Client - by ID): Fetched ${entitiesSnapshot.docs.length} active entities for business ${fetchedBusiness.id}.`);
-      
-      const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
-      entitiesSnapshot.forEach(docSnap => {
-        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & { startDate: Timestamp | string | Date, endDate: Timestamp | string | Date, createdAt?: Timestamp | string | Date };
-        
-        let startDateStr: string;
-        let endDateStr: string;
-        const nowStr = new Date().toISOString();
-
-        if (entityData.startDate instanceof Timestamp) {
-            startDateStr = entityData.startDate.toDate().toISOString();
-        } else if (typeof entityData.startDate === 'string') {
-            startDateStr = entityData.startDate;
-        } else if (entityData.startDate instanceof Date) {
-            startDateStr = entityData.startDate.toISOString();
-        } else {
-            console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
-            startDateStr = nowStr; 
-        }
-
-        if (entityData.endDate instanceof Timestamp) {
-            endDateStr = entityData.endDate.toDate().toISOString();
-        } else if (typeof entityData.endDate === 'string') {
-            endDateStr = entityData.endDate;
-        } else if (entityData.endDate instanceof Date) {
-            endDateStr = entityData.endDate.toISOString();
-        } else {
-            console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
-            endDateStr = nowStr; 
-        }
-        
-        const entityForCheck: BusinessManagedEntity = {
-          id: docSnap.id,
-          businessId: entityData.businessId,
-          type: entityData.type,
-          name: entityData.name || "Entidad sin nombre",
-          description: entityData.description || "",
-          startDate: startDateStr,
-          endDate: endDateStr,
-          isActive: entityData.isActive === undefined ? true : entityData.isActive,
-          usageLimit: entityData.usageLimit || 0,
-          maxAttendance: entityData.maxAttendance || 0,
-          ticketTypes: Array.isArray(entityData.ticketTypes) ? entityData.ticketTypes.map(tt => sanitizeObjectForFirestore({...tt})) : [],
-          eventBoxes: Array.isArray(entityData.eventBoxes) ? entityData.eventBoxes.map(eb => sanitizeObjectForFirestore({...eb})) : [],
-          assignedPromoters: Array.isArray(entityData.assignedPromoters) ? entityData.assignedPromoters.map(ap => sanitizeObjectForFirestore({...ap})) : [],
-          generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
-          imageUrl: entityData.imageUrl,
-          aiHint: entityData.aiHint,
-          termsAndConditions: entityData.termsAndConditions,
-          createdAt: entityData.createdAt instanceof Timestamp 
-            ? entityData.createdAt.toDate().toISOString() 
-            : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
+      } else {
+        const bizData = businessSnap.data();
+        const fetchedBusiness: Business = {
+          id: businessSnap.id,
+          name: bizData.name || "Nombre de Negocio Desconocido",
+          contactEmail: bizData.contactEmail || "",
+          joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : (bizData.joinDate ? String(bizData.joinDate) : new Date().toISOString()),
+          customUrlPath: bizData.customUrlPath || undefined,
+          logoUrl: bizData.logoUrl || undefined,
+          publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
+          slogan: bizData.slogan || undefined,
+          publicContactEmail: bizData.publicContactEmail || undefined,
+          publicPhone: bizData.publicPhone || undefined,
+          publicAddress: bizData.publicAddress || undefined,
         };
-
-        if (isEntityCurrentlyActivatable(entityForCheck)) {
-          allActiveAndCurrentEntities.push(entityForCheck);
+        
+        if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "" && fetchedBusiness.id === id) {
+           console.log(`BusinessPage (Client - by ID): Business ${id} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
+           router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
+           return; // Stop further processing as we are redirecting
         }
-      });
-      setActiveEntitiesForBusiness(allActiveAndCurrentEntities.sort((a,b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()));
+      
+        setBusinessDetails(fetchedBusiness);
+        console.log("BusinessPage (Client - by ID): Business data found (rendering here):", fetchedBusiness.name, "ID:", fetchedBusiness.id);
+
+        const entitiesQuery = query(
+            collection(db, "businessEntities"),
+            where("businessId", "==", fetchedBusiness.id),
+            where("isActive", "==", true)
+        );
+        const entitiesSnapshot = await getDocs(entitiesQuery);
+        console.log(`BusinessPage (Client - by ID): Fetched ${entitiesSnapshot.docs.length} active entities for business ${fetchedBusiness.id}.`);
+        
+        const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
+        entitiesSnapshot.forEach(docSnap => {
+            const entityData = docSnap.data();
+            
+            let startDateStr: string;
+            let endDateStr: string;
+            const nowStr = new Date().toISOString();
+
+            if (entityData.startDate instanceof Timestamp) {
+                startDateStr = entityData.startDate.toDate().toISOString();
+            } else if (typeof entityData.startDate === 'string') {
+                startDateStr = entityData.startDate;
+            } else if (entityData.startDate instanceof Date) {
+                startDateStr = entityData.startDate.toISOString();
+            } else {
+                console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
+                startDateStr = nowStr; 
+            }
+
+            if (entityData.endDate instanceof Timestamp) {
+                endDateStr = entityData.endDate.toDate().toISOString();
+            } else if (typeof entityData.endDate === 'string') {
+                endDateStr = entityData.endDate;
+            } else if (entityData.endDate instanceof Date) {
+                endDateStr = entityData.endDate.toISOString();
+            } else {
+                console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
+                endDateStr = nowStr; 
+            }
+            
+            const entityForCheck: BusinessManagedEntity = {
+              id: docSnap.id,
+              businessId: entityData.businessId,
+              type: entityData.type,
+              name: entityData.name || "Entidad sin nombre",
+              description: entityData.description || "",
+              startDate: startDateStr,
+              endDate: endDateStr,
+              isActive: entityData.isActive === undefined ? true : entityData.isActive,
+              usageLimit: entityData.usageLimit || 0,
+              maxAttendance: entityData.maxAttendance || 0,
+              ticketTypes: Array.isArray(entityData.ticketTypes) ? entityData.ticketTypes.map((tt: any) => sanitizeObjectForFirestore({...tt})) : [],
+              eventBoxes: Array.isArray(entityData.eventBoxes) ? entityData.eventBoxes.map((eb: any) => sanitizeObjectForFirestore({...eb})) : [],
+              assignedPromoters: Array.isArray(entityData.assignedPromoters) ? entityData.assignedPromoters.map((ap: any) => sanitizeObjectForFirestore({...ap})) : [],
+              generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes.map((gc: any) => sanitizeObjectForFirestore({...gc})) : [],
+              imageUrl: entityData.imageUrl,
+              aiHint: entityData.aiHint,
+              termsAndConditions: entityData.termsAndConditions,
+              createdAt: entityData.createdAt instanceof Timestamp 
+                ? entityData.createdAt.toDate().toISOString() 
+                : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
+            };
+
+            if (isEntityCurrentlyActivatable(entityForCheck)) {
+              allActiveAndCurrentEntities.push(entityForCheck);
+            }
+        });
+        setActiveEntitiesForBusiness(allActiveAndCurrentEntities.sort((a,b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()));
+      }
     } catch (err: any) {
       console.error("BusinessPage (Client - by ID): Error fetching business data by ID:", err);
       setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
@@ -239,7 +243,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     } finally {
       setIsLoading(false);
     }
-  }, [router, toast]); 
+  }, [router]); // Removed toast from dependencies, as it's stable
 
   useEffect(() => {
     if (businessIdFromParams) {
@@ -260,7 +264,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         toast({title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive"});
         return;
     }
-    if (!entity.generatedCodes) {
+    if (!entity.generatedCodes || entity.generatedCodes.length === 0) { // Check if array exists and is not empty
       toast({title: "Sin Códigos", description: `Esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} no tiene códigos creados.`, variant: "destructive"});
       return;
     }
@@ -326,11 +330,13 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
           description: activeEntityForQr.description,
           validUntil: activeEntityForQr.endDate,
           imageUrl: activeEntityForQr.imageUrl || "",
+          promoCode: validatedSpecificCode, 
           aiHint: activeEntityForQr.aiHint || "",
           type: activeEntityForQr.type,
+          termsAndConditions: activeEntityForQr.termsAndConditions,
         };
 
-        setQrData({ user: clientForQr, entityDetails: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
+        setQrData({ user: clientForQr, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
         setPageViewState('qrDisplay');
     } catch(e: any) {
         console.error("Error verificando DNI:", e);
@@ -377,10 +383,12 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
             description: activeEntityForQr.description,
             validUntil: activeEntityForQr.endDate,
             imageUrl: activeEntityForQr.imageUrl || "",
+            promoCode: validatedSpecificCode, 
             aiHint: activeEntityForQr.aiHint || "",
             type: activeEntityForQr.type,
+            termsAndConditions: activeEntityForQr.termsAndConditions,
         };
-      setQrData({ user: registeredClient, entityDetails: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
+      setQrData({ user: registeredClient, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: 'available' });
       setShowDniModal(false);
       setPageViewState('qrDisplay');
       toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
@@ -460,7 +468,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   }, [qrData, pageViewState, toast]);
 
   const handleSaveQrWithDetails = async () => {
-    if (!qrData || !qrData.user || !qrData.entityDetails || !generatedQrDataUrl || !businessDetails) {
+    if (!qrData || !qrData.user || !qrData.promotion || !generatedQrDataUrl || !businessDetails) {
       toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
       return;
     }
@@ -472,122 +480,187 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     }
 
     const padding = 20;
-    const qrSize = 180;
+    const qrSize = 180; 
     const maxLogoHeight = 50;
     const spacingAfterLogo = 20;
-    const businessNameFontSize = 16;
-    const spacingAfterBusinessName = 40;
-    const entityTitleFontSize = 20;
-    const spacingAfterEntityTitle = 15;
+    const businessNameFontSize = 14; 
+    const spacingAfterBusinessName = 15; 
+    const entityTitleFontSize = 20; 
+    const spacingAfterEntityTitle = 15; 
     const userDetailsFontSize = 16;
     const smallTextFontSize = 10;
     const lineSpacing = 5;
-    const canvasWidth = 320;
+    const canvasWidth = 320; 
 
-    let currentY = padding;
+    let currentY = 0;
     const businessLogo = new Image();
     businessLogo.crossOrigin = "anonymous";
+    
+    let initialEstimatedHeight = padding + maxLogoHeight + spacingAfterLogo + businessNameFontSize + spacingAfterBusinessName + entityTitleFontSize + spacingAfterEntityTitle + qrSize + padding + userDetailsFontSize + lineSpacing + userDetailsFontSize + padding + smallTextFontSize + lineSpacing + padding;
+    if (qrData.promotion.termsAndConditions) {
+      initialEstimatedHeight += 50;
+    }
+    canvas.height = initialEstimatedHeight; 
 
     const drawContent = () => {
-        currentY = 0; 
+      ctx.fillStyle = 'hsl(280, 13%, 96%)'; 
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      currentY = 0;
 
-        const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
-        ctx.fillStyle = 'hsl(var(--primary))';
-        ctx.fillRect(0, currentY, canvas.width, headerBgHeight);
-        currentY += padding;
+      const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
+      ctx.fillStyle = 'hsl(var(--primary))'; 
+      ctx.fillRect(0, currentY, canvas.width, headerBgHeight);
+      currentY += padding; 
 
-        if (businessDetails.logoUrl) {
-            const aspectRatio = businessLogo.width / businessLogo.height;
-            let logoHeight = businessLogo.height;
-            let logoWidth = businessLogo.width;
+      if (businessDetails.logoUrl) {
+        const aspectRatio = businessLogo.width / businessLogo.height;
+        let logoHeight = businessLogo.height;
+        let logoWidth = businessLogo.width;
 
-            if (logoHeight > maxLogoHeight) {
-                logoHeight = maxLogoHeight;
-                logoWidth = logoHeight * aspectRatio;
-            }
-            if (logoWidth > canvas.width - 2 * padding) {
-                logoWidth = canvas.width - 2 * padding;
-                logoHeight = logoWidth / aspectRatio;
-            }
-            ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
-            currentY += logoHeight + spacingAfterLogo / 2;
-        } else {
-            currentY += maxLogoHeight + spacingAfterLogo / 2; 
+        if (logoHeight > maxLogoHeight) {
+          logoHeight = maxLogoHeight;
+          logoWidth = logoHeight * aspectRatio;
         }
-        
-        ctx.fillStyle = 'hsl(var(--primary-foreground))';
-        ctx.font = `${businessNameFontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
-        currentY = headerBgHeight; 
-        currentY += spacingAfterBusinessName / 2;
+        if (logoWidth > canvas.width / 2 - padding) { 
+            logoWidth = canvas.width / 2 - padding;
+            logoHeight = logoWidth / aspectRatio;
+        }
+        ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight); 
+        currentY += logoHeight + spacingAfterLogo / 2 ; 
+      } else {
+        currentY += maxLogoHeight + spacingAfterLogo / 2; 
+      }
+      
+      ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
+      ctx.font = `bold ${businessNameFontSize}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
+      currentY += businessNameFontSize + padding / 2; 
+      
+      currentY = headerBgHeight; 
+      currentY += spacingAfterBusinessName; 
+
+      ctx.fillStyle = 'hsl(var(--primary))';
+      ctx.font = `bold ${entityTitleFontSize}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
+      currentY += entityTitleFontSize + spacingAfterEntityTitle;
+
+      const qrImage = new Image();
+      qrImage.onload = () => {
+        const qrX = (canvas.width - qrSize) / 2;
+        ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
+        ctx.strokeStyle = 'hsl(var(--primary))';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
+        currentY += qrSize + padding;
 
         ctx.fillStyle = 'hsl(var(--primary))';
-        ctx.font = `bold ${entityTitleFontSize}px Arial`;
+        ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText(qrData.entityDetails.title, canvas.width / 2, currentY);
-        currentY += entityTitleFontSize + spacingAfterEntityTitle;
+        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
+        currentY += (userDetailsFontSize + 2) + lineSpacing;
 
-        const qrImage = new Image();
-        qrImage.onload = () => {
-            const qrX = (canvas.width - qrSize) / 2;
-            ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
-            ctx.strokeStyle = 'hsl(var(--primary))';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-            currentY += qrSize + padding;
+        ctx.fillStyle = 'hsl(var(--foreground))';
+        ctx.font = `${userDetailsFontSize - 2}px Arial`;
+        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+        currentY += (userDetailsFontSize - 2) + padding;
 
-            ctx.fillStyle = 'hsl(var(--primary))';
-            ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
-            ctx.textAlign = 'center';
-            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
-            currentY += (userDetailsFontSize + 2) + lineSpacing;
-
-            ctx.fillStyle = 'hsl(var(--foreground))';
-            ctx.font = `${userDetailsFontSize - 2}px Arial`;
-            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
-            currentY += (userDetailsFontSize - 2) + padding;
-
-            ctx.font = `italic ${smallTextFontSize}px Arial`;
+        ctx.font = `italic ${smallTextFontSize}px Arial`;
+        ctx.fillStyle = 'hsl(var(--muted-foreground))';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+        currentY += smallTextFontSize + lineSpacing + 15;
+        
+        if (qrData.promotion.termsAndConditions) {
+            ctx.font = `italic ${smallTextFontSize -1}px Arial`;
             ctx.fillStyle = 'hsl(var(--muted-foreground))';
             ctx.textAlign = 'center';
-            ctx.fillText(`Válido hasta: ${format(parseISO(qrData.entityDetails.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
-            currentY += smallTextFontSize + lineSpacing + 15;
-            
-            canvas.height = currentY; 
-            const finalCanvas = document.createElement('canvas');
-            const finalCtx = finalCanvas.getContext('2d');
-            if(!finalCtx) return;
-            finalCanvas.width = canvas.width;
-            finalCanvas.height = canvas.height;
-            finalCtx.fillStyle = 'hsl(280, 13%, 96%)'; 
-            finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-            finalCtx.drawImage(canvas, 0,0); 
+            const termsLines = qrData.promotion.termsAndConditions.split('\n');
+            termsLines.forEach(line => {
+                ctx.fillText(line, canvas.width / 2, currentY);
+                currentY += smallTextFontSize + 2;
+            });
+            currentY += padding / 2;
+        }
+        
+        canvas.height = currentY;
+        ctx.fillStyle = 'hsl(280, 13%, 96%)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'hsl(var(--primary))';
+        ctx.fillRect(0, 0, canvas.width, headerBgHeight);
+        let redrawY = padding;
+        if (businessDetails.logoUrl) {
+             const aspectRatio = businessLogo.width / businessLogo.height;
+            let logoHeight = businessLogo.height;
+            let logoWidth = businessLogo.width;
+            if (logoHeight > maxLogoHeight) { logoHeight = maxLogoHeight; logoWidth = logoHeight * aspectRatio; }
+            if (logoWidth > canvas.width / 2 - padding) { logoWidth = canvas.width / 2 - padding; logoHeight = logoWidth / aspectRatio; }
+            ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, redrawY, logoWidth, logoHeight);
+            redrawY += logoHeight + spacingAfterLogo / 2;
+        } else { redrawY += maxLogoHeight + spacingAfterLogo / 2; }
+        ctx.fillStyle = 'hsl(var(--primary-foreground))';
+        ctx.font = `bold ${businessNameFontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText(businessDetails.name, canvas.width / 2, redrawY);
+        redrawY = headerBgHeight + spacingAfterBusinessName;
+        ctx.fillStyle = 'hsl(var(--primary))';
+        ctx.font = `bold ${entityTitleFontSize}px Arial`;
+        ctx.fillText(qrData.promotion.title, canvas.width / 2, redrawY);
+        redrawY += entityTitleFontSize + spacingAfterEntityTitle;
+        ctx.drawImage(qrImage, qrX, redrawY, qrSize, qrSize);
+        ctx.strokeStyle = 'hsl(var(--primary))';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(qrX - 2, redrawY - 2, qrSize + 4, qrSize + 4);
+        redrawY += qrSize + padding;
+        ctx.fillStyle = 'hsl(var(--primary))';
+        ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
+        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, redrawY);
+        redrawY += (userDetailsFontSize + 2) + lineSpacing;
+        ctx.fillStyle = 'hsl(var(--foreground))';
+        ctx.font = `${userDetailsFontSize - 2}px Arial`;
+        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, redrawY);
+        redrawY += (userDetailsFontSize - 2) + padding;
+        ctx.font = `italic ${smallTextFontSize}px Arial`;
+        ctx.fillStyle = 'hsl(var(--muted-foreground))';
+        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, redrawY);
+        redrawY += smallTextFontSize + lineSpacing + 15;
+        if (qrData.promotion.termsAndConditions) {
+            ctx.font = `italic ${smallTextFontSize -1}px Arial`;
+            ctx.fillStyle = 'hsl(var(--muted-foreground))';
+            termsLines.forEach(line => {
+                ctx.fillText(line, canvas.width / 2, redrawY);
+                redrawY += smallTextFontSize + 2;
+            });
+        }
 
-            const dataUrl = finalCanvas.toDataURL('image/png');
-            const linkElement = document.createElement('a');
-            linkElement.href = dataUrl;
-            linkElement.download = `SocioVIP_QR_${qrData.entityDetails.type}_${qrData.code}.png`;
-            document.body.appendChild(linkElement);
-            linkElement.click();
-            document.body.removeChild(linkElement);
-            toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
-        };
-        qrImage.onerror = () => {
-            toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
-        };
-        if (generatedQrDataUrl) qrImage.src = generatedQrDataUrl;
-        else toast({ title: "Error", description: "URL de QR no generada aún.", variant: "destructive" });
+        const dataUrl = canvas.toDataURL('image/png');
+        const linkElement = document.createElement('a');
+        linkElement.href = dataUrl;
+        const entityTypeForFilename = qrData.promotion.type === 'event' ? 'Evento' : 'Promo';
+        linkElement.download = `SocioVIP_QR_${entityTypeForFilename}_${qrData.code}.png`;
+        document.body.appendChild(linkElement);
+        linkElement.click();
+        document.body.removeChild(linkElement);
+        toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
+      };
+      qrImage.onerror = () => {
+        toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
+      };
+      if (generatedQrDataUrl) qrImage.src = generatedQrDataUrl;
+      else toast({ title: "Error", description: "URL de QR no generada aún.", variant: "destructive" });
     };
 
-    if (businessDetails?.logoUrl) {
-        businessLogo.onload = () => {}; // No need to call drawContent here
-        businessLogo.onerror = () => {
-            console.warn("Logo del negocio no se pudo cargar para la descarga. Se procederá sin él.");
-        };
-        businessLogo.src = businessDetails.logoUrl;
+    if (businessDetails.logoUrl) {
+      businessLogo.onload = drawContent;
+      businessLogo.onerror = () => {
+        console.warn("Logo del negocio no se pudo cargar para la descarga. Se procederá sin él.");
+        drawContent(); 
+      };
+      businessLogo.src = businessDetails.logoUrl;
+    } else {
+      drawContent(); 
     }
-    // Draw content is initiated by qrImage.onload
   };
 
   const resetQrFlow = () => {
@@ -641,11 +714,12 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     );
   };
 
-  if (!businessIdFromParams) { // Moved this check here, as it's fundamental
-    return (
+  if (!businessIdFromParams && !isLoading) {
+     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
           <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no proporcionado en la URL</h1>
+          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no recibido por el componente cliente</h1>
+          <p className="text-muted-foreground mt-2">El componente que muestra esta página no recibió un ID de negocio.</p>
           <Link href="/" passHref>
             <Button variant="link" className="mt-6 text-primary">Volver a la Página Principal</Button>
           </Link>
@@ -653,12 +727,14 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     );
   }
 
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
-         <div className="absolute top-0 left-0 right-0 p-4 bg-background border-b">
-         </div>
-        <div className="flex flex-col items-center justify-center flex-grow pt-20">
+        <div className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full flex items-center justify-between">
+           {/* Header mínimo durante la carga */}
+        </div>
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
             <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
         </div>
@@ -669,9 +745,10 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-         <div className="absolute top-0 left-0 right-0 p-4 bg-background border-b">
-         </div>
-        <div className="flex flex-col items-center justify-center flex-grow pt-20">
+        <div className="flex items-center justify-between w-full max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+         {/* Header mínimo en error */}
+        </div>
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
             <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-destructive">{error}</h1>
             <p className="text-muted-foreground mt-2">ID de Negocio intentado: {businessIdFromParams}</p>
@@ -686,9 +763,10 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   if (!businessDetails && !isLoading && !error) { 
      return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-         <div className="absolute top-0 left-0 right-0 p-4 bg-background border-b">
+         <div className="flex items-center justify-between w-full max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          {/* Header mínimo */}
          </div>
-        <div className="flex flex-col items-center justify-center flex-grow pt-20">
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
             <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
             <p className="text-muted-foreground mt-2">No se encontró un negocio con el ID: "{businessIdFromParams}". Verifica que la URL sea correcta.</p>
@@ -703,6 +781,17 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
+             <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+                <div className="max-w-7xl mx-auto flex items-center justify-start">
+                    {businessDetails.logoUrl && (
+                        <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
+                    )}
+                    <div>
+                        <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
+                        {businessDetails.slogan && <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>}
+                    </div>
+                </div>
+            </header>
             <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
                 <Card className="w-full max-w-md shadow-xl">
                     <CardHeader className="text-center">
@@ -737,7 +826,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                             <Download className="mr-2 h-4 w-4" /> Guardar QR con Detalles
                         </Button>
                         <Button onClick={resetQrFlow} className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
-                             Ver Otras Promociones/Eventos
+                             Ver Otras del Negocio
                         </Button>
                     </CardFooter>
                 </Card>
@@ -780,7 +869,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                 </div>
                 <div className="text-muted-foreground">
                     <Link href="/" className="hover:text-primary hover:underline">
-                    Plataforma de sociosvip.app
+                     Plataforma de sociosvip.app
                     </Link>
                 </div>
                 </div>
@@ -789,8 +878,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     );
   }
 
-  // Fallback para asegurar que businessDetails no es null antes de usarlo extensivamente
-  if (!businessDetails) {
+  if (!businessDetails) { // Debería estar cubierto por el !businessDetails && !isLoading arriba
     return null; 
   }
 
@@ -800,44 +888,18 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-             {/* Header de la página del negocio - Sin branding de SocioVIP */}
+            <div className="max-w-7xl mx-auto flex items-center justify-start">
+                {businessDetails.logoUrl && (
+                  <Image src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-auto object-contain rounded mr-3"/>
+                )}
+                <div>
+                  <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
+                  {businessDetails.slogan && <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>}
+                </div>
+            </div>
         </header>
-
-        {businessDetails.publicCoverImageUrl && (
-          <div className="relative h-48 md:h-64 lg:h-80 w-full">
-            <Image
-              src={businessDetails.publicCoverImageUrl}
-              alt={`Portada de ${businessDetails.name}`}
-              fill
-              priority
-              className="object-cover"
-              data-ai-hint="business cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-black/10"></div>
-          </div>
-        )}
-        <div className={`max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 ${businessDetails.publicCoverImageUrl ? '-mt-16 md:-mt-20' : 'pt-12 pb-6'} relative z-10`}>
-          <Card className="shadow-xl bg-card/90 backdrop-blur-sm">
-            <CardContent className="p-4 md:p-6 flex flex-col sm:flex-row items-center gap-4 md:gap-6">
-              {businessDetails.logoUrl && (
-                <Image
-                  src={businessDetails.logoUrl}
-                  alt={`Logo de ${businessDetails.name}`}
-                  width={100}
-                  height={100}
-                  className="rounded-md object-contain h-20 w-20 sm:h-24 sm:w-24 border bg-background p-1 shadow-md"
-                  data-ai-hint="business logo"
-                />
-              )}
-              <div className="text-center sm:text-left">
-                <h1 className="text-3xl md:text-4xl font-bold text-primary">{businessDetails.name}</h1>
-                {businessDetails.slogan && <p className="text-md text-muted-foreground mt-1">{businessDetails.slogan}</p>}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow">
+        
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
         {events.length > 0 && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
@@ -1014,7 +1076,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                         {...field} 
                         onBlur={(e) => handleNewUserDniChangeDuringRegistration(e.target.value, newQrClientForm.getValues())}
                         maxLength={15} 
-                        disabled={isLoadingQrFlow || true} // DNI no editable en este paso
+                        disabled={isLoadingQrFlow || true} 
                         className="disabled:bg-muted/30"
                       />
                     </FormControl>
@@ -1071,11 +1133,13 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
       </Dialog>
 
       <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
-        <AlertDialogContent>
-          <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
-          <AlertDialogDescription>
-              El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
-          </AlertDialogDescription>
+         <AlertDialogContent>
+           <AlertDialogHeader>
+            <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
+            <AlertDialogDescription>
+                El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
+            </AlertDialogDescription>
+           </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
             <AlertDialogCancel onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dni", ""); }}>No, corregir DNI</AlertDialogCancel>
             <AlertDialogAction onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</AlertDialogAction>
