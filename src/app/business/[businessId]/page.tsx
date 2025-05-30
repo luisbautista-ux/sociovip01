@@ -1,133 +1,91 @@
 
-// This file serves as the fallback if a business doesn't have a customUrlPath.
-// Its content will be very similar to /b/[customUrlPath]/page.tsx,
-// but it will fetch business details by businessId from the params.
+"use client";
 
-import { redirect } from 'next/navigation'
+// This file serves as the fallback if a business doesn't have a customUrlPath,
+// or if accessed directly via its ID.
+// It renders the business page content. If the business has a customUrlPath,
+// it will redirect to /b/[customUrlPath].
+
+import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation"; // Added useRouter import
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
-import type { Business } from "@/lib/types";
+import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
+import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData, PromotionDetails } from "@/lib/types";
+import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
+import { es } from "date-fns/locale";
+import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
+import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit } from "lucide-react";
+import { SocioVipLogo } from "@/components/icons";
+import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription, DialogFooter as ShadcnDialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle as UIAlertTitle } from "@/components/ui/alert";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+import QRCode from 'qrcode';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
-// This is a Server Component
-export default async function BusinessPublicPageById({ params }: { params: { businessId: string } }) {
+
+const specificCodeFormSchema = z.object({
+  specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
+});
+type SpecificCodeFormValues = z.infer<typeof specificCodeFormSchema>;
+
+const dniSchema = z.object({
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+});
+type DniFormValues = z.infer<typeof dniSchema>;
+
+const newQrClientSchema = z.object({
+  name: z.string().min(2, { message: "Nombre es requerido." }),
+  surname: z.string().min(2, { message: "Apellido es requerido." }),
+  phone: z.string().min(7, { message: "Celular es requerido." }).regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
+  dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
+  dniConfirm: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+});
+type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
+
+
+export default function BusinessPublicPageById({ params }: { params: { businessId: string } }) {
+  // This outer component is a Server Component by default in App Router if no "use client"
+  // It immediately renders the client component below.
+  // The "use client" directive is in BusinessPageClientComponent.
+  console.log("Business Public Page by ID - Server Component Shell. businessId from params:", params.businessId);
   if (!params.businessId) {
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-            <h1 className="text-2xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
-            <p className="text-muted-foreground">No se puede cargar la página del negocio sin un ID.</p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
+          <p className="text-muted-foreground mt-2">No se puede cargar la página del negocio sin un ID.</p>
+          <Link href="/" passHref>
+            <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
+          </Link>
+      </div>
     );
   }
-
-  const businessDocRef = doc(db, "businesses", params.businessId);
-  const businessSnap = await getDoc(businessDocRef);
-
-  if (!businessSnap.exists()) {
-     return (
-        <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-            <h1 className="text-2xl font-bold text-destructive">Negocio No Encontrado</h1>
-            <p className="text-muted-foreground">No se encontró un negocio con el ID: {params.businessId}</p>
-        </div>
-    );
-  }
-
-  const businessDetails = { id: businessSnap.id, ...businessSnap.data() } as Business;
-
-  // If this business HAS a customUrlPath, redirect to it for a canonical URL.
-  if (businessDetails.customUrlPath && businessDetails.customUrlPath.trim() !== "") {
-    return redirect(`/b/${businessDetails.customUrlPath.trim()}`);
-  }
-
-  // If it reaches here, it means the business exists but has NO customUrlPath.
-  // We should render a version of the business page, but this indicates a configuration gap
-  // as ideally all businesses should have a customUrlPath or a clear fallback display.
-  // For now, we will redirect to a generic "not found" or home, as the /b/[customUrlPath] is the canonical one.
-  // Or, we could implement the full page logic here just like in /b/[customUrlPath]/page.tsx
-  // For simplicity in this step, and to enforce custom URLs, let's redirect if no custom path.
-  // However, a more user-friendly approach would be to render its content using its ID.
-  // Given the request to ALWAYS have a working link, we will render its content.
-  // To do this properly, this page needs to be converted to "use client" and fetch its own entities.
-  // Or, pass all necessary data as props if we keep it a Server Component.
-  // The structure of `/b/[customUrlPath]/page.tsx` is client-side for interactivity.
-  // We will redirect to `/` if no customUrlPath for now, as the main display logic is in the client component.
-  // A true fallback would mean replicating a lot of the client-side logic here or passing massive props.
-
-  // For a true fallback page that renders content, this component would need to be "use client"
-  // and fetch its own entities, similar to how /b/[customUrlPath]/page.tsx does.
-  // The user request implies this page SHOULD render content if no customUrlPath.
-  // This means we need to make this page a client component and fetch data.
-  // OR, for now, redirect to a page that signals this issue.
-  // Given the complexity and the desire for a working link *always*, the best path
-  // is to have this page mirror the functionality of /b/[customUrlPath]/page.tsx,
-  // but fetch based on businessId.
-
-  // For now, redirecting to home if no custom URL, as requested to simplify and ensure custom URLs are primary.
-  // But the user's last request implies this fallback *must* work.
-  // The previous XML for /b/[customUrlPath]/page.tsx actually handles being a client component.
-  // We will make this page effectively a wrapper that redirects to /b/[customUrlPath] if available,
-  // otherwise, it should ideally render the content of /b/[customUrlPath]/page.tsx by passing businessId.
-  // This is difficult without making this a client component or having a shared layout component.
-
-  // Correct approach based on request: If no customUrlPath, this page itself should behave like /b/[customUrlPath]
-  // but fetching data via businessId. This means this page needs to be a client component.
-  // However, I cannot change a file to be "use client" AND provide its new full content if it wasn't client before.
-  // The previous /b/[customUrlPath]/page.tsx is already a client component.
-  // The most straightforward solution is to have /b/[customUrlPath]/page.tsx handle BOTH cases:
-  // if params.customUrlPath is an ID, fetch by ID; if it's a path, fetch by path.
-  // This is NOT what Next.js routing is designed for.
-
-  // The most robust solution is to have two distinct dynamic routes and they share a common UI component.
-  // 1. /b/[customUrlPath]/page.tsx (fetches by customUrlPath)
-  // 2. /business/[businessId]/page.tsx (fetches by businessId)
-
-  // This file `/business/[businessId]/page.tsx` will now be the client component rendering the page.
-  // The logic will be very similar to the one I will provide for `/b/[customUrlPath]/page.tsx`.
-  // I will provide the corrected `/b/[customUrlPath]/page.tsx` which will be similar to this.
-
-  // For this file, we will copy the content of the corrected /b/[customUrlPath]/page.tsx
-  // and adapt its data fetching to use params.businessId.
-
-  // Since the request is to make the /business/[businessId] route functional,
-  // this component MUST become a client component and replicate the data fetching
-  // and UI logic of /b/[customUrlPath]/page.tsx, but using businessId.
-  
-  // REDIRECTING TO HOME if no customUrlPath is not what's desired by "button must always work".
-  // The page /business/[businessId]/page.tsx MUST render the business page.
-  // The simplest way is to make it a client component mirroring the one for customUrlPath.
-
-  // I will provide the full client component code for this page.
-  // The content will be almost identical to the corrected /b/[customUrlPath]/page.tsx,
-  // with the fetchBusinessData adapted to use businessId.
-  console.log("Business Public Page by ID - businessId from params:", params.businessId);
-  // This console log will appear on the server if the redirect doesn't happen.
-  // Given the latest request, this page MUST render the content.
-
-  // This will be filled with client component logic similar to /b/[customUrlPath]/page.tsx
-  // but fetching initial business details by ID.
-  // For the purpose of this response, I'll provide the structure for /b/[customUrlPath]/page.tsx
-  // which is the primary route. This /business/[businessId]/page.tsx
-  // should effectively be a client component that mirrors it, fetching by ID.
-  // The XML below will provide the code for this file to be a client component.
-
-  // To avoid duplicating a very large file content twice in one response,
-  // this file will now contain the client-side logic to render the business page
-  // using the businessId.
   return (
-    <BusinessPageClientComponent businessId={params.businessId} />
+    <BusinessPageClientComponent businessIdFromParams={params.businessId} />
   );
 }
 
-// Create a new client component to handle the actual rendering
-// This component will be almost identical to the content of /b/[customUrlPath]/page.tsx
-// but will fetch data based on businessId.
-
-function BusinessPageClientComponent({ businessId }: { businessId: string }) {
-  // All the state, useEffects, functions from /b/[customUrlPath]/page.tsx
-  // would be here, but fetchBusinessData would use businessId.
-  // For brevity, I will not duplicate the entire 500+ lines here.
-  // The actual /b/[customUrlPath]/page.tsx will be provided.
-  // This component shows the *intent* for the fallback route.
-
+// The actual page content is a client component to handle state and interactivity
+function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromParams: string }) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -159,21 +117,22 @@ function BusinessPageClientComponent({ businessId }: { businessId: string }) {
   });
 
   const fetchBusinessDataById = useCallback(async () => {
-    if (!businessId) {
-      setError("ID de Negocio no proporcionado.");
+    if (!businessIdFromParams) {
+      console.error("BusinessPage (Client): businessIdFromParams is missing.");
+      setError("ID de negocio no proporcionado para cargar la página.");
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     setError(null);
-    console.log("BusinessPage by ID: Fetching business with ID:", businessId);
+    console.log("BusinessPage (Client): Fetching business with ID:", businessIdFromParams);
 
     try {
-      const businessDocRef = doc(db, "businesses", businessId);
+      const businessDocRef = doc(db, "businesses", businessIdFromParams);
       const businessSnap = await getDoc(businessDocRef);
 
       if (!businessSnap.exists()) {
-        console.error("BusinessPage by ID: No business found for ID:", businessId);
+        console.error("BusinessPage (Client): No business found for ID:", businessIdFromParams);
         setError("Negocio no encontrado. Verifica que el ID sea correcto.");
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
@@ -191,25 +150,40 @@ function BusinessPageClientComponent({ businessId }: { businessId: string }) {
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
           publicAddress: bizData.publicAddress || undefined,
+          // Include other fields as needed
+          ruc: bizData.ruc,
+          razonSocial: bizData.razonSocial,
+          department: bizData.department,
+          province: bizData.province,
+          district: bizData.district,
+          address: bizData.address,
+          managerName: bizData.managerName,
+          managerDni: bizData.managerDni,
+          businessType: bizData.businessType,
         };
-        setBusinessDetails(fetchedBusiness);
-
-        // If business has a customUrlPath, redirect to it for canonical URL
+        
+        // Canonical URL redirection
         if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
+          console.log(`BusinessPage (Client): Business ${businessIdFromParams} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
           router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
           return; // Stop further execution as we are redirecting
         }
         
-        // Fetch entities for this business
+        setBusinessDetails(fetchedBusiness);
+        console.log("BusinessPage (Client): Business data found (no customUrlPath, rendering here):", fetchedBusiness.name, "ID:", fetchedBusiness.id);
+
         const entitiesQuery = query(
           collection(db, "businessEntities"),
           where("businessId", "==", fetchedBusiness.id),
           where("isActive", "==", true)
         );
         const entitiesSnapshot = await getDocs(entitiesQuery);
+        console.log(`BusinessPage (Client): Fetched ${entitiesSnapshot.docs.length} active entities for business ${fetchedBusiness.id}.`);
+        
         const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
           const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
+          
           let startDateStr: string;
           let endDateStr: string;
           const nowStr = new Date().toISOString();
@@ -218,22 +192,47 @@ function BusinessPageClientComponent({ businessId }: { businessId: string }) {
               startDateStr = entityData.startDate.toDate().toISOString();
           } else if (typeof entityData.startDate === 'string') {
               startDateStr = entityData.startDate;
-          } else { startDateStr = nowStr; }
+          } else if (entityData.startDate instanceof Date) {
+              startDateStr = entityData.startDate.toISOString();
+          } else {
+              console.warn(`BusinessPage (Client): Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
+              startDateStr = nowStr; 
+          }
 
           if (entityData.endDate instanceof Timestamp) {
               endDateStr = entityData.endDate.toDate().toISOString();
           } else if (typeof entityData.endDate === 'string') {
               endDateStr = entityData.endDate;
-          } else { endDateStr = nowStr; }
+          } else if (entityData.endDate instanceof Date) {
+              endDateStr = entityData.endDate.toISOString();
+          } else {
+              console.warn(`BusinessPage (Client): Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
+              endDateStr = nowStr; 
+          }
           
           const entityForCheck: BusinessManagedEntity = {
-            id: docSnap.id, businessId: entityData.businessId, type: entityData.type,
-            name: entityData.name || "Entidad", description: entityData.description || "",
-            startDate: startDateStr, endDate: endDateStr, isActive: entityData.isActive === undefined ? true : entityData.isActive,
+            id: docSnap.id,
+            businessId: entityData.businessId,
+            type: entityData.type,
+            name: entityData.name || "Entidad sin nombre",
+            description: entityData.description || "",
+            startDate: startDateStr,
+            endDate: endDateStr,
+            isActive: entityData.isActive === undefined ? true : entityData.isActive,
+            usageLimit: entityData.usageLimit || 0,
+            maxAttendance: entityData.maxAttendance || 0,
+            ticketTypes: entityData.ticketTypes || [],
+            eventBoxes: entityData.eventBoxes || [],
+            assignedPromoters: entityData.assignedPromoters || [],
             generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes : [],
-            imageUrl: entityData.imageUrl, aiHint: entityData.aiHint, termsAndConditions: entityData.termsAndConditions,
-            createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : String(entityData.createdAt || nowStr),
+            imageUrl: entityData.imageUrl,
+            aiHint: entityData.aiHint,
+            termsAndConditions: entityData.termsAndConditions,
+            createdAt: entityData.createdAt instanceof Timestamp 
+              ? entityData.createdAt.toDate().toISOString() 
+              : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
           };
+
           if (isEntityCurrentlyActivatable(entityForCheck)) {
             allActiveAndCurrentEntities.push(entityForCheck);
           }
@@ -241,74 +240,841 @@ function BusinessPageClientComponent({ businessId }: { businessId: string }) {
         setActiveEntitiesForBusiness(allActiveAndCurrentEntities.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
       }
     } catch (err: any) {
-      console.error("BusinessPage by ID: Error fetching business data:", err);
-      setError("No se pudo cargar la información del negocio.");
+      console.error("BusinessPage (Client): Error fetching business data by ID:", err);
+      setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
+      setBusinessDetails(null);
+      setActiveEntitiesForBusiness([]);
     } finally {
       setIsLoading(false);
     }
-  }, [businessId, router]);
+  }, [businessIdFromParams, router]);
 
   useEffect(() => {
     fetchBusinessDataById();
   }, [fetchBusinessDataById]);
 
-  // The rest of the component (handleInitiateQrFlow, handleDniSubmitInModal, etc., and the JSX)
-  // would be identical to the /b/[customUrlPath]/page.tsx content.
-  // To avoid massive duplication, I will omit it here but it should be
-  // copied from the corrected /b/[customUrlPath]/page.tsx.
-  // The key difference is `fetchBusinessDataById` and the initial check/redirect.
 
-  // ... (All the state and functions from /b/[customUrlPath]/page.tsx would go here) ...
-  // ... (The entire JSX from /b/[customUrlPath]/page.tsx would go here, starting from the main div) ...
+  const handleInitiateQrFlow = (entity: BusinessManagedEntity, codeInputValue: string) => {
+    const codeToValidate = codeInputValue.trim().toUpperCase();
+    if (!codeToValidate) {
+        toast({title: "Código Requerido", description: "Por favor, ingresa el código de 9 dígitos.", variant: "destructive"});
+        return;
+    }
+    if (codeToValidate.length !== 9) {
+        toast({title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive"});
+        return;
+    }
 
-  // Placeholder render for this component to avoid being empty
+    const foundCodeObject = entity.generatedCodes?.find(
+      (gc) => gc.value.toUpperCase() === codeToValidate && gc.status === 'available'
+    );
+
+    if (foundCodeObject) {
+      setActiveEntityForQr(entity);
+      setValidatedSpecificCode(codeToValidate); // Store the validated 9-digit code
+      setCurrentStepInModal('enterDni');
+      dniForm.reset({ dni: "" });
+      setShowDniModal(true);
+    } else {
+      toast({
+        title: "Código Inválido o No Disponible",
+        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'entrada'} o ya fue utilizado.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
+    if (!activeEntityForQr || !validatedSpecificCode || !businessDetails) {
+      toast({title: "Error interno", description:"Falta entidad activa, código validado o detalles del negocio.", variant: "destructive"});
+      return;
+    }
+    setIsLoadingQrFlow(true);
+    setEnteredDni(data.dni);
+
+    try {
+        const qrClientsRef = collection(db, "qrClients");
+        const q = query(qrClientsRef, where("dni", "==", data.dni), limit(1));
+        const querySnapshot = await getDocs(q);
+
+        let clientForQr: QrClient;
+
+        if (!querySnapshot.empty) {
+          const existingClientDoc = querySnapshot.docs[0];
+          const clientData = existingClientDoc.data();
+          clientForQr = {
+            id: existingClientDoc.id,
+            dni: clientData.dni,
+            name: clientData.name,
+            surname: clientData.surname,
+            phone: clientData.phone,
+            dob: clientData.dob instanceof Timestamp ? clientData.dob.toDate().toISOString() : String(clientData.dob),
+            registrationDate: clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate().toISOString() : String(clientData.registrationDate),
+          };
+          toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
+          setShowDniModal(false);
+        } else {
+          newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dniConfirm: data.dni });
+          setCurrentStepInModal('newUserForm');
+          setIsLoadingQrFlow(false); 
+          return; 
+        }
+        
+        const promotionDetails: PromotionDetails = {
+          id: activeEntityForQr.id,
+          title: activeEntityForQr.name,
+          description: activeEntityForQr.description,
+          validUntil: activeEntityForQr.endDate,
+          imageUrl: activeEntityForQr.imageUrl || "",
+          promoCode: validatedSpecificCode, 
+          type: activeEntityForQr.type,
+          termsAndConditions: activeEntityForQr.termsAndConditions,
+          aiHint: activeEntityForQr.aiHint || "",
+        };
+
+        setQrData({ user: clientForQr, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
+        setPageViewState('qrDisplay');
+    } catch(e: any) {
+        console.error("Error verificando DNI:", e);
+        toast({ title: "Error de Verificación", description: "No se pudo verificar el DNI. " + e.message, variant: "destructive" });
+    } finally {
+        if (currentStepInModal !== 'newUserForm') { 
+            setIsLoadingQrFlow(false);
+        }
+    }
+  };
+
+  const processNewQrClientRegistration = async (formData: NewQrClientFormValues) => {
+    if (!activeEntityForQr || !validatedSpecificCode || !enteredDni || !businessDetails) {
+         toast({title: "Error interno", description:"Falta información para registrar cliente.", variant: "destructive"});
+        return;
+    }
+    setIsLoadingQrFlow(true);
+
+    const newClientDataToSave = {
+      dni: enteredDni, 
+      name: formData.name,
+      surname: formData.surname,
+      phone: formData.phone,
+      dob: Timestamp.fromDate(formData.dob), 
+      registrationDate: serverTimestamp(),
+      generatedForBusinessId: businessDetails.id,
+      generatedForEntityId: activeEntityForQr.id, 
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, "qrClients"), sanitizeObjectForFirestore(newClientDataToSave));
+      const registeredClient: QrClient = {
+        id: docRef.id,
+        dni: newClientDataToSave.dni,
+        name: newClientDataToSave.name,
+        surname: newClientDataToSave.surname,
+        phone: newClientDataToSave.phone,
+        dob: newClientDataToSave.dob.toDate().toISOString(),
+        registrationDate: new Date().toISOString(), 
+      };
+       const promotionDetails: PromotionDetails = {
+            id: activeEntityForQr.id,
+            title: activeEntityForQr.name,
+            description: activeEntityForQr.description,
+            validUntil: activeEntityForQr.endDate,
+            imageUrl: activeEntityForQr.imageUrl || "",
+            promoCode: validatedSpecificCode, 
+            type: activeEntityForQr.type,
+            termsAndConditions: activeEntityForQr.termsAndConditions,
+            aiHint: activeEntityForQr.aiHint || "",
+        };
+      setQrData({ user: registeredClient, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
+      setShowDniModal(false);
+      setPageViewState('qrDisplay');
+      toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
+    } catch (e: any) {
+      console.error("Error adding new QrClient: ", e);
+      toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
+    } finally {
+        setIsLoadingQrFlow(false);
+    }
+  };
+  
+  const handleNewUserDniChangeDuringRegistration = async (newDniValue: string, currentFormData: NewQrClientFormValues): Promise<boolean> => {
+      const newDniCleaned = newDniValue.trim();
+      if (newDniCleaned === enteredDni) return true; 
+      if (newDniCleaned.length < 7 || newDniCleaned.length > 15) {
+          newQrClientForm.setError("dniConfirm", { type: "manual", message: "DNI/CE debe tener entre 7 y 15 caracteres."});
+          return false;
+      }
+      newQrClientForm.clearErrors("dniConfirm");
+
+      try {
+        setIsLoadingQrFlow(true);
+        const qrClientsRef = collection(db, "qrClients");
+        const q = query(qrClientsRef, where("dni", "==", newDniCleaned), limit(1));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            setFormDataForDniWarning(currentFormData); 
+            setEnteredDni(newDniCleaned); 
+            setShowDniExistsWarningDialog(true);
+            return false; 
+        }
+        setEnteredDni(newDniCleaned); 
+        return true; 
+      } catch (e: any) {
+        toast({ title: "Error al verificar DNI", description: e.message, variant: "destructive"});
+        return false;
+      } finally {
+        setIsLoadingQrFlow(false);
+      }
+  };
+
+  const handleDniExistsWarningConfirm = async () => {
+      setShowDniExistsWarningDialog(false);
+      dniForm.setValue("dni", enteredDni); 
+      await handleDniSubmitInModal({ dni: enteredDni });
+      setFormDataForDniWarning(null); 
+  };
+
+  const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormValues> = async (data) => {
+      if (data.dniConfirm.trim() !== enteredDni.trim()) {
+        const dniIsValidForCreation = await handleNewUserDniChangeDuringRegistration(data.dniConfirm, data);
+        if (dniIsValidForCreation) {
+            await processNewQrClientRegistration(data);
+        }
+      } else {
+        await processNewQrClientRegistration(data);
+      }
+  };
+  
+  useEffect(() => {
+    const generateQrImage = async () => {
+      if (pageViewState === 'qrDisplay' && qrData?.code) { 
+        try {
+          const dataUrl = await QRCode.toDataURL(qrData.code, { width: 250, errorCorrectionLevel: 'H', margin: 2 });
+          setGeneratedQrDataUrl(dataUrl);
+        } catch (err) {
+          console.error("Failed to generate QR code", err);
+          toast({ title: "Error", description: "No se pudo generar el código QR.", variant: "destructive" });
+          setGeneratedQrDataUrl(null);
+        }
+      } else {
+        setGeneratedQrDataUrl(null);
+      }
+    };
+    generateQrImage();
+  }, [qrData, pageViewState, toast]);
+
+  const handleSaveQrWithDetails = async () => {
+    if (!qrData || !qrData.user || !qrData.promotion || !generatedQrDataUrl || !businessDetails) {
+      toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      toast({ title: "Error", description: "No se pudo preparar la imagen para descarga.", variant: "destructive" });
+      return;
+    }
+
+    const padding = 20;
+    const qrSize = 180; 
+    const maxLogoHeight = 50; 
+    const spacingAfterLogo = 20; 
+    const businessNameFontSize = 16; 
+    const spacingAfterBusinessName = 40; 
+    const promoTitleFontSize = 20;
+    const spacingAfterPromoTitle = 15; 
+    const userDetailsFontSize = 16;
+    const smallTextFontSize = 10;
+    const lineSpacing = 5;
+    const canvasWidth = 320; 
+
+    canvas.width = canvasWidth;
+    canvas.height = 600; 
+    ctx.fillStyle = 'hsl(280, 13%, 96%)'; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let currentY = padding;
+
+    const businessLogo = new Image();
+    businessLogo.crossOrigin = "anonymous";
+    
+    const drawContent = () => {
+        currentY = padding;
+        const headerBgHeightReduction = 15; 
+        let headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - headerBgHeightReduction;
+        
+        if (businessDetails.logoUrl) {
+           headerBgHeight = maxLogoHeight + (businessNameFontSize + 5) + padding * 2;
+        } else {
+           headerBgHeight = (businessNameFontSize + 5) + padding * 2; 
+        }
+
+        ctx.fillStyle = 'hsl(var(--primary))'; 
+        ctx.fillRect(0, 0, canvas.width, headerBgHeight);
+        currentY += padding / 2;
+
+        if (businessDetails.logoUrl) {
+            const aspectRatio = businessLogo.width / businessLogo.height;
+            let logoHeight = businessLogo.height;
+            let logoWidth = businessLogo.width;
+
+            if (logoHeight > maxLogoHeight) {
+                logoHeight = maxLogoHeight;
+                logoWidth = logoHeight * aspectRatio;
+            }
+            if (logoWidth > canvas.width - 2 * padding) {
+                logoWidth = canvas.width - 2 * padding;
+                logoHeight = logoWidth / aspectRatio;
+            }
+            ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
+            currentY += logoHeight + spacingAfterLogo / 2; 
+        } else {
+            currentY += padding; 
+        }
+        
+        ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
+        ctx.font = `bold ${businessNameFontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
+        currentY += businessNameFontSize - (businessNameFontSize / 2) + spacingAfterBusinessName; 
+        
+        ctx.fillStyle = 'hsl(var(--primary))'; 
+        ctx.font = `bold ${promoTitleFontSize}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
+        currentY += promoTitleFontSize + spacingAfterPromoTitle;
+
+        const qrImage = new Image();
+        qrImage.onload = () => {
+            const qrX = (canvas.width - qrSize) / 2;
+            ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
+            ctx.strokeStyle = 'hsl(var(--primary))'; 
+            ctx.lineWidth = 2;
+            ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
+            currentY += qrSize + padding + 10;
+
+            ctx.fillStyle = 'hsl(var(--primary))';
+            ctx.font = `bold ${userDetailsFontSize + 2}px Arial`; 
+            ctx.textAlign = 'center';
+            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
+            currentY += (userDetailsFontSize + 2) + lineSpacing;
+
+            ctx.fillStyle = 'hsl(var(--foreground))'; 
+            ctx.font = `${userDetailsFontSize - 2}px Arial`; 
+            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+            currentY += (userDetailsFontSize - 2) + padding;
+
+            ctx.font = `italic ${smallTextFontSize}px Arial`;
+            ctx.fillStyle = 'hsl(var(--muted-foreground))'; 
+            ctx.textAlign = 'center';
+            ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+            currentY += smallTextFontSize + lineSpacing + 5;
+
+            if (qrData.promotion.termsAndConditions) {
+              ctx.font = `${smallTextFontSize}px Arial`;
+              const lines: string[] = [];
+              let currentLineText = "Términos: ";
+              const words = qrData.promotion.termsAndConditions.split(" ");
+              for (const word of words) {
+                  const testLine = currentLineText + word + " ";
+                  if (ctx.measureText(testLine).width > canvas.width - 2 * padding && currentLineText !== "Términos: ") {
+                      lines.push(currentLineText.trim());
+                      currentLineText = word + " ";
+                  } else {
+                      currentLineText = testLine;
+                  }
+              }
+              lines.push(currentLineText.trim());
+              
+              for (const line of lines) {
+                  ctx.fillText(line, canvas.width / 2, currentY);
+                  currentY += smallTextFontSize + lineSpacing;
+              }
+            }
+            
+            const finalHeight = currentY + padding;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            if (!tempCtx) return;
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = finalHeight;
+            tempCtx.drawImage(canvas, 0, 0, canvas.width, finalHeight, 0,0, canvas.width, finalHeight);
+            
+            const dataUrl = tempCanvas.toDataURL('image/png');
+            const linkElement = document.createElement('a');
+            linkElement.href = dataUrl;
+            linkElement.download = `SocioVIP_QR_${qrData.promotion.type}_${qrData.code}.png`;
+            document.body.appendChild(linkElement);
+            linkElement.click();
+            document.body.removeChild(linkElement);
+            toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
+        };
+        qrImage.onerror = () => {
+            toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
+        };
+        if (generatedQrDataUrl) qrImage.src = generatedQrDataUrl;
+        else toast({ title: "Error", description: "URL de QR no generada aún.", variant: "destructive" });
+    }; 
+
+    if (businessDetails.logoUrl) {
+        businessLogo.onload = drawContent;
+        businessLogo.onerror = () => {
+            console.warn("Logo del negocio no se pudo cargar. Se procederá sin él.");
+            drawContent(); 
+        };
+        businessLogo.src = businessDetails.logoUrl;
+    } else {
+        drawContent(); 
+    }
+  };
+
+  const resetQrFlow = () => {
+    setPageViewState('entityList');
+    setQrData(null);
+    setGeneratedQrDataUrl(null);
+    setActiveEntityForQr(null);
+    setValidatedSpecificCode(null);
+    setEnteredDni("");
+    dniForm.reset();
+    newQrClientForm.reset();
+    setShowDniModal(false);
+  };
+
+
+  const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
+    const form = useForm<SpecificCodeFormValues>({
+      resolver: zodResolver(specificCodeFormSchema),
+      defaultValues: { specificCode: "" },
+    });
+  
+    return (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(data => handleInitiateQrFlow(entity, data.specificCode))} className="space-y-2 mt-2">
+          <FormField
+            control={form.control}
+            name="specificCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor={`specificCode-${entity.id}`} className="text-xs text-muted-foreground">Código (9 dígitos) <span className="text-destructive">*</span></FormLabel>
+                <FormControl>
+                  <Input
+                    id={`specificCode-${entity.id}`}
+                    placeholder="ABC123XYZ"
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    maxLength={9}
+                    className="text-sm h-9"
+                    disabled={isLoadingQrFlow}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-9" disabled={isLoadingQrFlow}>
+            {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />}
+            Generar QR
+          </Button>
+        </form>
+      </Form>
+    );
+  };
+
+
   if (isLoading) {
-    return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /> Cargando Negocio por ID...</div>;
-  }
-  if (error) {
-    return <div className="text-center mt-10 text-destructive">{error}</div>;
-  }
-  if (!businessDetails) {
-    return <div className="text-center mt-10">Negocio no encontrado con este ID.</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <Link href="/" passHref className="flex items-center gap-2 group">
+                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
+                </Link>
+                <PublicHeaderAuth />
+            </div>
+        </header>
+        <div className="flex flex-col items-center justify-center flex-grow pt-20">
+            <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+            <p className="text-xl text-muted-foreground">Cargando información del negocio (ID: {businessIdFromParams})...</p>
+        </div>
+         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
+            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
+        </footer>
+      </div>
+    );
   }
 
-  // This is where the full JSX for rendering the business page would go,
-  // identical to /b/[customUrlPath]/page.tsx
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <Link href="/" passHref className="flex items-center gap-2 group">
+                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
+                </Link>
+                <PublicHeaderAuth />
+            </div>
+        </header>
+        <div className="flex flex-col items-center justify-center flex-grow pt-20">
+            <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-destructive">{error}</h1>
+            <p className="text-muted-foreground mt-2">ID de Negocio intentado: {businessIdFromParams}</p>
+            <Link href="/" passHref>
+              <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
+            </Link>
+        </div>
+         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
+            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
+        </footer>
+      </div>
+    );
+  }
+
+  if (!businessDetails && !isLoading) { 
+     return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <Link href="/" passHref className="flex items-center gap-2 group">
+                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
+                </Link>
+                <PublicHeaderAuth />
+            </div>
+        </header>
+        <div className="flex flex-col items-center justify-center flex-grow pt-20">
+            <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
+            <p className="text-muted-foreground mt-2">No se encontró un negocio con el ID: "{businessIdFromParams}".</p>
+            <Link href="/" passHref>
+              <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
+            </Link>
+        </div>
+        <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
+            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
+        </footer>
+      </div>
+    );
+  }
+
+
+  if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
+    return (
+        <div className="min-h-screen bg-background text-foreground flex flex-col">
+            <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                     <Link href="/" passHref className="flex items-center gap-2 group">
+                        <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                        <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
+                    </Link>
+                    <PublicHeaderAuth />
+                </div>
+            </header>
+            <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
+                <Card className="w-full max-w-md shadow-xl">
+                    <CardHeader className="text-center">
+                        <CardTitle className="text-2xl font-bold text-primary">
+                          {activeEntityForQr.type === 'event' ? "Tu Entrada para el Evento" : "Tu Promoción Adquirida"}
+                        </CardTitle>
+                        <CardDescription>
+                            ¡Tu QR está listo! Presenta este código en {businessDetails.name}.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {generatedQrDataUrl ? (
+                            <Image src={generatedQrDataUrl} alt="Código QR" width={250} height={250} className="mx-auto border rounded-md shadow-md p-1 bg-white" />
+                        ) : (
+                            <div className="h-[250px] w-[250px] mx-auto flex items-center justify-center border rounded-md bg-muted text-muted-foreground">
+                                <Loader2 className="h-8 w-8 animate-spin" /> <span className="ml-2">Generando QR...</span>
+                            </div>
+                        )}
+                         <div className="text-center">
+                            <p className="text-2xl font-semibold text-primary">{qrData.user.name} {qrData.user.surname}</p>
+                            <p className="text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
+                        </div>
+                        <div className="text-sm space-y-1 text-center border-t pt-3">
+                            <p className="font-semibold">{activeEntityForQr.name}</p>
+                            <p className="text-muted-foreground">
+                                Válido hasta: {format(parseISO(activeEntityForQr.endDate), "dd MMMM yyyy", { locale: es })}
+                            </p>
+                            {activeEntityForQr.termsAndConditions && (
+                                <p className="text-xs text-muted-foreground pt-1">
+                                    Términos: {activeEntityForQr.termsAndConditions}
+                                </p>
+                            )}
+                        </div>
+                    </CardContent>
+                    <CardFooter className="flex flex-col sm:flex-row gap-2">
+                        <Button onClick={handleSaveQrWithDetails} className="w-full sm:flex-1" variant="outline" disabled={!generatedQrDataUrl}>
+                            <Download className="mr-2 h-4 w-4" /> Guardar QR con Detalles
+                        </Button>
+                        <Button onClick={resetQrFlow} className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
+                             Volver a {businessDetails.name}
+                        </Button>
+                    </CardFooter>
+                </Card>
+            </main>
+             <footer className="py-8 bg-muted/50 text-center">
+                <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
+            </footer>
+        </div>
+    );
+  }
+
+  if (!businessDetails) return null; 
+
+  const events = activeEntitiesForBusiness.filter(e => e.type === 'event');
+  const promotions = activeEntitiesForBusiness.filter(e => e.type === 'promotion');
+
   return (
-    <div>
-      <p>Renderizado de la página del negocio para ID: {businessDetails.id} (Contenido completo como en /b/[customUrlPath]/page.tsx)</p>
-      {/* Replicate the entire JSX structure from the /b/[customUrlPath]/page.tsx here */}
+    <div className="min-h-screen bg-background text-foreground">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+                 <Link href="/" passHref className="flex items-center gap-2 group">
+                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+                    <div><span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span><p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p></div>
+                </Link>
+                <PublicHeaderAuth />
+            </div>
+        </header>
+
+        {businessDetails.publicCoverImageUrl && (
+          <div className="relative h-48 md:h-64 lg:h-80 w-full">
+            <Image
+              src={businessDetails.publicCoverImageUrl}
+              alt={`Portada de ${businessDetails.name}`}
+              fill
+              priority
+              className="object-cover"
+              data-ai-hint="business cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-black/10"></div>
+          </div>
+        )}
+        <div className={`max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 ${businessDetails.publicCoverImageUrl ? '-mt-16 md:-mt-20' : 'pt-12 pb-6'} relative z-10`}>
+          <Card className="shadow-xl bg-card/90 backdrop-blur-sm">
+            <CardContent className="p-4 md:p-6 flex flex-col sm:flex-row items-center gap-4 md:gap-6">
+              {businessDetails.logoUrl && (
+                <Image
+                  src={businessDetails.logoUrl}
+                  alt={`Logo de ${businessDetails.name}`}
+                  width={100}
+                  height={100}
+                  className="rounded-md object-contain h-20 w-20 sm:h-24 sm:w-24 border bg-background p-1 shadow-md"
+                  data-ai-hint="business logo"
+                />
+              )}
+              <div className="text-center sm:text-left">
+                <h1 className="text-3xl md:text-4xl font-bold text-primary">{businessDetails.name}</h1>
+                {businessDetails.slogan && <p className="text-md text-muted-foreground mt-1">{businessDetails.slogan}</p>}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {events.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
+              <CalendarDays className="h-8 w-8 mr-3" /> Eventos Próximos
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {events.map((event) => (
+                <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
+                  <div className="relative aspect-[16/9] w-full">
+                    <Image src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" data-ai-hint={event.aiHint || "event party"} />
+                  </div>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl">{event.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow space-y-1">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
+                    <p className="text-xs text-muted-foreground">Del {format(parseISO(event.startDate), "dd MMM", { locale: es })} al {format(parseISO(event.endDate), "dd MMM, yyyy", { locale: es })}</p>
+                    {event.termsAndConditions && <p className="text-xs text-muted-foreground pt-1 line-clamp-2">Términos: {event.termsAndConditions}</p>}
+                  </CardContent>
+                  <CardFooter className="flex-col items-start p-4 border-t">
+                     <SpecificCodeEntryForm entity={event} />
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {promotions.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
+              <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {promotions.map((promo) => (
+                 <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
+                  <div className="relative aspect-[16/9] w-full">
+                    <Image src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} alt={promo.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" data-ai-hint={promo.aiHint || "discount offer"} />
+                  </div>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl">{promo.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow space-y-1">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
+                    <p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p>
+                     {promo.termsAndConditions && <p className="text-xs text-muted-foreground pt-1 line-clamp-2">Términos: {promo.termsAndConditions}</p>}
+                  </CardContent>
+                  <CardFooter className="flex-col items-start p-4 border-t">
+                    <SpecificCodeEntryForm entity={promo} />
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+        
+        {!isLoading && !error && events.length === 0 && promotions.length === 0 && (
+            <Card className="col-span-full">
+                <CardHeader className="text-center">
+                    <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <CardTitle className="mt-2">No hay Actividad por Ahora</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                    <CardDescription>Este negocio no tiene eventos o promociones activos en este momento. ¡Vuelve pronto!</CardDescription>
+                </CardContent>
+            </Card>
+        )}
+        
+        {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
+            <section className="mt-12 pt-8 border-t">
+                <h2 className="text-xl font-semibold tracking-tight text-foreground mb-4 flex items-center">
+                    <Info className="h-6 w-6 mr-2 text-primary" />
+                    Información de Contacto
+                </h2>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                    {businessDetails.publicAddress && <p><strong>Dirección:</strong> {businessDetails.publicAddress}</p>}
+                    {businessDetails.publicPhone && <p><strong>Teléfono:</strong> {businessDetails.publicPhone}</p>}
+                    {businessDetails.publicContactEmail && <p><strong>Email:</strong> <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>}
+                </div>
+            </section>
+        ) : null }
+      </main>
+
+      <footer className="w-full mt-12 py-8 bg-muted/50 text-center">
+        <p className="text-sm text-muted-foreground">
+          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
+        </p>
+      </footer>
+      
+      <Dialog open={showDniModal} onOpenChange={(isOpen) => { if (!isOpen) { dniForm.reset(); newQrClientForm.reset(); } setShowDniModal(isOpen); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {currentStepInModal === 'enterDni' ? "Ingresa tu DNI/CE" : "Completa tus Datos"}
+            </DialogTitle>
+            <UIDialogDescription>
+              {currentStepInModal === 'enterDni' 
+                ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
+                : "Necesitamos algunos datos para generar tu QR."
+              }
+            </UIDialogDescription>
+          </DialogHeader>
+          {currentStepInModal === 'enterDni' ? (
+            <Form {...dniForm}>
+              <form onSubmit={dniForm.handleSubmit(handleDniSubmitInModal)} className="space-y-4 py-2">
+                <FormField control={dniForm.control} name="dni" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
+                    <FormControl><Input placeholder="Número de documento" {...field} maxLength={15} disabled={isLoadingQrFlow} autoFocus /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <ShadcnDialogFooter className="pt-2">
+                  <Button type="button" variant="outline" onClick={() => {setShowDniModal(false); resetQrFlow();}} disabled={isLoadingQrFlow}>Cancelar</Button>
+                  <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isLoadingQrFlow}>
+                    {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Verificar DNI"}
+                  </Button>
+                </ShadcnDialogFooter>
+              </form>
+            </Form>
+          ) : ( 
+            <Form {...newQrClientForm}>
+              <form onSubmit={newQrClientForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-1 max-h-[60vh] overflow-y-auto pr-2">
+                <FormField control={newQrClientForm.control} name="dniConfirm" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Confirma tu número de documento"
+                        {...field} 
+                        onBlur={(e) => handleNewUserDniChangeDuringRegistration(e.target.value, newQrClientForm.getValues())}
+                        maxLength={15} 
+                        disabled={isLoadingQrFlow} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={newQrClientForm.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus nombres" {...field} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={newQrClientForm.control} name="surname" render={({ field }) => (
+                  <FormItem><FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Tus apellidos" {...field} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={newQrClientForm.control} name="phone" render={({ field }) => (
+                  <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isLoadingQrFlow} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={newQrClientForm.control} name="dob" render={({ field }) => (
+                  <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isLoadingQrFlow}>
+                            {field.value ? format(field.value, "d MMMM yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
+                            <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <ShadcnCalendar 
+                            mode="single" 
+                            selected={field.value} 
+                            onSelect={field.onChange} 
+                            disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1920-01-01")} 
+                            captionLayout="dropdown-buttons" 
+                            fromYear={1920} 
+                            toYear={new Date().getFullYear() -10} 
+                            locale={es} 
+                            initialFocus 
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <ShadcnDialogFooter className="pt-3">
+                  <Button type="button" variant="outline" onClick={() => {setCurrentStepInModal('enterDni'); newQrClientForm.reset(); dniForm.setValue('dni', enteredDni);}} disabled={isLoadingQrFlow}>Volver</Button>
+                  <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isLoadingQrFlow}>
+                    {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Registrar y Generar QR"}
+                  </Button>
+                </ShadcnDialogFooter>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
+        <AlertDialogContent>
+          <UIAlertTitle className="font-semibold">DNI Ya Registrado</UIAlertTitle>
+          <UIDialogDescription>
+              El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los datos existentes para generar tu QR?
+          </UIDialogDescription>
+          <ShadcnDialogFooter>
+            <Button variant="outline" onClick={() => { setShowDniExistsWarningDialog(false); newQrClientForm.setValue("dniConfirm", ""); }}>No, corregir DNI</Button>
+            <Button onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">Sí, usar datos existentes</Button>
+          </ShadcnDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-
-// Schemas (can be moved to a shared location or kept here if only used by this page)
-const SpecificCodeEntryForm = ({ entity, onSubmit }: { entity: BusinessManagedEntity; onSubmit: (entity: BusinessManagedEntity, code: string) => void }) => {
-  const form = useForm<SpecificCodeFormValues>({
-    resolver: zodResolver(specificCodeFormSchema),
-    defaultValues: { specificCode: "" },
-  });
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(data => onSubmit(entity, data.specificCode))} className="space-y-2 mt-2">
-        <FormField
-          control={form.control}
-          name="specificCode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel htmlFor={`specificCode-${entity.id}`} className="text-xs text-muted-foreground">Código (9 dígitos) <span className="text-destructive">*</span></FormLabel>
-              <FormControl>
-                <Input id={`specificCode-${entity.id}`} placeholder="ABC123XYZ" {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} maxLength={9} className="text-sm h-9" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-9">
-          <QrCodeIcon className="h-4 w-4 mr-2" /> Generar QR
-        </Button>
-      </form>
-    </Form>
-  );
-};
+    
