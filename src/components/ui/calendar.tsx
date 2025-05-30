@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker, type CaptionProps, useCaption } from "react-day-picker" // Import useCaption
+import { DayPicker, type CaptionProps } from "react-day-picker" // CORRECTED: Removed useCaption
 
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
@@ -21,16 +21,15 @@ function Calendar({
   ...props // These are the DayPickerProps (like fromYear, toYear) passed to DayPicker
 }: CalendarProps) {
 
-  // Custom Caption now uses the useCaption hook
-  function CustomCaptionComponent() { // Renamed to avoid confusion
-    const { displayMonth, goToMonth, previousMonth: prevMonthNav, nextMonth: nextMonthNav } = useCaption();
+  // Custom Caption now uses CaptionProps passed by DayPicker
+  function CustomCaptionComponent(captionProps: CaptionProps) { 
+    const { displayMonth, goToMonth, previousMonth: prevMonthNav, nextMonth: nextMonthNav } = captionProps; 
     
-    // Props for year/month dropdowns still come from the outer Calendar component's props
     const { fromYear, toYear, fromMonth, toMonth, fromDate, toDate } = props;
 
     const handleYearChange = (value: string) => {
       if (!displayMonth) {
-        console.error("Calendar CustomCaption: displayMonth (from useCaption) is not available in handleYearChange.");
+        console.error("Calendar CustomCaption: displayMonth (from captionProps) is not available in handleYearChange.");
         return;
       }
       const newDate = new Date(displayMonth);
@@ -38,13 +37,13 @@ function Calendar({
       if (typeof goToMonth === 'function') {
         goToMonth(newDate);
       } else {
-        console.error("Calendar CustomCaption: goToMonth (from useCaption) is not available or not a function in handleYearChange.");
+        console.error("Calendar CustomCaption: goToMonth is not available or not a function in handleYearChange.", captionProps);
       }
     };
 
     const handleMonthChange = (value: string) => {
       if (!displayMonth) {
-        console.error("Calendar CustomCaption: displayMonth (from useCaption) is not available in handleMonthChange.");
+        console.error("Calendar CustomCaption: displayMonth (from captionProps) is not available in handleMonthChange.");
         return;
       }
       const newDate = new Date(displayMonth);
@@ -52,7 +51,7 @@ function Calendar({
       if (typeof goToMonth === 'function') {
         goToMonth(newDate);
       } else {
-        console.error("Calendar CustomCaption: goToMonth (from useCaption) is not available or not a function in handleMonthChange.");
+        console.error("Calendar CustomCaption: goToMonth is not available or not a function in handleMonthChange.", captionProps);
       }
     };
     
@@ -76,7 +75,7 @@ function Calendar({
           size="icon"
           name="previous-month"
           aria-label="Go to previous month"
-          disabled={!prevMonthNav}
+          disabled={!prevMonthNav || typeof goToMonth !== 'function'}
           className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute left-1"
           onClick={() => prevMonthNav && typeof goToMonth === 'function' && goToMonth(prevMonthNav)}
         >
@@ -86,7 +85,7 @@ function Calendar({
             <Select
                 value={displayMonth ? displayMonth.getMonth().toString() : ""}
                 onValueChange={handleMonthChange}
-                disabled={!displayMonth}
+                disabled={!displayMonth || typeof goToMonth !== 'function'}
             >
                 <SelectTrigger className="h-7 w-[calc(50%-0.25rem)] max-w-[120px] px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
                     <SelectValue>{displayMonth ? format(displayMonth, "LLLL", { locale: es }) : "Mes"}</SelectValue>
@@ -102,7 +101,7 @@ function Calendar({
             <Select
                 value={displayMonth ? displayMonth.getFullYear().toString() : ""}
                 onValueChange={handleYearChange}
-                disabled={!displayMonth}
+                disabled={!displayMonth || typeof goToMonth !== 'function'}
             >
                 <SelectTrigger className="h-7 w-[calc(50%-0.25rem)] max-w-[80px] px-2 py-1 text-xs data-[placeholder]:text-muted-foreground focus:ring-0 focus:ring-offset-0 sm:text-sm">
                     <SelectValue>{displayMonth ? displayMonth.getFullYear() : "Año"}</SelectValue>
@@ -121,7 +120,7 @@ function Calendar({
           size="icon"
           name="next-month"
           aria-label="Go to next month"
-          disabled={!nextMonthNav}
+          disabled={!nextMonthNav || typeof goToMonth !== 'function'}
           className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute right-1"
           onClick={() => nextMonthNav && typeof goToMonth === 'function' && goToMonth(nextMonthNav)}
         >
@@ -162,7 +161,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Caption: CustomCaptionComponent, // Use the renamed component that uses the hook
+        Caption: CustomCaptionComponent, 
       }}
       {...props}
     />
