@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription as ShadcnCardDescription, CardHeader, CardTitle } from "@/components/ui/card"; 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog";
@@ -61,8 +61,8 @@ export default function AdminBusinessesPage() {
           customUrlPath: data.customUrlPath || undefined,
         };
         fetchedBusinesses.push(businessData);
-        if (data.customUrlPath) {
-          paths.push(data.customUrlPath);
+        if (data.customUrlPath && data.customUrlPath.trim() !== "") {
+          paths.push(data.customUrlPath.trim());
         }
       });
       setBusinesses(fetchedBusinesses.sort((a,b) => new Date(b.joinDate as string).getTime() - new Date(a.joinDate as string).getTime()));
@@ -104,7 +104,7 @@ export default function AdminBusinessesPage() {
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
       biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
       biz.managerName || "N/A", biz.managerDni || "N/A", 
-      biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : `sociosvip.app/business/${biz.id}/public-fallback (Por defecto)`,
+      biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : `sociosvip.app/business/${biz.id}`,
       biz.logoUrl || "N/A", biz.publicCoverImageUrl || "N/A", biz.slogan || "N/A",
       biz.publicContactEmail || "N/A", biz.publicPhone || "N/A", biz.publicAddress || "N/A",
     ]);
@@ -142,7 +142,9 @@ export default function AdminBusinessesPage() {
   const handleCreateOrEditBusiness = async (data: BusinessFormData, currentBusinessId?: string): Promise<{success: boolean; error?: string}> => {
     setIsSubmitting(true);
     
-    const cleanedCustomUrlPath = data.customUrlPath ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : null;
+    const cleanedCustomUrlPath = data.customUrlPath && data.customUrlPath.trim() !== "" 
+        ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') 
+        : null; // Ensure it's null if empty
 
     if (cleanedCustomUrlPath) {
       const isUnique = await checkCustomUrlPathUniqueness(cleanedCustomUrlPath, currentBusinessId);
@@ -171,11 +173,10 @@ export default function AdminBusinessesPage() {
         publicContactEmail: data.publicContactEmail || null,
         publicPhone: data.publicPhone || null,
         publicAddress: data.publicAddress || null,
-        customUrlPath: cleanedCustomUrlPath || null, // Ensure this is null if empty after cleaning
+        customUrlPath: cleanedCustomUrlPath, 
     };
     
     const businessPayload = sanitizeObjectForFirestore(businessPayloadRaw);
-
 
     try {
       if (currentBusinessId) { 
@@ -189,7 +190,7 @@ export default function AdminBusinessesPage() {
       }
       setShowCreateEditModal(false);
       setEditingBusiness(null);
-      fetchBusinesses(); 
+      await fetchBusinesses(); // Await fetchBusinesses
       return { success: true };
     } catch (error: any) {
       console.error("Failed to create/update business:", error);
@@ -207,7 +208,7 @@ export default function AdminBusinessesPage() {
     try {
       await deleteDoc(doc(db, "businesses", businessId));
       toast({ title: "Negocio Eliminado", description: `El negocio "${businessName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
-      fetchBusinesses(); 
+      await fetchBusinesses(); // Await fetchBusinesses
     } catch (error: any) {
       console.error("Failed to delete business:", error);
       toast({ title: "Error al Eliminar", description: `No se pudo eliminar el negocio. ${error.message}`, variant: "destructive"});
@@ -235,7 +236,7 @@ export default function AdminBusinessesPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Negocios Afiliados</CardTitle>
-          <ShadcnCardDescription>Negocios que utilizan la plataforma SocioVIP.</ShadcnCardDescription>
+          <CardDescription>Negocios que utilizan la plataforma SocioVIP.</CardDescription>
            <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -273,20 +274,24 @@ export default function AdminBusinessesPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredBusinesses.length > 0 ? (
-                    filteredBusinesses.map((biz) => (
+                    filteredBusinesses.map((biz) => {
+                      const publicLink = biz.customUrlPath && biz.customUrlPath.trim() !== ""
+                        ? `/b/${biz.customUrlPath.trim()}`
+                        : `/business/${biz.id}`;
+                      const displayUrl = biz.customUrlPath && biz.customUrlPath.trim() !== ""
+                        ? `sociosvip.app/b/${biz.customUrlPath.trim()}`
+                        : `sociosvip.app/business/${biz.id}`;
+
+                      return (
                       <TableRow key={biz.id}>
                         <TableCell className="font-medium">{biz.name}</TableCell>
                         <TableCell className="hidden xl:table-cell">{biz.razonSocial || "N/A"}</TableCell>
                         <TableCell className="hidden md:table-cell">{biz.ruc || "N/A"}</TableCell>
                         <TableCell className="hidden lg:table-cell">{biz.businessType || "N/A"}</TableCell>
                         <TableCell>
-                          {biz.customUrlPath ? (
-                            <Link href={`/b/${biz.customUrlPath}`} target="_blank" className="text-primary hover:underline text-xs flex items-center">
-                              sociosvip.app/b/{biz.customUrlPath} <ExternalLink className="ml-1 h-3 w-3" />
+                           <Link href={publicLink} target="_blank" className="text-primary hover:underline text-xs flex items-center">
+                              {displayUrl} <ExternalLink className="ml-1 h-3 w-3" />
                             </Link>
-                          ) : (
-                             <span className="text-xs text-muted-foreground">No configurada</span>
-                          )}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => handleOpenEditModal(biz)} disabled={isSubmitting}>
@@ -323,7 +328,7 @@ export default function AdminBusinessesPage() {
                           </AlertDialog>
                         </TableCell>
                       </TableRow>
-                    ))
+                    )})
                   ) : (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
@@ -359,3 +364,4 @@ export default function AdminBusinessesPage() {
     </div>
   );
 }
+

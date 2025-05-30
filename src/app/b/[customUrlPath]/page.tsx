@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation"; // Added useRouter
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,7 +15,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData, PromotionDetails } from "@/lib/types";
 import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
 import { es } from "date-fns/locale";
@@ -28,13 +28,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as 
 import { Alert, AlertDescription, AlertTitle as UIAlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from 'qrcode';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+
 
 const specificCodeFormSchema = z.object({
   specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
@@ -92,7 +93,7 @@ export default function BusinessPublicPageByUrl() {
   const fetchBusinessData = useCallback(async () => {
     if (!customUrlPath) {
       console.error("BusinessPage by URL: customUrlPath is missing.");
-      setError("URL de negocio no especificada.");
+      setError("URL de negocio no especificada. Por favor, verifica la dirección.");
       setIsLoading(false);
       return;
     }
@@ -119,9 +120,10 @@ export default function BusinessPublicPageByUrl() {
         const fetchedBusiness: Business = {
           id: businessDoc.id,
           name: bizData.name || "Nombre de Negocio Desconocido",
-          contactEmail: bizData.contactEmail || "",
+          contactEmail: bizData.contactEmail || "", // Campo interno, no necesariamente público
           joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
           customUrlPath: bizData.customUrlPath || customUrlPath,
+          // Campos públicos
           logoUrl: bizData.logoUrl || undefined,
           publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
           slogan: bizData.slogan || undefined,
@@ -140,9 +142,10 @@ export default function BusinessPublicPageByUrl() {
         const entitiesSnapshot = await getDocs(entitiesQuery);
         console.log(`BusinessPage by URL: Fetched ${entitiesSnapshot.docs.length} active entities for business ${fetchedBusiness.id}.`);
         
-        const allActiveEntities: BusinessManagedEntity[] = [];
+        const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
         entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data();
+          const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
+          
           let startDateStr: string;
           let endDateStr: string;
           const nowStr = new Date().toISOString();
@@ -169,7 +172,7 @@ export default function BusinessPublicPageByUrl() {
               endDateStr = nowStr; 
           }
           
-          const entityToAdd: BusinessManagedEntity = {
+          const entityForCheck: BusinessManagedEntity = {
             id: docSnap.id,
             businessId: entityData.businessId,
             type: entityData.type,
@@ -187,14 +190,16 @@ export default function BusinessPublicPageByUrl() {
             imageUrl: entityData.imageUrl,
             aiHint: entityData.aiHint,
             termsAndConditions: entityData.termsAndConditions,
-            createdAt: entityData.createdAt instanceof Timestamp ? entityData.createdAt.toDate().toISOString() : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
+            createdAt: entityData.createdAt instanceof Timestamp 
+              ? entityData.createdAt.toDate().toISOString() 
+              : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
           };
 
-          if (isEntityCurrentlyActivatable(entityToAdd)) {
-            allActiveEntities.push(entityToAdd);
+          if (isEntityCurrentlyActivatable(entityForCheck)) {
+            allActiveAndCurrentEntities.push(entityForCheck);
           }
         });
-        setActiveEntitiesForBusiness(allActiveEntities.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
+        setActiveEntitiesForBusiness(allActiveAndCurrentEntities.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
       }
     } catch (err: any) {
       console.error("BusinessPage by URL: Error fetching business data:", err);
@@ -215,7 +220,7 @@ export default function BusinessPublicPageByUrl() {
     }
   }, [customUrlPath, fetchBusinessData]);
 
-  // Restauración del flujo de Generar QR
+
   const handleInitiateQrFlow = (entity: BusinessManagedEntity, codeInputValue: string) => {
     const codeToValidate = codeInputValue.trim().toUpperCase();
     if (!codeToValidate) {
@@ -247,8 +252,8 @@ export default function BusinessPublicPageByUrl() {
   };
 
   const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
-    if (!activeEntityForQr || !validatedSpecificCode) {
-      toast({title: "Error interno", description:"Falta entidad activa o código validado.", variant: "destructive"});
+    if (!activeEntityForQr || !validatedSpecificCode || !businessDetails) {
+      toast({title: "Error interno", description:"Falta entidad activa, código validado o detalles del negocio.", variant: "destructive"});
       return;
     }
     setIsLoadingQrFlow(true);
@@ -259,10 +264,12 @@ export default function BusinessPublicPageByUrl() {
         const q = query(qrClientsRef, where("dni", "==", data.dni), limit(1));
         const querySnapshot = await getDocs(q);
 
+        let clientForQr: QrClient;
+
         if (!querySnapshot.empty) {
           const existingClientDoc = querySnapshot.docs[0];
           const clientData = existingClientDoc.data();
-          const qrClient: QrClient = {
+          clientForQr = {
             id: existingClientDoc.id,
             dni: clientData.dni,
             name: clientData.name,
@@ -271,37 +278,41 @@ export default function BusinessPublicPageByUrl() {
             dob: clientData.dob instanceof Timestamp ? clientData.dob.toDate().toISOString() : String(clientData.dob),
             registrationDate: clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate().toISOString() : String(clientData.registrationDate),
           };
-          
-          const promotionDetails: PromotionDetails = {
-            id: activeEntityForQr.id,
-            title: activeEntityForQr.name,
-            description: activeEntityForQr.description,
-            validUntil: activeEntityForQr.endDate,
-            imageUrl: activeEntityForQr.imageUrl || "",
-            promoCode: validatedSpecificCode, // This is the 9-digit specific code for the QR
-            type: activeEntityForQr.type,
-            termsAndConditions: activeEntityForQr.termsAndConditions,
-            aiHint: activeEntityForQr.aiHint || "",
-          };
-
-          setQrData({ user: qrClient, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
-          setShowDniModal(false);
-          setPageViewState('qrDisplay');
           toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
+          setShowDniModal(false);
         } else {
           newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dniConfirm: data.dni });
           setCurrentStepInModal('newUserForm');
+          setIsLoadingQrFlow(false); // Stop loading here, wait for new user form submit
+          return; 
         }
+        
+        const promotionDetails: PromotionDetails = {
+          id: activeEntityForQr.id,
+          title: activeEntityForQr.name,
+          description: activeEntityForQr.description,
+          validUntil: activeEntityForQr.endDate,
+          imageUrl: activeEntityForQr.imageUrl || "",
+          promoCode: validatedSpecificCode, 
+          type: activeEntityForQr.type,
+          termsAndConditions: activeEntityForQr.termsAndConditions,
+          aiHint: activeEntityForQr.aiHint || "",
+        };
+
+        setQrData({ user: clientForQr, promotion: promotionDetails, code: validatedSpecificCode, status: 'available' });
+        setPageViewState('qrDisplay');
     } catch(e: any) {
         console.error("Error verificando DNI:", e);
         toast({ title: "Error de Verificación", description: "No se pudo verificar el DNI. " + e.message, variant: "destructive" });
     } finally {
-        setIsLoadingQrFlow(false);
+        if (currentStepInModal !== 'newUserForm') { // Only stop loading if not switching to new user form
+            setIsLoadingQrFlow(false);
+        }
     }
   };
 
   const processNewQrClientRegistration = async (formData: NewQrClientFormValues) => {
-    if (!activeEntityForQr || !validatedSpecificCode || !enteredDni) {
+    if (!activeEntityForQr || !validatedSpecificCode || !enteredDni || !businessDetails) {
          toast({title: "Error interno", description:"Falta información para registrar cliente.", variant: "destructive"});
         return;
     }
@@ -314,6 +325,8 @@ export default function BusinessPublicPageByUrl() {
       phone: formData.phone,
       dob: Timestamp.fromDate(formData.dob), 
       registrationDate: serverTimestamp(),
+      generatedForBusinessId: businessDetails.id, // Track which business this QR client was generated for
+      generatedForEntityId: activeEntityForQr.id, // Track for which promo/event
     };
 
     try {
@@ -333,7 +346,7 @@ export default function BusinessPublicPageByUrl() {
             description: activeEntityForQr.description,
             validUntil: activeEntityForQr.endDate,
             imageUrl: activeEntityForQr.imageUrl || "",
-            promoCode: validatedSpecificCode, // This is the 9-digit specific code
+            promoCode: validatedSpecificCode, 
             type: activeEntityForQr.type,
             termsAndConditions: activeEntityForQr.termsAndConditions,
             aiHint: activeEntityForQr.aiHint || "",
@@ -392,16 +405,16 @@ export default function BusinessPublicPageByUrl() {
       if (data.dniConfirm.trim() !== enteredDni.trim()) {
         const dniIsValidForCreation = await handleNewUserDniChangeDuringRegistration(data.dniConfirm, data);
         if (dniIsValidForCreation) {
-            processNewQrClientRegistration(data);
+            await processNewQrClientRegistration(data);
         }
       } else {
-        processNewQrClientRegistration(data);
+        await processNewQrClientRegistration(data);
       }
   };
   
   useEffect(() => {
     const generateQrImage = async () => {
-      if (pageViewState === 'qrDisplay' && qrData?.code) {
+      if (pageViewState === 'qrDisplay' && qrData?.code) { // Use qrData.code (the 9-digit code)
         try {
           const dataUrl = await QRCode.toDataURL(qrData.code, { width: 250, errorCorrectionLevel: 'H', margin: 2 });
           setGeneratedQrDataUrl(dataUrl);
@@ -431,19 +444,19 @@ export default function BusinessPublicPageByUrl() {
 
     const padding = 20;
     const qrSize = 180; 
-    const maxLogoHeight = 40; 
+    const maxLogoHeight = 50; 
     const spacingAfterLogo = 20; 
-    const businessNameFontSize = 18;
+    const businessNameFontSize = 16; 
     const spacingAfterBusinessName = 40; 
     const promoTitleFontSize = 20;
-    const spacingAfterPromoTitle = 10; 
+    const spacingAfterPromoTitle = 15; 
     const userDetailsFontSize = 16;
     const smallTextFontSize = 10;
     const lineSpacing = 5;
     const canvasWidth = 320; 
 
     canvas.width = canvasWidth;
-    canvas.height = 600; 
+    canvas.height = 600; // Initial height, will be adjusted
     ctx.fillStyle = 'hsl(280, 13%, 96%)'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -455,7 +468,14 @@ export default function BusinessPublicPageByUrl() {
     const drawContent = () => {
         currentY = padding;
         const headerBgHeightReduction = 15; 
-        const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - headerBgHeightReduction;
+        let headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5 - headerBgHeightReduction;
+        
+        if (businessDetails.logoUrl) {
+           headerBgHeight = maxLogoHeight + (businessNameFontSize + 5) + padding * 2; // Adjusted for logo + name below
+        } else {
+           headerBgHeight = (businessNameFontSize + 5) + padding * 2; // Only name
+        }
+
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.fillRect(0, 0, canvas.width, headerBgHeight);
         currentY += padding / 2;
@@ -474,16 +494,16 @@ export default function BusinessPublicPageByUrl() {
                 logoHeight = logoWidth / aspectRatio;
             }
             ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
-            currentY += logoHeight + spacingAfterLogo;
+            currentY += logoHeight + spacingAfterLogo / 2; // Reduced spacing
         } else {
-            currentY += maxLogoHeight + spacingAfterLogo; 
+            currentY += padding; // Space if no logo
         }
         
         ctx.fillStyle = 'hsl(var(--primary-foreground))'; 
-        ctx.font = `bold ${businessNameFontSize - 2}px Arial`;
+        ctx.font = `bold ${businessNameFontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
-        currentY += (businessNameFontSize - 2) + spacingAfterBusinessName; 
+        currentY += businessNameFontSize + spacingAfterBusinessName; 
         
         ctx.fillStyle = 'hsl(var(--primary))'; 
         ctx.font = `bold ${promoTitleFontSize}px Arial`;
@@ -498,7 +518,7 @@ export default function BusinessPublicPageByUrl() {
             ctx.strokeStyle = 'hsl(var(--primary))'; 
             ctx.lineWidth = 2;
             ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-            currentY += qrSize + padding + 5; 
+            currentY += qrSize + padding + 10; // Increased space after QR
 
             ctx.fillStyle = 'hsl(var(--primary))';
             ctx.font = `bold ${userDetailsFontSize + 2}px Arial`; 
@@ -515,7 +535,7 @@ export default function BusinessPublicPageByUrl() {
             ctx.fillStyle = 'hsl(var(--muted-foreground))'; 
             ctx.textAlign = 'center';
             ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
-            currentY += smallTextFontSize + lineSpacing;
+            currentY += smallTextFontSize + lineSpacing + 5;
 
             if (qrData.promotion.termsAndConditions) {
               ctx.font = `${smallTextFontSize}px Arial`;
@@ -545,7 +565,7 @@ export default function BusinessPublicPageByUrl() {
             if (!tempCtx) return;
             tempCanvas.width = canvas.width;
             tempCanvas.height = finalHeight;
-            tempCtx.drawImage(canvas, 0, 0); 
+            tempCtx.drawImage(canvas, 0, 0, canvas.width, finalHeight, 0,0, canvas.width, finalHeight); // Ensure correct cropping
             
             const dataUrl = tempCanvas.toDataURL('image/png');
             const linkElement = document.createElement('a');
@@ -644,6 +664,9 @@ export default function BusinessPublicPageByUrl() {
             <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
             <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
         </div>
+         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
+            <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
+        </footer>
       </div>
     );
   }
@@ -660,22 +683,22 @@ export default function BusinessPublicPageByUrl() {
                 <PublicHeaderAuth />
             </div>
         </header>
-        <div className="pt-24">
+        <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-destructive">{error}</h1>
-            <p className="text-muted-foreground mt-2">Path intentado: /b/{customUrlPath}</p>
+            <p className="text-muted-foreground mt-2">Ruta intentada: /b/{customUrlPath}</p>
             <Link href="/" passHref>
               <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
-         <footer className="w-full mt-12 py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
+         <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
             <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
         </footer>
       </div>
     );
   }
 
-  if (!businessDetails && !isLoading) {
+  if (!businessDetails && !isLoading) { // Caso de negocio no encontrado después de la carga
      return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
         <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-20 w-full">
@@ -687,7 +710,7 @@ export default function BusinessPublicPageByUrl() {
                 <PublicHeaderAuth />
             </div>
         </header>
-        <div className="pt-24">
+        <div className="flex flex-col items-center justify-center flex-grow pt-20">
             <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
             <p className="text-muted-foreground mt-2">La página del negocio con la URL "/b/{customUrlPath}" no existe o la URL es incorrecta.</p>
@@ -695,12 +718,13 @@ export default function BusinessPublicPageByUrl() {
               <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
             </Link>
         </div>
-        <footer className="w-full mt-12 py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
+        <footer className="w-full py-8 bg-muted/50 text-center fixed bottom-0 left-0 right-0">
             <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
         </footer>
       </div>
     );
   }
+
 
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
@@ -765,7 +789,7 @@ export default function BusinessPublicPageByUrl() {
     );
   }
 
-  if (!businessDetails) return null;
+  if (!businessDetails) return null; // Should be caught by the loading/error/not found states
 
   const events = activeEntitiesForBusiness.filter(e => e.type === 'event');
   const promotions = activeEntitiesForBusiness.filter(e => e.type === 'promotion');
@@ -901,7 +925,9 @@ export default function BusinessPublicPageByUrl() {
       </main>
 
       <footer className="w-full mt-12 py-8 bg-muted/50 text-center">
-        <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
+        <p className="text-sm text-muted-foreground">
+          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
+        </p>
       </footer>
       
       <Dialog open={showDniModal} onOpenChange={(isOpen) => { if (!isOpen) { dniForm.reset(); newQrClientForm.reset(); } setShowDniModal(isOpen); }}>
@@ -991,7 +1017,7 @@ export default function BusinessPublicPageByUrl() {
                   </FormItem>
                 )} />
                 <ShadcnDialogFooter className="pt-3">
-                  <Button type="button" variant="outline" onClick={() => {setCurrentStepInModal('enterDni'); newQrClientForm.reset(); dniForm.reset({dni: enteredDni});}} disabled={isLoadingQrFlow}>Volver</Button>
+                  <Button type="button" variant="outline" onClick={() => {setCurrentStepInModal('enterDni'); newQrClientForm.reset(); dniForm.setValue('dni', enteredDni);}} disabled={isLoadingQrFlow}>Volver</Button>
                   <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isLoadingQrFlow}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : "Registrar y Generar QR"}
                   </Button>

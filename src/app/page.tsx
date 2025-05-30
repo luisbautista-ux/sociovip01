@@ -14,7 +14,7 @@ import {
   CardFooter
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -22,57 +22,40 @@ import { isEntityCurrentlyActivatable } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays, ExternalLink, PackageOpen } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { PublicHeaderAuth } from "@/components/layout/PublicHeaderAuth";
+import { useToast } from "@/hooks/use-toast";
 
 interface PublicDisplayEntity extends BusinessManagedEntity {
   businessName?: string;
   businessLogoUrl?: string;
-  businessCustomUrlPath?: string;
+  businessCustomUrlPath?: string; // Ya existe, se usará para el link
 }
 
 export default function HomePage() {
   const [publicEntities, setPublicEntities] = useState<PublicDisplayEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const fetchPublicEntitiesAndBusinesses = useCallback(async () => {
+    console.log("HomePage: Fetching public entities and businesses...");
     setIsLoading(true);
     setError(null);
     try {
       const businessesSnapshot = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
       businessesSnapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const businessProfile: Business = {
-          id: docSnap.id,
-          name: data.name || "Nombre Desconocido",
-          contactEmail: data.contactEmail || "",
-          joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : String(data.joinDate || new Date().toISOString()),
-          ruc: data.ruc || undefined,
-          razonSocial: data.razonSocial || undefined,
-          department: data.department || undefined,
-          province: data.province || undefined,
-          district: data.district || undefined,
-          address: data.address || undefined,
-          managerName: data.managerName || undefined,
-          managerDni: data.managerDni || undefined,
-          businessType: data.businessType || undefined,
-          logoUrl: data.logoUrl || undefined,
-          publicCoverImageUrl: data.publicCoverImageUrl || undefined,
-          slogan: data.slogan || undefined,
-          publicContactEmail: data.publicContactEmail || undefined,
-          publicPhone: data.publicPhone || undefined,
-          publicAddress: data.publicAddress || undefined,
-          customUrlPath: data.customUrlPath || undefined,
-        };
-        businessesMap.set(docSnap.id, businessProfile);
+        businessesMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Business);
       });
+      console.log("HomePage: Fetched businessesMap size:", businessesMap.size);
 
       const entitiesQuery = query(collection(db, "businessEntities"), where("isActive", "==", true));
       const entitiesSnapshot = await getDocs(entitiesQuery);
+      console.log("HomePage: Fetched active entities snapshot size:", entitiesSnapshot.size);
       
-      const allActiveEntities: PublicDisplayEntity[] = [];
+      const allActiveAndCurrentEntities: PublicDisplayEntity[] = [];
       entitiesSnapshot.forEach(docSnap => {
-        const entityData = docSnap.data();
+        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id'>;
+        
         let startDateStr: string;
         let endDateStr: string;
         const nowStr = new Date().toISOString();
@@ -84,6 +67,7 @@ export default function HomePage() {
         } else if (entityData.startDate instanceof Date) {
             startDateStr = entityData.startDate.toISOString();
         } else {
+            console.warn(`HomePage: Entity ${docSnap.id} missing or invalid startDate. Using fallback.`);
             startDateStr = nowStr; 
         }
 
@@ -94,6 +78,7 @@ export default function HomePage() {
         } else if (entityData.endDate instanceof Date) {
             endDateStr = entityData.endDate.toISOString();
         } else {
+            console.warn(`HomePage: Entity ${docSnap.id} missing or invalid endDate. Using fallback.`);
             endDateStr = nowStr; 
         }
         
@@ -122,16 +107,27 @@ export default function HomePage() {
 
         if (isEntityCurrentlyActivatable(entityForCheck)) {
           const business = businessesMap.get(entityForCheck.businessId);
-          allActiveEntities.push({
-            ...entityForCheck,
-            businessName: business?.name || "Negocio Desconocido",
-            businessLogoUrl: business?.logoUrl,
-            businessCustomUrlPath: business?.customUrlPath,
-          });
+          if (business) {
+            allActiveAndCurrentEntities.push({
+              ...entityForCheck,
+              businessName: business.name || "Negocio Desconocido",
+              businessLogoUrl: business.logoUrl,
+              businessCustomUrlPath: business.customUrlPath,
+            });
+          } else {
+            console.warn(`HomePage: No business found for entity ${entityForCheck.id} with businessId ${entityForCheck.businessId}`);
+            // Optionally still add the entity without business info, or skip it
+            // For now, we'll add it so it's visible, but missing business details
+            allActiveAndCurrentEntities.push({
+              ...entityForCheck,
+              businessName: "Negocio Desconocido",
+            });
+          }
         }
       });
+      console.log("HomePage: Filtered active and current entities:", allActiveAndCurrentEntities.length);
       
-      const sortedEntities = allActiveEntities.sort((a, b) => {
+      const sortedEntities = allActiveAndCurrentEntities.sort((a, b) => {
         if (a.type === 'event' && b.type !== 'event') return -1;
         if (a.type !== 'event' && b.type === 'event') return 1;
         const aDate = a.startDate ? new Date(a.startDate).getTime() : 0;
@@ -147,7 +143,7 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchPublicEntitiesAndBusinesses();
@@ -159,17 +155,17 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" passHref className="flex items-center gap-2 group">
-                    <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
-                    <div>
-                      <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
-                      <p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p>
-                    </div>
-                </Link>
-                <PublicHeaderAuth />
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link href="/" passHref className="flex items-center gap-2 group">
+            <SocioVipLogo className="h-10 w-10 text-primary group-hover:animate-pulse" />
+            <div>
+              <span className="font-semibold text-2xl text-primary group-hover:text-primary/80">SocioVIP</span>
+              <p className="text-xs text-muted-foreground group-hover:text-primary/70">Conexiones que Premian</p>
             </div>
-        </header>
+          </Link>
+          <PublicHeaderAuth />
+        </div>
+      </header>
 
       <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
         {isLoading && (
@@ -204,8 +200,9 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {events.map((event) => {
-                    const hasValidCustomUrl = event.businessCustomUrlPath && event.businessCustomUrlPath.trim() !== "";
-                    const businessLink = hasValidCustomUrl ? `/b/${event.businessCustomUrlPath.trim()}` : null;
+                    const businessLink = event.businessCustomUrlPath && event.businessCustomUrlPath.trim() !== ""
+                      ? `/b/${event.businessCustomUrlPath.trim()}`
+                      : `/business/${event.businessId}`; // Fallback to ID-based URL
                     
                     return (
                     <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
@@ -221,19 +218,13 @@ export default function HomePage() {
                       </div>
                       <CardHeader className="pb-3">
                         <CardTitle className="text-xl hover:text-primary transition-colors">
-                          {event.name}
+                            {event.name}
                         </CardTitle>
                         {event.businessName && (
-                          businessLink ? (
-                            <Link href={businessLink} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
-                              <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> 
-                              {event.businessName}
-                            </Link>
-                          ) : (
-                            <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {event.businessName}
-                            </p>
-                          )
+                          <Link href={businessLink} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
+                            <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> 
+                            {event.businessName}
+                          </Link>
                         )}
                       </CardHeader>
                       <CardContent className="flex-grow">
@@ -243,18 +234,12 @@ export default function HomePage() {
                         </p>
                       </CardContent>
                        <CardFooter>
-                         {businessLink ? (
-                            <Link href={businessLink} passHref className="w-full">
-                              <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                                Ver Detalles del Evento
-                                <ExternalLink className="ml-2 h-4 w-4" />
-                              </Button>
-                            </Link>
-                         ) : (
-                            <Button className="w-full" disabled>
-                                Página del Negocio No Disponible
-                            </Button>
-                         )}
+                        <Link href={businessLink} passHref className="w-full">
+                          <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                            Ver Detalles
+                            <ExternalLink className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
                       </CardFooter>
                     </Card>
                   )})}
@@ -270,8 +255,9 @@ export default function HomePage() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {promotions.map((promo) => {
-                    const hasValidCustomUrl = promo.businessCustomUrlPath && promo.businessCustomUrlPath.trim() !== "";
-                    const businessLink = hasValidCustomUrl ? `/b/${promo.businessCustomUrlPath.trim()}` : null;
+                     const businessLink = promo.businessCustomUrlPath && promo.businessCustomUrlPath.trim() !== ""
+                     ? `/b/${promo.businessCustomUrlPath.trim()}`
+                     : `/business/${promo.businessId}`; // Fallback to ID-based URL
 
                     return (
                     <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
@@ -290,16 +276,10 @@ export default function HomePage() {
                            {promo.name}
                         </CardTitle>
                          {promo.businessName && (
-                           businessLink ? (
-                            <Link href={businessLink} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
-                              <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> 
-                              {promo.businessName}
-                            </Link>
-                          ) : (
-                             <p className="text-sm text-muted-foreground flex items-center mt-1">
-                               <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> {promo.businessName}
-                            </p>
-                          )
+                           <Link href={businessLink} className="text-sm text-muted-foreground hover:underline hover:text-primary flex items-center mt-1">
+                             <Building className="h-4 w-4 mr-1.5 flex-shrink-0" /> 
+                             {promo.businessName}
+                           </Link>
                          )}
                       </CardHeader>
                       <CardContent className="flex-grow">
@@ -309,18 +289,12 @@ export default function HomePage() {
                         </p>
                       </CardContent>
                        <CardFooter>
-                         {businessLink ? (
-                           <Link href={businessLink} passHref className="w-full">
-                            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-                              Ver Detalles de la Promoción
-                              <ExternalLink className="ml-2 h-4 w-4" />
-                            </Button>
-                          </Link>
-                         ) : (
-                            <Button className="w-full" disabled>
-                                Página del Negocio No Disponible
-                            </Button>
-                         )}
+                        <Link href={businessLink} passHref className="w-full">
+                          <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
+                            Ver Detalles
+                            <ExternalLink className="ml-2 h-4 w-4" />
+                          </Button>
+                        </Link>
                       </CardFooter>
                     </Card>
                   )})}
@@ -332,7 +306,9 @@ export default function HomePage() {
       </main>
 
       <footer className="w-full mt-12 py-8 bg-muted/50 text-center">
-          <p className="text-sm text-muted-foreground">Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link></p>
+        <p className="text-sm text-muted-foreground">
+          Copyright ©{new Date().getFullYear()} Todos los derechos reservados | Plataforma de <Link href="/" className="hover:text-primary underline">sociosvip.app</Link>
+        </p>
       </footer>
     </div>
   );
