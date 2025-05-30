@@ -25,7 +25,7 @@ interface CreateCodesDialogProps {
   onOpenChange: (open: boolean) => void;
   entityName: string;
   entityId: string;
-  onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string) => void;
+  onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string) => void; // observation es string o undefined
   existingCodesValues: string[]; 
   isSubmittingMain?: boolean; 
   currentUserProfileName?: string;
@@ -92,7 +92,7 @@ export function CreateCodesDialog({
       }
 
       currentAndNewCodes.add(newCodeValue);
-      const codeObservation = observation.trim() === "" ? null : observation.trim();
+      const codeObservation = observation.trim() === "" ? undefined : observation.trim(); // Use undefined if empty
       newCodesBatch.push({
         id: `code-${entityId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
         entityId: entityId,
@@ -191,7 +191,7 @@ export function CreateCodesDialog({
              <p className="text-sm text-muted-foreground">
               Estos códigos se han añadido a '{entityName}'.
               {currentUserProfileName?.toLowerCase().includes("promotor") 
-                ? " Estos códigos son simulados y deben ser confirmados por el negocio." 
+                ? "" // No mostrar mensaje de simulación si el promotor ahora guarda en Firestore
                 : " Puedes verlos y gestionarlos en la sección 'Ver Códigos'."
               }
             </p>

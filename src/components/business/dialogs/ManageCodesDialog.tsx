@@ -63,7 +63,7 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
     const batchKeyBase = `${currentGeneratedTimeSignature}-${currentObservation || 'no-obs'}`;
     
     if (currentBatch.length > 1) {
-      const batchKey = `${batchKeyBase}-${i}-${currentCode.id}`; // Use first code's ID in batchKey for more stability
+      const batchKey = `${batchKeyBase}-${i}-${currentCode.id}`; 
       processedItems.push({
         isBatch: true,
         id: batchKey,
@@ -77,7 +77,7 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
     } else {
       processedItems.push({
         isBatch: false,
-        id: currentCode.id, // Use the actual code ID as the React key
+        id: currentCode.id, 
         singleCode: currentCode,
       });
       i++;
@@ -92,7 +92,8 @@ interface ManageCodesDialogProps {
   entity: BusinessManagedEntity | null; 
   onCodesUpdated: (entityId: string, updatedCodes: GeneratedCode[]) => void;
   onRequestCreateNewCodes: () => void;
-  isPromoterView?: boolean; // Added to distinguish view for promoter
+  isPromoterView?: boolean; 
+  currentUserProfileName?: string; // Necesario para la lógica de eliminación del promotor
 }
 
 export function ManageCodesDialog({
@@ -101,7 +102,8 @@ export function ManageCodesDialog({
     entity,
     onCodesUpdated,
     onRequestCreateNewCodes,
-    isPromoterView = false, // Default to false
+    isPromoterView = false, 
+    currentUserProfileName,
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const { toast } = useToast();
@@ -109,13 +111,17 @@ export function ManageCodesDialog({
 
   useEffect(() => {
     if (open && entity?.generatedCodes) {
-      setInternalCodes([...entity.generatedCodes]); // Use a copy for local manipulation
+      // Si es vista de promotor, filtrar solo sus códigos
+      const codesToDisplay = isPromoterView 
+        ? (entity.generatedCodes || []).filter(c => c.generatedByName === currentUserProfileName)
+        : (entity.generatedCodes || []);
+      setInternalCodes([...codesToDisplay]); 
       setExpandedBatches({}); 
     } else if (open && (!entity || !entity.generatedCodes)) {
       setInternalCodes([]);
       setExpandedBatches({});
     }
-  }, [entity, open]);
+  }, [entity, open, isPromoterView, currentUserProfileName]);
 
   const processedAndGroupedCodes = useMemo(() => groupAndSortCodes(internalCodes), [internalCodes]);
 
@@ -126,6 +132,12 @@ export function ManageCodesDialog({
   const handleDeleteCode = (codeIdToDelete: string) => {
     if (!entity || !codeIdToDelete) return;
     const codeToDelete = internalCodes.find(c => c.id === codeIdToDelete);
+
+    if (isPromoterView && codeToDelete?.generatedByName !== currentUserProfileName) {
+        toast({ title: "Acción no permitida", description: "Solo puedes eliminar códigos generados por ti.", variant: "destructive" });
+        return;
+    }
+
     if (codeToDelete && codeToDelete.status === 'redeemed') {
         toast({
             title: "Acción no permitida",
@@ -135,8 +147,8 @@ export function ManageCodesDialog({
         return;
     }
     const updatedRawCodes = internalCodes.filter(c => c.id !== codeIdToDelete);
-    setInternalCodes(updatedRawCodes); // Update local state first for immediate UI feedback
-    onCodesUpdated(entity.id, updatedRawCodes); // Notify parent to update Firestore/main state
+    setInternalCodes(updatedRawCodes); 
+    onCodesUpdated(entity.id, updatedRawCodes); 
     toast({ title: "Código Eliminado", description: `El código "${codeToDelete?.value}" ha sido eliminado.`, variant: "destructive" });
   };
 
@@ -144,7 +156,10 @@ export function ManageCodesDialog({
     if (!entity || !batchItem.isBatch || !batchItem.codesInBatch || !batchItem.batchId) return;
 
     const codesToDeleteFromBatchIds = batchItem.codesInBatch
-      .filter(c => c.status !== 'redeemed')
+      .filter(c => {
+        const canDelete = c.status !== 'redeemed' && (!isPromoterView || c.generatedByName === currentUserProfileName);
+        return canDelete;
+      })
       .map(c => c.id);
     
     if (codesToDeleteFromBatchIds.length === 0) {
@@ -154,11 +169,10 @@ export function ManageCodesDialog({
 
     const updatedRawCodes = internalCodes.filter(c => !codesToDeleteFromBatchIds.includes(c.id));
     
-    setInternalCodes(updatedRawCodes); // Update local state
-    onCodesUpdated(entity.id, updatedRawCodes); // Notify parent
+    setInternalCodes(updatedRawCodes); 
+    onCodesUpdated(entity.id, updatedRawCodes); 
     toast({ title: "Códigos del Lote Eliminados", description: `${codesToDeleteFromBatchIds.length} código(s) no canjeado(s) del lote han sido eliminados.`, variant: "destructive" });
     
-    // If all codes from this batch were removed, collapse it
     const remainingInBatch = updatedRawCodes.filter(c => batchItem.codesInBatch?.some(orig => orig.id === c.id));
     if (remainingInBatch.length === 0 && batchItem.batchId) {
       setExpandedBatches(prev => {
@@ -207,12 +221,15 @@ export function ManageCodesDialog({
 
   if (!entity) return null; 
 
-  const renderCodeRow = (code: GeneratedCode | undefined, isInsideBatch = false) => {
+  const renderCodeRow = (code: GeneratedCode | undefined, isInsideBatch = false, batchId?: string) => {
     if (!code || !code.id) {
         console.warn("ManageCodesDialog: Attempted to render a code without a valid ID.", code);
         return null; 
     }
-    const uniqueKeyForRow = `code-row-${code.id}-${Math.random()}`; // Make key more unique if IDs might clash across renders
+    const uniqueKeyForRow = `code-row-${code.id}-${batchId || 'single'}`;
+
+    const canPromoterDeleteThisCode = isPromoterView && code.generatedByName === currentUserProfileName && code.status !== 'redeemed';
+    const canAdminDeleteThisCode = !isPromoterView && code.status !== 'redeemed';
 
     return (
     <TableRow 
@@ -220,7 +237,7 @@ export function ManageCodesDialog({
         className={cn(
             "text-xs", 
             isInsideBatch ? "bg-muted/20 hover:bg-muted/40" : "hover:bg-muted/20",
-            isInsideBatch && "border-l-2 border-primary/30" // Visual indicator for batch codes
+            isInsideBatch && "border-l-2 border-primary/30" 
         )}
     >
       <TableCell className={cn("font-mono py-1.5 px-2", isInsideBatch && "pl-4")}>
@@ -247,7 +264,7 @@ export function ManageCodesDialog({
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
       </TableCell>
       <TableCell className="text-right py-1.5 px-2">
-          {!isPromoterView && code.status !== 'redeemed' && ( // Hide delete for promoter or if redeemed
+          {(canAdminDeleteThisCode || canPromoterDeleteThisCode) && ( 
                <AlertDialog>
                   <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive h-6 w-6" onClick={(e) => e.stopPropagation()}>
@@ -285,7 +302,7 @@ export function ManageCodesDialog({
         <DialogHeader>
           <DialogTitle>Códigos para: {entity.name}</DialogTitle>
           <DialogDescription>
-            Visualiza y gestiona los códigos existentes. {isPromoterView ? "Solo puedes ver y copiar los códigos que tú has generado." : "Se agrupan si se crearon juntos con la misma observación y por el mismo usuario."}
+            Visualiza y gestiona los códigos existentes. {isPromoterView ? "Solo puedes gestionar los códigos que tú has generado." : "Se agrupan si se crearon juntos con la misma observación y por el mismo usuario."}
           </DialogDescription>
         </DialogHeader>
 
@@ -313,14 +330,16 @@ export function ManageCodesDialog({
                   <TableHead className="px-2 py-2">Observación</TableHead>
                   <TableHead className="px-2 py-2">Fecha Creación</TableHead>
                   <TableHead className="px-2 py-2">Fecha Canje</TableHead>
-                  <TableHead className="text-right px-2 py-2">{isPromoterView ? "" : "Acción"}</TableHead>
+                  <TableHead className="text-right px-2 py-2">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {processedAndGroupedCodes.map((item) => {
                   if (item.isBatch && item.codesInBatch && item.batchId) {
                     const isExpanded = !!expandedBatches[item.batchId];
-                    const nonRedeemedInBatchCount = item.codesInBatch.filter(c => c.status !== 'redeemed').length;
+                    const nonRedeemedInBatch = item.codesInBatch.filter(c => c.status !== 'redeemed' && (!isPromoterView || c.generatedByName === currentUserProfileName));
+                    const nonRedeemedInBatchCount = nonRedeemedInBatch.length;
+
                     return (
                       <React.Fragment key={item.id}>
                         <TableRow 
@@ -329,64 +348,58 @@ export function ManageCodesDialog({
                             data-state={isExpanded ? "open" : "closed"}
                         >
                           <TableCell colSpan={7} className="py-2 px-3 text-xs">
-                            <div className="flex items-center justify-between group w-full hover:bg-transparent">
+                            <div className="flex items-center justify-between group w-full">
                               <div className="flex items-center">
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
                                 <span>Lote de {item.codesInBatch.length} códigos (Por: {item.generatedByName || 'N/A'})</span>
                                 {item.generatedDate && <span className="text-muted-foreground ml-1 text-xs"> - {format(new Date(item.generatedDate), "dd/MM/yy HH:mm", { locale: es })}</span>}
-                                {item.observation && <span className="ml-2 text-muted-foreground text-xs truncate max-w-[150px] sm:max-w-xs" title={item.observation}> - Obs: {item.observation}</span>}
+                              </div>
+                              <div className="flex-grow mx-2 text-muted-foreground text-xs truncate text-center" title={item.observation || undefined}>
+                                {item.observation ? `Obs: ${item.observation}` : "Sin observación"}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    className="text-xs h-auto py-1 px-1.5"
+                                    onClick={(e) => { e.stopPropagation(); handleCopyBatchCodes(item.codesInBatch);}}
+                                >
+                                    <Copy className="mr-1 h-3 w-3" /> Copiar Lote ({item.codesInBatch!.length})
+                                </Button>
+                                {nonRedeemedInBatchCount > 0 && (
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="xs"
+                                                className="text-destructive hover:text-destructive text-xs h-auto py-1 px-1.5"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Trash2 className="mr-1 h-3 w-3" /> Eliminar No Canjeados ({nonRedeemedInBatchCount})
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2"/>¿Eliminar Códigos del Lote?</UIAlertDialogTitle>
+                                                <UIDialogDescription>
+                                                    Se eliminarán {nonRedeemedInBatchCount} código(s) no canjeado(s) de este lote (Observación: {item.observation || "N/A"}). 
+                                                    Los códigos ya canjeados no se verán afectados. Esta acción no se puede deshacer.
+                                                </UIDialogDescription>
+                                            </AlertDialogHeader>
+                                            <UIAlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteBatchCodes(item)} className="bg-destructive hover:bg-destructive/90">
+                                                    Sí, Eliminar No Canjeados
+                                                </AlertDialogAction>
+                                            </UIAlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                )}
                               </div>
                             </div>
                           </TableCell>
                         </TableRow>
-                        {isExpanded && (
-                          <>
-                            <TableRow className="bg-muted/10 hover:bg-muted/10">
-                                <TableCell colSpan={7} className="pt-1 pb-1.5 px-6">
-                                    <div className="flex gap-2 items-center">
-                                        <Button
-                                            variant="outline"
-                                            size="xs"
-                                            className="text-xs h-auto py-1 px-1.5"
-                                            onClick={(e) => { e.stopPropagation(); handleCopyBatchCodes(item.codesInBatch);}}
-                                        >
-                                            <Copy className="mr-1 h-3 w-3" /> Copiar Lote ({item.codesInBatch!.length})
-                                        </Button>
-                                        {!isPromoterView && nonRedeemedInBatchCount > 0 && ( // Hide for promoter
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button
-                                                        variant="destructive"
-                                                        size="xs"
-                                                        className="text-xs h-auto py-1 px-1.5"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <Trash2 className="mr-1 h-3 w-3" /> Eliminar No Canjeados ({nonRedeemedInBatchCount})
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2"/>¿Eliminar Códigos del Lote?</UIAlertDialogTitle>
-                                                        <UIDialogDescription>
-                                                            Se eliminarán {nonRedeemedInBatchCount} código(s) no canjeado(s) de este lote (Observación: {item.observation || "N/A"}). 
-                                                            Los códigos ya canjeados no se verán afectados. Esta acción no se puede deshacer.
-                                                        </UIDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <UIAlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteBatchCodes(item)} className="bg-destructive hover:bg-destructive/90">
-                                                            Sí, Eliminar No Canjeados
-                                                        </AlertDialogAction>
-                                                    </UIAlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        )}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            {item.codesInBatch.map(code => renderCodeRow(code, true))}
-                          </>
-                        )}
+                        {isExpanded && item.codesInBatch.map(code => renderCodeRow(code, true, item.batchId))}
                       </React.Fragment>
                     );
                   } else if (item.singleCode) {
