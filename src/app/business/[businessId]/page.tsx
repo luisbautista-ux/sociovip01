@@ -1,9 +1,10 @@
-"use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+"use client"; // This directive applies to BusinessPageClientComponent and its exports
+
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; // Corrected: was missing for client component previously
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,9 +15,9 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc, updateDoc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, addDoc, serverTimestamp, limit, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, NewQrClientFormData } from "@/lib/types";
-import { format, parseISO, set, startOfDay, endOfDay, getMonth } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { Loader2, Building, Tag, CalendarDays, ExternalLink, QrCode as QrCodeIcon, Home, User, ShieldCheck, Download, Info, AlertTriangle, PackageOpen, UserCheck as UserCheckIcon, Edit, LogOut, UserCircle } from "lucide-react";
@@ -41,33 +42,46 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter as ShadcnAlertDialogFooterAliased, // Alias for footer within AlertDialog
+  AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
-  AlertDialogTitle as UIAlertDialogTitleAliased, // Alias for title within AlertDialog
+  AlertDialogTitle as UIAlertDialogTitleAliased,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-
 // Server Component Shell
+// This default export is the Server Component.
 export default function BusinessPublicPageById({ params }: { params: { businessId: string } }) {
-  if (!params.businessId) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
-          <Link href="/" passHref>
-            <Button variant="outline" className="mt-6">Volver a la Página Principal</Button>
-          </Link>
-      </div>
-    );
-  }
+  // We pass the params directly to the client component.
+  // The check for businessId will happen inside BusinessPageClientComponent.
   return (
-    <BusinessPageClientComponent businessIdFromParams={params.businessId} />
+    <BusinessPageClientComponent paramsFromShell={params} />
   );
 }
 
+// Schemas defined at the top level of the module, accessible by the client component
+const specificCodeFormSchema = z.object({
+  specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
+});
+type SpecificCodeFormValues = z.infer<typeof specificCodeFormSchema>;
+
+const dniSchema = z.object({
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+});
+type DniFormValues = z.infer<typeof dniSchema>;
+
+const newQrClientSchema = z.object({
+  name: z.string().min(2, { message: "Nombre es requerido." }),
+  surname: z.string().min(2, { message: "Apellido es requerido." }),
+  phone: z.string().min(7, { message: "Celular es requerido." }).regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
+  dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+});
+type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
+
+
 // Client Component for actual page logic
-function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromParams?: string }) {
+function BusinessPageClientComponent({ paramsFromShell }: { paramsFromShell: { businessId?: string } }) {
+  const businessIdFromParams = paramsFromShell?.businessId;
   const router = useRouter();
   const { toast } = useToast();
   const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
@@ -90,24 +104,6 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormValues | null>(null);
 
-  const specificCodeFormSchema = z.object({
-    specificCode: z.string().length(9, "El código debe tener 9 caracteres alfanuméricos.").regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
-  });
-  type SpecificCodeFormValues = z.infer<typeof specificCodeFormSchema>;
-
-  const dniSchema = z.object({
-    dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
-  });
-  type DniFormValues = z.infer<typeof dniSchema>;
-
-  const newQrClientSchema = z.object({
-    name: z.string().min(2, { message: "Nombre es requerido." }),
-    surname: z.string().min(2, { message: "Apellido es requerido." }),
-    phone: z.string().min(7, { message: "Celular es requerido." }).regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
-    dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
-    dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
-  });
-  type NewQrClientFormValues = z.infer<typeof newQrClientSchema>;
 
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(dniSchema),
@@ -119,126 +115,124 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
 
-  const fetchBusinessDataById = useCallback(async () => {
-    if (!businessIdFromParams) {
-      console.error("BusinessPage (Client - by ID): businessIdFromParams is missing.");
-      setError("ID de negocio no proporcionado para cargar la página.");
-      setIsLoading(false);
-      return;
-    }
+  const fetchBusinessDataById = useCallback(async (id: string) => {
     setIsLoading(true);
     setError(null);
-    console.log("BusinessPage (Client - by ID): Fetching business with ID:", businessIdFromParams);
+    console.log("BusinessPage (Client - by ID): Fetching business with ID:", id);
 
     try {
-      const businessDocRef = doc(db, "businesses", businessIdFromParams);
+      const businessDocRef = doc(db, "businesses", id);
       const businessSnap = await getDoc(businessDocRef);
 
       if (!businessSnap.exists()) {
-        console.error("BusinessPage (Client - by ID): No business found for ID:", businessIdFromParams);
-        setError(`Negocio no encontrado. Verifica que el ID sea correcto.`);
+        console.error("BusinessPage (Client - by ID): No business found for ID:", id);
+        setError(`Negocio no encontrado. Verifica que el ID (${id}) sea correcto.`);
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
-      } else {
-        const bizData = businessSnap.data();
-        const fetchedBusiness: Business = {
-          id: businessSnap.id,
-          name: bizData.name || "Nombre de Negocio Desconocido",
-          contactEmail: bizData.contactEmail || "",
-          joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
-          customUrlPath: bizData.customUrlPath || undefined,
-          logoUrl: bizData.logoUrl || undefined,
-          publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
-          slogan: bizData.slogan || undefined,
-          publicContactEmail: bizData.publicContactEmail || undefined,
-          publicPhone: bizData.publicPhone || undefined,
-          publicAddress: bizData.publicAddress || undefined,
-          ruc: bizData.ruc,
-          razonSocial: bizData.razonSocial,
-          department: bizData.department,
-          province: bizData.province,
-          district: bizData.district,
-          address: bizData.address,
-          managerName: bizData.managerName,
-          managerDni: bizData.managerDni,
-          businessType: bizData.businessType,
-        };
+        setIsLoading(false);
+        return;
+      }
+      
+      const bizData = businessSnap.data();
+      const fetchedBusiness: Business = {
+        id: businessSnap.id,
+        name: bizData.name || "Nombre de Negocio Desconocido",
+        contactEmail: bizData.contactEmail || "",
+        joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : String(bizData.joinDate || new Date().toISOString()),
+        customUrlPath: bizData.customUrlPath || undefined,
+        logoUrl: bizData.logoUrl || undefined,
+        publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
+        slogan: bizData.slogan || undefined,
+        publicContactEmail: bizData.publicContactEmail || undefined,
+        publicPhone: bizData.publicPhone || undefined,
+        publicAddress: bizData.publicAddress || undefined,
+        ruc: bizData.ruc,
+        razonSocial: bizData.razonSocial,
+        department: bizData.department,
+        province: bizData.province,
+        district: bizData.district,
+        address: bizData.address,
+        managerName: bizData.managerName,
+        managerDni: bizData.managerDni,
+        businessType: bizData.businessType,
+      };
+      
+      if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
+        console.log(`BusinessPage (Client - by ID): Business ${id} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
+        router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
+        // No need to setIsLoading(false) here as a redirect is happening
+        return; 
+      }
+      
+      setBusinessDetails(fetchedBusiness);
+      console.log("BusinessPage (Client - by ID): Business data found (no customUrlPath, rendering here):", fetchedBusiness.name, "ID:", fetchedBusiness.id);
+
+      const entitiesQuery = query(
+        collection(db, "businessEntities"),
+        where("businessId", "==", fetchedBusiness.id),
+        where("isActive", "==", true)
+      );
+      const entitiesSnapshot = await getDocs(entitiesQuery);
+      console.log(`BusinessPage (Client - by ID): Fetched ${entitiesSnapshot.docs.length} active entities for business ${fetchedBusiness.id}.`);
+      
+      const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
+      entitiesSnapshot.forEach(docSnap => {
+        const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & { startDate: Timestamp | string, endDate: Timestamp | string, createdAt?: Timestamp | string };
         
-        if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
-          console.log(`BusinessPage (Client - by ID): Business ${businessIdFromParams} has customUrlPath '${fetchedBusiness.customUrlPath}'. Redirecting to /b/${fetchedBusiness.customUrlPath.trim()}`);
-          router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-          return; 
+        let startDateStr: string;
+        let endDateStr: string;
+        const nowStr = new Date().toISOString();
+
+        if (entityData.startDate instanceof Timestamp) {
+            startDateStr = entityData.startDate.toDate().toISOString();
+        } else if (typeof entityData.startDate === 'string') {
+            startDateStr = entityData.startDate;
+        } else if (entityData.startDate instanceof Date) { // Should not happen if from Firestore
+            startDateStr = entityData.startDate.toISOString();
+        } else {
+            console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
+            startDateStr = nowStr; 
+        }
+
+        if (entityData.endDate instanceof Timestamp) {
+            endDateStr = entityData.endDate.toDate().toISOString();
+        } else if (typeof entityData.endDate === 'string') {
+            endDateStr = entityData.endDate;
+        } else if (entityData.endDate instanceof Date) { // Should not happen if from Firestore
+            endDateStr = entityData.endDate.toISOString();
+        } else {
+            console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
+            endDateStr = nowStr; 
         }
         
-        setBusinessDetails(fetchedBusiness);
-        console.log("BusinessPage (Client - by ID): Business data found (no customUrlPath, rendering here):", fetchedBusiness.name, "ID:", fetchedBusiness.id);
+        const entityForCheck: BusinessManagedEntity = {
+          id: docSnap.id,
+          businessId: entityData.businessId,
+          type: entityData.type,
+          name: entityData.name || "Entidad sin nombre",
+          description: entityData.description || "",
+          startDate: startDateStr,
+          endDate: endDateStr,
+          isActive: entityData.isActive === undefined ? true : entityData.isActive,
+          usageLimit: entityData.usageLimit || 0,
+          maxAttendance: entityData.maxAttendance || 0,
+          ticketTypes: Array.isArray(entityData.ticketTypes) ? entityData.ticketTypes.map(tt => sanitizeObjectForFirestore({...tt})) : [],
+          eventBoxes: Array.isArray(entityData.eventBoxes) ? entityData.eventBoxes.map(eb => sanitizeObjectForFirestore({...eb})) : [],
+          assignedPromoters: Array.isArray(entityData.assignedPromoters) ? entityData.assignedPromoters.map(ap => sanitizeObjectForFirestore({...ap})) : [],
+          generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
+          imageUrl: entityData.imageUrl,
+          aiHint: entityData.aiHint,
+          termsAndConditions: entityData.termsAndConditions,
+          createdAt: entityData.createdAt instanceof Timestamp 
+            ? entityData.createdAt.toDate().toISOString() 
+            : (typeof entityData.createdAt === 'string' ? entityData.createdAt : undefined),
+        };
 
-        const entitiesQuery = query(
-          collection(db, "businessEntities"),
-          where("businessId", "==", fetchedBusiness.id),
-          where("isActive", "==", true)
-        );
-        const entitiesSnapshot = await getDocs(entitiesQuery);
-        console.log(`BusinessPage (Client - by ID): Fetched ${entitiesSnapshot.docs.length} active entities for business ${fetchedBusiness.id}.`);
-        
-        const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
-        entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data();
-          let startDateStr: string;
-          let endDateStr: string;
-          const nowStr = new Date().toISOString();
-
-          if (entityData.startDate instanceof Timestamp) {
-              startDateStr = entityData.startDate.toDate().toISOString();
-          } else if (typeof entityData.startDate === 'string') {
-              startDateStr = entityData.startDate;
-          } else if (entityData.startDate instanceof Date) {
-              startDateStr = entityData.startDate.toISOString();
-          } else {
-              console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
-              startDateStr = nowStr; 
-          }
-
-          if (entityData.endDate instanceof Timestamp) {
-              endDateStr = entityData.endDate.toDate().toISOString();
-          } else if (typeof entityData.endDate === 'string') {
-              endDateStr = entityData.endDate;
-          } else if (entityData.endDate instanceof Date) {
-              endDateStr = entityData.endDate.toISOString();
-          } else {
-              console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
-              endDateStr = nowStr; 
-          }
-          
-          const entityForCheck: BusinessManagedEntity = {
-            id: docSnap.id,
-            businessId: entityData.businessId,
-            type: entityData.type,
-            name: entityData.name || "Entidad sin nombre",
-            description: entityData.description || "",
-            startDate: startDateStr,
-            endDate: endDateStr,
-            isActive: entityData.isActive === undefined ? true : entityData.isActive,
-            usageLimit: entityData.usageLimit || 0,
-            maxAttendance: entityData.maxAttendance || 0,
-            ticketTypes: entityData.ticketTypes || [],
-            eventBoxes: entityData.eventBoxes || [],
-            assignedPromoters: entityData.assignedPromoters || [],
-            generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [],
-            imageUrl: entityData.imageUrl,
-            aiHint: entityData.aiHint,
-            termsAndConditions: entityData.termsAndConditions,
-            createdAt: entityData.createdAt instanceof Timestamp 
-              ? entityData.createdAt.toDate().toISOString() 
-              : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
-          };
-
-          if (isEntityCurrentlyActivatable(entityForCheck)) {
-            allActiveAndCurrentEntities.push(entityForCheck);
-          }
-        });
-        setActiveEntitiesForBusiness(allActiveAndCurrentEntities.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
-      }
+        if (isEntityCurrentlyActivatable(entityForCheck)) {
+          allActiveAndCurrentEntities.push(entityForCheck);
+        }
+      });
+      setActiveEntitiesForBusiness(allActiveAndCurrentEntities.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
     } catch (err: any) {
       console.error("BusinessPage (Client - by ID): Error fetching business data by ID:", err);
       setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
@@ -247,17 +241,31 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     } finally {
       setIsLoading(false);
     }
-  }, [businessIdFromParams, router, toast]); 
+  }, [router, toast]); 
 
   useEffect(() => {
     if (businessIdFromParams) {
-      fetchBusinessDataById();
+      fetchBusinessDataById(businessIdFromParams);
     } else {
-      setError("ID de negocio no especificado en la URL.");
-      setIsLoading(false);
+      // This case is now handled by the initial check in the component's body.
+      // setError("ID de negocio no especificado en la URL.");
+      // setIsLoading(false);
     }
   }, [businessIdFromParams, fetchBusinessDataById]);
 
+  //Moved from Server Component Shell
+  if (!businessIdFromParams) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-destructive">ID de Negocio no proporcionado</h1>
+          <p className="text-muted-foreground mt-2">La URL no especificó un ID de negocio.</p>
+          <Link href="/" passHref>
+            <Button variant="link" className="mt-6 text-primary">Volver a la Página Principal</Button>
+          </Link>
+      </div>
+    );
+  }
 
   const handleSpecificCodeSubmit = (entity: BusinessManagedEntity, codeInputValue: string) => {
     const codeToValidate = codeInputValue.trim().toUpperCase();
@@ -269,8 +277,12 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         toast({title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive"});
         return;
     }
+    if (!entity.generatedCodes) {
+      toast({title: "Sin Códigos", description: `Esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} no tiene códigos generados.`, variant: "destructive"});
+      return;
+    }
 
-    const foundCodeObject = entity.generatedCodes?.find(
+    const foundCodeObject = entity.generatedCodes.find(
       (gc) => gc.value.toUpperCase() === codeToValidate && gc.status === 'available'
     );
 
@@ -614,7 +626,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
         else toast({ title: "Error", description: "URL de QR no generada aún.", variant: "destructive" });
     }; 
 
-    if (businessDetails.logoUrl) {
+    if (businessDetails?.logoUrl) {
         businessLogo.onload = drawContent;
         businessLogo.onerror = () => {
             console.warn("Logo del negocio no se pudo cargar. Se procederá sin él.");
@@ -638,6 +650,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     setShowDniModal(false);
   };
 
+  // Form component for each specific code entry
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
     const form = useForm<SpecificCodeFormValues>({
       resolver: zodResolver(specificCodeFormSchema),
@@ -660,7 +673,7 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                     {...field}
                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                     maxLength={9}
-                    className="text-sm h-9 w-full" // Added w-full
+                    className="text-sm h-9 w-full"
                     disabled={isLoadingQrFlow}
                   />
                 </FormControl>
@@ -723,7 +736,6 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
   if (pageViewState === 'qrDisplay' && qrData && activeEntityForQr && businessDetails) {
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col">
-             {/* Header removed as per user request for auth elements to be in footer */}
             <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
                 <Card className="w-full max-w-md shadow-xl">
                     <CardHeader className="text-center">
@@ -759,11 +771,54 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                             <Download className="mr-2 h-4 w-4" /> Guardar QR con Detalles
                         </Button>
                         <Button onClick={resetQrFlow} className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
-                             Volver a {businessDetails.name}
+                             Ver Otras Promociones/Eventos del Negocio
                         </Button>
                     </CardFooter>
                 </Card>
             </main>
+             <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
+                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div className="flex items-center gap-3">
+                    {!loadingAuth && !loadingProfile && (
+                    <>
+                        {currentUser && userProfile ? (
+                        <>
+                            <span className="text-foreground flex items-center">
+                            <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
+                            {userProfile.name || currentUser.email?.split('@')[0]}
+                            </span>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>
+                                    <ShadcnAlertDialogFooterAliased>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
+                                    </ShadcnAlertDialogFooterAliased>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                            <Link href="/auth/dispatcher" passHref>
+                            <Button variant="outline" size="sm">Ir a Administración</Button>
+                            </Link>
+                        </>
+                        ) : (
+                        <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
+                            Iniciar Sesión
+                        </Button>
+                        )}
+                    </>
+                    )}
+                    {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                </div>
+                <div className="text-muted-foreground">
+                    <Link href="/" className="hover:text-primary hover:underline">
+                    Plataforma de sociosvip.app
+                    </Link>
+                </div>
+                </div>
+            </footer>
         </div>
     );
   }
@@ -775,7 +830,16 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-        {/* Main page header (SocioVIP branding) removed from business specific page */}
+        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <Link href="/" passHref className="flex items-center gap-2 group">
+                <SocioVipLogo className="h-8 w-8 text-primary group-hover:animate-pulse" />
+                <span className="font-semibold text-xl text-primary group-hover:text-primary/80">SocioVIP</span>
+            </Link>
+            {/* PublicHeaderAuth is now part of the footer */}
+            </div>
+        </header>
+
         {businessDetails.publicCoverImageUrl && (
           <div className="relative h-48 md:h-64 lg:h-80 w-full">
             <Image
@@ -828,7 +892,6 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
                     <p className="text-xs text-muted-foreground">Del {format(parseISO(event.startDate), "dd MMM", { locale: es })} al {format(parseISO(event.endDate), "dd MMM, yyyy", { locale: es })}</p>
-                    {/* Terms and conditions removed from display */}
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t">
                      <SpecificCodeEntryForm entity={event} />
@@ -856,7 +919,6 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
                     <p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p>
-                     {/* Terms and conditions removed from display */}
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t">
                     <SpecificCodeEntryForm entity={promo} />
@@ -1060,3 +1122,5 @@ function BusinessPageClientComponent({ businessIdFromParams }: { businessIdFromP
     </div>
   );
 }
+
+    
