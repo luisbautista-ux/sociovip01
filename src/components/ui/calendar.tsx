@@ -3,7 +3,7 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker, type CaptionProps } from "react-day-picker"
+import { DayPicker, type CaptionProps, useCaption } from "react-day-picker" // Import useCaption
 
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
@@ -18,17 +18,19 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  ...props
+  ...props // These are the DayPickerProps (like fromYear, toYear) passed to DayPicker
 }: CalendarProps) {
 
-  // Custom Caption to use Shadcn Select for month/year
-  function CustomCaption(captionProps: CaptionProps) {
-    const { goToMonth, displayMonth } = captionProps; 
+  // Custom Caption now uses the useCaption hook
+  function CustomCaptionComponent() { // Renamed to avoid confusion
+    const { displayMonth, goToMonth, previousMonth: prevMonthNav, nextMonth: nextMonthNav } = useCaption();
+    
+    // Props for year/month dropdowns still come from the outer Calendar component's props
     const { fromYear, toYear, fromMonth, toMonth, fromDate, toDate } = props;
 
     const handleYearChange = (value: string) => {
       if (!displayMonth) {
-        console.error("Calendar CustomCaption: displayMonth is not available in handleYearChange.", captionProps);
+        console.error("Calendar CustomCaption: displayMonth (from useCaption) is not available in handleYearChange.");
         return;
       }
       const newDate = new Date(displayMonth);
@@ -36,13 +38,13 @@ function Calendar({
       if (typeof goToMonth === 'function') {
         goToMonth(newDate);
       } else {
-        console.error("Calendar CustomCaption: goToMonth is not available or not a function in handleYearChange.", captionProps);
+        console.error("Calendar CustomCaption: goToMonth (from useCaption) is not available or not a function in handleYearChange.");
       }
     };
 
     const handleMonthChange = (value: string) => {
       if (!displayMonth) {
-        console.error("Calendar CustomCaption: displayMonth is not available in handleMonthChange.", captionProps);
+        console.error("Calendar CustomCaption: displayMonth (from useCaption) is not available in handleMonthChange.");
         return;
       }
       const newDate = new Date(displayMonth);
@@ -50,7 +52,7 @@ function Calendar({
       if (typeof goToMonth === 'function') {
         goToMonth(newDate);
       } else {
-        console.error("Calendar CustomCaption: goToMonth is not available or not a function in handleMonthChange.", captionProps);
+        console.error("Calendar CustomCaption: goToMonth (from useCaption) is not available or not a function in handleMonthChange.");
       }
     };
     
@@ -67,17 +69,16 @@ function Calendar({
         label: format(new Date(2000, i, 1), "LLLL", { locale: es }),
     }));
 
-
     return (
-      <div className="flex justify-between items-center pt-1 relative px-10"> {/* Added padding for buttons */}
+      <div className="flex justify-between items-center pt-1 relative px-10">
         <Button
           variant="outline"
           size="icon"
           name="previous-month"
           aria-label="Go to previous month"
-          disabled={!captionProps.previousMonth}
+          disabled={!prevMonthNav}
           className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute left-1"
-          onClick={() => captionProps.previousMonth && typeof goToMonth === 'function' && goToMonth(captionProps.previousMonth)}
+          onClick={() => prevMonthNav && typeof goToMonth === 'function' && goToMonth(prevMonthNav)}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -120,9 +121,9 @@ function Calendar({
           size="icon"
           name="next-month"
           aria-label="Go to next month"
-          disabled={!captionProps.nextMonth}
+          disabled={!nextMonthNav}
           className="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 absolute right-1"
-          onClick={() => captionProps.nextMonth && typeof goToMonth === 'function' && goToMonth(captionProps.nextMonth)}
+          onClick={() => nextMonthNav && typeof goToMonth === 'function' && goToMonth(nextMonthNav)}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -161,7 +162,7 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        Caption: CustomCaption,
+        Caption: CustomCaptionComponent, // Use the renamed component that uses the hook
       }}
       {...props}
     />
