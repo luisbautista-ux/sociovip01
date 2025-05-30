@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -7,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { PlusCircle, Trash2, ClipboardCopy, ChevronDown, ChevronUp, Copy, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -18,11 +19,11 @@ import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from
 
 interface ProcessedCodeItem {
   isBatch: boolean;
-  id: string; // Unique key for React list (can be batchId or single code id)
-  batchId?: string; // Identifier for the batch itself
+  id: string; 
+  batchId?: string; 
   observation?: string | null;
-  generatedDate?: string; // Common generatedDate for the batch
-  generatedByName?: string; // Common generator for the batch
+  generatedDate?: string; 
+  generatedByName?: string; 
   codesInBatch?: GeneratedCode[];
   singleCode?: GeneratedCode;
 }
@@ -38,7 +39,8 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
   let i = 0;
   while (i < sortedCodes.length) {
     const currentCode = sortedCodes[i];
-    if (!currentCode) { // Defensive check
+    if (!currentCode || !currentCode.id) { 
+        console.warn("ManageCodesDialog: Skipping code with no ID in groupAndSortCodes", currentCode);
         i++;
         continue;
     }
@@ -50,7 +52,7 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
 
     while (
       j < sortedCodes.length &&
-      sortedCodes[j] && // Defensive check
+      sortedCodes[j] && 
       `${new Date(sortedCodes[j].generatedDate || 0).toISOString().substring(0, 19)}-${sortedCodes[j].generatedByName || 'unknown'}` === currentGeneratedTimeSignature &&
       (sortedCodes[j].observation === undefined ? null : sortedCodes[j].observation) === currentObservation
     ) {
@@ -61,10 +63,10 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
     const batchKeyBase = `${currentGeneratedTimeSignature}-${currentObservation || 'no-obs'}`;
     
     if (currentBatch.length > 1) {
-      const batchKey = `${batchKeyBase}-${i}`;
+      const batchKey = `${batchKeyBase}-${i}-${currentCode.id}`; // Use first code's ID in batchKey for more stability
       processedItems.push({
         isBatch: true,
-        id: batchKey, // Use batchKey as the React key for the group
+        id: batchKey,
         batchId: batchKey,
         observation: currentObservation,
         generatedDate: currentCode.generatedDate,
@@ -75,7 +77,7 @@ function groupAndSortCodes(codesToSort: GeneratedCode[] | undefined): ProcessedC
     } else {
       processedItems.push({
         isBatch: false,
-        id: currentCode.id || `${batchKeyBase}-single-${i}-${Math.random().toString(36).slice(2)}`,
+        id: currentCode.id, // Use the actual code ID as the React key
         singleCode: currentCode,
       });
       i++;
@@ -90,6 +92,7 @@ interface ManageCodesDialogProps {
   entity: BusinessManagedEntity | null; 
   onCodesUpdated: (entityId: string, updatedCodes: GeneratedCode[]) => void;
   onRequestCreateNewCodes: () => void;
+  isPromoterView?: boolean; // Added to distinguish view for promoter
 }
 
 export function ManageCodesDialog({
@@ -97,7 +100,8 @@ export function ManageCodesDialog({
     onOpenChange,
     entity,
     onCodesUpdated,
-    onRequestCreateNewCodes
+    onRequestCreateNewCodes,
+    isPromoterView = false, // Default to false
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const { toast } = useToast();
@@ -105,7 +109,7 @@ export function ManageCodesDialog({
 
   useEffect(() => {
     if (open && entity?.generatedCodes) {
-      setInternalCodes([...entity.generatedCodes]);
+      setInternalCodes([...entity.generatedCodes]); // Use a copy for local manipulation
       setExpandedBatches({}); 
     } else if (open && (!entity || !entity.generatedCodes)) {
       setInternalCodes([]);
@@ -131,8 +135,8 @@ export function ManageCodesDialog({
         return;
     }
     const updatedRawCodes = internalCodes.filter(c => c.id !== codeIdToDelete);
-    setInternalCodes(updatedRawCodes);
-    onCodesUpdated(entity.id, updatedRawCodes); 
+    setInternalCodes(updatedRawCodes); // Update local state first for immediate UI feedback
+    onCodesUpdated(entity.id, updatedRawCodes); // Notify parent to update Firestore/main state
     toast({ title: "Código Eliminado", description: `El código "${codeToDelete?.value}" ha sido eliminado.`, variant: "destructive" });
   };
 
@@ -150,15 +154,16 @@ export function ManageCodesDialog({
 
     const updatedRawCodes = internalCodes.filter(c => !codesToDeleteFromBatchIds.includes(c.id));
     
-    setInternalCodes(updatedRawCodes);
-    onCodesUpdated(entity.id, updatedRawCodes);
+    setInternalCodes(updatedRawCodes); // Update local state
+    onCodesUpdated(entity.id, updatedRawCodes); // Notify parent
     toast({ title: "Códigos del Lote Eliminados", description: `${codesToDeleteFromBatchIds.length} código(s) no canjeado(s) del lote han sido eliminados.`, variant: "destructive" });
     
+    // If all codes from this batch were removed, collapse it
     const remainingInBatch = updatedRawCodes.filter(c => batchItem.codesInBatch?.some(orig => orig.id === c.id));
-    if (remainingInBatch.length === 0) {
+    if (remainingInBatch.length === 0 && batchItem.batchId) {
       setExpandedBatches(prev => {
         const newState = {...prev};
-        if(batchItem.batchId) delete newState[batchItem.batchId];
+        delete newState[batchItem.batchId!];
         return newState;
       });
     }
@@ -205,24 +210,27 @@ export function ManageCodesDialog({
   const renderCodeRow = (code: GeneratedCode | undefined, isInsideBatch = false) => {
     if (!code || !code.id) {
         console.warn("ManageCodesDialog: Attempted to render a code without a valid ID.", code);
-        return null; // Do not render if code or code.id is missing
+        return null; 
     }
+    const uniqueKeyForRow = `code-row-${code.id}-${Math.random()}`; // Make key more unique if IDs might clash across renders
+
     return (
     <TableRow 
-        key={code.id} // Ensure key is always valid
+        key={uniqueKeyForRow} 
         className={cn(
             "text-xs", 
             isInsideBatch ? "bg-muted/20 hover:bg-muted/40" : "hover:bg-muted/20",
+            isInsideBatch && "border-l-2 border-primary/30" // Visual indicator for batch codes
         )}
     >
-      <TableCell className={cn("font-mono py-1.5 px-2", isInsideBatch && "pl-6")}>
+      <TableCell className={cn("font-mono py-1.5 px-2", isInsideBatch && "pl-4")}>
         <div className="flex items-center gap-1">
             <span>{code.value}</span>
             <Button
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                onClick={() => handleCopyIndividualCode(code.value)}
+                onClick={(e) => { e.stopPropagation(); handleCopyIndividualCode(code.value);}}
                 title="Copiar código"
             >
                 <ClipboardCopy className="h-3 w-3" />
@@ -239,10 +247,10 @@ export function ManageCodesDialog({
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
       </TableCell>
       <TableCell className="text-right py-1.5 px-2">
-          {code.status !== 'redeemed' && (
+          {!isPromoterView && code.status !== 'redeemed' && ( // Hide delete for promoter or if redeemed
                <AlertDialog>
                   <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive h-6 w-6">
+                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive h-6 w-6" onClick={(e) => e.stopPropagation()}>
                           <Trash2 className="h-3.5 w-3.5" />
                           <span className="sr-only">Eliminar Código</span>
                       </Button>
@@ -277,7 +285,7 @@ export function ManageCodesDialog({
         <DialogHeader>
           <DialogTitle>Códigos para: {entity.name}</DialogTitle>
           <DialogDescription>
-            Visualiza y gestiona los códigos existentes. Se ordenan por fecha de creación (más recientes primero) y se agrupan si se crearon juntos con la misma observación y por el mismo usuario.
+            Visualiza y gestiona los códigos existentes. {isPromoterView ? "Solo puedes ver y copiar los códigos que tú has generado." : "Se agrupan si se crearon juntos con la misma observación y por el mismo usuario."}
           </DialogDescription>
         </DialogHeader>
 
@@ -305,7 +313,7 @@ export function ManageCodesDialog({
                   <TableHead className="px-2 py-2">Observación</TableHead>
                   <TableHead className="px-2 py-2">Fecha Creación</TableHead>
                   <TableHead className="px-2 py-2">Fecha Canje</TableHead>
-                  <TableHead className="text-right px-2 py-2">Acción</TableHead>
+                  <TableHead className="text-right px-2 py-2">{isPromoterView ? "" : "Acción"}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -316,7 +324,7 @@ export function ManageCodesDialog({
                     return (
                       <React.Fragment key={item.id}>
                         <TableRow 
-                            className="border-b hover:bg-muted/30 cursor-pointer data-[state=open]:bg-muted/20"
+                            className="border-b hover:bg-muted/30 cursor-pointer data-[state=open]:bg-muted/30"
                             onClick={() => toggleBatchExpansion(item.batchId!)}
                             data-state={isExpanded ? "open" : "closed"}
                         >
@@ -326,7 +334,7 @@ export function ManageCodesDialog({
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
                                 <span>Lote de {item.codesInBatch.length} códigos (Por: {item.generatedByName || 'N/A'})</span>
                                 {item.generatedDate && <span className="text-muted-foreground ml-1 text-xs"> - {format(new Date(item.generatedDate), "dd/MM/yy HH:mm", { locale: es })}</span>}
-                                {item.observation && <span className="ml-2 text-muted-foreground text-xs truncate" title={item.observation}> - Obs: {item.observation}</span>}
+                                {item.observation && <span className="ml-2 text-muted-foreground text-xs truncate max-w-[150px] sm:max-w-xs" title={item.observation}> - Obs: {item.observation}</span>}
                               </div>
                             </div>
                           </TableCell>
@@ -335,7 +343,7 @@ export function ManageCodesDialog({
                           <>
                             <TableRow className="bg-muted/10 hover:bg-muted/10">
                                 <TableCell colSpan={7} className="pt-1 pb-1.5 px-6">
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 items-center">
                                         <Button
                                             variant="outline"
                                             size="xs"
@@ -344,7 +352,7 @@ export function ManageCodesDialog({
                                         >
                                             <Copy className="mr-1 h-3 w-3" /> Copiar Lote ({item.codesInBatch!.length})
                                         </Button>
-                                        {nonRedeemedInBatchCount > 0 && (
+                                        {!isPromoterView && nonRedeemedInBatchCount > 0 && ( // Hide for promoter
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
                                                     <Button

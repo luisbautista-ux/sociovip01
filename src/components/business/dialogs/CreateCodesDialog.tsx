@@ -27,8 +27,8 @@ interface CreateCodesDialogProps {
   entityId: string;
   onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string) => void;
   existingCodesValues: string[]; 
-  isSubmittingMain?: boolean; // Renamed from isSubmitting to avoid conflict if parent has it
-  currentUserProfileName?: string; // Added prop
+  isSubmittingMain?: boolean; 
+  currentUserProfileName?: string;
 }
 
 export function CreateCodesDialog({ 
@@ -38,14 +38,14 @@ export function CreateCodesDialog({
     entityId, 
     onCodesCreated,
     existingCodesValues,
-    isSubmittingMain = false, // Default to false
-    currentUserProfileName, // Destructure new prop
+    isSubmittingMain = false, 
+    currentUserProfileName,
 }: CreateCodesDialogProps) {
   const [numCodes, setNumCodes] = useState(1);
   const [observation, setObservation] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [justCreatedCodes, setJustCreatedCodes] = useState<GeneratedCode[]>([]);
-  const [isCreating, setIsCreating] = useState(false); // Local submitting state
+  const [isCreating, setIsCreating] = useState(false); 
   const { toast } = useToast();
 
   useEffect(() => {
@@ -92,14 +92,15 @@ export function CreateCodesDialog({
       }
 
       currentAndNewCodes.add(newCodeValue);
+      const codeObservation = observation.trim() === "" ? null : observation.trim();
       newCodesBatch.push({
         id: `code-${entityId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
         entityId: entityId,
         value: newCodeValue,
         status: "available",
-        generatedByName: currentUserProfileName || "Sistema", // Use passed name or fallback
+        generatedByName: currentUserProfileName || "Sistema",
         generatedDate: new Date().toISOString(),
-        observation: observation.trim() === "" ? null : observation.trim(),
+        observation: codeObservation,
         redemptionDate: null,
         redeemedByInfo: null,
         isVipCandidate: false,
@@ -169,7 +170,7 @@ export function CreateCodesDialog({
               <Label htmlFor="observation" className="text-sm font-medium">Observación (Opcional)</Label>
               <Textarea
                 id="observation"
-                placeholder="Ej: Para invitados de cumpleaños, promoción especial..."
+                placeholder="Ej: Para invitados VIP, promoción especial fin de semana..."
                 value={observation}
                 onChange={(e) => setObservation(e.target.value)}
                 className="mt-1"
@@ -188,7 +189,11 @@ export function CreateCodesDialog({
               </Button>
             )}
              <p className="text-sm text-muted-foreground">
-              Estos códigos se han añadido a '{entityName}'. Puedes verlos y gestionarlos en la sección "Ver Códigos".
+              Estos códigos se han añadido a '{entityName}'.
+              {currentUserProfileName?.toLowerCase().includes("promotor") 
+                ? " Estos códigos son simulados y deben ser confirmados por el negocio." 
+                : " Puedes verlos y gestionarlos en la sección 'Ver Códigos'."
+              }
             </p>
           </div>
         )}
