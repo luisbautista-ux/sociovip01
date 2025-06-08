@@ -1,7 +1,7 @@
 
 "use client";
 
-import { StatCard } from "@/components/admin/StatCard"; 
+import { StatCard } from "@/components/admin/StatCard";
 import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
@@ -22,58 +22,22 @@ interface BusinessDashboardStats {
 
 export default function BusinessDashboardPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
-  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
   const [stats, setStats] = useState<BusinessDashboardStats>({
     activePromotions: 0,
     upcomingEvents: 0,
     totalCodesCreated: 0,
     totalQrUsed: 0,
   });
-  const [isLoading, setIsLoading] = useState(true); // Initialize to true
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // This effect solely determines the currentBusinessId based on auth/profile state
-    // It also sets an initial loading state until profile is processed.
-    if (loadingAuth || loadingProfile) {
-      setIsLoading(true); // Keep loading true while auth/profile is being determined
-      return;
-    }
-
-    if (userProfile) {
-      const fetchedBusinessId = userProfile.businessId;
-      if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
-        setCurrentBusinessId(fetchedBusinessId.trim());
-        // setIsLoading(true); // Data fetching will start in the next effect, which will handle its own loading
-      } else {
-        setCurrentBusinessId(null);
-        setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
-        setIsLoading(false); // No business ID, so nothing to load for stats
-        if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
-           toast({
-            title: "Error de Configuración del Negocio",
-            description: "Tu perfil de usuario no está asociado a un negocio válido para cargar el dashboard. Contacta al superadministrador.",
-            variant: "destructive",
-            duration: 10000,
-          });
-        }
-      }
-    } else { 
-      setCurrentBusinessId(null);
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
-      setIsLoading(false); // No user profile, so nothing to load
-    }
-  }, [userProfile, loadingAuth, loadingProfile, toast]);
-
+  // Derivar businessId aquí para estabilizarlo como dependencia
+  const businessId = userProfile?.businessId;
 
   const fetchBusinessStats = useCallback(async (businessIdForQuery: string) => {
-    if (typeof businessIdForQuery !== 'string' || businessIdForQuery.trim() === '') {
-        setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
-        setIsLoading(false); 
-        return;
-    }
-
-    setIsLoading(true);
+    // No establecer setIsLoading(true) aquí; se maneja en el useEffect que llama.
+    // setIsLoading(true) was previously here and could contribute to loops if fetchBusinessStats
+    // itself was re-created often and called itself.
     try {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
@@ -133,6 +97,7 @@ export default function BusinessDashboardPage() {
         if (entity.type === 'event' && entity.isActive) {
           try {
             const eventStartDate = parseISO(entity.startDate);
+            // Consider active if currently running OR its start date is in the future
             if (isEntityCurrentlyActivatable(entity) || isFuture(eventStartDate)) {
               upcomingEventsCount++;
             }
@@ -172,21 +137,29 @@ export default function BusinessDashboardPage() {
   }, [toast]);
 
   useEffect(() => {
-    // This effect triggers data fetching when currentBusinessId is available and auth is complete.
     if (loadingAuth || loadingProfile) {
-      // Wait for auth/profile to complete before attempting to fetch stats.
+      setIsLoading(true); // Keep overall page loading
       return;
     }
 
-    if (currentBusinessId) {
-      fetchBusinessStats(currentBusinessId);
+    // At this point, auth and profile loading are complete.
+    if (businessId) {
+      setIsLoading(true); // Set loading true specifically for data fetching phase
+      fetchBusinessStats(businessId);
     } else {
-      // If there's no currentBusinessId (e.g., user has no businessId, or profile is null),
-      // ensure stats are reset and loading is false.
+      // No businessId, or userProfile is null
       setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
-      setIsLoading(false);
+      setIsLoading(false); // No data to fetch, so stop loading.
+      if (userProfile && (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff'))) {
+        toast({
+          title: "Error de Configuración del Negocio",
+          description: "Tu perfil de usuario no está asociado a un negocio válido para cargar el dashboard. Contacta al superadministrador.",
+          variant: "destructive",
+          duration: 10000,
+        });
+      }
     }
-  }, [currentBusinessId, loadingAuth, loadingProfile, fetchBusinessStats]);
+  }, [businessId, loadingAuth, loadingProfile, fetchBusinessStats, toast, userProfile]);
 
 
   if (isLoading) { 
@@ -197,8 +170,8 @@ export default function BusinessDashboardPage() {
       </div>
     );
   }
-
-  if (!currentBusinessId && !isLoading && userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'))) {
+  
+  if (!businessId && userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'))) {
     return (
         <div className="flex flex-col items-center justify-center h-64 p-4 border border-dashed rounded-md">
             <CardTitle className="text-xl text-destructive">Configuración de Negocio Incompleta</CardTitle>
@@ -209,7 +182,7 @@ export default function BusinessDashboardPage() {
         </div>
     );
   }
-
+  
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary">Dashboard de Mi Negocio</h1>
@@ -235,3 +208,4 @@ export default function BusinessDashboardPage() {
     </div>
   );
 }
+
