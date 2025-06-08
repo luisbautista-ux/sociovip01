@@ -128,11 +128,12 @@ export default function BusinessDashboardPage() {
         if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
           activePromotionsCount++;
         }
-        // 2. Eventos Próximos
+        // 2. Eventos Próximos (incluye activos hoy y futuros)
         if (entity.type === 'event' && entity.isActive) {
           try {
             const eventStartDate = parseISO(entity.startDate);
-            if (isFuture(eventStartDate) || isEntityCurrentlyActivatable(entity)) {
+             // Check if the event is currently active or if its start date is in the future
+            if (isEntityCurrentlyActivatable(entity) || isFuture(eventStartDate)) {
               upcomingEventsCount++;
             }
           } catch (e) {
