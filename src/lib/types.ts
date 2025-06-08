@@ -58,6 +58,8 @@ export interface Business {
   publicPhone?: string;
   publicAddress?: string;
   customUrlPath?: string | null; 
+  primaryColor?: string;
+  secondaryColor?: string;
 }
 
 export type PlatformUserRole = typeof ALL_PLATFORM_USER_ROLES[number];
@@ -104,8 +106,8 @@ export interface AdminDashboardStats {
 export interface BusinessDashboardStats {
   activePromotions: number;
   upcomingEvents: number;
-  totalRedemptionsToday: number; 
-  newCustomersThisWeek: number; // Placeholder
+  totalCodesCreated: number; 
+  totalQrUsed: number; 
 }
 
 
@@ -354,6 +356,7 @@ export interface PromoterCommissionEntry {
     period: string; // Ej: "Mayo 2025"
     entityId: string;
     promoterId: string;
+    businessId?: string; // Added for filtering
 }
 
 export interface TicketTypeFormData {

@@ -2,49 +2,43 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Palette, Image as ImageIconLucide, Type, QrCode, UploadCloud, Loader2 } from "lucide-react"; // Added UploadCloud, Loader2
+import { Settings, Palette, Image as ImageIconLucide, Type, QrCode, UploadCloud, Loader2 } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-// Textarea no se usa en la sección de branding de este archivo.
-import React, { useState, useRef, ChangeEvent, useEffect } from 'react'; // Added React, useState, useRef, ChangeEvent
-import Image from "next/image"; // For image previews
-import { useToast } from "@/hooks/use-toast"; // For feedback
-import { useAuth } from "@/context/AuthContext"; // To get businessId
-import { db } from "@/lib/firebase"; // For Firestore
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import React, { useState, useRef, ChangeEvent, useEffect, useCallback } from 'react'; 
+import NextImage from "next/image"; 
+import { useToast } from "@/hooks/use-toast"; 
+import { useAuth } from "@/context/AuthContext"; 
+import { db, storage } from "@/lib/firebase"; 
+import { doc, getDoc, updateDoc, type DocumentData } from "firebase/firestore";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import type { Business } from "@/lib/types";
-
-// Initial mock, will be replaced by fetched data
-const initialBusinessDetails = {
-  name: "Cargando...",
-  contactEmail: "",
-  address: "",
-  phone: "",
-  logoUrl: "",
-  coverImageUrl: "",
-  slogan: "",
-  primaryColor: "#B080D0", 
-  secondaryColor: "#8E5EA2",
-};
+import { sanitizeObjectForFirestore } from "@/lib/utils";
 
 
 export default function BusinessSettingsPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
 
-  // State for fetched business data
   const [businessData, setBusinessData] = useState<Business | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // State for Info del Negocio
+  const [businessName, setBusinessName] = useState("");
+  const [businessContactEmail, setBusinessContactEmail] = useState("");
+  const [businessAddress, setBusinessAddress] = useState(""); // Assuming publicAddress is the one to edit here
+  const [businessPublicPhone, setBusinessPublicPhone] = useState("");
+
 
   // State for branding form fields
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [slogan, setSlogan] = useState(initialBusinessDetails.slogan);
-  const [primaryColor, setPrimaryColor] = useState(initialBusinessDetails.primaryColor);
-  const [secondaryColor, setSecondaryColor] = useState(initialBusinessDetails.secondaryColor);
+  const [slogan, setSlogan] = useState("");
+  const [primaryColor, setPrimaryColor] = useState("#B080D0"); 
+  const [secondaryColor, setSecondaryColor] = useState("#8E5EA2");
   
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [isSavingInfo, setIsSavingInfo] = useState(false);
@@ -52,49 +46,44 @@ export default function BusinessSettingsPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch business data on mount
-  useEffect(() => {
-    const fetchBusinessData = async () => {
-      if (userProfile?.businessId) {
-        setIsLoadingData(true);
-        try {
-          const businessDocRef = doc(db, "businesses", userProfile.businessId);
-          const businessSnap = await getDoc(businessDocRef);
-          if (businessSnap.exists()) {
-            const data = businessSnap.data() as Business;
-            setBusinessData(data);
-            // Initialize form states with fetched data
-            setSlogan(data.slogan || "");
-            setPrimaryColor(data.primaryColor || initialBusinessDetails.primaryColor); // Use initial color if not set
-            setSecondaryColor(data.secondaryColor || initialBusinessDetails.secondaryColor); // Use initial color if not set
-            setLogoPreview(data.logoUrl || null);
-            setCoverPreview(data.publicCoverImageUrl || null);
+  const fetchBusinessData = useCallback(async () => {
+    if (userProfile?.businessId) {
+      setIsLoadingData(true);
+      try {
+        const businessDocRef = doc(db, "businesses", userProfile.businessId);
+        const businessSnap = await getDoc(businessDocRef);
+        if (businessSnap.exists()) {
+          const data = businessSnap.data() as Business;
+          setBusinessData(data);
+          
+          setBusinessName(data.name || "");
+          setBusinessContactEmail(data.contactEmail || "");
+          setBusinessAddress(data.publicAddress || data.address || ""); // Prioritize publicAddress
+          setBusinessPublicPhone(data.publicPhone || "");
 
-            // Also update the 'Info del Negocio' section's controlled inputs
-            // Assuming you'll make those controlled too. For now, they are defaultValue.
-            // Example: setBusinessName(data.name || "");
-          } else {
-            toast({ title: "Error", description: "No se encontraron los datos del negocio.", variant: "destructive" });
-          }
-        } catch (error) {
-          console.error("Error fetching business data for settings:", error);
-          toast({ title: "Error", description: "No se pudo cargar la configuración del negocio.", variant: "destructive" });
-        } finally {
-          setIsLoadingData(false);
+          setSlogan(data.slogan || "");
+          setPrimaryColor(data.primaryColor || "#B080D0"); 
+          setSecondaryColor(data.secondaryColor || "#8E5EA2");
+          setLogoPreview(data.logoUrl || null);
+          setCoverPreview(data.publicCoverImageUrl || null);
+        } else {
+          toast({ title: "Error", description: "No se encontraron los datos del negocio.", variant: "destructive" });
         }
-      } else if (userProfile === null) { // User profile is loaded but no businessId
+      } catch (error) {
+        console.error("Error fetching business data for settings:", error);
+        toast({ title: "Error", description: "No se pudo cargar la configuración del negocio.", variant: "destructive" });
+      } finally {
         setIsLoadingData(false);
-         toast({ title: "Advertencia", description: "Tu perfil no está asociado a un negocio.", variant: "default" });
       }
-    };
-
-    if (userProfile) {
-      fetchBusinessData();
-    } else if (userProfile === null) { // Explicitly handle case where userProfile is loaded and null (no user)
+    } else if (!loadingAuth && !loadingProfile && !userProfile?.businessId) {
       setIsLoadingData(false);
+      toast({ title: "Advertencia", description: "Tu perfil no está asociado a un negocio.", variant: "default" });
     }
-    // Only re-run if userProfile reference changes (e.g., on login/logout or initial load)
-  }, [userProfile, toast]);
+  }, [userProfile, toast, loadingAuth, loadingProfile]);
+
+  useEffect(() => {
+    fetchBusinessData();
+  }, [fetchBusinessData]);
 
 
   const handleLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
@@ -129,6 +118,43 @@ export default function BusinessSettingsPage() {
     }
   };
 
+  const uploadFileAndGetURL = async (file: File, path: string): Promise<string | null> => {
+    try {
+      const fileRef = storageRef(storage, path);
+      const uploadTask = uploadBytesResumable(fileRef, file);
+
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            // Optional: handle progress
+            // const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            // console.log('Upload is ' + progress + '% done');
+          },
+          (error) => {
+            console.error("Upload failed:", error);
+            toast({ title: "Error de Subida", description: `No se pudo subir ${file.name}. ${error.message}`, variant: "destructive" });
+            reject(null);
+          },
+          async () => {
+            try {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              resolve(downloadURL);
+            } catch (error) {
+              console.error("Failed to get download URL:", error);
+              toast({ title: "Error de URL", description: `No se pudo obtener la URL para ${file.name}.`, variant: "destructive"});
+              reject(null);
+            }
+          }
+        );
+      });
+    } catch (error) {
+      console.error("Error setting up upload:", error);
+      toast({ title: "Error de Subida", description: `Error al preparar la subida de ${file.name}.`, variant: "destructive"});
+      return null;
+    }
+  };
+
   const handleSaveChangesBranding = async () => {
     if (!userProfile?.businessId) {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
@@ -136,43 +162,71 @@ export default function BusinessSettingsPage() {
     }
     setIsSavingBranding(true);
     
-    // Simulate saving branding data
-    console.log("Guardando cambios de branding (simulado):", {
+    const updateData: Partial<Business> = {
       slogan,
       primaryColor,
       secondaryColor,
-      logoFile: logoFile?.name,
-      coverFile: coverFile?.name,
-    });
+    };
 
-    // TODO: Implement actual image upload to Firebase Storage
-    // TODO: Get downloadURLs for logo and cover
-    // TODO: Update Firestore document for the business with new URLs and other branding info
+    try {
+      if (logoFile) {
+        const logoUrl = await uploadFileAndGetURL(logoFile, `businesses/${userProfile.businessId}/logo/${logoFile.name}`);
+        if (logoUrl) updateData.logoUrl = logoUrl;
+        else { setIsSavingBranding(false); return; } // Stop if upload fails
+      }
 
-    // For now, just showing a toast
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+      if (coverFile) {
+        const coverUrl = await uploadFileAndGetURL(coverFile, `businesses/${userProfile.businessId}/cover/${coverFile.name}`);
+        if (coverUrl) updateData.publicCoverImageUrl = coverUrl;
+        else { setIsSavingBranding(false); return; } // Stop if upload fails
+      }
 
-    toast({
-      title: "Branding Guardado (Simulado)",
-      description: "Los cambios de branding se han procesado (simulación).",
-    });
-    setIsSavingBranding(false);
+      const businessDocRef = doc(db, "businesses", userProfile.businessId);
+      await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
+
+      toast({
+        title: "Branding Guardado",
+        description: "Los cambios de branding se han guardado correctamente.",
+      });
+      setLogoFile(null); 
+      setCoverFile(null); 
+      fetchBusinessData(); // Re-fetch to confirm changes
+    } catch (error: any) {
+      console.error("Error saving branding:", error);
+      toast({ title: "Error al Guardar Branding", description: `No se pudieron guardar los cambios. ${error.message}`, variant: "destructive"});
+    } finally {
+      setIsSavingBranding(false);
+    }
   };
   
-  const handleSaveChangesInfo = () => {
+  const handleSaveChangesInfo = async () => {
+    if (!userProfile?.businessId) {
+      toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
+      return;
+    }
     setIsSavingInfo(true);
-    console.log("Guardando cambios de información (simulado)");
-    // Here you would collect data from the info form and save to Firestore
-    // For example:
-    // const businessName = (document.getElementById('businessName') as HTMLInputElement).value;
-    // ... other fields
-    setTimeout(() => {
-        toast({ title: "Información Guardada (Simulado)", description: "Los datos del negocio se han procesado (simulación)." });
+
+    const infoUpdateData: Partial<Business> = {
+        name: businessName,
+        contactEmail: businessContactEmail,
+        publicAddress: businessAddress, 
+        publicPhone: businessPublicPhone,
+    };
+
+    try {
+        const businessDocRef = doc(db, "businesses", userProfile.businessId);
+        await updateDoc(businessDocRef, sanitizeObjectForFirestore(infoUpdateData as DocumentData));
+        toast({ title: "Información Guardada", description: "Los datos del negocio se han actualizado." });
+        fetchBusinessData(); // Re-fetch
+    } catch (error: any) {
+        console.error("Error saving business info:", error);
+        toast({ title: "Error al Guardar Información", description: `No se pudieron guardar los cambios. ${error.message}`, variant: "destructive"});
+    } finally {
         setIsSavingInfo(false);
-    }, 1500);
+    }
   };
   
-  if (isLoadingData && userProfile) { // Only show main loader if userProfile exists and we are fetching
+  if (isLoadingData) { 
     return (
       <div className="flex flex-col items-center justify-center h-96">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -181,7 +235,7 @@ export default function BusinessSettingsPage() {
     );
   }
 
-  if (!userProfile?.businessId && !isLoadingData) { // If loading is done and still no businessId
+  if (!userProfile?.businessId && !isLoadingData) { 
      return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-primary flex items-center">
@@ -217,19 +271,19 @@ export default function BusinessSettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="businessName">Nombre del Negocio</Label>
-            <Input id="businessName" defaultValue={businessData?.name || initialBusinessDetails.name} disabled={isSavingInfo || isLoadingData} />
+            <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} disabled={isSavingInfo || isLoadingData} />
           </div>
           <div>
             <Label htmlFor="businessEmail">Email de Contacto</Label>
-            <Input id="businessEmail" type="email" defaultValue={businessData?.contactEmail || initialBusinessDetails.contactEmail} disabled={isSavingInfo || isLoadingData} />
+            <Input id="businessEmail" type="email" value={businessContactEmail} onChange={(e) => setBusinessContactEmail(e.target.value)} disabled={isSavingInfo || isLoadingData} />
           </div>
            <div>
-            <Label htmlFor="businessAddress">Dirección</Label>
-            <Input id="businessAddress" defaultValue={businessData?.address || initialBusinessDetails.address} disabled={isSavingInfo || isLoadingData} />
+            <Label htmlFor="businessAddress">Dirección Pública</Label>
+            <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} disabled={isSavingInfo || isLoadingData} />
           </div>
            <div>
-            <Label htmlFor="businessPhone">Teléfono</Label>
-            <Input id="businessPhone" type="tel" defaultValue={businessData?.publicPhone || initialBusinessDetails.phone} disabled={isSavingInfo || isLoadingData}/>
+            <Label htmlFor="businessPhone">Teléfono Público</Label>
+            <Input id="businessPhone" type="tel" value={businessPublicPhone} onChange={(e) => setBusinessPublicPhone(e.target.value)} disabled={isSavingInfo || isLoadingData}/>
           </div>
           <Button onClick={handleSaveChangesInfo} className="bg-primary hover:bg-primary/90" disabled={isSavingInfo || isLoadingData}>
             {isSavingInfo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -253,7 +307,7 @@ export default function BusinessSettingsPage() {
               </Button>
               {logoPreview && (
                 <div className="mt-2 p-2 border rounded-md inline-block bg-muted">
-                  <Image src={logoPreview} alt="Previsualización del Logo" width={150} height={50} className="object-contain max-h-[50px]" data-ai-hint="logo business"/>
+                  <NextImage src={logoPreview} alt="Previsualización del Logo" width={150} height={50} className="object-contain max-h-[50px]" data-ai-hint="logo business"/>
                 </div>
               )}
               <p className="text-xs text-muted-foreground">Preferiblemente PNG con fondo transparente.</p>
@@ -266,7 +320,7 @@ export default function BusinessSettingsPage() {
               </Button>
               {coverPreview && (
                  <div className="mt-2 p-2 border rounded-md inline-block bg-muted">
-                    <Image src={coverPreview} alt="Previsualización de Portada" width={250} height={100} className="object-cover max-h-[100px]" data-ai-hint="cover image store"/>
+                    <NextImage src={coverPreview} alt="Previsualización de Portada" width={250} height={100} className="object-cover max-h-[100px]" data-ai-hint="cover image store"/>
                  </div>
               )}
               <p className="text-xs text-muted-foreground">Imagen para la página pública de tu negocio.</p>
