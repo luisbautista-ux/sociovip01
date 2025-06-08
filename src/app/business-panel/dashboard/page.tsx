@@ -16,8 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 interface BusinessDashboardStats {
   activePromotions: number;
   upcomingEvents: number;
-  totalRedemptionsToday: number; 
-  qrGeneratedWithCodes: number;
+  totalCodesCreated: number;
+  totalQrUsed: number;
 }
 
 export default function BusinessDashboardPage() {
@@ -26,8 +26,8 @@ export default function BusinessDashboardPage() {
   const [stats, setStats] = useState<BusinessDashboardStats>({
     activePromotions: 0,
     upcomingEvents: 0,
-    totalRedemptionsToday: 0,
-    qrGeneratedWithCodes: 0,
+    totalCodesCreated: 0,
+    totalQrUsed: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -47,7 +47,7 @@ export default function BusinessDashboardPage() {
       } else {
         console.warn("BusinessDashboardPage: UserProfile does not have a valid businessId. User roles:", userProfile.roles);
         setCurrentBusinessId(null);
-        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
+        setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
         setIsLoading(false); 
         if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
            toast({
@@ -61,7 +61,7 @@ export default function BusinessDashboardPage() {
     } else { 
       console.log("BusinessDashboardPage: No userProfile found after auth/profile load. Cannot fetch business stats.");
       setCurrentBusinessId(null);
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
       setIsLoading(false);
     }
   }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]);
@@ -72,7 +72,7 @@ export default function BusinessDashboardPage() {
     
     if (typeof businessIdForQuery !== 'string' || businessIdForQuery.trim() === '') {
         console.error("BusinessDashboardPage: fetchBusinessStats called with invalid businessIdForQuery:", businessIdForQuery, "UserProfile for context:", userProfile);
-        setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
+        setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
         setIsLoading(false); 
         return;
     }
@@ -131,9 +131,9 @@ export default function BusinessDashboardPage() {
 
       let activePromotionsCount = 0;
       let upcomingEventsCount = 0;
-      let redemptionsTodayCount = 0;
-      let totalQrCodesCreatedForBusiness = 0;
-      const todayStartObj = startOfDay(new Date());
+      let totalCodesCreatedCount = 0;
+      let totalQrUsedCount = 0;
+      
       const todayEndObj = endOfDay(new Date());
 
       entities.forEach(entity => {
@@ -150,40 +150,32 @@ export default function BusinessDashboardPage() {
           }
         }
 
-        entity.generatedCodes?.forEach(code => {
-          if (code.status === 'redeemed' && code.redemptionDate) {
-            try {
-              const redemptionDateObj = parseISO(code.redemptionDate);
-              if (redemptionDateObj >= todayStartObj && redemptionDateObj <= todayEndObj) {
-                redemptionsTodayCount++;
-              }
-            } catch (e) {
-              console.warn("BusinessDashboardPage: Invalid redemptionDate format for code:", code.id, code.redemptionDate, e);
-            }
-          }
-        });
-        
         if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
-            totalQrCodesCreatedForBusiness += entity.generatedCodes.length;
+            totalCodesCreatedCount += entity.generatedCodes.length;
+            entity.generatedCodes.forEach(code => {
+              if (code.status === 'redeemed') {
+                totalQrUsedCount++;
+              }
+            });
         }
       });
       
       console.log("BusinessDashboardPage: Calculated activePromotions:", activePromotionsCount);
       console.log("BusinessDashboardPage: Calculated upcomingEvents:", upcomingEventsCount);
-      console.log("BusinessDashboardPage: Calculated redemptionsToday:", redemptionsTodayCount);
-      console.log("BusinessDashboardPage: Calculated totalQrCodesCreatedForBusiness:", totalQrCodesCreatedForBusiness);
+      console.log("BusinessDashboardPage: Calculated totalCodesCreated:", totalCodesCreatedCount);
+      console.log("BusinessDashboardPage: Calculated totalQrUsed:", totalQrUsedCount);
 
       setStats(prevStats => ({
         ...prevStats,
         activePromotions: activePromotionsCount,
         upcomingEvents: upcomingEventsCount,
-        totalRedemptionsToday: redemptionsTodayCount,
-        qrGeneratedWithCodes: totalQrCodesCreatedForBusiness,
+        totalCodesCreated: totalCodesCreatedCount,
+        totalQrUsed: totalQrUsedCount,
       }));
 
     } catch (error: any) {
       console.error("BusinessDashboardPage: Error fetching business dashboard stats:", error.code, error.message, error);
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
       toast({
         title: "Error al Cargar las Estadísticas del Negocio",
         description: `Permiso denegado (${error.code || 'desconocido'}). Asegúrate de que tu perfil en Firestore (colección 'platformUsers', documento con tu UID de Auth) tenga un campo 'roles' como un array con 'business_admin' o 'staff', y un campo 'businessId' válido. Revisa las reglas de seguridad de Firestore.`,
@@ -208,7 +200,7 @@ export default function BusinessDashboardPage() {
     } else {
       console.log("BusinessDashboardPage: No currentBusinessId for fetching stats. Ensuring isLoading is false.");
       if (isLoading) setIsLoading(false);
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
+      setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps 
   }, [currentBusinessId, loadingAuth, loadingProfile]); 
@@ -243,8 +235,8 @@ export default function BusinessDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Promociones Activas" value={stats.activePromotions} icon={Ticket} />
         <StatCard title="Eventos Próximos" value={stats.upcomingEvents} icon={Calendar} />
-        <StatCard title="Canjes Hoy" value={stats.totalRedemptionsToday} icon={ScanLine} />
-        <StatCard title="Códigos QR Creados (Total)" value={stats.qrGeneratedWithCodes} icon={QrCodeLucide} />
+        <StatCard title="Códigos Creados" value={stats.totalCodesCreated} icon={QrCodeLucide} />
+        <StatCard title="QRs Usados" value={stats.totalQrUsed} icon={ScanLine} />
       </div>
 
       <Card className="shadow-lg">
