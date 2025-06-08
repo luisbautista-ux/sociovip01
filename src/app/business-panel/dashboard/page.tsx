@@ -29,12 +29,14 @@ export default function BusinessDashboardPage() {
     totalCodesCreated: 0,
     totalQrUsed: 0,
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Initialize to true
   const { toast } = useToast();
 
   useEffect(() => {
+    // This effect solely determines the currentBusinessId based on auth/profile state
+    // It also sets an initial loading state until profile is processed.
     if (loadingAuth || loadingProfile) {
-      if (!isLoading) setIsLoading(true);
+      setIsLoading(true); // Keep loading true while auth/profile is being determined
       return;
     }
 
@@ -42,10 +44,11 @@ export default function BusinessDashboardPage() {
       const fetchedBusinessId = userProfile.businessId;
       if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
         setCurrentBusinessId(fetchedBusinessId.trim());
+        // setIsLoading(true); // Data fetching will start in the next effect, which will handle its own loading
       } else {
         setCurrentBusinessId(null);
         setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
-        setIsLoading(false); 
+        setIsLoading(false); // No business ID, so nothing to load for stats
         if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
            toast({
             title: "Error de Configuración del Negocio",
@@ -58,9 +61,9 @@ export default function BusinessDashboardPage() {
     } else { 
       setCurrentBusinessId(null);
       setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
-      setIsLoading(false);
+      setIsLoading(false); // No user profile, so nothing to load
     }
-  }, [userProfile, loadingAuth, loadingProfile, toast, isLoading]);
+  }, [userProfile, loadingAuth, loadingProfile, toast]);
 
 
   const fetchBusinessStats = useCallback(async (businessIdForQuery: string) => {
@@ -124,15 +127,12 @@ export default function BusinessDashboardPage() {
       let totalQrUsedCount = 0;
       
       entities.forEach(entity => {
-        // 1. Promociones Activas
         if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
           activePromotionsCount++;
         }
-        // 2. Eventos Próximos (incluye activos hoy y futuros)
         if (entity.type === 'event' && entity.isActive) {
           try {
             const eventStartDate = parseISO(entity.startDate);
-             // Check if the event is currently active or if its start date is in the future
             if (isEntityCurrentlyActivatable(entity) || isFuture(eventStartDate)) {
               upcomingEventsCount++;
             }
@@ -141,10 +141,8 @@ export default function BusinessDashboardPage() {
           }
         }
 
-        // 3. Códigos Creados
         if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
             totalCodesCreatedCount += entity.generatedCodes.length;
-            // 4. QRs Usados (Códigos con estado 'redeemed')
             entity.generatedCodes.forEach(code => {
               if (code.status === 'redeemed') {
                 totalQrUsedCount++;
@@ -174,16 +172,21 @@ export default function BusinessDashboardPage() {
   }, [toast]);
 
   useEffect(() => {
+    // This effect triggers data fetching when currentBusinessId is available and auth is complete.
     if (loadingAuth || loadingProfile) {
+      // Wait for auth/profile to complete before attempting to fetch stats.
       return;
     }
+
     if (currentBusinessId) {
       fetchBusinessStats(currentBusinessId);
     } else {
-      if (isLoading) setIsLoading(false);
+      // If there's no currentBusinessId (e.g., user has no businessId, or profile is null),
+      // ensure stats are reset and loading is false.
       setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
+      setIsLoading(false);
     }
-  }, [currentBusinessId, loadingAuth, loadingProfile, fetchBusinessStats, isLoading]);
+  }, [currentBusinessId, loadingAuth, loadingProfile, fetchBusinessStats]);
 
 
   if (isLoading) { 
