@@ -27,7 +27,7 @@ export default function BusinessSettingsPage() {
   // State for Info del Negocio
   const [businessName, setBusinessName] = useState("");
   const [businessContactEmail, setBusinessContactEmail] = useState("");
-  const [businessAddress, setBusinessAddress] = useState(""); // Assuming publicAddress is the one to edit here
+  const [businessAddress, setBusinessAddress] = useState(""); 
   const [businessPublicPhone, setBusinessPublicPhone] = useState("");
 
 
@@ -58,7 +58,7 @@ export default function BusinessSettingsPage() {
           
           setBusinessName(data.name || "");
           setBusinessContactEmail(data.contactEmail || "");
-          setBusinessAddress(data.publicAddress || data.address || ""); // Prioritize publicAddress
+          setBusinessAddress(data.publicAddress || data.address || ""); 
           setBusinessPublicPhone(data.publicPhone || "");
 
           setSlogan(data.slogan || "");
@@ -128,30 +128,31 @@ export default function BusinessSettingsPage() {
           "state_changed",
           (snapshot) => {
             // Optional: handle progress
-            // const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            // console.log('Upload is ' + progress + '% done');
           },
           (error) => {
             console.error("Upload failed:", error);
-            toast({ title: "Error de Subida", description: `No se pudo subir ${file.name}. ${error.message}`, variant: "destructive" });
-            reject(null);
+            const errorMessage = error.message || "Error desconocido al subir archivo.";
+            toast({ title: "Error de Subida", description: `No se pudo subir ${file.name}. ${errorMessage}`, variant: "destructive" });
+            reject(new Error(errorMessage)); // Reject with an Error object
           },
           async () => {
             try {
               const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
               resolve(downloadURL);
-            } catch (error) {
+            } catch (error: any) {
               console.error("Failed to get download URL:", error);
-              toast({ title: "Error de URL", description: `No se pudo obtener la URL para ${file.name}.`, variant: "destructive"});
-              reject(null);
+              const errorMessage = error.message || "Error desconocido al obtener URL de descarga.";
+              toast({ title: "Error de URL", description: `No se pudo obtener la URL para ${file.name}. ${errorMessage}`, variant: "destructive"});
+              reject(new Error(errorMessage)); // Reject with an Error object
             }
           }
         );
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error setting up upload:", error);
-      toast({ title: "Error de Subida", description: `Error al preparar la subida de ${file.name}.`, variant: "destructive"});
-      return null;
+      const errorMessage = error.message || "Error desconocido al preparar subida.";
+      toast({ title: "Error de Subida", description: `Error al preparar la subida de ${file.name}. ${errorMessage}`, variant: "destructive"});
+      return Promise.reject(new Error(errorMessage)); // Return a rejected promise
     }
   };
 
@@ -172,13 +173,13 @@ export default function BusinessSettingsPage() {
       if (logoFile) {
         const logoUrl = await uploadFileAndGetURL(logoFile, `businesses/${userProfile.businessId}/logo/${logoFile.name}`);
         if (logoUrl) updateData.logoUrl = logoUrl;
-        else { setIsSavingBranding(false); return; } // Stop if upload fails
+        else { setIsSavingBranding(false); return; } 
       }
 
       if (coverFile) {
         const coverUrl = await uploadFileAndGetURL(coverFile, `businesses/${userProfile.businessId}/cover/${coverFile.name}`);
         if (coverUrl) updateData.publicCoverImageUrl = coverUrl;
-        else { setIsSavingBranding(false); return; } // Stop if upload fails
+        else { setIsSavingBranding(false); return; } 
       }
 
       const businessDocRef = doc(db, "businesses", userProfile.businessId);
@@ -190,10 +191,13 @@ export default function BusinessSettingsPage() {
       });
       setLogoFile(null); 
       setCoverFile(null); 
-      fetchBusinessData(); // Re-fetch to confirm changes
+      fetchBusinessData(); 
     } catch (error: any) {
       console.error("Error saving branding:", error);
-      toast({ title: "Error al Guardar Branding", description: `No se pudieron guardar los cambios. ${error.message}`, variant: "destructive"});
+      const description = error?.message 
+        ? `No se pudieron guardar los cambios. ${error.message}` 
+        : "No se pudieron guardar los cambios. Ocurrió un error desconocido.";
+      toast({ title: "Error al Guardar Branding", description, variant: "destructive"});
     } finally {
       setIsSavingBranding(false);
     }
@@ -217,10 +221,13 @@ export default function BusinessSettingsPage() {
         const businessDocRef = doc(db, "businesses", userProfile.businessId);
         await updateDoc(businessDocRef, sanitizeObjectForFirestore(infoUpdateData as DocumentData));
         toast({ title: "Información Guardada", description: "Los datos del negocio se han actualizado." });
-        fetchBusinessData(); // Re-fetch
+        fetchBusinessData(); 
     } catch (error: any) {
         console.error("Error saving business info:", error);
-        toast({ title: "Error al Guardar Información", description: `No se pudieron guardar los cambios. ${error.message}`, variant: "destructive"});
+        const description = error?.message 
+          ? `No se pudieron guardar los cambios. ${error.message}` 
+          : "No se pudieron guardar los cambios. Ocurrió un error desconocido.";
+        toast({ title: "Error al Guardar Información", description, variant: "destructive"});
     } finally {
         setIsSavingInfo(false);
     }
