@@ -18,20 +18,17 @@ import { sanitizeObjectForFirestore } from "@/lib/utils";
 
 
 export default function BusinessSettingsPage() {
-  const { userProfile, currentUser, loadingAuth, loadingProfile } = useAuth(); // Added currentUser
+  const { userProfile, currentUser, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
 
   const [businessData, setBusinessData] = useState<Business | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // State for Info del Negocio
   const [businessName, setBusinessName] = useState("");
   const [businessContactEmail, setBusinessContactEmail] = useState("");
   const [businessAddress, setBusinessAddress] = useState(""); 
   const [businessPublicPhone, setBusinessPublicPhone] = useState("");
 
-
-  // State for branding form fields
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -85,7 +82,6 @@ export default function BusinessSettingsPage() {
     fetchBusinessData();
   }, [fetchBusinessData]);
 
-
   const handleLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -119,6 +115,7 @@ export default function BusinessSettingsPage() {
   };
 
   const uploadFileAndGetURL = async (file: File, path: string): Promise<string | null> => {
+    console.log(`Attempting to upload to Storage. User UID: ${currentUser?.uid || 'N/A'}, Path: ${path}`);
     try {
       const fileRef = storageRef(storage, path);
       const uploadTask = uploadBytesResumable(fileRef, file);
@@ -126,31 +123,30 @@ export default function BusinessSettingsPage() {
       return new Promise((resolve, reject) => {
         uploadTask.on(
           "state_changed",
-          (snapshot) => {
-            // Optional: handle progress
-          },
-          (error) => { // Firebase Storage errors usually come here
+          (snapshot) => { /* Optional: handle progress */ },
+          (error: any) => { // Firebase Storage errors usually come here
             console.error("Firebase Storage Upload failed:", error.code, error.message, error.name, error.serverResponse);
             const errorMessage = error.message || "Error desconocido al subir archivo.";
-            toast({ title: "Error de Subida (Storage)", description: `No se pudo subir ${file.name}. Código: ${error.code}. Mensaje: ${errorMessage}`, variant: "destructive", duration: 10000 });
+            const detailedDescription = `No se pudo subir ${file.name}. Código: ${error.code}. Mensaje: ${errorMessage}. Verifica que el businessId en tu perfil de platformUsers (para UID: ${currentUser?.uid || 'Desconocido'}) coincida con el ID en la ruta de Storage y que las reglas de Storage y Firestore lo permitan.`;
+            toast({ title: "Error de Subida (Storage)", description: detailedDescription, variant: "destructive", duration: 15000 });
             reject(new Error(errorMessage)); // Reject with an Error object
           },
           async () => {
             try {
               const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
               resolve(downloadURL);
-            } catch (error: any) {
-              console.error("Failed to get download URL:", error);
-              const errorMessage = error.message || "Error desconocido al obtener URL de descarga.";
+            } catch (downloadUrlError: any) {
+              console.error("Failed to get download URL:", downloadUrlError);
+              const errorMessage = downloadUrlError.message || "Error desconocido al obtener URL de descarga.";
               toast({ title: "Error de URL", description: `No se pudo obtener la URL para ${file.name}. ${errorMessage}`, variant: "destructive"});
               reject(new Error(errorMessage)); 
             }
           }
         );
       });
-    } catch (error: any) {
-      console.error("Error setting up upload (outer try-catch):", error);
-      const errorMessage = error.message || "Error desconocido al preparar subida.";
+    } catch (outerError: any) {
+      console.error("Error setting up upload (outer try-catch):", outerError);
+      const errorMessage = outerError.message || "Error desconocido al preparar subida.";
       toast({ title: "Error de Preparación de Subida", description: `Error al preparar la subida de ${file.name}. ${errorMessage}`, variant: "destructive"});
       return Promise.reject(new Error(errorMessage)); 
     }
@@ -166,19 +162,14 @@ export default function BusinessSettingsPage() {
       return;
     }
 
-    // --- DETAILED LOGGING ---
     const storagePathForLogo = logoFile ? `businesses/${userProfile.businessId}/logo/${logoFile.name}` : "N/A";
     const storagePathForCover = coverFile ? `businesses/${userProfile.businessId}/cover/${coverFile.name}` : "N/A";
-    console.log("--- handleSaveChangesBranding ---");
+    
+    console.log("--- handleSaveChangesBranding Initiated ---");
     console.log("Current User UID (for rule check):", currentUser.uid);
     console.log("User Profile Business ID (for rule check & path):", userProfile.businessId);
-    console.log("Target Storage Path (Logo):", storagePathForLogo);
-    console.log("Target Storage Path (Cover):", storagePathForCover);
-    console.log("Business ID from error (for comparison): 0cCVXIJm2qxVrpOjXVTC");
-    if (userProfile.businessId !== "0cCVXIJm2qxVrpOjXVTC") {
-        console.warn("POTENTIAL MISMATCH: The businessId in userProfile on the client ('" + userProfile.businessId + "') is different from the businessId in the error path ('0cCVXIJm2qxVrpOjXVTC'). This is likely the cause of the permission error if the rules check against userProfile.businessId.");
-    }
-    // --- END DETAILED LOGGING ---
+    console.log("Constructed Storage Path (Logo):", storagePathForLogo);
+    console.log("Constructed Storage Path (Cover):", storagePathForCover);
     
     setIsSavingBranding(true);
     
@@ -190,20 +181,31 @@ export default function BusinessSettingsPage() {
 
     try {
       if (logoFile) {
-        const logoUrl = await uploadFileAndGetURL(logoFile, `businesses/${userProfile.businessId}/logo/${logoFile.name}`);
+        console.log(`Uploading logo: ${logoFile.name} to ${storagePathForLogo}`);
+        const logoUrl = await uploadFileAndGetURL(logoFile, storagePathForLogo);
         if (logoUrl) updateData.logoUrl = logoUrl;
         else { setIsSavingBranding(false); return; } 
       }
 
       if (coverFile) {
-        const coverUrl = await uploadFileAndGetURL(coverFile, `businesses/${userProfile.businessId}/cover/${coverFile.name}`);
+        console.log(`Uploading cover: ${coverFile.name} to ${storagePathForCover}`);
+        const coverUrl = await uploadFileAndGetURL(coverFile, storagePathForCover);
         if (coverUrl) updateData.publicCoverImageUrl = coverUrl;
         else { setIsSavingBranding(false); return; } 
       }
 
-      const businessDocRef = doc(db, "businesses", userProfile.businessId);
-      await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
-
+      if (Object.keys(updateData).some(key => key !== 'slogan' && key !== 'primaryColor' && key !== 'secondaryColor' ? updateData[key as keyof Business] !== businessData?.[key as keyof Business] : true) || 
+          updateData.slogan !== businessData?.slogan ||
+          updateData.primaryColor !== businessData?.primaryColor ||
+          updateData.secondaryColor !== businessData?.secondaryColor
+      ) {
+        console.log("Updating Firestore with data:", sanitizeObjectForFirestore(updateData as DocumentData));
+        const businessDocRef = doc(db, "businesses", userProfile.businessId);
+        await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
+      } else {
+        console.log("No changes in branding data to update in Firestore.");
+      }
+      
       toast({
         title: "Branding Guardado",
         description: "Los cambios de branding se han guardado correctamente.",
@@ -212,7 +214,7 @@ export default function BusinessSettingsPage() {
       setCoverFile(null); 
       fetchBusinessData(); 
     } catch (error: any) {
-      console.error("Error saving branding:", error); // This will now hopefully have more details if error came from upload
+      console.error("Error saving branding:", error);
       const description = error?.message 
         ? `No se pudieron guardar los cambios. ${error.message}` 
         : "No se pudieron guardar los cambios. Ocurrió un error desconocido.";
@@ -281,7 +283,6 @@ export default function BusinessSettingsPage() {
       </div>
     );
   }
-
 
   return (
     <div className="space-y-6">
@@ -393,5 +394,3 @@ export default function BusinessSettingsPage() {
     </div>
   );
 }
-
-    
