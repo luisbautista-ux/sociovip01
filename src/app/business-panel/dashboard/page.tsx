@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import type { BusinessManagedEntity } from "@/lib/types";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { parseISO, endOfDay, isFuture } from "date-fns";
+import { parseISO, isFuture } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 interface BusinessDashboardStats {
@@ -124,15 +124,16 @@ export default function BusinessDashboardPage() {
       let totalQrUsedCount = 0;
       
       entities.forEach(entity => {
-        // Promociones Activas
+        // 1. Promociones Activas
         if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
           activePromotionsCount++;
         }
-        // Eventos Próximos
+        // 2. Eventos Próximos
         if (entity.type === 'event' && entity.isActive) {
           try {
             const eventStartDate = parseISO(entity.startDate);
-            if (isFuture(eventStartDate) || isEntityCurrentlyActivatable(entity)) { // Count if future or currently active
+            // Un evento es "próximo" si está activo y (su fecha de inicio es futura O es activable actualmente)
+            if (isFuture(eventStartDate) || isEntityCurrentlyActivatable(entity)) {
               upcomingEventsCount++;
             }
           } catch (e) {
@@ -140,10 +141,10 @@ export default function BusinessDashboardPage() {
           }
         }
 
-        // Códigos Creados
+        // 3. Códigos Creados
         if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
             totalCodesCreatedCount += entity.generatedCodes.length;
-            // QRs Usados (Códigos canjeados)
+            // 4. QRs Usados (Códigos con estado 'redeemed')
             entity.generatedCodes.forEach(code => {
               if (code.status === 'redeemed') {
                 totalQrUsedCount++;
