@@ -18,7 +18,7 @@ import { sanitizeObjectForFirestore } from "@/lib/utils";
 
 
 export default function BusinessSettingsPage() {
-  const { userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { userProfile, currentUser, loadingAuth, loadingProfile } = useAuth(); // Added currentUser
   const { toast } = useToast();
 
   const [businessData, setBusinessData] = useState<Business | null>(null);
@@ -129,10 +129,10 @@ export default function BusinessSettingsPage() {
           (snapshot) => {
             // Optional: handle progress
           },
-          (error) => {
-            console.error("Upload failed:", error);
+          (error) => { // Firebase Storage errors usually come here
+            console.error("Firebase Storage Upload failed:", error.code, error.message, error.name, error.serverResponse);
             const errorMessage = error.message || "Error desconocido al subir archivo.";
-            toast({ title: "Error de Subida", description: `No se pudo subir ${file.name}. ${errorMessage}`, variant: "destructive" });
+            toast({ title: "Error de Subida (Storage)", description: `No se pudo subir ${file.name}. Código: ${error.code}. Mensaje: ${errorMessage}`, variant: "destructive", duration: 10000 });
             reject(new Error(errorMessage)); // Reject with an Error object
           },
           async () => {
@@ -143,16 +143,16 @@ export default function BusinessSettingsPage() {
               console.error("Failed to get download URL:", error);
               const errorMessage = error.message || "Error desconocido al obtener URL de descarga.";
               toast({ title: "Error de URL", description: `No se pudo obtener la URL para ${file.name}. ${errorMessage}`, variant: "destructive"});
-              reject(new Error(errorMessage)); // Reject with an Error object
+              reject(new Error(errorMessage)); 
             }
           }
         );
       });
     } catch (error: any) {
-      console.error("Error setting up upload:", error);
+      console.error("Error setting up upload (outer try-catch):", error);
       const errorMessage = error.message || "Error desconocido al preparar subida.";
-      toast({ title: "Error de Subida", description: `Error al preparar la subida de ${file.name}. ${errorMessage}`, variant: "destructive"});
-      return Promise.reject(new Error(errorMessage)); // Return a rejected promise
+      toast({ title: "Error de Preparación de Subida", description: `Error al preparar la subida de ${file.name}. ${errorMessage}`, variant: "destructive"});
+      return Promise.reject(new Error(errorMessage)); 
     }
   };
 
@@ -161,6 +161,25 @@ export default function BusinessSettingsPage() {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       return;
     }
+    if (!currentUser?.uid) {
+      toast({ title: "Error", description: "Usuario no autenticado o UID no disponible.", variant: "destructive" });
+      return;
+    }
+
+    // --- DETAILED LOGGING ---
+    const storagePathForLogo = logoFile ? `businesses/${userProfile.businessId}/logo/${logoFile.name}` : "N/A";
+    const storagePathForCover = coverFile ? `businesses/${userProfile.businessId}/cover/${coverFile.name}` : "N/A";
+    console.log("--- handleSaveChangesBranding ---");
+    console.log("Current User UID (for rule check):", currentUser.uid);
+    console.log("User Profile Business ID (for rule check & path):", userProfile.businessId);
+    console.log("Target Storage Path (Logo):", storagePathForLogo);
+    console.log("Target Storage Path (Cover):", storagePathForCover);
+    console.log("Business ID from error (for comparison): 0cCVXIJm2qxVrpOjXVTC");
+    if (userProfile.businessId !== "0cCVXIJm2qxVrpOjXVTC") {
+        console.warn("POTENTIAL MISMATCH: The businessId in userProfile on the client ('" + userProfile.businessId + "') is different from the businessId in the error path ('0cCVXIJm2qxVrpOjXVTC'). This is likely the cause of the permission error if the rules check against userProfile.businessId.");
+    }
+    // --- END DETAILED LOGGING ---
+    
     setIsSavingBranding(true);
     
     const updateData: Partial<Business> = {
@@ -193,11 +212,11 @@ export default function BusinessSettingsPage() {
       setCoverFile(null); 
       fetchBusinessData(); 
     } catch (error: any) {
-      console.error("Error saving branding:", error);
+      console.error("Error saving branding:", error); // This will now hopefully have more details if error came from upload
       const description = error?.message 
         ? `No se pudieron guardar los cambios. ${error.message}` 
         : "No se pudieron guardar los cambios. Ocurrió un error desconocido.";
-      toast({ title: "Error al Guardar Branding", description, variant: "destructive"});
+      toast({ title: "Error al Guardar Branding", description, variant: "destructive", duration: 10000 });
     } finally {
       setIsSavingBranding(false);
     }
@@ -233,7 +252,7 @@ export default function BusinessSettingsPage() {
     }
   };
   
-  if (isLoadingData) { 
+  if (isLoadingData || loadingAuth || loadingProfile) { 
     return (
       <div className="flex flex-col items-center justify-center h-96">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -242,7 +261,7 @@ export default function BusinessSettingsPage() {
     );
   }
 
-  if (!userProfile?.businessId && !isLoadingData) { 
+  if (!userProfile?.businessId && !isLoadingData && !loadingAuth && !loadingProfile) { 
      return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-primary flex items-center">
@@ -374,3 +393,5 @@ export default function BusinessSettingsPage() {
     </div>
   );
 }
+
+    
