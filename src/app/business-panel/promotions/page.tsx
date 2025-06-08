@@ -559,11 +559,10 @@ export default function BusinessPromotionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[25%] min-w-[200px]">Promoción y Gestión</TableHead>
-                      <TableHead className="w-[15%] min-w-[160px]">Vigencia</TableHead>
-                      <TableHead className="w-[20%] min-w-[200px]">QRs Promocionales</TableHead>
-                      <TableHead className="w-[15%] min-w-[160px]">Códigos Creados</TableHead>
-                      <TableHead className="w-[25%] min-w-[180px] text-left">Acciones Adicionales</TableHead>
+                      <TableHead className="w-[35%] min-w-[250px]">Promociones y Gestión</TableHead>
+                      <TableHead className="w-[20%] min-w-[180px]">Vigencia</TableHead>
+                      <TableHead className="w-[25%] min-w-[220px]">QRs Promocionales</TableHead>
+                      <TableHead className="w-[20%] min-w-[180px] text-left">Acciones Adicionales</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -599,6 +598,24 @@ export default function BusinessPromotionsPage() {
                                 <Button variant="outline" size="xs" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
                                     <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
                                 </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="xs" 
+                                    onClick={() => openCreateCodesDialog(promo)} 
+                                    disabled={!isActivatable || isSubmitting} 
+                                    className="px-2 py-1 h-auto text-xs"
+                                >
+                                    <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="xs" 
+                                    onClick={() => openViewCodesDialog(promo)} 
+                                    disabled={isSubmitting} 
+                                    className="px-2 py-1 h-auto text-xs"
+                                >
+                                    <ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({codesCreatedCount})
+                                </Button>
                             </div>
                         </TableCell>
                         <TableCell className="align-top py-3 text-xs">
@@ -608,33 +625,12 @@ export default function BusinessPromotionsPage() {
                         </TableCell>
                          <TableCell className="align-top py-3 text-xs">
                            <div className="flex flex-col">
-                                <span>QRs Generados (Clientes) ({0})</span> 
-                                <span>QRs Usados (Canjeados) ({codesRedeemedCount})</span>
-                                <span>Límite de Canjes ({promo.usageLimit || 'Ilimitado'})</span>
+                                <span>Códigos Creados ({codesCreatedCount})</span>
+                                <span>QR Generados (0)</span> {/* Placeholder */}
+                                <span>QRs Usados ({codesRedeemedCount})</span>
+                                <span>Límite de promociones ({promo.usageLimit && promo.usageLimit > 0 ? promo.usageLimit : 'Ilimitado'})</span>
                            </div>
                          </TableCell>
-                         <TableCell className="align-top py-3">
-                            <div className="flex flex-col items-start gap-1">
-                                <Button 
-                                    variant="outline" 
-                                    size="xs" 
-                                    onClick={() => openCreateCodesDialog(promo)} 
-                                    disabled={!isActivatable || isSubmitting} 
-                                    className="px-2 py-1 h-auto text-xs"
-                                >
-                                    <QrCodeIcon className="h-3 w-3 mr-1" /> Crear
-                                </Button>
-                                <Button 
-                                    variant="outline" 
-                                    size="xs" 
-                                    onClick={() => openViewCodesDialog(promo)} 
-                                    disabled={isSubmitting} 
-                                    className="px-2 py-1 h-auto text-xs"
-                                >
-                                    <ListChecks className="h-3 w-3 mr-1" /> Ver ({codesCreatedCount})
-                                </Button>
-                            </div>
-                          </TableCell>
                           <TableCell className="align-top py-3">
                              <div className="flex flex-col items-start gap-1">
                                 <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo, true)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
@@ -672,7 +668,7 @@ export default function BusinessPromotionsPage() {
                       </TableRow>
                     );
                     }) : (
-                        !isLoadingPageData && <TableRow><TableCell colSpan={5} className="text-center h-24">No se encontraron promociones con los filtros aplicados.</TableCell></TableRow>
+                        !isLoadingPageData && <TableRow><TableCell colSpan={4} className="text-center h-24">No se encontraron promociones con los filtros aplicados.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -795,6 +791,4 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
-
     
-
