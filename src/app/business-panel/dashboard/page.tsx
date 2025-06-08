@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard"; 
-import { Ticket, Calendar, Users, BarChart3, ScanLine, Loader2, Info, QrCode as QrCodeLucide } from "lucide-react";
+import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useCallback } from "react";
@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import type { BusinessManagedEntity } from "@/lib/types";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { startOfDay, endOfDay, parseISO } from "date-fns";
+import { parseISO, endOfDay, isFuture } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 interface BusinessDashboardStats {
@@ -33,19 +33,16 @@ export default function BusinessDashboardPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log("BusinessDashboardPage: Auth/Profile loading state. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile);
     if (loadingAuth || loadingProfile) {
       if (!isLoading) setIsLoading(true);
       return;
     }
 
     if (userProfile) {
-      console.log("BusinessDashboardPage: UserProfile loaded in useEffect:", userProfile);
       const fetchedBusinessId = userProfile.businessId;
       if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
         setCurrentBusinessId(fetchedBusinessId.trim());
       } else {
-        console.warn("BusinessDashboardPage: UserProfile does not have a valid businessId. User roles:", userProfile.roles);
         setCurrentBusinessId(null);
         setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
         setIsLoading(false); 
@@ -59,7 +56,6 @@ export default function BusinessDashboardPage() {
         }
       }
     } else { 
-      console.log("BusinessDashboardPage: No userProfile found after auth/profile load. Cannot fetch business stats.");
       setCurrentBusinessId(null);
       setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
       setIsLoading(false);
@@ -68,10 +64,7 @@ export default function BusinessDashboardPage() {
 
 
   const fetchBusinessStats = useCallback(async (businessIdForQuery: string) => {
-    console.log("BusinessDashboardPage: fetchBusinessStats called for businessId:", businessIdForQuery);
-    
     if (typeof businessIdForQuery !== 'string' || businessIdForQuery.trim() === '') {
-        console.error("BusinessDashboardPage: fetchBusinessStats called with invalid businessIdForQuery:", businessIdForQuery, "UserProfile for context:", userProfile);
         setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
         setIsLoading(false); 
         return;
@@ -84,8 +77,7 @@ export default function BusinessDashboardPage() {
         where("businessId", "==", businessIdForQuery)
       );
       const querySnapshot = await getDocs(entitiesQuery);
-      console.log("BusinessDashboardPage: Fetched businessEntities snapshot size for businessId", businessIdForQuery, ":", querySnapshot.size);
-
+      
       const entities: BusinessManagedEntity[] = [];
       querySnapshot.forEach(docSnap => {
         const data = docSnap.data();
@@ -96,7 +88,6 @@ export default function BusinessDashboardPage() {
         else if (typeof data.startDate === 'string') startDateStr = data.startDate;
         else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
         else { 
-          console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid startDate. Using fallback.`);
           startDateStr = nowISO;
         }
 
@@ -105,7 +96,6 @@ export default function BusinessDashboardPage() {
         else if (typeof data.endDate === 'string') endDateStr = data.endDate;
         else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
         else { 
-          console.warn(`BusinessDashboardPage: Entity ${docSnap.id} for business ${data.businessId} missing or invalid endDate. Using fallback.`);
           endDateStr = nowISO;
         }
         
@@ -127,31 +117,33 @@ export default function BusinessDashboardPage() {
           createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
         } as BusinessManagedEntity);
       });
-      console.log("BusinessDashboardPage: Processed entities for dashboard:", entities.length);
 
       let activePromotionsCount = 0;
       let upcomingEventsCount = 0;
-      let totalCodesCreatedCount = 0;
+      let totalCodesCreatedCount = 0; 
       let totalQrUsedCount = 0;
       
-      const todayEndObj = endOfDay(new Date());
-
       entities.forEach(entity => {
+        // Promociones Activas
         if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
           activePromotionsCount++;
         }
+        // Eventos Próximos
         if (entity.type === 'event' && entity.isActive) {
           try {
-            if (entity.startDate && parseISO(entity.startDate) > todayEndObj) {
+            const eventStartDate = parseISO(entity.startDate);
+            if (isFuture(eventStartDate) || isEntityCurrentlyActivatable(entity)) { // Count if future or currently active
               upcomingEventsCount++;
             }
           } catch (e) {
-            console.warn("BusinessDashboardPage: Invalid startDate format for event:", entity.id, entity.startDate, e);
+            console.warn("BusinessDashboardPage: Invalid startDate format for event for upcoming check:", entity.id, entity.startDate, e);
           }
         }
 
+        // Códigos Creados
         if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
             totalCodesCreatedCount += entity.generatedCodes.length;
+            // QRs Usados (Códigos canjeados)
             entity.generatedCodes.forEach(code => {
               if (code.status === 'redeemed') {
                 totalQrUsedCount++;
@@ -160,50 +152,37 @@ export default function BusinessDashboardPage() {
         }
       });
       
-      console.log("BusinessDashboardPage: Calculated activePromotions:", activePromotionsCount);
-      console.log("BusinessDashboardPage: Calculated upcomingEvents:", upcomingEventsCount);
-      console.log("BusinessDashboardPage: Calculated totalCodesCreated:", totalCodesCreatedCount);
-      console.log("BusinessDashboardPage: Calculated totalQrUsed:", totalQrUsedCount);
-
-      setStats(prevStats => ({
-        ...prevStats,
+      setStats({
         activePromotions: activePromotionsCount,
         upcomingEvents: upcomingEventsCount,
         totalCodesCreated: totalCodesCreatedCount,
         totalQrUsed: totalQrUsedCount,
-      }));
+      });
 
     } catch (error: any) {
-      console.error("BusinessDashboardPage: Error fetching business dashboard stats:", error.code, error.message, error);
       setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
       toast({
-        title: "Error al Cargar las Estadísticas del Negocio",
-        description: `Permiso denegado (${error.code || 'desconocido'}). Asegúrate de que tu perfil en Firestore (colección 'platformUsers', documento con tu UID de Auth) tenga un campo 'roles' como un array con 'business_admin' o 'staff', y un campo 'businessId' válido. Revisa las reglas de seguridad de Firestore.`,
+        title: "Error al Cargar Estadísticas del Negocio",
+        description: `No se pudieron obtener las estadísticas. Error: ${error.message}. Asegúrate de que tu perfil de Firestore ('platformUsers') tenga 'businessId' y roles correctos ('business_admin', 'staff') y que las reglas de Firestore permitan el acceso.`,
         variant: "destructive",
         duration: 15000,
       });
     } finally {
       setIsLoading(false); 
-      console.log("BusinessDashboardPage: fetchBusinessStats finished, isLoading set to false.");
     }
-  }, [toast, userProfile]);
+  }, [toast]);
 
   useEffect(() => {
-    console.log("BusinessDashboardPage: Effect for fetching data. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "currentBusinessId:", currentBusinessId);
     if (loadingAuth || loadingProfile) {
       return;
     }
-
     if (currentBusinessId) {
-      console.log("BusinessDashboardPage: Valid currentBusinessId, calling fetchBusinessStats:", currentBusinessId);
       fetchBusinessStats(currentBusinessId);
     } else {
-      console.log("BusinessDashboardPage: No currentBusinessId for fetching stats. Ensuring isLoading is false.");
       if (isLoading) setIsLoading(false);
       setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [currentBusinessId, loadingAuth, loadingProfile]); 
+  }, [currentBusinessId, loadingAuth, loadingProfile, fetchBusinessStats, isLoading]);
 
 
   if (isLoading) { 
@@ -227,7 +206,6 @@ export default function BusinessDashboardPage() {
     );
   }
 
-
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary">Dashboard de Mi Negocio</h1>
@@ -241,19 +219,6 @@ export default function BusinessDashboardPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center">
-            <BarChart3 className="h-6 w-6 mr-2 text-primary" />
-            Rendimiento Reciente de Promociones
-          </CardTitle>
-          <CardDescription>Visualiza cómo están funcionando tus promociones. (Datos de ejemplo para el gráfico)</CardDescription>
-        </CardHeader>
-        <CardContent className="h-[300px] flex items-center justify-center">
-          <p className="text-muted-foreground">Aquí iría un gráfico de rendimiento de promociones.</p>
-        </CardContent>
-      </Card>
-
-       <Card className="shadow-lg">
-        <CardHeader>
           <CardTitle>Actividad Reciente de tu Negocio</CardTitle>
         </CardHeader>
         <CardContent className="min-h-[150px] flex flex-col items-center justify-center text-center">
@@ -266,4 +231,3 @@ export default function BusinessDashboardPage() {
     </div>
   );
 }
-
