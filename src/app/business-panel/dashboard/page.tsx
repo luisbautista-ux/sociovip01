@@ -132,7 +132,6 @@ export default function BusinessDashboardPage() {
         if (entity.type === 'event' && entity.isActive) {
           try {
             const eventStartDate = parseISO(entity.startDate);
-            // Un evento es "próximo" si está activo y (su fecha de inicio es futura O es activable actualmente)
             if (isFuture(eventStartDate) || isEntityCurrentlyActivatable(entity)) {
               upcomingEventsCount++;
             }
