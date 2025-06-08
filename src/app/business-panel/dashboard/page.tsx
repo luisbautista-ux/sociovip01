@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard"; 
-import { Ticket, Calendar, Users, BarChart3, ScanLine, Loader2, Info } from "lucide-react";
+import { Ticket, Calendar, Users, BarChart3, ScanLine, Loader2, Info, QrCode as QrCodeLucide } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useCallback } from "react";
@@ -17,7 +17,7 @@ interface BusinessDashboardStats {
   activePromotions: number;
   upcomingEvents: number;
   totalRedemptionsToday: number; 
-  qrGeneratedWithCodes: number; // Placeholder
+  qrGeneratedWithCodes: number;
 }
 
 export default function BusinessDashboardPage() {
@@ -27,7 +27,7 @@ export default function BusinessDashboardPage() {
     activePromotions: 0,
     upcomingEvents: 0,
     totalRedemptionsToday: 0,
-    qrGeneratedWithCodes: 0, // Placeholder
+    qrGeneratedWithCodes: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -121,7 +121,6 @@ export default function BusinessDashboardPage() {
           maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
           isActive: data.isActive === undefined ? true : data.isActive,
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
-          // No necesitamos cargar sub-arrays completos aquí para las stats básicas
           ticketTypes: [], 
           eventBoxes: [],
           assignedPromoters: [], 
@@ -133,6 +132,7 @@ export default function BusinessDashboardPage() {
       let activePromotionsCount = 0;
       let upcomingEventsCount = 0;
       let redemptionsTodayCount = 0;
+      let totalQrCodesCreatedForBusiness = 0;
       const todayStartObj = startOfDay(new Date());
       const todayEndObj = endOfDay(new Date());
 
@@ -162,18 +162,23 @@ export default function BusinessDashboardPage() {
             }
           }
         });
+        
+        if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
+            totalQrCodesCreatedForBusiness += entity.generatedCodes.length;
+        }
       });
       
       console.log("BusinessDashboardPage: Calculated activePromotions:", activePromotionsCount);
       console.log("BusinessDashboardPage: Calculated upcomingEvents:", upcomingEventsCount);
       console.log("BusinessDashboardPage: Calculated redemptionsToday:", redemptionsTodayCount);
+      console.log("BusinessDashboardPage: Calculated totalQrCodesCreatedForBusiness:", totalQrCodesCreatedForBusiness);
 
       setStats(prevStats => ({
         ...prevStats,
         activePromotions: activePromotionsCount,
         upcomingEvents: upcomingEventsCount,
         totalRedemptionsToday: redemptionsTodayCount,
-        qrGeneratedWithCodes: 0, // Mantener como 0, no hay lógica de backend para este contador aún
+        qrGeneratedWithCodes: totalQrCodesCreatedForBusiness,
       }));
 
     } catch (error: any) {
@@ -206,7 +211,7 @@ export default function BusinessDashboardPage() {
       setStats({ activePromotions: 0, upcomingEvents: 0, totalRedemptionsToday: 0, qrGeneratedWithCodes: 0 });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [currentBusinessId, loadingAuth, loadingProfile]); // fetchBusinessStats se quita de aquí porque está en useCallback con userProfile
+  }, [currentBusinessId, loadingAuth, loadingProfile]); 
 
 
   if (isLoading) { 
@@ -239,7 +244,7 @@ export default function BusinessDashboardPage() {
         <StatCard title="Promociones Activas" value={stats.activePromotions} icon={Ticket} />
         <StatCard title="Eventos Próximos" value={stats.upcomingEvents} icon={Calendar} />
         <StatCard title="Canjes Hoy" value={stats.totalRedemptionsToday} icon={ScanLine} />
-        <StatCard title="QRs generados con tus códigos" value={stats.qrGeneratedWithCodes} icon={Users} />
+        <StatCard title="Códigos QR Creados (Total)" value={stats.qrGeneratedWithCodes} icon={QrCodeLucide} />
       </div>
 
       <Card className="shadow-lg">
@@ -269,3 +274,4 @@ export default function BusinessDashboardPage() {
     </div>
   );
 }
+
