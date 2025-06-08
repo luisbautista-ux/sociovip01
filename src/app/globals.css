@@ -2,39 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer base {
   :root {
-    --background: 280 13% 94%; /* Light Gray */
-    --foreground: 0 0% 3.9%; /* Dark Gray / Black */
+    --background: 280 30% 96%; /* #F5F0F9 Very Light Purple */
+    --foreground: 283 10% 25%; /* #4A424E Dark Purple-Gray text */
 
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 283 10% 25%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
+    --popover-foreground: 283 10% 25%;
 
-    --primary: 283 44% 53%; /* Vibrant Purple */
+    --primary: 280 43% 63%;  /* #B080D0 User's Primary */
     --primary-foreground: 0 0% 98%; /* White */
 
-    --secondary: 280 10% 88%; /* Lighter Gray */
-    --secondary-foreground: 0 0% 9%; /* Dark Gray / Black */
+    --secondary: 280 30% 88%; /* Lighter version of primary for secondary elements */
+    --secondary-foreground: 280 43% 45%; /* Darker primary for text on secondary */
 
-    --muted: 280 10% 80%; /* Muted Gray */
-    --muted-foreground: 0 0% 45.1%; /* Medium Gray */
+    --muted: 280 20% 90%;
+    --muted-foreground: 280 10% 45%;
 
-    --accent: 167 27% 59%; /* Soft Teal */
-    --accent-foreground: 0 0% 98%; /* White */
+    --accent: 280 27% 59%;   /* #8E5EA2 User's Accent */
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 280 10% 85%; /* Subtle Border */
-    --input: 0 0% 100%; /* White Input Background */
-    --ring: 283 44% 63%; /* Lighter Purple for Focus Ring */
+    --border: 280 15% 85%;
+    --input: 0 0% 100%;
+    --ring: 280 43% 70%;     /* Lighter primary for focus */
 
     --radius: 0.5rem;
 
@@ -43,61 +39,42 @@ body {
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-
-    /* Sidebar specific colors - can remain default or be themed if sidebar is used later */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
+    --background: 283 10% 15%; /* Dark Purple-Gray for dark mode background */
+    --foreground: 280 30% 90%; /* Light Purple-Gray for dark mode text */
 
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --card: 283 10% 20%;
+    --card-foreground: 280 30% 90%;
 
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 283 10% 10%;
+    --popover-foreground: 280 30% 90%;
 
-    --primary: 283 44% 63%; /* Lighter Vibrant Purple for Dark Mode */
-    --primary-foreground: 0 0% 9%; 
+    --primary: 280 50% 70%; /* Brighter Primary for dark mode */
+    --primary-foreground: 283 10% 15%;
 
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 283 15% 25%;
+    --secondary-foreground: 280 30% 90%;
 
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
+    --muted: 283 10% 22%;
+    --muted-foreground: 280 20% 70%;
 
-    --accent: 167 27% 69%; /* Lighter Soft Teal for Dark Mode */
-    --accent-foreground: 0 0% 9%;
+    --accent: 280 35% 65%;   /* Brighter Accent for dark mode */
+    --accent-foreground: 283 10% 15%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 283 44% 53%; /* Primary Purple for Focus Ring */
-    
+    --border: 283 10% 30%;
+    --input: 283 10% 20%;
+    --ring: 280 50% 75%;
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -107,5 +84,9 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    @apply font-body; /* Apply PT Sans as default body font */
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline; /* Apply Poppins to all headings */
   }
 }

@@ -1,17 +1,19 @@
-# **App Name**: CloverPass
+# **App Name**: QR Code Customizer
 
 ## Core Features:
 
-- QR Code Generation: QR code generation from a unique alphanumeric code to validate entries and promotions.  Each code contains information to identify the creator, participating local and applicable promotion.
-- Landing Page for QR Generation: A landing page for QR generation featuring a simple input form for codes and a button to generate QR codes. Includes validation messages for expired, invalid, or valid codes and prompts for user information if the code is valid but the user is new.
-- QR Display: Displaying user data, promotions and QR code.
-- Code Status Monitoring: Monitor codes and their status. Track the codes by using these status: generated, utilized and expired.
+- Image Upload: Upload an image of a QR code design.
+- Image Cropping: Crop/resize a portion of the image for repeat tiling.
+- AI-powered Tiling Generation: Based on the original image, create a tiling of QR code visual customizations, leveraging a tool that detects image properties to achieve consistent styling.
+- QR Content Customization: Customize QR code content: allows inputting URL/text for the QR code.
+- Download QR Code: Download the generated QR code as a high-resolution PNG.
 
 ## Style Guidelines:
 
-- Primary color: Vibrant purple (#A050BE) to reflect exclusivity, creativity, and modernity which is ideal for businesses offering VIP experiences and innovative services.
-- Background color: Light gray (#EAE4EC) offers a clean, uncluttered backdrop that ensures readability and focuses attention on the interface elements without overwhelming the user.
-- Accent color: Soft teal (#77B7A8) acts as a refreshing and inviting highlight, complementing the purple tones while adding a sense of tranquility and approachability. It will be used in buttons.
-- Clean and modern typography that ensures readability and supports a user-friendly experience. Should have different weights for headers, sub-headers, body texts and labels.
-- A minimalistic and intuitive layout design that puts the code input at the center. Ensures easy QR code generation.
-- Use of consistent and clear icons for the code status: 'generated,' 'utilized,' and 'expired,' aiding in quick visual recognition and interaction.
+- Primary color: Light purple (#B080D0), referencing the example image but aiming for greater vibrancy.
+- Background color: Very light purple (#F5F0F9). It provides a subtle contrast against the content.
+- Accent color: Slightly darker purple (#8E5EA2) than the primary for buttons and highlights.
+- Font pairing: 'Poppins' (sans-serif) for headlines and short text, 'PT Sans' (sans-serif) for longer text.
+- Simple, clear icons to represent different options. Favor outline style icons.
+- Clean, minimalistic layout to focus on the image and customization options.
+- Subtle transitions on button presses to signal activity.

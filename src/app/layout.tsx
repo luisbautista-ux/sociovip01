@@ -1,23 +1,13 @@
 
-import type {Metadata} from 'next';
-import {Geist, Geist_Mono} from 'next/font/google';
-import './globals.css';
+import type { Metadata } from "next";
+// Removed Geist imports as per new font instructions
+import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/context/AuthContext"; // Import AuthProvider
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: 'SocioVIP',
-  description: 'Gestión de eventos, promociones y fidelización de clientes.',
+  title: "QR Code Customizer",
+  description: "Upload an image, generate AI tiling, customize QR content, and download.",
 };
 
 export default function RootLayout({
@@ -27,8 +17,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AuthProvider> {/* Wrap children with AuthProvider */}
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
+      </head>
+      <body className="font-body antialiased"> {/* Added font-body here */}
+        <AuthProvider>
           {children}
           <Toaster />
         </AuthProvider>
