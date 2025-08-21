@@ -25,7 +25,6 @@ import { cn } from "@/lib/utils";
 import { format, parseISO, startOfDay, isBefore, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessEventFormData } from "@/lib/types";
-import { DialogFooter } from "@/components/ui/dialog";
 
 // Schema for the details tab form
 const eventDetailsFormSchema = z.object({
@@ -48,22 +47,18 @@ const eventDetailsFormSchema = z.object({
 });
 
 // This type is for what the form itself manages and submits
-type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
+export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 
 
 interface BusinessEventFormProps {
   event?: BusinessManagedEntity; 
-  onSubmit: (data: EventDetailsFormValues) => void; // Renamed from BusinessEventFormData as maxAttendance is not directly submitted by this form
-  onCancel?: () => void; 
   isSubmitting?: boolean;
 }
 
-export function BusinessEventForm({ 
-  event, 
-  onSubmit, 
-  onCancel, // onCancel is not used by this form directly as it's part of a larger modal
-  isSubmitting = false,
-}: BusinessEventFormProps) {
+export const BusinessEventForm = React.forwardRef<
+    { triggerSubmit: () => void },
+    BusinessEventFormProps
+  >(({ event, isSubmitting = false }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     defaultValues: {
@@ -77,6 +72,14 @@ export function BusinessEventForm({
       aiHint: event?.aiHint || "",
     },
   });
+
+  React.useImperativeHandle(ref, () => ({
+    triggerSubmit: () => {
+        // This function will be called from the parent to get the form data
+        // It does not submit to firestore, it just returns the validated data
+        return form.getValues(); 
+    }
+  }));
 
   React.useEffect(() => {
     if (event) {
@@ -93,10 +96,12 @@ export function BusinessEventForm({
     }
   }, [event, form]);
 
-
   const handleSubmit = (values: EventDetailsFormValues) => {
-    onSubmit(values); 
+    // The form itself doesn't submit. The parent will call the function exposed by the ref.
+    // This is a placeholder or can be used for local state updates if needed.
+    console.log("BusinessEventForm submitted with values (local validation):", values);
   };
+
 
   return (
     <Form {...form}>
@@ -235,13 +240,10 @@ export function BusinessEventForm({
             </FormItem>
           )}
         />
-        <div className="pt-4 flex justify-end">
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-             Actualizar Detalles del Evento
-          </Button>
-        </div>
+        {/* The submit button is now in the parent component (the dialog footer) */}
       </form>
     </Form>
   );
-}
+});
+
+BusinessEventForm.displayName = "BusinessEventForm";

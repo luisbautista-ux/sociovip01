@@ -35,7 +35,7 @@ import {
   AlertDialogTitle as UIAlertDialogTitle, 
   AlertDialogTrigger 
 } from "@/components/ui/alert-dialog";
-import { BusinessEventForm } from "@/components/business/forms/BusinessEventForm";
+import { BusinessEventForm, type EventDetailsFormValues } from "@/components/business/forms/BusinessEventForm";
 import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
 import { TicketTypeForm } from "@/components/business/forms/TicketTypeForm";
@@ -95,6 +95,10 @@ type CommissionRuleFormValues = z.infer<typeof commissionRuleFormSchema>;
 export default function BusinessEventsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
+  
+  // Create a ref for the form inside the manage modal
+  const eventDetailsFormRef = React.useRef<React.ElementRef<typeof BusinessEventForm>>(null);
+
 
   const [events, setEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true); 
@@ -541,24 +545,6 @@ export default function BusinessEventsPage() {
       setIsSubmitting(false);
     }
   };
-
-  const handleMainEventFormSubmit = (data: BusinessEventFormData) => { 
-    setEditingEvent(prevEvent => {
-        if (!prevEvent) return null; 
-        return {
-            ...prevEvent, 
-            name: data.name,
-            description: data.description || "",
-            termsAndConditions: data.termsAndConditions || "",
-            startDate: data.startDate.toISOString(),
-            endDate: data.endDate.toISOString(),
-            isActive: data.isActive,
-            imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/600x400.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : prevEvent.imageUrl || `https://placehold.co/600x400.png`),
-            aiHint: data.aiHint || "",
-        };
-    });
-    toast({ title: "Detalles del Evento Actualizados", description: `Los cambios en "${data.name}" han sido aplicados en el editor. Guarda el evento para persistir.` });
-  };
   
   const handleDeleteEvent = async (eventId: string, eventName?: string) => {
     if (isSubmitting) return;
@@ -585,86 +571,96 @@ export default function BusinessEventsPage() {
     }
   };
 
- const handleSaveManagedEventAndClose = async () => {
+  const handleSaveManagedEventAndClose = async (eventDetailsFormData?: EventDetailsFormValues) => {
     if (!editingEvent || !currentBusinessId) {
-        toast({ title: "Error", description: "No hay evento para guardar o ID de negocio no disponible.", variant: "destructive" });
-        setIsSubmitting(false);
+      toast({ title: "Error", description: "No hay evento para guardar o ID de negocio no disponible.", variant: "destructive" });
+      return;
+    }
+
+    if (!eventDetailsFormData) {
+        toast({ title: "Error de formulario", description: "No se pudieron obtener los datos del formulario de detalles.", variant: "destructive" });
         return;
     }
-
+    
     setIsSubmitting(true);
+
     try {
-      const calculatedAtt = calculateMaxAttendance(editingEvent.ticketTypes);
-      const eventToSave: BusinessManagedEntity = {
-        ...editingEvent,
-        maxAttendance: calculatedAtt,
-        businessId: currentBusinessId, 
-        type: "event" as "event", 
-      };
-      
-      const finalTicketTypes = (eventToSave.ticketTypes || []).map((tt, index) => (sanitizeObjectForFirestore({
-        ...tt,
-        id: tt.id || `tt-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}F`, 
-        eventId: eventToSave.id || "", 
-        businessId: currentBusinessId,
-      }) as TicketType));
+        const combinedEventData: BusinessManagedEntity = {
+            ...editingEvent,
+            ...eventDetailsFormData,
+            startDate: eventDetailsFormData.startDate.toISOString(),
+            endDate: eventDetailsFormData.endDate.toISOString(),
+        };
 
-      const finalEventBoxes = (eventToSave.eventBoxes || []).map((eb, index) => (sanitizeObjectForFirestore({
-        ...eb,
-        id: eb.id || `box-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}G`,
-        eventId: eventToSave.id || "",
-        businessId: currentBusinessId,
-      }) as EventBox));
+        const calculatedAtt = calculateMaxAttendance(combinedEventData.ticketTypes);
+        const eventToSave: BusinessManagedEntity = {
+            ...combinedEventData,
+            maxAttendance: calculatedAtt,
+            businessId: currentBusinessId,
+            type: "event",
+        };
 
-      const finalAssignedPromoters = (eventToSave.assignedPromoters || []).map(ap => (sanitizeObjectForFirestore({
-        ...ap,
-        promoterProfileId: ap.promoterProfileId || `unknown-promoter-${Date.now()}-${Math.random().toString(36).slice(2)}H`,
-        commissionRules: (ap.commissionRules || []).map((cr, crIndex) => (sanitizeObjectForFirestore({
-          ...cr,
-          id: cr.id || `cr-${ap.promoterProfileId || 'unknown'}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}I`
-        }) as CommissionRule))
-      }) as EventPromoterAssignment));
-      
-      const finalGeneratedCodes = Array.isArray(eventToSave.generatedCodes) ? eventToSave.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc})) : [];
+        const finalTicketTypes = (eventToSave.ticketTypes || []).map((tt, index) => sanitizeObjectForFirestore({
+            ...tt,
+            id: tt.id || `tt-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}F`,
+            eventId: eventToSave.id || "",
+            businessId: currentBusinessId,
+        }) as TicketType);
 
-      const payloadForFirestore: any = sanitizeObjectForFirestore({ 
-          ...eventToSave, 
-          ticketTypes: finalTicketTypes,
-          eventBoxes: finalEventBoxes,
-          assignedPromoters: finalAssignedPromoters,
-          generatedCodes: finalGeneratedCodes,
-          startDate: Timestamp.fromDate(new Date(eventToSave.startDate)),
-          endDate: Timestamp.fromDate(new Date(eventToSave.endDate)),
-          createdAt: eventToSave.createdAt ? Timestamp.fromDate(new Date(eventToSave.createdAt)) : serverTimestamp(),
-      });
-      
-      delete payloadForFirestore.id; 
-      
-      if (isDuplicatingEvent || !editingEvent.id || editingEvent.id === '') { 
-          if(!payloadForFirestore.createdAt) payloadForFirestore.createdAt = serverTimestamp();
-          console.log("Events Page (SaveManaged - Duplicating/New): Creating event with payload:", payloadForFirestore);
-          const docRef = await addDoc(collection(db, "businessEntities"), payloadForFirestore);
-          toast({ title: isDuplicatingEvent ? "Evento Duplicado Exitosamente" : "Evento Creado Exitosamente", description: `El evento "${payloadForFirestore.name}" ha sido guardado con ID: ${docRef.id}.` });
-      } else { 
-          if (payloadForFirestore.createdAt === undefined) { // If not duplicating and no existing createdAt, don't add it
-             delete payloadForFirestore.createdAt;
-          }
-          console.log("Events Page (SaveManaged - Updating): Updating event with ID", editingEvent.id, "Payload:", payloadForFirestore);
-          await updateDoc(doc(db, "businessEntities", editingEvent.id), payloadForFirestore);
-          toast({ title: "Evento Guardado", description: `Los cambios en "${payloadForFirestore.name}" han sido guardados.` });
-      }
-      
-      setShowManageEventModal(false);
-      setEditingEvent(null);
-      setIsDuplicatingEvent(false);
-      if (currentBusinessId) fetchBusinessEvents(currentBusinessId);
+        const finalEventBoxes = (eventToSave.eventBoxes || []).map((eb, index) => sanitizeObjectForFirestore({
+            ...eb,
+            id: eb.id || `box-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}G`,
+            eventId: eventToSave.id || "",
+            businessId: currentBusinessId,
+        }) as EventBox);
+
+        const finalAssignedPromoters = (eventToSave.assignedPromoters || []).map(ap => sanitizeObjectForFirestore({
+            ...ap,
+            promoterProfileId: ap.promoterProfileId || `unknown-promoter-${Date.now()}-${Math.random().toString(36).slice(2)}H`,
+            commissionRules: (ap.commissionRules || []).map((cr, crIndex) => sanitizeObjectForFirestore({
+                ...cr,
+                id: cr.id || `cr-${ap.promoterProfileId || 'unknown'}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}I`
+            }) as CommissionRule)
+        }) as EventPromoterAssignment);
+
+        const finalGeneratedCodes = Array.isArray(eventToSave.generatedCodes) ? eventToSave.generatedCodes.map(gc => sanitizeObjectForFirestore({ ...gc })) : [];
+
+        const payloadForFirestore: any = sanitizeObjectForFirestore({
+            ...eventToSave,
+            ticketTypes: finalTicketTypes,
+            eventBoxes: finalEventBoxes,
+            assignedPromoters: finalAssignedPromoters,
+            generatedCodes: finalGeneratedCodes,
+            startDate: Timestamp.fromDate(new Date(eventToSave.startDate)),
+            endDate: Timestamp.fromDate(new Date(eventToSave.endDate)),
+            createdAt: eventToSave.createdAt ? Timestamp.fromDate(new Date(eventToSave.createdAt)) : serverTimestamp(),
+        });
+        
+        delete payloadForFirestore.id;
+
+        if (isDuplicatingEvent || !editingEvent.id || editingEvent.id === '') {
+            if (!payloadForFirestore.createdAt) payloadForFirestore.createdAt = serverTimestamp();
+            const docRef = await addDoc(collection(db, "businessEntities"), payloadForFirestore);
+            toast({ title: isDuplicatingEvent ? "Evento Duplicado Exitosamente" : "Evento Creado Exitosamente", description: `El evento "${payloadForFirestore.name}" ha sido guardado con ID: ${docRef.id}.` });
+        } else {
+            if (payloadForFirestore.createdAt === undefined) {
+                delete payloadForFirestore.createdAt;
+            }
+            await updateDoc(doc(db, "businessEntities", editingEvent.id), payloadForFirestore);
+            toast({ title: "Evento Guardado", description: `Los cambios en "${payloadForFirestore.name}" han sido guardados.` });
+        }
+
+        setShowManageEventModal(false);
+        setEditingEvent(null);
+        setIsDuplicatingEvent(false);
+        if (currentBusinessId) fetchBusinessEvents(currentBusinessId);
     } catch (error: any) {
-      console.error("Events Page: Error saving/updating event:", error.code, error.message, error);
-      toast({ title: "Error al Guardar Evento", description: `No se pudo guardar el evento. ${error.message}`, variant: "destructive", duration: 10000});
+        console.error("Events Page: Error saving/updating event:", error.code, error.message, error);
+        toast({ title: "Error al Guardar Evento", description: `No se pudo guardar el evento. ${error.message}`, variant: "destructive", duration: 10000 });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
-  };
+};
 
   const openCreateCodesDialog = (event: BusinessManagedEntity) => {
     if (!isEntityCurrentlyActivatable(event)) {
@@ -1400,8 +1396,8 @@ export default function BusinessEventsPage() {
 
                         <TabsContent value="details">
                             <BusinessEventForm
+                                ref={eventDetailsFormRef}
                                 event={editingEvent}
-                                onSubmit={handleMainEventFormSubmit}
                                 isSubmitting={isSubmitting} 
                             />
                         </TabsContent>
@@ -1579,7 +1575,11 @@ export default function BusinessEventsPage() {
                 <Button variant="outline" onClick={() => { setShowManageEventModal(false); setEditingEvent(null); setIsDuplicatingEvent(false); }} disabled={isSubmitting}>
                     Cancelar
                 </Button>
-                <Button onClick={handleSaveManagedEventAndClose} className="bg-primary hover:bg-primary/90" disabled={isSubmitting || !editingEvent}>
+                <Button 
+                   onClick={() => eventDetailsFormRef.current?.triggerSubmit()}
+                   className="bg-primary hover:bg-primary/90" 
+                   disabled={isSubmitting || !editingEvent}
+                >
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : ((!editingEvent || !editingEvent.id || isDuplicatingEvent) ? "Crear Evento y Cerrar" : "Guardar Cambios y Cerrar")}
                 </Button>
             </UIDialogFooterAliased>
@@ -1845,4 +1845,3 @@ export default function BusinessEventsPage() {
   );
 }
     
-
