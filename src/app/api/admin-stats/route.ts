@@ -5,35 +5,28 @@ import type { ServiceAccount } from 'firebase-admin';
 
 // Helper function to initialize Firebase Admin SDK
 function initializeAdminApp() {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-  if (!serviceAccountJson) {
-    console.error('API Route (admin-stats): FIREBASE_SERVICE_ACCOUNT_JSON no está configurada.');
-    throw new Error('Las credenciales del Firebase Admin SDK no están configuradas.');
+  // Check if the default app is already initialized
+  if (admin.apps.length > 0) {
+    console.log("Admin SDK already initialized. Using existing app.");
+    return admin.app();
   }
 
-  // Check if the placeholder value is still being used
-  if (serviceAccountJson.startsWith('TU_JSON_DE')) {
-    console.error('API Route (admin-stats): FIREBASE_SERVICE_ACCOUNT_JSON contiene el valor de ejemplo.');
-    throw new Error('El JSON de la cuenta de servicio de Firebase no ha sido configurado en el archivo .env. Por favor, reemplaza el valor de ejemplo.');
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
+  if (!serviceAccountJson || serviceAccountJson.startsWith('TU_JSON_DE')) {
+    const errorMessage = 'El JSON de la cuenta de servicio de Firebase no ha sido configurado en el archivo .env.';
+    console.error(`API Route (admin-stats): ${errorMessage}`);
+    throw new Error(errorMessage);
   }
 
   try {
     const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
-    
-    if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
-      throw new Error("El JSON de la cuenta de servicio es inválido o no tiene los campos requeridos (project_id, client_email, private_key).");
-    }
 
-    // Initialize a new app instance every time to avoid conflicts in serverless environments.
-    // Use a unique name to prevent "already exists" error if the environment is reused.
-    const appName = `admin-stats-app-${Date.now()}`;
-    
-    // If there is an app with that name already, get it. Otherwise, initialize it.
-    const app = admin.apps.find(a => a?.name === appName) || admin.initializeApp({
+    // Initialize the app if it hasn't been initialized yet
+    console.log("Admin SDK not initialized. Initializing now.");
+    const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-    }, appName);
-
+    });
     return app;
 
   } catch (error: any) {
