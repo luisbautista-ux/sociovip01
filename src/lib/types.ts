@@ -73,6 +73,7 @@ export interface PlatformUser {
   roles: PlatformUserRole[];
   businessId?: string | null; 
   lastLogin: Timestamp | string; 
+  phone?: string; // Added for consistency with other user-like types
 }
 
 export interface SocioVipMember {
@@ -97,8 +98,8 @@ export interface SocioVipMember {
 export interface AdminDashboardStats {
   totalBusinesses: number;
   totalPlatformUsers: number;
-  totalQrCodesGenerated: number; // Renombrado de totalQrCodesGenerated
   totalSocioVipMembers: number;
+  totalQrCodesGenerated: number;
 }
 
 export interface BusinessDashboardStats {
@@ -112,8 +113,8 @@ export interface BusinessDashboardStats {
 export interface PromotionAnalyticsData { 
   month: string;
   promotionsCreated: number; 
-  codesCreated: number; // Renombrado de qrCodesGenerated
-  codesRedeemed: number; // Renombrado de qrCodesUtilized
+  qrCodesGenerated: number; // Reverted for consistency with chart
+  qrCodesUtilized: number; // Reverted for consistency with chart
 }
 
 export interface RegisteredClient { 

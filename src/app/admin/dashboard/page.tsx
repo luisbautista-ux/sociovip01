@@ -34,39 +34,31 @@ export default function AdminDashboardPage() {
     totalSocioVipMembers: 0,
     totalQrCodesGenerated: 0,
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Set to false, no initial loading
   const { toast } = useToast();
 
+  // The fetch function is kept but won't be called to avoid permission errors.
+  // This allows for easy re-enabling in the future if rules/backend changes.
   const fetchAdminStats = useCallback(async () => {
     setIsLoading(true);
     console.log("AdminDashboard: Starting fetchAdminStats...");
     try {
-      // Use getCountFromServer for efficient counting without reading all documents
-      const businessesCountSnap = await getCountFromServer(collection(db, "businesses"));
-      const platformUsersCountSnap = await getCountFromServer(collection(db, "platformUsers"));
-      const socioVipMembersCountSnap = await getCountFromServer(collection(db, "socioVipMembers"));
+      // All stat fetching is disabled to prevent permission errors.
+      console.warn("AdminDashboard: All stat fetching is currently disabled to resolve permission-denied errors.");
+      toast({
+        title: "Estadísticas Deshabilitadas",
+        description: "La carga de estadísticas está deshabilitada temporalmente para asegurar el funcionamiento del dashboard.",
+        variant: "default",
+        duration: 10000,
+      });
       
-      let qrCodesGeneratedCount = 0;
-      console.warn("AdminDashboard: Calculation for total generated codes has been temporarily disabled to prevent permission-denied errors from collection-wide reads.");
-       toast({
-            title: "Cálculo de Códigos Omitido",
-            description: "No se calculó el total de códigos generados para asegurar la carga del dashboard. Esta es una medida temporal.",
-            variant: "default",
-            duration: 8000,
-        });
-      
-      console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count);
-      console.log("AdminDashboard: Calculated total generated codes (temporarily 0):", qrCodesGeneratedCount);
-
-
       const newStats: AdminDashboardStats = {
-        totalBusinesses: businessesCountSnap.data().count,
-        totalPlatformUsers: platformUsersCountSnap.data().count,
-        totalSocioVipMembers: socioVipMembersCountSnap.data().count,
-        totalQrCodesGenerated: qrCodesGeneratedCount, // Temporarily 0
+        totalBusinesses: 0,
+        totalPlatformUsers: 0,
+        totalSocioVipMembers: 0,
+        totalQrCodesGenerated: 0,
       };
       setStats(newStats);
-      console.log("AdminDashboard: Stats state updated with:", newStats);
 
     } catch (error: any) {
       console.error("AdminDashboard: Error fetching admin dashboard stats:", error.code, error.message, error);
@@ -88,9 +80,10 @@ export default function AdminDashboardPage() {
     }
   }, [toast]);
 
+  // The useEffect hook is now empty, preventing the fetch from running on load.
   useEffect(() => {
-    fetchAdminStats();
-  }, [fetchAdminStats]);
+    // fetchAdminStats(); // <-- This is intentionally commented out.
+  }, []);
 
   if (isLoading) {
     return (
@@ -106,10 +99,10 @@ export default function AdminDashboardPage() {
       <h1 className="text-3xl font-bold text-primary">Dashboard de Administración</h1>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-        <StatCard title="Negocios Registrados" value={stats.totalBusinesses} icon={Building} />
-        <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} />
-        <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} /> 
-        <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} description="Cálculo omitido temporalmente" />
+        <StatCard title="Negocios Registrados" value={stats.totalBusinesses} icon={Building} description="Cálculo deshabilitado"/>
+        <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} description="Cálculo deshabilitado"/>
+        <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} description="Cálculo deshabilitado"/> 
+        <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} description="Cálculo deshabilitado" />
       </div>
 
       <Card className="shadow-lg col-span-1 lg:col-span-2">
