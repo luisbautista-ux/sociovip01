@@ -4,39 +4,40 @@ import * as admin from 'firebase-admin';
 import type { ServiceAccount } from 'firebase-admin';
 
 // Helper function to initialize Firebase Admin SDK
-// This ensures we don't try to initialize it multiple times
 function initializeAdminApp() {
-  if (admin.apps.length > 0) {
-    return admin.app();
-  }
-
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
   if (!serviceAccountJson) {
-    console.error('API Route (admin-stats): La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON no está configurada.');
+    console.error('API Route (admin-stats): FIREBASE_SERVICE_ACCOUNT_JSON no está configurada.');
     throw new Error('Las credenciales del Firebase Admin SDK no están configuradas.');
   }
 
   // Check if the placeholder value is still being used
   if (serviceAccountJson.startsWith('TU_JSON_DE')) {
-    console.error('API Route (admin-stats): La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON contiene el valor de ejemplo. Reemplázalo con tus credenciales reales.');
+    console.error('API Route (admin-stats): FIREBASE_SERVICE_ACCOUNT_JSON contiene el valor de ejemplo.');
     throw new Error('El JSON de la cuenta de servicio de Firebase no ha sido configurado en el archivo .env. Por favor, reemplaza el valor de ejemplo.');
   }
 
   try {
     const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
     
-    // Check if the parsed object has the required keys
     if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
       throw new Error("El JSON de la cuenta de servicio es inválido o no tiene los campos requeridos (project_id, client_email, private_key).");
     }
 
-    return admin.initializeApp({
+    // Initialize a new app instance every time to avoid conflicts in serverless environments.
+    // Use a unique name to prevent "already exists" error if the environment is reused.
+    const appName = `admin-stats-app-${Date.now()}`;
+    
+    // If there is an app with that name already, get it. Otherwise, initialize it.
+    const app = admin.apps.find(a => a?.name === appName) || admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-    });
+    }, appName);
+
+    return app;
+
   } catch (error: any) {
     console.error('API Route (admin-stats): Error inicializando Firebase Admin SDK desde JSON:', error.message);
-    // Throw a more specific error to help with debugging
     throw new Error(`No se pudo inicializar el Firebase Admin SDK: ${error.message}`);
   }
 }
@@ -46,7 +47,6 @@ export async function GET(request: Request) {
     const adminApp = initializeAdminApp();
     const adminDb = admin.firestore(adminApp);
     
-    // Fetch all counts in parallel
     const [
       businessesSnap, 
       platformUsersSnap, 
@@ -56,10 +56,9 @@ export async function GET(request: Request) {
       adminDb.collection('businesses').count().get(),
       adminDb.collection('platformUsers').count().get(),
       adminDb.collection('socioVipMembers').count().get(),
-      adminDb.collection('businessEntities').get() // Get all docs to sum nested codes
+      adminDb.collection('businessEntities').get() 
     ]);
 
-    // Calculate total codes from all entities
     let totalCodes = 0;
     businessEntitiesSnap.forEach(doc => {
       const data = doc.data();
