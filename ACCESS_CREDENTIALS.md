@@ -1,83 +1,85 @@
-# App Access URLs, Roles, and Credentials
+# URLs de Acceso, Roles y Credenciales de la Aplicación
 
-This file provides the URLs, user roles, and example credentials to access the different panels in the application.
+Este archivo proporciona las URLs, roles de usuario y credenciales de ejemplo para acceder a los diferentes paneles de la aplicación.
 
-**Common Password for all users:** `password123`
-
----
-
-## 1. User Panels & Example Credentials
-
-### Super Admin Panel
--   **URL to access:** `/login`
--   **Example Email:** `superadmin@sociosvip.app`
--   **Password:** `password123`
--   **Description:** Has full access to the entire platform, including managing businesses, all users, and platform-wide analytics. After login, you will be redirected to `/admin/dashboard`.
-
-### Business Admin / Staff Panel
--   **URL to access:** `/login`
--   **Example Email:** `admin@pandora.com`
--   **Password:** `password123`
--   **Description:** Manages a specific business. Can create and manage promotions, events, view clients, and configure business settings. After login, you will be redirected to `/business-panel/dashboard`.
-
-### Promoter Panel
--   **URL to access:** `/login`
--   **Example Email:** `promoter@sociosvip.app`
--   **Password:** `password123`
--   **Description:** Can view promotions/events they are assigned to and generate unique codes for them. After login, you will be redirected to `/promoter/dashboard`.
-
-### Host (Anfitrión) Panel
--   **URL to access:** `/login`
--   **Example Email:** `host@pandora.com`
--   **Password:** `password123`
--   **Description:** Primarily uses the QR code scanner to validate tickets and promotions at the door of an event or business. After login, you will be redirected to `/host/validate`.
+**Contraseña Común para todos los usuarios:** `password123`
 
 ---
 
-## 2. Internal URL Access by User Role
+## 1. Paneles de Usuario y Credenciales de Ejemplo
 
-This section outlines the application's internal routes and which user roles have access to them.
+### Panel de Super Administrador
+-   **URL de acceso:** `/login`
+-   **Email de Ejemplo:** `superadmin@sociosvip.app`
+-   **Contraseña:** `password123`
+-   **Descripción:** Tiene acceso completo a toda la plataforma, incluida la gestión de negocios, todos los usuarios y los análisis de toda la plataforma. Después de iniciar sesión, serás redirigido a `/admin/dashboard`.
 
-### Public Routes (No login required)
--   `/`: Main landing page of the application.
--   `/login`: User login page.
--   `/signup`: Super Admin registration page.
--   `/b/[customUrlPath]`: Public page for a business with a custom URL (e.g., `/b/pandora-lounge`).
--   `/business/[businessId]`: Public page for a business without a custom URL.
+### Panel de Administrador de Negocio / Staff
+-   **URL de acceso:** `/login`
+-   **Email de Ejemplo:** `admin@pandora.com`
+-   **Contraseña:** `password123`
+-   **ID de Negocio Asociado (`businessId`):** Se debe asignar en el perfil del usuario en Firestore.
+-   **Descripción:** Gestiona un negocio específico. Puede crear y gestionar promociones, eventos, ver clientes y configurar los ajustes del negocio. Después de iniciar sesión, serás redirigido a `/business-panel/dashboard`.
 
-### Authentication Routes (Internal)
--   `/auth/dispatcher`: A page that redirects logged-in users to their corresponding dashboard based on their role. Users are sent here immediately after a successful login.
+### Panel de Promotor
+-   **URL de acceso:** `/login`
+-   **Email de Ejemplo:** `promoter@sociosvip.app`
+-   **Contraseña:** `password123`
+-   **Descripción:** Puede ver las promociones/eventos a los que está asignado y generar códigos únicos para ellos. Después de iniciar sesión, serás redirigido a `/promoter/dashboard`.
 
-### Super Admin Routes (`superadmin` role)
--   **Base Path:** `/admin`
--   `/admin/dashboard`: Main statistics and overview of the entire platform.
--   `/admin/businesses`: Manage (create, edit, delete) all affiliated businesses.
--   `/admin/users`: Manage all platform users (admins, staff, promoters, hosts).
--   `/admin/socios-vip`: Manage the exclusive SocioVIP members.
--   `/admin/clients`: View all QR clients from all businesses.
--   `/admin/analytics`: View platform-wide analytics.
-
-### Business Panel Routes (`business_admin` or `staff` roles)
--   **Base Path:** `/business-panel`
--   `/business-panel/dashboard`: Statistics and overview for the specific business.
--   `/business-panel/promotions`: Manage promotions for the business.
--   `/business-panel/events`: Manage events for the business.
--   `/business-panel/clients`: View clients (QR and VIP) associated with the business.
--   `/business-panel/promoters`: Manage promoters linked to the business.
--   `/business-panel/staff`: Manage staff members for the business.
--   `/business-panel/analytics`: View detailed analytics for the business.
--   `/business-panel/settings`: Configure branding and public information for the business.
-
-### Promoter Routes (`promoter` role)
--   **Base Path:** `/promoter`
--   `/promoter/dashboard`: Overview and statistics for the promoter.
--   `/promoter/entities`: View assigned promotions and events and generate codes.
--   `/promoter/commissions`: View commission reports (functionality pending).
-
-### Host Routes (`host` role)
--   **Base Path:** `/host`
--   `/host/validate`: Main page with QR code scanner for validating promotional codes and event tickets at the door.
+### Panel de Anfitrión (Host)
+-   **URL de acceso:** `/login`
+-   **Email de Ejemplo:** `host@pandora.com`
+-   **Contraseña:** `password123`
+-   **ID de Negocio Asociado (`businessId`):** Se debe asignar en el perfil del usuario en Firestore.
+-   **Descripción:** Utiliza principalmente el escáner de códigos QR para validar tickets y promociones en la puerta de un evento o negocio. Después de iniciar sesión, serás redirigido a `/host/validate`.
 
 ---
 
-**Note:** The example credentials are for demonstration purposes. You will need to create these users in your Firebase Authentication console and set up their corresponding profiles in the Firestore `platformUsers` collection with the correct roles and `businessId` where applicable.
+## 2. Acceso a URLs Internas por Rol de Usuario
+
+Esta sección detalla las rutas internas de la aplicación y qué roles de usuario tienen acceso a ellas.
+
+### Rutas Públicas (No requieren inicio de sesión)
+-   `/`: Página principal de la aplicación.
+-   `/login`: Página de inicio de sesión de usuario.
+-   `/signup`: Página de registro de Super Administrador.
+-   `/b/[customUrlPath]`: Página pública para un negocio con una URL personalizada (ej., `/b/pandora-lounge`).
+-   `/business/[businessId]`: Página pública para un negocio sin una URL personalizada.
+
+### Rutas de Autenticación (Internas)
+-   `/auth/dispatcher`: Una página que redirige a los usuarios que han iniciado sesión a su panel de control correspondiente según su rol. Los usuarios son enviados aquí inmediatamente después de un inicio de sesión exitoso.
+
+### Rutas de Super Administrador (rol `superadmin`)
+-   **Ruta Base:** `/admin`
+-   `/admin/dashboard`: Estadísticas principales y visión general de toda la plataforma.
+-   `/admin/businesses`: Gestionar (crear, editar, eliminar) todos los negocios afiliados.
+-   `/admin/users`: Gestionar todos los usuarios de la plataforma (admins, staff, promotores, anfitriones).
+-   `/admin/socios-vip`: Gestionar los miembros exclusivos de SocioVIP.
+-   `/admin/clients`: Ver todos los clientes QR de todos los negocios.
+-   `/admin/analytics`: Ver analíticas a nivel de toda la plataforma.
+
+### Rutas del Panel de Negocio (roles `business_admin` o `staff`)
+-   **Ruta Base:** `/business-panel`
+-   `/business-panel/dashboard`: Estadísticas y visión general del negocio específico.
+-   `/business-panel/promotions`: Gestionar promociones para el negocio.
+-   `/business-panel/events`: Gestionar eventos para el negocio.
+-   `/business-panel/clients`: Ver clientes (QR y VIP) asociados al negocio.
+-   `/business-panel/promoters`: Gestionar promotores vinculados al negocio.
+-   `/business-panel/staff`: Gestionar miembros del personal del negocio.
+-   `/business-panel/analytics`: Ver analíticas detalladas para el negocio.
+-   `/business-panel/settings`: Configurar la marca e información pública del negocio.
+
+### Rutas de Promotor (rol `promoter`)
+-   **Ruta Base:** `/promoter`
+-   `/promoter/dashboard`: Visión general y estadísticas para el promotor.
+-   `/promoter/entities`: Ver promociones y eventos asignados y generar códigos.
+-   `/promoter/commissions`: Ver informes de comisiones (funcionalidad pendiente).
+
+### Rutas de Anfitrión (rol `host`)
+-   **Ruta Base:** `/host`
+-   `/host/validate`: Página principal con escáner de códigos QR para validar códigos promocionales y entradas de eventos en la puerta.
+
+---
+
+**Nota:** Las credenciales de ejemplo son para fines de demostración. Necesitarás crear estos usuarios en tu consola de Firebase Authentication y configurar sus perfiles correspondientes en la colección `platformUsers` de Firestore con los roles correctos y el `businessId` cuando sea aplicable.
