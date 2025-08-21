@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2 } from "lucide-react";
+import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle } from "lucide-react";
 import type { AdminDashboardStats } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
@@ -30,30 +30,34 @@ export default function AdminDashboardPage() {
     totalQrCodesGenerated: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchAdminStats = useCallback(async () => {
     setIsLoading(true);
+    setConfigError(null);
     try {
       // Llama a la nueva API Route para obtener las estadísticas
       const response = await fetch('/api/admin-stats');
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error en el servidor al obtener estadísticas.');
+        // En lugar de lanzar un error que rompe la página, lo guardamos en el estado.
+        setConfigError(data.error || 'Error en el servidor al obtener estadísticas.');
+        // Resetear stats a 0 en caso de error
+        setStats({
+          totalBusinesses: 0,
+          totalPlatformUsers: 0,
+          totalSocioVipMembers: 0,
+          totalQrCodesGenerated: 0,
+        });
+      } else {
+        setStats(data);
       }
       
-      setStats(data);
-
     } catch (error: any) {
       console.error("AdminDashboard: Error calling API route:", error);
-      toast({
-        title: "Error al Cargar Estadísticas",
-        description: `No se pudieron obtener las estadísticas desde el servidor. ${error.message}`,
-        variant: "destructive",
-        duration: 10000,
-      });
-      // Resetear stats a 0 en caso de error
+      setConfigError(`No se pudieron obtener las estadísticas desde el servidor. ${error.message}`);
       setStats({
         totalBusinesses: 0,
         totalPlatformUsers: 0,
@@ -63,7 +67,7 @@ export default function AdminDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     fetchAdminStats();
@@ -82,6 +86,27 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary">Dashboard de Administración</h1>
       
+      {configError && (
+        <Card className="shadow-lg border-destructive">
+          <CardHeader className="flex flex-row items-center space-x-3 space-y-0">
+            <AlertTriangle className="h-8 w-8 text-destructive" />
+            <div>
+              <CardTitle className="text-destructive">Error de Configuración del Servidor</CardTitle>
+              <CardDescription className="text-destructive/80">
+                No se pueden cargar las estadísticas.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm font-semibold">Mensaje de Error:</p>
+            <p className="text-sm text-muted-foreground bg-muted p-2 rounded-md font-mono">{configError}</p>
+            <p className="text-sm mt-3">
+              <strong>Solución:</strong> Revisa que la variable de entorno `FIREBASE_SERVICE_ACCOUNT_JSON` en tu archivo `.env` contenga el JSON de credenciales de tu cuenta de servicio de Firebase completo y válido.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Negocios Registrados" value={stats.totalBusinesses} icon={Building} />
         <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} />
