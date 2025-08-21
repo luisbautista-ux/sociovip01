@@ -97,7 +97,6 @@ export interface SocioVipMember {
 export interface AdminDashboardStats {
   totalBusinesses: number;
   totalPlatformUsers: number;
-  totalPromotionsActive: number;
   totalQrCodesGenerated: number; // Renombrado de totalQrCodesGenerated
   totalSocioVipMembers: number;
 }
@@ -417,5 +416,3 @@ export interface InitialDataForPromoterLink {
   qrClientData?: QrClient; 
   socioVipData?: SocioVipMember; 
 }
-
-    
