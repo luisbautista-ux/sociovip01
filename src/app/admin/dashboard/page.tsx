@@ -2,30 +2,27 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Building, Users, ScanLine, ListChecks, BarChart3, Ticket, Star, Loader2, Info } from "lucide-react";
-import type { AdminDashboardStats, BusinessManagedEntity } from "@/lib/types";
+import { Building, Users, ScanLine, Star, BarChart3, Info, Loader2 } from "lucide-react";
+import type { AdminDashboardStats } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
 import { useState, useEffect, useCallback } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, Timestamp, query, where, getCountFromServer } from "firebase/firestore";
+import { collection, getDocs, Timestamp, query } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { format, subMonths, parseISO } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { es } from "date-fns/locale";
-
 
 // Mock Data for chart (will remain mock for now)
 const mockMonthlyPromotionData = Array.from({ length: 6 }, (_, i) => {
   const monthDate = subMonths(new Date(), 5 - i);
   return {
-    month: format(monthDate, "MMM yy", { locale: es }), // Format month for chart
+    month: format(monthDate, "MMM yy", { locale: es }),
     promotionsCreated: Math.floor(Math.random() * 15) + 5,
     qrCodesGenerated: Math.floor(Math.random() * 200) + 50,
     qrCodesUtilized: Math.floor(Math.random() * 100) + 20,
   };
 });
-
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminDashboardStats>({
@@ -34,41 +31,55 @@ export default function AdminDashboardPage() {
     totalSocioVipMembers: 0,
     totalQrCodesGenerated: 0,
   });
-  const [isLoading, setIsLoading] = useState(false); // Set to false, no initial loading
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // The fetch function is kept but won't be called to avoid permission errors.
-  // This allows for easy re-enabling in the future if rules/backend changes.
   const fetchAdminStats = useCallback(async () => {
     setIsLoading(true);
-    console.log("AdminDashboard: Starting fetchAdminStats...");
     try {
-      // All stat fetching is disabled to prevent permission errors.
-      console.warn("AdminDashboard: All stat fetching is currently disabled to resolve permission-denied errors.");
-      toast({
-        title: "Estadísticas Deshabilitadas",
-        description: "La carga de estadísticas está deshabilitada temporalmente para asegurar el funcionamiento del dashboard.",
-        variant: "default",
-        duration: 10000,
-      });
-      
+      // Fetch all collections and count on the client side.
+      // This is generally safe for a superadmin view where the number of documents is manageable.
+      const businessesPromise = getDocs(query(collection(db, "businesses")));
+      const platformUsersPromise = getDocs(query(collection(db, "platformUsers")));
+      const socioVipMembersPromise = getDocs(query(collection(db, "socioVipMembers")));
+      const businessEntitiesPromise = getDocs(query(collection(db, "businessEntities")));
+
+      const [
+        businessesSnap,
+        platformUsersSnap,
+        socioVipMembersSnap,
+        businessEntitiesSnap,
+      ] = await Promise.all([
+        businessesPromise,
+        platformUsersPromise,
+        socioVipMembersPromise,
+        businessEntitiesPromise,
+      ]);
+
+      const totalCodes = businessEntitiesSnap.docs.reduce((acc, doc) => {
+          const codes = doc.data().generatedCodes;
+          return acc + (Array.isArray(codes) ? codes.length : 0);
+      }, 0);
+
       const newStats: AdminDashboardStats = {
-        totalBusinesses: 0,
-        totalPlatformUsers: 0,
-        totalSocioVipMembers: 0,
-        totalQrCodesGenerated: 0,
+        totalBusinesses: businessesSnap.size,
+        totalPlatformUsers: platformUsersSnap.size,
+        totalSocioVipMembers: socioVipMembersSnap.size,
+        totalQrCodesGenerated: totalCodes,
       };
+
       setStats(newStats);
 
     } catch (error: any) {
       console.error("AdminDashboard: Error fetching admin dashboard stats:", error.code, error.message, error);
       toast({
         title: "Error al Cargar Estadísticas",
-        description: `No se pudieron obtener las estadísticas principales. Error: ${error.message}. Revisa la consola y tus reglas de Firestore.`,
+        description: `No se pudieron obtener las estadísticas. Error: ${error.message}. Asegúrate de tener los permisos correctos.`,
         variant: "destructive",
         duration: 10000,
       });
-      setStats({ // Reset stats on error
+      // Reset stats on error
+      setStats({
         totalBusinesses: 0,
         totalPlatformUsers: 0,
         totalSocioVipMembers: 0,
@@ -76,14 +87,12 @@ export default function AdminDashboardPage() {
       });
     } finally {
       setIsLoading(false);
-      console.log("AdminDashboard: fetchAdminStats finished, isLoading set to false.");
     }
   }, [toast]);
 
-  // The useEffect hook is now empty, preventing the fetch from running on load.
   useEffect(() => {
-    // fetchAdminStats(); // <-- This is intentionally commented out.
-  }, []);
+    fetchAdminStats();
+  }, [fetchAdminStats]);
 
   if (isLoading) {
     return (
@@ -98,11 +107,11 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary">Dashboard de Administración</h1>
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-        <StatCard title="Negocios Registrados" value={stats.totalBusinesses} icon={Building} description="Cálculo deshabilitado"/>
-        <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} description="Cálculo deshabilitado"/>
-        <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} description="Cálculo deshabilitado"/> 
-        <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} description="Cálculo deshabilitado" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Negocios Registrados" value={stats.totalBusinesses} icon={Building} />
+        <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} />
+        <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} /> 
+        <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} />
       </div>
 
       <Card className="shadow-lg col-span-1 lg:col-span-2">
