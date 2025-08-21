@@ -1,5 +1,9 @@
 // src/lib/firebase/firebaseAdmin.ts
 import * as admin from 'firebase-admin';
+import { config } from 'dotenv';
+
+// Cargar las variables de entorno desde el archivo .env
+config();
 
 // Asegúrate de que el SDK de Firebase Admin no se inicialice más de una vez.
 if (!admin.apps.length) {
