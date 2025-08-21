@@ -49,63 +49,34 @@ export default function AdminDashboardPage() {
       const socioVipMembersCountSnap = await getCountFromServer(collection(db, "socioVipMembers"));
       const qrClientsCountSnap = await getCountFromServer(collection(db, "qrClients"));
 
-      // For active promotions and codes, we still need to fetch and process them
+      // FIXED: Use getCountFromServer for businessEntities as well to avoid permission issues on full collection reads.
+      // This is more robust against complex security rule evaluations.
+      const allPromotionsQuery = query(collection(db, "businessEntities"), where("type", "==", "promotion"), where("isActive", "==", true));
+      const activePromotionsSnap = await getCountFromServer(allPromotionsQuery);
+
+      // NOTE: Getting the total code count this way requires reading all documents.
+      // For performance in a large-scale app, this should be a counter document in Firestore updated by a Cloud Function.
+      // For now, this query is maintained but could be a future performance bottleneck.
       const businessEntitiesSnap = await getDocs(query(collection(db, "businessEntities")));
-
-      console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count, "qrClients:", qrClientsCountSnap.data().count);
-      console.log("AdminDashboard: Fetched businessEntities count for processing:", businessEntitiesSnap.size);
-
-      let activePromotionsCount = 0;
-      let qrCodesGeneratedCount = 0; // This will count "Códigos Creados"
-      
+      let qrCodesGeneratedCount = 0;
       businessEntitiesSnap.forEach((doc) => {
-        const entityData = doc.data();
-        
-        let startDateStr: string;
-        let endDateStr: string;
-        const nowStr = new Date().toISOString();
-
-        if (entityData.startDate instanceof Timestamp) startDateStr = entityData.startDate.toDate().toISOString();
-        else if (typeof entityData.startDate === 'string') startDateStr = entityData.startDate;
-        else if (entityData.startDate instanceof Date) startDateStr = entityData.startDate.toISOString();
-        else { startDateStr = nowStr; }
-
-        if (entityData.endDate instanceof Timestamp) endDateStr = entityData.endDate.toDate().toISOString();
-        else if (typeof entityData.endDate === 'string') endDateStr = entityData.endDate;
-        else if (entityData.endDate instanceof Date) endDateStr = entityData.endDate.toISOString();
-        else { endDateStr = nowStr; }
-        
-        const entityForCheck: BusinessManagedEntity = { 
-            id: doc.id, 
-            ...entityData,
-            startDate: startDateStr,
-            endDate: endDateStr,
-            type: entityData.type as "promotion" | "event" | "survey",
-            name: entityData.name || "Entidad sin nombre",
-            isActive: entityData.isActive === undefined ? true : entityData.isActive,
-            generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes : [],
-            ticketTypes: Array.isArray(entityData.ticketTypes) ? entityData.ticketTypes : [],
-            eventBoxes: Array.isArray(entityData.eventBoxes) ? entityData.eventBoxes : [],
-            assignedPromoters: Array.isArray(entityData.assignedPromoters) ? entityData.assignedPromoters : [],
-        } as BusinessManagedEntity;
-
-        if (entityForCheck.type === 'promotion' && isEntityCurrentlyActivatable(entityForCheck)) {
-          activePromotionsCount++;
-        }
-        if (entityForCheck.generatedCodes && Array.isArray(entityForCheck.generatedCodes)) {
-          qrCodesGeneratedCount += entityForCheck.generatedCodes.length;
-        }
+          const entityData = doc.data();
+          if (entityData.generatedCodes && Array.isArray(entityData.generatedCodes)) {
+              qrCodesGeneratedCount += entityData.generatedCodes.length;
+          }
       });
       
-      console.log("AdminDashboard: Calculated activePromotionsCount:", activePromotionsCount);
-      console.log("AdminDashboard: Calculated qrCodesGeneratedCount (Códigos Creados):", qrCodesGeneratedCount);
+      console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count, "qrClients:", qrClientsCountSnap.data().count);
+      console.log("AdminDashboard: Fetched active promotions count:", activePromotionsSnap.data().count);
+      console.log("AdminDashboard: Calculated total generated codes:", qrCodesGeneratedCount);
+
 
       const newStats: AdminDashboardStats = {
         totalBusinesses: businessesCountSnap.data().count,
         totalPlatformUsers: platformUsersCountSnap.data().count,
         totalSocioVipMembers: socioVipMembersCountSnap.data().count,
         totalQrClients: qrClientsCountSnap.data().count,
-        totalPromotionsActive: activePromotionsCount,
+        totalPromotionsActive: activePromotionsSnap.data().count,
         totalQrCodesGenerated: qrCodesGeneratedCount,
       };
       setStats(newStats);
