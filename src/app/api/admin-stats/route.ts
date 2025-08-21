@@ -17,6 +17,12 @@ function initializeAdminApp() {
     throw new Error('Las credenciales del Firebase Admin SDK no están configuradas.');
   }
 
+  // Check if the placeholder value is still being used
+  if (serviceAccountJson.startsWith('TU_JSON_DE')) {
+    console.error('API Route (admin-stats): La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON contiene el valor de ejemplo. Reemplázalo con tus credenciales reales.');
+    throw new Error('El JSON de la cuenta de servicio de Firebase no ha sido configurado en el archivo .env. Por favor, reemplaza el valor de ejemplo.');
+  }
+
   try {
     const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
     
@@ -62,7 +68,7 @@ export async function GET(request: Request) {
       }
     });
     
-    const stats: AdminDashboardStats = {
+    const stats = {
       totalBusinesses: businessesSnap.data().count,
       totalPlatformUsers: platformUsersSnap.data().count,
       totalSocioVipMembers: socioVipMembersSnap.data().count,
