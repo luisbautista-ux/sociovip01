@@ -10,8 +10,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format, subMonths } from 'date-fns';
 import { es } from "date-fns/locale";
-import { getAdminDashboardStats } from "@/app/admin/dashboard/actions";
-
 
 // Mock Data for chart (will remain mock for now)
 const mockMonthlyPromotionData = Array.from({ length: 6 }, (_, i) => {
@@ -37,17 +35,25 @@ export default function AdminDashboardPage() {
   const fetchAdminStats = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Llama a la Server Action para obtener las estadísticas
-      const newStats = await getAdminDashboardStats();
-      setStats(newStats);
+      // Llama a la nueva API Route para obtener las estadísticas
+      const response = await fetch('/api/admin-stats');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error en el servidor al obtener estadísticas.');
+      }
+      
+      setStats(data);
+
     } catch (error: any) {
-      console.error("AdminDashboard: Error calling getAdminDashboardStats function:", error);
+      console.error("AdminDashboard: Error calling API route:", error);
       toast({
         title: "Error al Cargar Estadísticas",
         description: `No se pudieron obtener las estadísticas desde el servidor. ${error.message}`,
         variant: "destructive",
         duration: 10000,
       });
+      // Resetear stats a 0 en caso de error
       setStats({
         totalBusinesses: 0,
         totalPlatformUsers: 0,
