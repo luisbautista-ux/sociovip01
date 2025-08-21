@@ -7,11 +7,10 @@ import type { AdminDashboardStats } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
 import { useState, useEffect, useCallback } from "react";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, Timestamp, query } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { format, subMonths } from 'date-fns';
 import { es } from "date-fns/locale";
+import { getAdminDashboardStats } from '@/lib/firebase/functions'; // Importa la Cloud Function
 
 // Mock Data for chart (will remain mock for now)
 const mockMonthlyPromotionData = Array.from({ length: 6 }, (_, i) => {
@@ -37,48 +36,17 @@ export default function AdminDashboardPage() {
   const fetchAdminStats = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch all collections and count on the client side.
-      // This is generally safe for a superadmin view where the number of documents is manageable.
-      const businessesPromise = getDocs(query(collection(db, "businesses")));
-      const platformUsersPromise = getDocs(query(collection(db, "platformUsers")));
-      const socioVipMembersPromise = getDocs(query(collection(db, "socioVipMembers")));
-      const businessEntitiesPromise = getDocs(query(collection(db, "businessEntities")));
-
-      const [
-        businessesSnap,
-        platformUsersSnap,
-        socioVipMembersSnap,
-        businessEntitiesSnap,
-      ] = await Promise.all([
-        businessesPromise,
-        platformUsersPromise,
-        socioVipMembersPromise,
-        businessEntitiesPromise,
-      ]);
-
-      const totalCodes = businessEntitiesSnap.docs.reduce((acc, doc) => {
-          const codes = doc.data().generatedCodes;
-          return acc + (Array.isArray(codes) ? codes.length : 0);
-      }, 0);
-
-      const newStats: AdminDashboardStats = {
-        totalBusinesses: businessesSnap.size,
-        totalPlatformUsers: platformUsersSnap.size,
-        totalSocioVipMembers: socioVipMembersSnap.size,
-        totalQrCodesGenerated: totalCodes,
-      };
-
+      // Llama a la Cloud Function para obtener las estadísticas
+      const newStats = await getAdminDashboardStats();
       setStats(newStats);
-
     } catch (error: any) {
-      console.error("AdminDashboard: Error fetching admin dashboard stats:", error.code, error.message, error);
+      console.error("AdminDashboard: Error calling getAdminDashboardStats function:", error);
       toast({
         title: "Error al Cargar Estadísticas",
-        description: `No se pudieron obtener las estadísticas. Error: ${error.message}. Asegúrate de tener los permisos correctos.`,
+        description: `No se pudieron obtener las estadísticas desde el servidor. ${error.message}`,
         variant: "destructive",
         duration: 10000,
       });
-      // Reset stats on error
       setStats({
         totalBusinesses: 0,
         totalPlatformUsers: 0,
