@@ -49,14 +49,30 @@ export default function HomePage() {
       
       const enrichedPromotions: EnrichedPromotion[] = [];
       promotionsSnap.forEach(doc => {
-        const promoData = doc.data() as Omit<BusinessManagedEntity, 'id'> & { startDate: Timestamp, endDate: Timestamp };
+        const promoData = doc.data() as Omit<BusinessManagedEntity, 'id'> & { startDate: Timestamp | string, endDate: Timestamp | string };
         const business = businessesMap.get(promoData.businessId);
+        
+        // Helper to safely convert a Firestore Timestamp or a date string to an ISO string
+        const toSafeISOString = (dateValue: Timestamp | string | undefined): string => {
+            if (!dateValue) return new Date().toISOString(); // Fallback to now
+            if (typeof dateValue === 'string') {
+                return new Date(dateValue).toISOString();
+            }
+            if (dateValue instanceof Timestamp) {
+                return dateValue.toDate().toISOString();
+            }
+            // If it's already a Date object (less common from Firestore SDK but possible)
+            if (dateValue instanceof Date) {
+              return dateValue.toISOString();
+            }
+            return new Date().toISOString(); // Final fallback
+        };
 
         const entityForCheck: BusinessManagedEntity = {
             id: doc.id,
             ...promoData,
-            startDate: promoData.startDate.toDate().toISOString(),
-            endDate: promoData.endDate.toDate().toISOString(),
+            startDate: toSafeISOString(promoData.startDate),
+            endDate: toSafeISOString(promoData.endDate),
         };
 
         // 3. Filter for currently valid promotions
@@ -96,7 +112,7 @@ export default function HomePage() {
     const lowercasedTerm = searchTerm.toLowerCase();
     return allPromotions.filter(promo => 
       promo.name.toLowerCase().includes(lowercasedTerm) ||
-      promo.description.toLowerCase().includes(lowercasedTerm) ||
+      (promo.description && promo.description.toLowerCase().includes(lowercasedTerm)) ||
       promo.businessName?.toLowerCase().includes(lowercasedTerm)
     );
   }, [allPromotions, searchTerm]);
