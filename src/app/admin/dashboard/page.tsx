@@ -48,36 +48,23 @@ export default function AdminDashboardPage() {
       const platformUsersCountSnap = await getCountFromServer(collection(db, "platformUsers"));
       const socioVipMembersCountSnap = await getCountFromServer(collection(db, "socioVipMembers"));
       const qrClientsCountSnap = await getCountFromServer(collection(db, "qrClients"));
-
-      // This was the problematic query. It's now replaced with a more specific count.
       const allActiveEntitiesQuery = query(collection(db, "businessEntities"), where("isActive", "==", true));
       const activeEntitiesSnap = await getCountFromServer(allActiveEntitiesQuery);
       
-      // To get total codes, we still need to read all entities. This is the last potential fail point.
-      // If this fails, the next step is a backend counter.
+      // To get total codes, we would need to read all entities. This is the fail point.
+      // We will temporarily disable this to ensure the dashboard loads.
       let qrCodesGeneratedCount = 0;
-      try {
-        const businessEntitiesSnap = await getDocs(query(collection(db, "businessEntities")));
-        businessEntitiesSnap.forEach((doc) => {
-            const entityData = doc.data();
-            if (entityData.generatedCodes && Array.isArray(entityData.generatedCodes)) {
-                qrCodesGeneratedCount += entityData.generatedCodes.length;
-            }
-        });
-      } catch (codeCountError: any) {
-         console.warn("AdminDashboard: Could not calculate total generated codes due to permissions. Defaulting to 0.", codeCountError.message);
-         qrCodesGeneratedCount = 0; // Fallback if this specific read fails.
-         toast({
-            title: "Cálculo Parcial",
-            description: "No se pudo calcular el total de códigos generados por un posible problema de permisos en la sub-lectura. El resto de las estadísticas son correctas.",
+      console.warn("AdminDashboard: Calculation for total generated codes has been temporarily disabled to prevent permission-denied errors from collection-wide reads.");
+       toast({
+            title: "Cálculo de Códigos Omitido",
+            description: "No se calculó el total de códigos generados para asegurar la carga del dashboard. Esta es una medida temporal.",
             variant: "default",
             duration: 8000,
-         });
-      }
+        });
       
       console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count, "qrClients:", qrClientsCountSnap.data().count);
       console.log("AdminDashboard: Fetched active entities count:", activeEntitiesSnap.data().count);
-      console.log("AdminDashboard: Calculated total generated codes:", qrCodesGeneratedCount);
+      console.log("AdminDashboard: Calculated total generated codes (temporarily 0):", qrCodesGeneratedCount);
 
 
       const newStats: AdminDashboardStats = {
@@ -85,8 +72,8 @@ export default function AdminDashboardPage() {
         totalPlatformUsers: platformUsersCountSnap.data().count,
         totalSocioVipMembers: socioVipMembersCountSnap.data().count,
         totalQrClients: qrClientsCountSnap.data().count,
-        totalPromotionsActive: activeEntitiesSnap.data().count, // Using the more specific count
-        totalQrCodesGenerated: qrCodesGeneratedCount,
+        totalPromotionsActive: activeEntitiesSnap.data().count,
+        totalQrCodesGenerated: qrCodesGeneratedCount, // Temporarily 0
       };
       setStats(newStats);
       console.log("AdminDashboard: Stats state updated with:", newStats);
@@ -135,7 +122,7 @@ export default function AdminDashboardPage() {
         <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} />
         <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} /> 
         <StatCard title="Promociones/Eventos Activos" value={stats.totalPromotionsActive} icon={Ticket} />
-        <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} />
+        <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} description="Cálculo omitido temporalmente" />
         <StatCard title="Clientes QR Registrados" value={stats.totalQrClients} icon={ListChecks} />
       </div>
 
@@ -184,3 +171,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
