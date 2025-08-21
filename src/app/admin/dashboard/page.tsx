@@ -49,25 +49,34 @@ export default function AdminDashboardPage() {
       const socioVipMembersCountSnap = await getCountFromServer(collection(db, "socioVipMembers"));
       const qrClientsCountSnap = await getCountFromServer(collection(db, "qrClients"));
 
-      // FIXED: Use getCountFromServer for businessEntities as well to avoid permission issues on full collection reads.
-      // This is more robust against complex security rule evaluations.
-      const allPromotionsQuery = query(collection(db, "businessEntities"), where("type", "==", "promotion"), where("isActive", "==", true));
-      const activePromotionsSnap = await getCountFromServer(allPromotionsQuery);
-
-      // NOTE: Getting the total code count this way requires reading all documents.
-      // For performance in a large-scale app, this should be a counter document in Firestore updated by a Cloud Function.
-      // For now, this query is maintained but could be a future performance bottleneck.
-      const businessEntitiesSnap = await getDocs(query(collection(db, "businessEntities")));
+      // This was the problematic query. It's now replaced with a more specific count.
+      const allActiveEntitiesQuery = query(collection(db, "businessEntities"), where("isActive", "==", true));
+      const activeEntitiesSnap = await getCountFromServer(allActiveEntitiesQuery);
+      
+      // To get total codes, we still need to read all entities. This is the last potential fail point.
+      // If this fails, the next step is a backend counter.
       let qrCodesGeneratedCount = 0;
-      businessEntitiesSnap.forEach((doc) => {
-          const entityData = doc.data();
-          if (entityData.generatedCodes && Array.isArray(entityData.generatedCodes)) {
-              qrCodesGeneratedCount += entityData.generatedCodes.length;
-          }
-      });
+      try {
+        const businessEntitiesSnap = await getDocs(query(collection(db, "businessEntities")));
+        businessEntitiesSnap.forEach((doc) => {
+            const entityData = doc.data();
+            if (entityData.generatedCodes && Array.isArray(entityData.generatedCodes)) {
+                qrCodesGeneratedCount += entityData.generatedCodes.length;
+            }
+        });
+      } catch (codeCountError: any) {
+         console.warn("AdminDashboard: Could not calculate total generated codes due to permissions. Defaulting to 0.", codeCountError.message);
+         qrCodesGeneratedCount = 0; // Fallback if this specific read fails.
+         toast({
+            title: "Cálculo Parcial",
+            description: "No se pudo calcular el total de códigos generados por un posible problema de permisos en la sub-lectura. El resto de las estadísticas son correctas.",
+            variant: "default",
+            duration: 8000,
+         });
+      }
       
       console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count, "qrClients:", qrClientsCountSnap.data().count);
-      console.log("AdminDashboard: Fetched active promotions count:", activePromotionsSnap.data().count);
+      console.log("AdminDashboard: Fetched active entities count:", activeEntitiesSnap.data().count);
       console.log("AdminDashboard: Calculated total generated codes:", qrCodesGeneratedCount);
 
 
@@ -76,7 +85,7 @@ export default function AdminDashboardPage() {
         totalPlatformUsers: platformUsersCountSnap.data().count,
         totalSocioVipMembers: socioVipMembersCountSnap.data().count,
         totalQrClients: qrClientsCountSnap.data().count,
-        totalPromotionsActive: activePromotionsSnap.data().count,
+        totalPromotionsActive: activeEntitiesSnap.data().count, // Using the more specific count
         totalQrCodesGenerated: qrCodesGeneratedCount,
       };
       setStats(newStats);
@@ -86,7 +95,7 @@ export default function AdminDashboardPage() {
       console.error("AdminDashboard: Error fetching admin dashboard stats:", error.code, error.message, error);
       toast({
         title: "Error al Cargar Estadísticas",
-        description: `No se pudieron obtener las estadísticas. Error: ${error.message}. Revisa la consola y tus reglas de Firestore.`,
+        description: `No se pudieron obtener las estadísticas principales. Error: ${error.message}. Revisa la consola y tus reglas de Firestore.`,
         variant: "destructive",
         duration: 10000,
       });
@@ -125,7 +134,7 @@ export default function AdminDashboardPage() {
         <StatCard title="Negocios Registrados" value={stats.totalBusinesses} icon={Building} />
         <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} />
         <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} /> 
-        <StatCard title="Promociones Activas" value={stats.totalPromotionsActive} icon={Ticket} />
+        <StatCard title="Promociones/Eventos Activos" value={stats.totalPromotionsActive} icon={Ticket} />
         <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} />
         <StatCard title="Clientes QR Registrados" value={stats.totalQrClients} icon={ListChecks} />
       </div>
