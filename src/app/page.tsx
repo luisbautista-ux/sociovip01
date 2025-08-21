@@ -53,17 +53,17 @@ export default function HomePage() {
         const business = businessesMap.get(promoData.businessId);
         
         // Helper to safely convert a Firestore Timestamp or a date string to an ISO string
-        const toSafeISOString = (dateValue: Timestamp | string | undefined): string => {
+        const toSafeISOString = (dateValue: Timestamp | string | Date | undefined): string => {
             if (!dateValue) return new Date().toISOString(); // Fallback to now
-            if (typeof dateValue === 'string') {
-                return new Date(dateValue).toISOString();
-            }
             if (dateValue instanceof Timestamp) {
                 return dateValue.toDate().toISOString();
             }
-            // If it's already a Date object (less common from Firestore SDK but possible)
             if (dateValue instanceof Date) {
               return dateValue.toISOString();
+            }
+            // If it's a string, assume it's a valid date string
+            if (typeof dateValue === 'string') {
+                return new Date(dateValue).toISOString();
             }
             return new Date().toISOString(); // Final fallback
         };
@@ -161,13 +161,15 @@ export default function HomePage() {
                   </div>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xl">{promo.name}</CardTitle>
-                    <CardDescription className="flex items-center text-xs pt-1">
-                      {promo.businessLogoUrl ? (
-                         <NextImage src={promo.businessLogoUrl} alt={`${promo.businessName} logo`} width={16} height={16} className="h-4 w-4 mr-1.5 rounded-full object-contain" data-ai-hint="logo business"/>
-                      ) : (
-                        <Building className="h-4 w-4 mr-1.5" />
-                      )}
-                      {promo.businessName}
+                    <CardDescription className="text-xs pt-1">
+                      <Link href={businessUrl} className="flex items-center text-muted-foreground hover:text-primary transition-colors">
+                        {promo.businessLogoUrl ? (
+                           <NextImage src={promo.businessLogoUrl} alt={`${promo.businessName} logo`} width={16} height={16} className="h-4 w-4 mr-1.5 rounded-full object-contain" data-ai-hint="logo business"/>
+                        ) : (
+                          <Building className="h-4 w-4 mr-1.5" />
+                        )}
+                        <span>{promo.businessName}</span>
+                      </Link>
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-grow space-y-1">
