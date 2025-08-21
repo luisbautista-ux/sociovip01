@@ -34,7 +34,6 @@ export default function AdminDashboardPage() {
     totalSocioVipMembers: 0,
     totalPromotionsActive: 0,
     totalQrCodesGenerated: 0,
-    totalQrClients: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -47,12 +46,10 @@ export default function AdminDashboardPage() {
       const businessesCountSnap = await getCountFromServer(collection(db, "businesses"));
       const platformUsersCountSnap = await getCountFromServer(collection(db, "platformUsers"));
       const socioVipMembersCountSnap = await getCountFromServer(collection(db, "socioVipMembers"));
-      const qrClientsCountSnap = await getCountFromServer(collection(db, "qrClients"));
+      // const qrClientsCountSnap = await getCountFromServer(collection(db, "qrClients")); // Temporarily removed due to permission errors
       const allActiveEntitiesQuery = query(collection(db, "businessEntities"), where("isActive", "==", true));
       const activeEntitiesSnap = await getCountFromServer(allActiveEntitiesQuery);
       
-      // To get total codes, we would need to read all entities. This is the fail point.
-      // We will temporarily disable this to ensure the dashboard loads.
       let qrCodesGeneratedCount = 0;
       console.warn("AdminDashboard: Calculation for total generated codes has been temporarily disabled to prevent permission-denied errors from collection-wide reads.");
        toast({
@@ -62,7 +59,7 @@ export default function AdminDashboardPage() {
             duration: 8000,
         });
       
-      console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count, "qrClients:", qrClientsCountSnap.data().count);
+      console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count);
       console.log("AdminDashboard: Fetched active entities count:", activeEntitiesSnap.data().count);
       console.log("AdminDashboard: Calculated total generated codes (temporarily 0):", qrCodesGeneratedCount);
 
@@ -71,7 +68,7 @@ export default function AdminDashboardPage() {
         totalBusinesses: businessesCountSnap.data().count,
         totalPlatformUsers: platformUsersCountSnap.data().count,
         totalSocioVipMembers: socioVipMembersCountSnap.data().count,
-        totalQrClients: qrClientsCountSnap.data().count,
+        // totalQrClients: qrClientsCountSnap.data().count, // Temporarily removed
         totalPromotionsActive: activeEntitiesSnap.data().count,
         totalQrCodesGenerated: qrCodesGeneratedCount, // Temporarily 0
       };
@@ -92,7 +89,6 @@ export default function AdminDashboardPage() {
         totalSocioVipMembers: 0,
         totalPromotionsActive: 0,
         totalQrCodesGenerated: 0,
-        totalQrClients: 0,
       });
     } finally {
       setIsLoading(false);
@@ -123,7 +119,7 @@ export default function AdminDashboardPage() {
         <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} /> 
         <StatCard title="Promociones/Eventos Activos" value={stats.totalPromotionsActive} icon={Ticket} />
         <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} description="Cálculo omitido temporalmente" />
-        <StatCard title="Clientes QR Registrados" value={stats.totalQrClients} icon={ListChecks} />
+        {/* <StatCard title="Clientes QR Registrados" value={stats.totalQrClients} icon={ListChecks} /> */}
       </div>
 
       <Card className="shadow-lg col-span-1 lg:col-span-2">

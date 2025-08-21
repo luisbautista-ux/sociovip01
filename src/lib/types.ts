@@ -98,8 +98,7 @@ export interface AdminDashboardStats {
   totalBusinesses: number;
   totalPlatformUsers: number;
   totalPromotionsActive: number;
-  totalCodesCreated: number; // Renombrado de totalQrCodesGenerated
-  totalQrClients: number;       
+  totalQrCodesGenerated: number; // Renombrado de totalQrCodesGenerated
   totalSocioVipMembers: number;
 }
 
