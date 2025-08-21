@@ -8,10 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
 import { useState, useEffect, useCallback } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, Timestamp } from "firebase/firestore";
+import { collection, getDocs, Timestamp, query, where, getCountFromServer } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { format, subMonths, parseISO } from 'date-fns'; // Import es if needed for chart
+import { format, subMonths, parseISO } from 'date-fns';
 import { es } from "date-fns/locale";
 
 
@@ -43,71 +43,57 @@ export default function AdminDashboardPage() {
     setIsLoading(true);
     console.log("AdminDashboard: Starting fetchAdminStats...");
     try {
-      const [
-        businessesSnap,
-        platformUsersSnap,
-        socioVipMembersSnap,
-        qrClientsSnap,
-        businessEntitiesSnap,
-      ] = await Promise.all([
-        getDocs(collection(db, "businesses")),
-        getDocs(collection(db, "platformUsers")),
-        getDocs(collection(db, "socioVipMembers")),
-        getDocs(collection(db, "qrClients")),
-        getDocs(collection(db, "businessEntities")),
-      ]);
+      // Use getCountFromServer for efficient counting without reading all documents
+      const businessesCountSnap = await getCountFromServer(collection(db, "businesses"));
+      const platformUsersCountSnap = await getCountFromServer(collection(db, "platformUsers"));
+      const socioVipMembersCountSnap = await getCountFromServer(collection(db, "socioVipMembers"));
+      const qrClientsCountSnap = await getCountFromServer(collection(db, "qrClients"));
 
-      console.log("AdminDashboard: Fetched businesses count:", businessesSnap.size);
-      console.log("AdminDashboard: Fetched platformUsers count:", platformUsersSnap.size);
-      console.log("AdminDashboard: Fetched socioVipMembers count:", socioVipMembersSnap.size);
-      console.log("AdminDashboard: Fetched qrClients count:", qrClientsSnap.size);
-      console.log("AdminDashboard: Fetched businessEntities count:", businessEntitiesSnap.size);
+      // For active promotions and codes, we still need to fetch and process them
+      const businessEntitiesSnap = await getDocs(query(collection(db, "businessEntities")));
+
+      console.log("AdminDashboard: Fetched counts - businesses:", businessesCountSnap.data().count, "platformUsers:", platformUsersCountSnap.data().count, "socioVipMembers:", socioVipMembersCountSnap.data().count, "qrClients:", qrClientsCountSnap.data().count);
+      console.log("AdminDashboard: Fetched businessEntities count for processing:", businessEntitiesSnap.size);
 
       let activePromotionsCount = 0;
       let qrCodesGeneratedCount = 0; // This will count "Códigos Creados"
       
-      const allEntities: BusinessManagedEntity[] = [];
       businessEntitiesSnap.forEach((doc) => {
-        const data = doc.data();
-        // Robust date handling
+        const entityData = doc.data();
+        
         let startDateStr: string;
         let endDateStr: string;
         const nowStr = new Date().toISOString();
 
-        if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
-        else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
+        if (entityData.startDate instanceof Timestamp) startDateStr = entityData.startDate.toDate().toISOString();
+        else if (typeof entityData.startDate === 'string') startDateStr = entityData.startDate;
+        else if (entityData.startDate instanceof Date) startDateStr = entityData.startDate.toISOString();
         else { startDateStr = nowStr; }
 
-        if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
-        else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
+        if (entityData.endDate instanceof Timestamp) endDateStr = entityData.endDate.toDate().toISOString();
+        else if (typeof entityData.endDate === 'string') endDateStr = entityData.endDate;
+        else if (entityData.endDate instanceof Date) endDateStr = entityData.endDate.toISOString();
         else { endDateStr = nowStr; }
         
-        allEntities.push({ 
+        const entityForCheck: BusinessManagedEntity = { 
             id: doc.id, 
-            ...data,
+            ...entityData,
             startDate: startDateStr,
             endDate: endDateStr,
-            // Ensure other fields are present or default
-            type: data.type as "promotion" | "event" | "survey",
-            name: data.name || "Entidad sin nombre",
-            isActive: data.isActive === undefined ? true : data.isActive,
-            generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
-            ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes : [],
-            eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes : [],
-            assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
-        } as BusinessManagedEntity);
-      });
-      console.log("AdminDashboard: Total businessEntities processed for details:", allEntities.length);
+            type: entityData.type as "promotion" | "event" | "survey",
+            name: entityData.name || "Entidad sin nombre",
+            isActive: entityData.isActive === undefined ? true : entityData.isActive,
+            generatedCodes: Array.isArray(entityData.generatedCodes) ? entityData.generatedCodes : [],
+            ticketTypes: Array.isArray(entityData.ticketTypes) ? entityData.ticketTypes : [],
+            eventBoxes: Array.isArray(entityData.eventBoxes) ? entityData.eventBoxes : [],
+            assignedPromoters: Array.isArray(entityData.assignedPromoters) ? entityData.assignedPromoters : [],
+        } as BusinessManagedEntity;
 
-
-      allEntities.forEach(entity => {
-        if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
+        if (entityForCheck.type === 'promotion' && isEntityCurrentlyActivatable(entityForCheck)) {
           activePromotionsCount++;
         }
-        if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
-          qrCodesGeneratedCount += entity.generatedCodes.length;
+        if (entityForCheck.generatedCodes && Array.isArray(entityForCheck.generatedCodes)) {
+          qrCodesGeneratedCount += entityForCheck.generatedCodes.length;
         }
       });
       
@@ -115,12 +101,12 @@ export default function AdminDashboardPage() {
       console.log("AdminDashboard: Calculated qrCodesGeneratedCount (Códigos Creados):", qrCodesGeneratedCount);
 
       const newStats: AdminDashboardStats = {
-        totalBusinesses: businessesSnap.size,
-        totalPlatformUsers: platformUsersSnap.size,
-        totalSocioVipMembers: socioVipMembersSnap.size,
-        totalQrClients: qrClientsSnap.size,
+        totalBusinesses: businessesCountSnap.data().count,
+        totalPlatformUsers: platformUsersCountSnap.data().count,
+        totalSocioVipMembers: socioVipMembersCountSnap.data().count,
+        totalQrClients: qrClientsCountSnap.data().count,
         totalPromotionsActive: activePromotionsCount,
-        totalQrCodesGenerated: qrCodesGeneratedCount, // This now represents "Códigos Creados"
+        totalQrCodesGenerated: qrCodesGeneratedCount,
       };
       setStats(newStats);
       console.log("AdminDashboard: Stats state updated with:", newStats);
