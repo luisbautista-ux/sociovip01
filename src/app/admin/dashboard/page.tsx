@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Building, Users, ScanLine, Star, BarChart3, Info, Loader2 } from "lucide-react";
+import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2 } from "lucide-react";
 import type { AdminDashboardStats } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
@@ -10,7 +10,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format, subMonths } from 'date-fns';
 import { es } from "date-fns/locale";
-import { getAdminDashboardStats } from '@/lib/firebase/functions'; // Importa la Cloud Function
+import { getAdminDashboardStats } from "@/app/admin/dashboard/actions";
+
 
 // Mock Data for chart (will remain mock for now)
 const mockMonthlyPromotionData = Array.from({ length: 6 }, (_, i) => {
@@ -36,7 +37,7 @@ export default function AdminDashboardPage() {
   const fetchAdminStats = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Llama a la Cloud Function para obtener las estadísticas
+      // Llama a la Server Action para obtener las estadísticas
       const newStats = await getAdminDashboardStats();
       setStats(newStats);
     } catch (error: any) {
