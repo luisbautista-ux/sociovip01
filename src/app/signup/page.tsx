@@ -25,6 +25,7 @@ import { Loader2 } from "lucide-react";
 import type { AuthError } from "firebase/auth";
 
 const signupFormSchema = z.object({
+  name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
   confirmPassword: z.string(),
@@ -44,6 +45,7 @@ export default function SignupPage() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
     defaultValues: {
+      name: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -53,14 +55,12 @@ export default function SignupPage() {
   const handleSignup = async (values: SignupFormValues) => {
     setIsSubmitting(true);
     try {
-      const result = await signup(values.email, values.password);
+      const result = await signup(values.email, values.password, values.name);
       if ("user" in result) { // UserCredential
         toast({
           title: "Registro Exitoso",
           description: "Tu cuenta de Super Admin ha sido creada. Por favor, inicia sesión.",
         });
-        // For Super Admin, might be good to create their profile in Firestore here too.
-        // Example: await createUserProfileInFirestore(result.user.uid, values.email, "superadmin");
         router.push("/login");
       } else { // AuthError
         const errorCode = (result as AuthError).code;
@@ -101,6 +101,19 @@ export default function SignupPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre Completo</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Tu nombre completo" {...field} disabled={isSubmitting} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="email"
