@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 import type { ServiceAccount } from 'firebase-admin';
-import type { AdminDashboardStats } from '@/lib/types';
 
 // Helper function to initialize Firebase Admin SDK
 // This ensures we don't try to initialize it multiple times
@@ -11,27 +10,26 @@ function initializeAdminApp() {
     return admin.app();
   }
 
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-  // Ensure all required environment variables are present
-  if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
-    console.error('API Route (admin-stats): Firebase Admin SDK credentials are not fully configured in environment variables.');
-    throw new Error('Las credenciales del Firebase Admin SDK no están configuradas en las variables de entorno.');
+  if (!serviceAccountJson) {
+    console.error('API Route (admin-stats): La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON no está configurada.');
+    throw new Error('Las credenciales del Firebase Admin SDK no están configuradas.');
   }
 
-  const serviceAccount: ServiceAccount = {
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    // Replace literal "\\n" with actual newline characters
-    privateKey: privateKey.replace(/\\n/g, '\n'),
-  };
-
   try {
+    const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
+    
+    // Check if the parsed object has the required keys
+    if (!serviceAccount.project_id || !serviceAccount.client_email || !serviceAccount.private_key) {
+      throw new Error("El JSON de la cuenta de servicio es inválido o no tiene los campos requeridos (project_id, client_email, private_key).");
+    }
+
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
   } catch (error: any) {
-    console.error('API Route (admin-stats): Error initializing Firebase Admin SDK:', error.message);
+    console.error('API Route (admin-stats): Error inicializando Firebase Admin SDK desde JSON:', error.message);
     // Throw a more specific error to help with debugging
     throw new Error(`No se pudo inicializar el Firebase Admin SDK: ${error.message}`);
   }
