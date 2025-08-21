@@ -1,8 +1,38 @@
 // src/lib/firebase/functions.ts
 'use server';
 
-import { adminDb } from './firebaseAdmin';
+import * as admin from 'firebase-admin';
+import { config } from 'dotenv';
 import type { AdminDashboardStats } from '../types';
+
+// Cargar las variables de entorno desde el archivo .env
+config();
+
+// Función para inicializar Firebase Admin SDK de forma segura
+function initializeAdminApp() {
+  if (admin.apps.length > 0) {
+    return admin.app();
+  }
+  
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  
+  if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
+    throw new Error('Firebase Admin SDK credentials are not set in environment variables.');
+  }
+
+  try {
+    return admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey,
+      }),
+    });
+  } catch (error: any) {
+    console.error('Firebase Admin SDK initialization error inside function:', error.stack);
+    throw new Error('Could not initialize Firebase Admin SDK.');
+  }
+}
 
 /**
  * Cloud Function (ejecutada en el servidor) para obtener las estadísticas del dashboard de admin.
@@ -12,6 +42,9 @@ import type { AdminDashboardStats } from '../types';
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
   console.log('Cloud Function: getAdminDashboardStats invoked.');
   try {
+    const adminApp = initializeAdminApp();
+    const adminDb = admin.firestore(adminApp);
+    
     const businessesSnap = await adminDb.collection('businesses').count().get();
     const platformUsersSnap = await adminDb.collection('platformUsers').count().get();
     const socioVipMembersSnap = await adminDb.collection('socioVipMembers').count().get();
