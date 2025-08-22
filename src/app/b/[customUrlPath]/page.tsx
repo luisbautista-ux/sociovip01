@@ -235,7 +235,7 @@ export default function BusinessPublicPageByUrl() {
     }
   }, [customUrlPath, fetchBusinessDataByCustomUrl]);
 
-  const handleSpecificCodeSubmit = (entity: BusinessManagedEntity, codeInputValue: string) => {
+  const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
     const codeToValidate = codeInputValue.trim().toUpperCase();
     if (!codeToValidate) {
         toast({title: "Código Requerido", description: "Por favor, ingresa el código de 9 dígitos.", variant: "destructive"});
@@ -245,27 +245,41 @@ export default function BusinessPublicPageByUrl() {
         toast({title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive"});
         return;
     }
-    if (!entity.generatedCodes) {
-      toast({title: "Sin Códigos", description: `Esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} no tiene códigos creados.`, variant: "destructive"});
-      return;
-    }
 
-    const foundCodeObject = entity.generatedCodes.find(
-      (gc) => gc.value.toUpperCase() === codeToValidate && gc.status === 'available'
-    );
+    setIsLoadingQrFlow(true);
+    // Fetch latest entity data to ensure code status is up-to-date
+    const entityDocRef = doc(db, "businessEntities", entity.id);
+    try {
+        const entitySnap = await getDoc(entityDocRef);
+        if (!entitySnap.exists()) {
+            toast({ title: "Error", description: "La promoción o evento ya no existe.", variant: "destructive" });
+            setIsLoadingQrFlow(false);
+            return;
+        }
 
-    if (foundCodeObject) {
-      setActiveEntityForQr(entity);
-      setValidatedSpecificCode(codeToValidate); 
-      setCurrentStepInModal('enterDni');
-      dniForm.reset({ dni: "" });
-      setShowDniModal(true);
-    } else {
-      toast({
-        title: "Código Inválido o No Disponible",
-        description: `El código "${codeToValidate}" no es válido para esta ${entity.type === 'promotion' ? 'promoción' : 'evento'} o ya fue utilizado/vencido.`,
-        variant: "destructive",
-      });
+        const currentEntityData = entitySnap.data() as BusinessManagedEntity;
+        const foundCodeObject = currentEntityData.generatedCodes?.find(
+          (gc) => gc.value.toUpperCase() === codeToValidate
+        );
+
+        if (foundCodeObject && foundCodeObject.status === 'available') {
+            setActiveEntityForQr({id: entitySnap.id, ...currentEntityData} as BusinessManagedEntity);
+            setValidatedSpecificCode(codeToValidate); 
+            setCurrentStepInModal('enterDni');
+            dniForm.reset({ dni: "" });
+            setShowDniModal(true);
+        } else {
+            toast({
+                title: "Código Inválido o No Disponible",
+                description: `El código "${codeToValidate}" no es válido, ya fue utilizado o ha vencido.`,
+                variant: "destructive",
+            });
+        }
+    } catch(e) {
+        console.error("Error validating specific code:", e);
+        toast({ title: "Error de Validación", description: "No se pudo validar el código.", variant: "destructive" });
+    } finally {
+        setIsLoadingQrFlow(false);
     }
   };
   
@@ -276,8 +290,10 @@ export default function BusinessPublicPageByUrl() {
         if (entitySnap.exists()) {
             const entityData = entitySnap.data() as BusinessManagedEntity;
             const existingCodes = entityData.generatedCodes || [];
+            let codeFound = false;
             const updatedCodes = existingCodes.map(code => {
-                if (code.value.toUpperCase() === promoterCodeValue.toUpperCase()) {
+                if (code.value.toUpperCase() === promoterCodeValue.toUpperCase() && code.status === 'available') {
+                    codeFound = true;
                     return {
                         ...code,
                         status: 'redeemed' as const,
@@ -290,17 +306,25 @@ export default function BusinessPublicPageByUrl() {
                 }
                 return code;
             });
-            await updateDoc(entityRef, { generatedCodes: updatedCodes });
-            console.log(`Successfully marked code ${promoterCodeValue} as redeemed for entity ${entityId}.`);
+
+            if(codeFound) {
+                await updateDoc(entityRef, { generatedCodes: updatedCodes });
+                console.log(`Successfully marked code ${promoterCodeValue} as redeemed for entity ${entityId}.`);
+                return true;
+            } else {
+                console.warn(`Code ${promoterCodeValue} for entity ${entityId} was not found or not available when trying to redeem.`);
+                return false;
+            }
         }
+        return false;
     } catch (error) {
         console.error("Error marking promoter code as redeemed:", error);
-        // Optionally, inform the user that there was an issue, but the main flow can continue.
         toast({
             title: "Advertencia",
             description: "No se pudo actualizar el estado del código del promotor, pero tu QR se ha generado.",
             variant: "destructive",
         });
+        return false; // Indicate failure
     }
 };
 
@@ -332,7 +356,14 @@ export default function BusinessPublicPageByUrl() {
             registrationDate: clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate().toISOString() : String(clientData.registrationDate),
           };
           toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
-          await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
+          // Attempt to redeem code and only proceed if successful
+          const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
+          if (!redeemSuccess) {
+              toast({ title: "Error", description: "Este código ya ha sido utilizado. No se puede generar un nuevo QR.", variant: "destructive"});
+              setIsLoadingQrFlow(false);
+              setShowDniModal(false);
+              return;
+          }
           setShowDniModal(false);
         } else {
           newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: data.dni });
@@ -395,7 +426,13 @@ export default function BusinessPublicPageByUrl() {
         registrationDate: new Date().toISOString(), 
       };
       
-      await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, registeredClient);
+      const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, registeredClient);
+       if (!redeemSuccess) {
+            toast({ title: "Error", description: "Este código ya ha sido utilizado. No se puede generar un nuevo QR.", variant: "destructive"});
+            setIsLoadingQrFlow(false);
+            setShowDniModal(false);
+            return;
+        }
 
        const qrCodeDetailsFromEntity: QrCodeData['entityDetails'] = { 
             id: activeEntityForQr.id,
@@ -1176,3 +1213,4 @@ export default function BusinessPublicPageByUrl() {
 }
 
     
+
