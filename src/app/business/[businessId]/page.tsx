@@ -107,6 +107,13 @@ export default function BusinessPublicPageById() {
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
 
+  const toSafeISOString = (dateValue: any): string => {
+    if (!dateValue) return new Date().toISOString();
+    if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
+    if (dateValue instanceof Date) return dateValue.toISOString();
+    if (typeof dateValue === 'string') return new Date(dateValue).toISOString();
+    return new Date().toISOString();
+  };
 
   const fetchBusinessDataById = useCallback(async (id: string) => {
     setIsLoadingPage(true);
@@ -131,7 +138,7 @@ export default function BusinessPublicPageById() {
         id: businessSnap.id,
         name: bizData.name || "Nombre de Negocio Desconocido",
         contactEmail: bizData.contactEmail || "",
-        joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : (bizData.joinDate ? String(bizData.joinDate) : new Date().toISOString()),
+        joinDate: toSafeISOString(bizData.joinDate),
         customUrlPath: bizData.customUrlPath || undefined,
         logoUrl: bizData.logoUrl || undefined,
         publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
@@ -169,33 +176,7 @@ export default function BusinessPublicPageById() {
       
       const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
       entitiesSnapshot.forEach(docSnap => {
-          const entityData = docSnap.data() as Omit<BusinessManagedEntity, 'id' | 'startDate' | 'endDate' | 'createdAt'> & {startDate: Timestamp | string, endDate: Timestamp | string, createdAt?: Timestamp | string };
-          
-          let startDateStr: string;
-          let endDateStr: string;
-          const nowStr = new Date().toISOString(); 
-
-          if (entityData.startDate instanceof Timestamp) {
-              startDateStr = entityData.startDate.toDate().toISOString();
-          } else if (typeof entityData.startDate === 'string') {
-              startDateStr = entityData.startDate;
-          } else if (entityData.startDate instanceof Date) {
-              startDateStr = entityData.startDate.toISOString();
-          } else {
-              console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
-              startDateStr = nowStr; 
-          }
-
-          if (entityData.endDate instanceof Timestamp) {
-              endDateStr = entityData.endDate.toDate().toISOString();
-          } else if (typeof entityData.endDate === 'string') {
-              endDateStr = entityData.endDate;
-          } else if (entityData.endDate instanceof Date) {
-              endDateStr = entityData.endDate.toISOString();
-          } else {
-              console.warn(`BusinessPage by ID: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
-              endDateStr = nowStr; 
-          }
+          const entityData = docSnap.data();
           
           const entityForCheck: BusinessManagedEntity = {
             id: docSnap.id,
@@ -203,8 +184,8 @@ export default function BusinessPublicPageById() {
             type: entityData.type,
             name: entityData.name || "Entidad sin nombre",
             description: entityData.description || "",
-            startDate: startDateStr,
-            endDate: endDateStr,
+            startDate: toSafeISOString(entityData.startDate),
+            endDate: toSafeISOString(entityData.endDate),
             isActive: entityData.isActive === undefined ? true : entityData.isActive,
             usageLimit: entityData.usageLimit || 0,
             maxAttendance: entityData.maxAttendance || 0,
@@ -215,9 +196,7 @@ export default function BusinessPublicPageById() {
             imageUrl: entityData.imageUrl,
             aiHint: entityData.aiHint,
             termsAndConditions: entityData.termsAndConditions,
-             createdAt: entityData.createdAt instanceof Timestamp 
-              ? entityData.createdAt.toDate().toISOString() 
-              : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
+             createdAt: toSafeISOString(entityData.createdAt),
           };
 
           if (isEntityCurrentlyActivatable(entityForCheck)) {
@@ -239,7 +218,7 @@ export default function BusinessPublicPageById() {
     } finally {
       setIsLoadingPage(false);
     }
-  }, [router, toast]); 
+  }, [router]); 
 
   useEffect(() => {
     if (businessIdFromParams) {
@@ -315,13 +294,20 @@ export default function BusinessPublicPageById() {
             setIsLoadingQrFlow(false);
             return;
         }
-        const currentEntityData = entitySnap.data() as BusinessManagedEntity;
+        const rawData = entitySnap.data();
+        const currentEntityData: BusinessManagedEntity = {
+            ...rawData,
+            id: entitySnap.id,
+            startDate: toSafeISOString(rawData.startDate),
+            endDate: toSafeISOString(rawData.endDate),
+        } as BusinessManagedEntity;
+
         const foundCodeObject = currentEntityData.generatedCodes?.find(
             (gc) => gc.value.toUpperCase() === codeToValidate
         );
 
-        if (foundCodeObject && foundCodeObject.status === 'available') {
-            setActiveEntityForQr({id: entitySnap.id, ...currentEntityData} as BusinessManagedEntity);
+        if (foundCodeObject && foundCodeObject.status === 'available' && isEntityCurrentlyActivatable(currentEntityData)) {
+            setActiveEntityForQr(currentEntityData);
             setValidatedSpecificCode(codeToValidate); 
             setCurrentStepInModal('enterDni');
             dniForm.reset({ dni: "" });
@@ -365,8 +351,8 @@ export default function BusinessPublicPageById() {
             name: clientData.name,
             surname: clientData.surname,
             phone: clientData.phone,
-            dob: clientData.dob instanceof Timestamp ? clientData.dob.toDate().toISOString() : String(clientData.dob),
-            registrationDate: clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate().toISOString() : String(clientData.registrationDate),
+            dob: toSafeISOString(clientData.dob),
+            registrationDate: toSafeISOString(clientData.registrationDate),
           };
           toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
           const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
@@ -967,7 +953,7 @@ export default function BusinessPublicPageById() {
                                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">Cerrar Sesión</Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><UIDialogDescriptionComponent>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescriptionComponent></AlertDialogHeader>
+                                        <AlertDialogHeader><UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased><UIAlertDescriptionComponent>¿Estás seguro de que quieres cerrar tu sesión?</UIAlertDescriptionComponent></AlertDialogHeader>
                                         <ShadcnAlertDialogFooterAliased>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                             <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">Sí, Cerrar Sesión</AlertDialogAction>
@@ -1280,4 +1266,5 @@ export default function BusinessPublicPageById() {
 }
 
     
+
 

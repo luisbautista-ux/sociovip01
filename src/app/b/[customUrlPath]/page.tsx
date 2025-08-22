@@ -105,6 +105,15 @@ export default function BusinessPublicPageByUrl() {
     resolver: zodResolver(newQrClientSchema),
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
+  
+  const toSafeISOString = (dateValue: any): string => {
+    if (!dateValue) return new Date().toISOString();
+    if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
+    if (dateValue instanceof Date) return dateValue.toISOString();
+    if (typeof dateValue === 'string') return new Date(dateValue).toISOString();
+    return new Date().toISOString();
+  };
+
 
   const fetchBusinessDataByCustomUrl = useCallback(async () => {
     if (!customUrlPath || typeof customUrlPath !== 'string') {
@@ -137,7 +146,7 @@ export default function BusinessPublicPageByUrl() {
           id: businessDoc.id,
           name: bizData.name || "Nombre de Negocio Desconocido",
           contactEmail: bizData.contactEmail || "", 
-          joinDate: bizData.joinDate instanceof Timestamp ? bizData.joinDate.toDate().toISOString() : (bizData.joinDate ? String(bizData.joinDate) : new Date().toISOString()),
+          joinDate: toSafeISOString(bizData.joinDate),
           customUrlPath: bizData.customUrlPath || customUrlPath,
           logoUrl: bizData.logoUrl || undefined,
           publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
@@ -161,40 +170,14 @@ export default function BusinessPublicPageByUrl() {
         entitiesSnapshot.forEach(docSnap => {
           const entityData = docSnap.data();
           
-          let startDateStr: string;
-          let endDateStr: string;
-          const nowStr = new Date().toISOString(); 
-
-          if (entityData.startDate instanceof Timestamp) {
-              startDateStr = entityData.startDate.toDate().toISOString();
-          } else if (typeof entityData.startDate === 'string') {
-              startDateStr = entityData.startDate;
-          } else if (entityData.startDate instanceof Date) {
-              startDateStr = entityData.startDate.toISOString();
-          } else {
-              console.warn(`BusinessPage by URL: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid startDate. Using fallback.`);
-              startDateStr = nowStr; 
-          }
-
-          if (entityData.endDate instanceof Timestamp) {
-              endDateStr = entityData.endDate.toDate().toISOString();
-          } else if (typeof entityData.endDate === 'string') {
-              endDateStr = entityData.endDate;
-          } else if (entityData.endDate instanceof Date) {
-              endDateStr = entityData.endDate.toISOString();
-          } else {
-              console.warn(`BusinessPage by URL: Entity ${docSnap.id} for business ${entityData.businessId} missing or invalid endDate. Using fallback.`);
-              endDateStr = nowStr; 
-          }
-          
           const entityForCheck: BusinessManagedEntity = {
             id: docSnap.id,
             businessId: entityData.businessId,
             type: entityData.type,
             name: entityData.name || "Entidad sin nombre",
             description: entityData.description || "",
-            startDate: startDateStr,
-            endDate: endDateStr,
+            startDate: toSafeISOString(entityData.startDate),
+            endDate: toSafeISOString(entityData.endDate),
             isActive: entityData.isActive === undefined ? true : entityData.isActive,
             usageLimit: entityData.usageLimit || 0,
             maxAttendance: entityData.maxAttendance || 0,
@@ -205,9 +188,7 @@ export default function BusinessPublicPageByUrl() {
             imageUrl: entityData.imageUrl,
             aiHint: entityData.aiHint,
             termsAndConditions: entityData.termsAndConditions,
-            createdAt: entityData.createdAt instanceof Timestamp 
-              ? entityData.createdAt.toDate().toISOString() 
-              : (typeof entityData.createdAt === 'string' ? entityData.createdAt : (entityData.createdAt instanceof Date ? entityData.createdAt.toISOString() : undefined)),
+            createdAt: toSafeISOString(entityData.createdAt),
           };
 
           if (isEntityCurrentlyActivatable(entityForCheck)) {
@@ -257,13 +238,20 @@ export default function BusinessPublicPageByUrl() {
             return;
         }
 
-        const currentEntityData = entitySnap.data() as BusinessManagedEntity;
+        const rawData = entitySnap.data();
+        const currentEntityData: BusinessManagedEntity = {
+            ...rawData,
+            id: entitySnap.id,
+            startDate: toSafeISOString(rawData.startDate),
+            endDate: toSafeISOString(rawData.endDate),
+        } as BusinessManagedEntity;
+        
         const foundCodeObject = currentEntityData.generatedCodes?.find(
           (gc) => gc.value.toUpperCase() === codeToValidate
         );
 
-        if (foundCodeObject && foundCodeObject.status === 'available') {
-            setActiveEntityForQr({id: entitySnap.id, ...currentEntityData} as BusinessManagedEntity);
+        if (foundCodeObject && foundCodeObject.status === 'available' && isEntityCurrentlyActivatable(currentEntityData)) {
+            setActiveEntityForQr(currentEntityData);
             setValidatedSpecificCode(codeToValidate); 
             setCurrentStepInModal('enterDni');
             dniForm.reset({ dni: "" });
@@ -352,8 +340,8 @@ export default function BusinessPublicPageByUrl() {
             name: clientData.name,
             surname: clientData.surname,
             phone: clientData.phone,
-            dob: clientData.dob instanceof Timestamp ? clientData.dob.toDate().toISOString() : String(clientData.dob),
-            registrationDate: clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate().toISOString() : String(clientData.registrationDate),
+            dob: toSafeISOString(clientData.dob),
+            registrationDate: toSafeISOString(clientData.registrationDate),
           };
           toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
           // Attempt to redeem code and only proceed if successful
@@ -1213,4 +1201,5 @@ export default function BusinessPublicPageByUrl() {
 }
 
     
+
 
