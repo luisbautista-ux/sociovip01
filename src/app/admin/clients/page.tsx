@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { QrClient } from "@/lib/types"; 
-import { format, getMonth, parseISO } from "date-fns";
+import { format, getMonth, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { ListChecks, Download, Search, Gift, Loader2, Filter, Cake, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -31,14 +31,27 @@ export default function AdminQrClientsPage() {
       const querySnapshot = await getDocs(collection(db, "qrClients"));
       const fetchedClients: QrClient[] = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
+        
+        // Robust date conversion
+        const toSafeISOString = (dateValue: any): string | null => {
+            if (!dateValue) return null;
+            if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
+            if (dateValue instanceof Date) return dateValue.toISOString();
+            if (typeof dateValue === 'string') {
+              const parsedDate = new Date(dateValue);
+              return isValid(parsedDate) ? parsedDate.toISOString() : null;
+            }
+            return null;
+        };
+
         return {
           id: docSnap.id,
           name: data.name,
           surname: data.surname,
           dni: data.dni,
           phone: data.phone,
-          dob: data.dob instanceof Timestamp ? data.dob.toDate().toISOString() : data.dob as string,
-          registrationDate: data.registrationDate instanceof Timestamp ? data.registrationDate.toDate().toISOString() : data.registrationDate as string,
+          dob: toSafeISOString(data.dob), // Use safe conversion
+          registrationDate: toSafeISOString(data.registrationDate), // Use safe conversion
         };
       });
       setQrClients(fetchedClients);
@@ -67,10 +80,10 @@ export default function AdminQrClientsPage() {
     );
 
     const birthdayMatch = birthdayMonthFilter === "all" ||
-      (client.dob && getMonth(parseISO(client.dob)) === parseInt(birthdayMonthFilter));
+      (client.dob && typeof client.dob === 'string' && getMonth(parseISO(client.dob)) === parseInt(birthdayMonthFilter));
 
     const registrationMatch = registrationMonthFilter === "all" ||
-      (client.registrationDate && getMonth(parseISO(client.registrationDate)) === parseInt(registrationMonthFilter));
+      (client.registrationDate && typeof client.registrationDate === 'string' && getMonth(parseISO(client.registrationDate)) === parseInt(registrationMonthFilter));
       
     return searchMatch && birthdayMatch && registrationMatch;
   });
@@ -87,8 +100,8 @@ export default function AdminQrClientsPage() {
       client.surname,
       client.dni,
       client.phone,
-      client.dob ? format(parseISO(client.dob), "dd/MM/yyyy", { locale: es }) : 'N/A',
-      client.registrationDate ? format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm", { locale: es }) : 'N/A',
+      client.dob && typeof client.dob === 'string' ? format(parseISO(client.dob), "dd/MM/yyyy", { locale: es }) : 'N/A',
+      client.registrationDate && typeof client.registrationDate === 'string' ? format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm", { locale: es }) : 'N/A',
     ]);
 
     let csvContent = "data:text/csv;charset=utf-8,"
@@ -198,8 +211,8 @@ export default function AdminQrClientsPage() {
                         <TableCell>{client.name} {client.surname}</TableCell>
                         <TableCell className="hidden md:table-cell">{client.dni}</TableCell>
                         <TableCell className="hidden lg:table-cell">{client.phone}</TableCell>
-                        <TableCell>{client.dob ? format(parseISO(client.dob), "P", { locale: es }) : "N/A"}</TableCell>
-                        <TableCell>{client.registrationDate ? format(parseISO(client.registrationDate), "P p", { locale: es }) : "N/A"}</TableCell>
+                        <TableCell>{client.dob && typeof client.dob === 'string' ? format(parseISO(client.dob), "P", { locale: es }) : "N/A"}</TableCell>
+                        <TableCell>{client.registrationDate && typeof client.registrationDate === 'string' ? format(parseISO(client.registrationDate), "P p", { locale: es }) : "N/A"}</TableCell>
                       </TableRow>
                     ))
                   ) : (
