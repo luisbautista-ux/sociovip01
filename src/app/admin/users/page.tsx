@@ -49,7 +49,7 @@ export default function AdminUsersPage() {
   const { toast } = useToast();
 
   const [availableBusinesses, setAvailableBusinesses] = useState<Business[]>([]);
-  const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(true);
+  const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(false); // Only load when needed
 
   const [showDniEntryModal, setShowDniEntryModal] = useState(false);
   const [dniForVerification, setDniForVerification] = useState(""); 
@@ -67,6 +67,10 @@ export default function AdminUsersPage() {
   });
 
   const fetchBusinessesForForm = useCallback(async () => {
+    // Only fetch if not already loaded
+    if (availableBusinesses.length > 0) {
+      return;
+    }
     setIsLoadingBusinesses(true);
     try {
       const querySnapshot = await getDocs(collection(db, "businesses"));
@@ -75,18 +79,8 @@ export default function AdminUsersPage() {
         return {
           id: docSnap.id,
           name: data.name,
-          contactEmail: data.contactEmail, 
-          joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : new Date(data.joinDate?.seconds * 1000 || Date.now()).toISOString(),
-          activePromotions: data.activePromotions || 0, // Campo mantenido por compatibilidad, podría eliminarse
-          ruc: data.ruc || "",
-          razonSocial: data.razonSocial || "",
-          department: data.department || "",
-          province: data.province || "",
-          district: data.district || "",
-          address: data.address || "",
-          managerName: data.managerName || "",
-          managerDni: data.managerDni || "",
-          businessType: data.businessType || undefined,
+          // Only map essential fields needed for the form
+          contactEmail: "", joinDate: "", // Not needed for the form
         };
       });
       setAvailableBusinesses(fetchedBusinesses);
@@ -101,7 +95,7 @@ export default function AdminUsersPage() {
     } finally {
       setIsLoadingBusinesses(false);
     }
-  }, [toast]);
+  }, [availableBusinesses.length, toast]);
 
   const fetchPlatformUsers = useCallback(async () => {
     setIsLoading(true);
@@ -146,8 +140,8 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchPlatformUsers();
-    fetchBusinessesForForm();
-  }, [fetchPlatformUsers, fetchBusinessesForForm]);
+    // Don't fetch businesses here initially. Fetch them only when the modal is opened.
+  }, [fetchPlatformUsers]);
 
   const filteredUsers = platformUsers.filter(user =>
     (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -231,6 +225,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
 
 
   const handleOpenCreateUserFlow = () => {
+    fetchBusinessesForForm(); // Pre-fetch businesses when flow starts
     setEditingUser(null);
     setVerifiedDniResult(null); 
     dniEntryForm.reset({ dni: "" }); 
@@ -266,7 +261,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             initialData.existingPlatformUserRoles = result.platformUserRoles || [];
             setShowDniIsPlatformUserAlert(true); 
             setShowDniEntryModal(false); 
-            return; // Detener aquí, el admin decidirá en la alerta si edita
+            return; 
         } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
             initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
             initialData.email = result.socioVipData.email;
@@ -288,7 +283,6 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
       setShowDniIsPlatformUserAlert(false); 
       if (existingPlatformUserToEdit) {
           setEditingUser(existingPlatformUserToEdit);
-          // verifiedDniResult ya contiene los datos del PlatformUser si se detectó en la verificación
           setVerifiedDniResult({ 
             dni: existingPlatformUserToEdit.dni,
             existingPlatformUser: existingPlatformUserToEdit,
@@ -326,7 +320,6 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
           roles: data.roles,
           businessId: finalBusinessId,
           dni: data.dni,
-          // email no se actualiza desde aquí si ya está ligado a Auth
         };
         await updateDoc(userRef, userPayload);
         toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
@@ -396,20 +389,10 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     }
   };
 
-  const getBusinessName = (user: PlatformUser): string => {
-    if (user.roles.includes('superadmin')) return "N/A (Super Admin)";
-    if (user.roles.includes('promoter')) return "N/A (Promotor Global)";
-    
-    const rolesThatNeedBusiness = user.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
-
-    if (rolesThatNeedBusiness.length > 0 && !user.businessId) {
-        return "Error: Negocio No Asignado";
-    }
-    if (user.businessId) {
-      const business = availableBusinesses.find(b => b.id === user.businessId);
-      return business?.name || `ID: ${user.businessId.substring(0,6)}... (No encontrado)`; 
-    }
-    return "N/A";
+  const getBusinessName = (businessId?: string | null): string => {
+    if (!businessId) return "N/A";
+    const business = availableBusinesses.find(b => b.id === businessId);
+    return business?.name || `ID: ${businessId.substring(0, 6)}...`;
   };
 
   return (
@@ -419,10 +402,10 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
           <Users className="h-8 w-8 mr-2" /> Gestión de Usuarios de Plataforma
         </h1>
         <div className="flex space-x-2">
-           <Button onClick={handleExport} variant="outline" disabled={isLoading || isLoadingBusinesses || platformUsers.length === 0}>
+           <Button onClick={handleExport} variant="outline" disabled={isLoading || platformUsers.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={handleOpenCreateUserFlow} className="bg-primary hover:bg-primary/90" disabled={isLoading || isLoadingBusinesses}>
+          <Button onClick={handleOpenCreateUserFlow} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Usuario
           </Button>
         </div>
@@ -440,15 +423,15 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
               className="pl-8 w-full sm:w-[300px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={isLoading || isLoadingBusinesses}
+              disabled={isLoading}
             />
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading || isLoadingBusinesses ? (
+          {isLoading ? (
              <div className="flex justify-center items-center h-60">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="ml-4 text-lg text-muted-foreground">Cargando datos...</p>
+              <p className="ml-4 text-lg text-muted-foreground">Cargando usuarios...</p>
             </div>
           ) : platformUsers.length === 0 && !searchTerm ? (
              <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
@@ -482,12 +465,13 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                               </Badge>
                           ))}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell">{getBusinessName(user)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{getBusinessName(user.businessId)}</TableCell>
                         <TableCell className="hidden xl:table-cell">{user.lastLogin ? format(new Date(user.lastLogin), "P p", { locale: es }) : "N/A"}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => {
+                              fetchBusinessesForForm(); // Load businesses before opening edit modal
                               setEditingUser(user); 
-                              setVerifiedDniResult(null); // No es necesario para editar directamente
+                              setVerifiedDniResult(null);
                               setShowCreateEditModal(true);
                           }} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />
@@ -605,15 +589,23 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
               }
             </UIDialogDescription>
           </UIDialogHeader>
-          <PlatformUserForm 
-            user={editingUser || undefined} 
-            initialDataForCreation={!editingUser && verifiedDniResult ? verifiedDniResult : undefined}
-            businesses={availableBusinesses}
-            onSubmit={handleCreateOrEditUser}
-            onCancel={() => { setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
-            isSubmitting={isSubmitting}
-            disableSubmitOverride={!editingUser && !!(verifiedDniResult?.existingPlatformUser)}
-          />
+          { isLoadingBusinesses ? (
+              <div className="flex items-center justify-center h-40">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="ml-3 text-muted-foreground">Cargando negocios...</p>
+              </div>
+            ) : (
+                <PlatformUserForm 
+                  user={editingUser || undefined} 
+                  initialDataForCreation={!editingUser && verifiedDniResult ? verifiedDniResult : undefined}
+                  businesses={availableBusinesses}
+                  onSubmit={handleCreateOrEditUser}
+                  onCancel={() => { setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
+                  isSubmitting={isSubmitting}
+                  disableSubmitOverride={!editingUser && !!(verifiedDniResult?.existingPlatformUser)}
+                />
+            )
+          }
         </UIDialogContent>
       </UIDialog>
 

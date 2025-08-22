@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -8,57 +9,64 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper function to get user profile data
-    function getUserProfile(userId) {
-      return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
+    // Helper function to get the user's roles from their profile document
+    function getUserRoles() {
+      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles;
+    }
+
+    // Helper function to check if the user is a Super Admin
+    function isSuperAdmin() {
+      return isSignedIn() && 'superadmin' in getUserRoles();
     }
     
-    // Helper function to check if a user is a Super Admin
-    function isSuperAdmin() {
-      let userProfile = getUserProfile(request.auth.uid);
-      return isSignedIn() && 'roles' in userProfile && userProfile.roles.hasAny(['superadmin']);
-    }
-
-    // Helper function to check if a user is a Business Admin or Staff for a specific business
+    // Helper function to check if a user is staff/admin of a specific business
     function isBusinessStaffOrAdmin(businessId) {
-      let userProfile = getUserProfile(request.auth.uid);
-      return isSignedIn() && 'businessId' in userProfile && userProfile.businessId == businessId && 'roles' in userProfile && userProfile.roles.hasAny(['business_admin', 'staff']);
+      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+      return isSignedIn() && userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
     }
 
-    // --- COLLECTION RULES ---
-
-    // Public business info is readable by anyone, writable only by superadmins.
+    // --- PUBLIC-FACING COLLECTIONS ---
+    
     match /businesses/{businessId} {
+      // Anyone can read business public data
       allow read: if true;
+      // Only superadmins can create, update, delete
+      allow write: if isSuperAdmin();
+    }
+    
+    match /businessEntities/{entityId} {
+      // Anyone can read promotion/event details
+      allow read: if true;
+      // Only staff/admin of that specific business can write to their entities
+      allow write: if isBusinessStaffOrAdmin(resource.data.businessId);
+    }
+    
+    match /qrClients/{clientId} {
+        // Anyone can create a new QR client profile (from public business page)
+        allow create: if true;
+        // Only superadmins can manage all clients
+        allow read, update, delete: if isSuperAdmin();
+    }
+    
+    // --- ADMIN & STAFF COLLECTIONS ---
+
+    match /platformUsers/{userId} {
+      // Superadmins can read any user profile and list all users
+      allow get, list: if isSuperAdmin();
+      // A user can read their own profile
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      // Only superadmins can create, update, or delete user profiles
       allow write: if isSuperAdmin();
     }
 
-    // Platform user profiles can be read by themselves or managed by superadmins.
-    match /platformUsers/{userId} {
-      allow get: if isSignedIn() && request.auth.uid == userId;
-      allow list, write: if isSuperAdmin();
-    }
-    
-    // VIP members are managed only by superadmins.
     match /socioVipMembers/{memberId} {
+      // Only superadmins can manage VIP members
       allow read, write: if isSuperAdmin();
     }
     
-    // QR clients can be created publicly, but only managed by superadmins.
-    match /qrClients/{clientId} {
-        allow read, write: if isSuperAdmin();
-        allow create: if true;
-    }
-    
-    // Promotions/Events are publicly readable, but only writable by the assigned business staff/admin.
-    match /businessEntities/{entityId} {
-        allow read: if true;
-        allow write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
-    }
-    
-    // Business-Promoter links are managed by the respective business staff/admin.
     match /businessPromoterLinks/{linkId} {
-        allow read, write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
+        // Staff/Admin of the business can manage their own promoter links
+        allow read, write: if isBusinessStaffOrAdmin(resource.data.businessId);
     }
   }
 }
