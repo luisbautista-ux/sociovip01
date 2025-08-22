@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -249,6 +250,40 @@ export default function BusinessPublicPageById() {
     }
   }, [businessIdFromParams, fetchBusinessDataById]);
 
+  const markPromoterCodeAsRedeemed = async (entityId: string, promoterCodeValue: string, clientInfo: { dni: string, name: string, surname: string }) => {
+    const entityRef = doc(db, "businessEntities", entityId);
+    try {
+        const entitySnap = await getDoc(entityRef);
+        if (entitySnap.exists()) {
+            const entityData = entitySnap.data() as BusinessManagedEntity;
+            const existingCodes = entityData.generatedCodes || [];
+            const updatedCodes = existingCodes.map(code => {
+                if (code.value.toUpperCase() === promoterCodeValue.toUpperCase()) {
+                    return {
+                        ...code,
+                        status: 'redeemed' as const,
+                        redemptionDate: new Date().toISOString(),
+                        redeemedByInfo: {
+                            dni: clientInfo.dni,
+                            name: `${clientInfo.name} ${clientInfo.surname}`,
+                        }
+                    };
+                }
+                return code;
+            });
+            await updateDoc(entityRef, { generatedCodes: updatedCodes });
+            console.log(`Successfully marked code ${promoterCodeValue} as redeemed for entity ${entityId}.`);
+        }
+    } catch (error) {
+        console.error("Error marking promoter code as redeemed:", error);
+        toast({
+            title: "Advertencia",
+            description: "No se pudo actualizar el estado del código del promotor, pero tu QR se ha generado.",
+            variant: "destructive",
+        });
+    }
+};
+
   const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
     const codeToValidate = codeInputValue.trim().toUpperCase();
     if (!codeToValidate) {
@@ -323,6 +358,7 @@ export default function BusinessPublicPageById() {
             registrationDate: clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate().toISOString() : String(clientData.registrationDate),
           };
           toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
+          await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
           setShowDniModal(false); 
         } else {
           newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: data.dni });
@@ -331,7 +367,7 @@ export default function BusinessPublicPageById() {
           return; 
         }
         
-        const qrCodeDetailsFromEntity: PromotionDetails = { 
+        const qrCodeDetailsFromEntity: QrCodeData['entityDetails'] = { 
           id: activeEntityForQr.id,
           title: activeEntityForQr.name,
           description: activeEntityForQr.description,
@@ -384,7 +420,10 @@ export default function BusinessPublicPageById() {
         dob: newClientDataToSave.dob.toDate().toISOString(),
         registrationDate: new Date().toISOString(), 
       };
-       const qrCodeDetailsFromEntity: PromotionDetails = { 
+      
+      await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, registeredClient);
+
+       const qrCodeDetailsFromEntity: QrCodeData['entityDetails'] = { 
             id: activeEntityForQr.id,
             title: activeEntityForQr.name,
             description: activeEntityForQr.description,
