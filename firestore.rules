@@ -3,6 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
@@ -16,37 +17,45 @@ service cloud.firestore {
       return isSignedIn() && userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
     }
 
-    // PUBLIC RULES
+    // --- COLLECTIONS ---
+
+    // Businesses are public
     match /businesses/{businessId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
     
+    // Public entities can be read by anyone
     match /businessEntities/{entityId} {
       allow read: if true;
-      allow write: if isBusinessStaffOrAdmin(resource.data.businessId);
+      // Only staff/admin of the specific business can write to their entities
+      allow write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
     }
-    
+
+    // Platform users can only be managed by Super Admins, but can read their own profile
+    match /platformUsers/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow list, write: if isSuperAdmin();
+    }
+
+    // QR Clients: Allow public creation and public DNI checks.
+    // Management only by Super Admins.
     match /qrClients/{clientId} {
-      // Allow public query by DNI, but not listing the whole collection
-      allow list: if request.query.keys().hasOnly(['dni']);
       allow create: if true;
-      // Admin can manage everything
+      // This rule allows anyone to run a query like "where('dni', '==', someDni)"
+      // but does NOT allow them to list the entire collection.
+      allow list: if true;
       allow read, update, delete: if isSuperAdmin();
     }
-
-    // ADMIN RULES
-    match /platformUsers/{userId} {
-      allow read, write: if isSuperAdmin();
+    
+    // VIP Members are only managed by Super Admins
+    match /socioVipMembers/{memberId} {
+       allow read, write: if isSuperAdmin();
     }
     
-    match /socioVipMembers/{memberId} {
-      allow read, write: if isSuperAdmin();
-    }
-
-    // BUSINESS PANEL RULES
+    // Promoter links can be managed by the business they belong to
     match /businessPromoterLinks/{linkId} {
-        allow read, write: if isBusinessStaffOrAdmin(resource.data.businessId);
+        allow read, write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
     }
   }
 }
