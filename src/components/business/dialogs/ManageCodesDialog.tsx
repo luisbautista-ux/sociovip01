@@ -6,16 +6,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ClipboardCopy, ChevronDown, ChevronUp, Copy, AlertTriangle } from "lucide-react";
+import { PlusCircle, Trash2, ClipboardCopy, ChevronDown, ChevronUp, Copy, AlertTriangle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as UIAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from "@/lib/constants";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 
 interface ProcessedCodeItem {
   isBatch: boolean;
@@ -106,22 +109,44 @@ export function ManageCodesDialog({
     currentUserProfileName,
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
+  const [isLoadingCodes, setIsLoadingCodes] = useState(false);
   const { toast } = useToast();
   const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (open && entity?.generatedCodes) {
-      // Si es vista de promotor, filtrar solo sus códigos
-      const codesToDisplay = isPromoterView 
-        ? (entity.generatedCodes || []).filter(c => c.generatedByName === currentUserProfileName)
-        : (entity.generatedCodes || []);
-      setInternalCodes([...codesToDisplay]); 
-      setExpandedBatches({}); 
-    } else if (open && (!entity || !entity.generatedCodes)) {
+  const fetchLatestCodes = useCallback(async () => {
+    if (!entity?.id) {
       setInternalCodes([]);
-      setExpandedBatches({});
+      return;
     }
-  }, [entity, open, isPromoterView, currentUserProfileName]);
+    setIsLoadingCodes(true);
+    try {
+      const entityRef = doc(db, "businessEntities", entity.id);
+      const entitySnap = await getDoc(entityRef);
+      if (entitySnap.exists()) {
+        const latestEntityData = entitySnap.data() as BusinessManagedEntity;
+        const codesToDisplay = isPromoterView
+          ? (latestEntityData.generatedCodes || []).filter(c => c.generatedByName === currentUserProfileName)
+          : (latestEntityData.generatedCodes || []);
+        setInternalCodes([...codesToDisplay]);
+      } else {
+        toast({ title: "Error", description: "La promoción o evento ya no existe.", variant: "destructive" });
+        setInternalCodes([]);
+      }
+    } catch (error) {
+      console.error("Error fetching latest codes:", error);
+      toast({ title: "Error", description: "No se pudieron cargar los datos actualizados de los códigos.", variant: "destructive" });
+      setInternalCodes(entity.generatedCodes || []); // Fallback to stale data
+    } finally {
+      setIsLoadingCodes(false);
+    }
+  }, [entity, isPromoterView, currentUserProfileName, toast]);
+
+  useEffect(() => {
+    if (open && entity) {
+      fetchLatestCodes();
+      setExpandedBatches({}); 
+    }
+  }, [entity, open, fetchLatestCodes]);
 
   const processedAndGroupedCodes = useMemo(() => groupAndSortCodes(internalCodes), [internalCodes]);
 
@@ -319,7 +344,12 @@ export function ManageCodesDialog({
           </Button>
         </div>
 
-        {processedAndGroupedCodes.length > 0 ? (
+        {isLoadingCodes ? (
+          <div className="flex justify-center items-center h-[50vh]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-3 text-muted-foreground">Cargando códigos actualizados...</p>
+          </div>
+        ) : processedAndGroupedCodes.length > 0 ? (
           <ScrollArea className="h-[50vh] border rounded-md">
             <Table>
               <TableHeader>
