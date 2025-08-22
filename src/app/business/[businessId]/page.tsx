@@ -231,15 +231,18 @@ export default function BusinessPublicPageById() {
 
   const markPromoterCodeAsRedeemed = async (entityId: string, promoterCodeValue: string, clientInfo: { dni: string, name: string, surname: string }) => {
     const entityRef = doc(db, "businessEntities", entityId);
+    const normalizedCodeValue = promoterCodeValue.trim().toUpperCase().replace(/-/g, "");
     try {
         const entitySnap = await getDoc(entityRef);
         if (entitySnap.exists()) {
             const entityData = entitySnap.data() as BusinessManagedEntity;
             const existingCodes = entityData.generatedCodes || [];
-            let codeFound = false;
+            let codeFoundAndUpdated = false;
             const updatedCodes = existingCodes.map(code => {
-                if (code.value.toUpperCase() === promoterCodeValue.toUpperCase() && code.status === 'available') {
-                    codeFound = true;
+                const isCodeMatch = code.value.toUpperCase() === normalizedCodeValue;
+                const isAvailable = code.status === 'available' || !code.status; // Treat undefined status as available
+                if (isCodeMatch && isAvailable) {
+                    codeFoundAndUpdated = true;
                     return {
                         ...code,
                         status: 'redeemed' as const,
@@ -253,15 +256,16 @@ export default function BusinessPublicPageById() {
                 return code;
             });
 
-            if(codeFound) {
+            if(codeFoundAndUpdated) {
                 await updateDoc(entityRef, { generatedCodes: updatedCodes });
-                console.log(`Successfully marked code ${promoterCodeValue} as redeemed for entity ${entityId}.`);
+                console.log(`Successfully marked code ${normalizedCodeValue} as redeemed for entity ${entityId}.`);
                 return true;
             } else {
-                console.warn(`Code ${promoterCodeValue} for entity ${entityId} was not found or not available when trying to redeem.`);
+                console.warn(`Code ${normalizedCodeValue} for entity ${entityId} was not found or was not available when trying to redeem.`);
                 return false;
             }
         }
+        console.warn(`Entity ${entityId} not found for redemption.`);
         return false;
     } catch (error) {
         console.error("Error marking promoter code as redeemed:", error);
@@ -270,18 +274,20 @@ export default function BusinessPublicPageById() {
             description: "No se pudo actualizar el estado del código del promotor, pero tu QR se ha generado.",
             variant: "destructive",
         });
-        return false; // Indicate failure
+        return false;
     }
 };
 
   const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
-    const codeToValidate = codeInputValue.trim().toUpperCase();
-    if (!codeToValidate) {
-        toast({title: "Código Requerido", description: "Por favor, ingresa el código de 9 dígitos.", variant: "destructive"});
+    const codeToValidate = codeInputValue.trim().toUpperCase().replace(/-/g, "");
+
+    if (codeToValidate.length !== 9) {
+        toast({title: "Código Inválido", description: "El código debe tener 9 caracteres alfanuméricos.", variant: "destructive"});
         return;
     }
-    if (codeToValidate.length !== 9) {
-        toast({title: "Código Inválido", description: "El código debe tener 9 caracteres.", variant: "destructive"});
+
+    if (!isEntityCurrentlyActivatable(entity)) {
+        toast({ title: "Promoción/Evento no disponible", description: "Esta oferta no está vigente en este momento.", variant: "destructive" });
         return;
     }
 
@@ -295,7 +301,7 @@ export default function BusinessPublicPageById() {
             return;
         }
         const rawData = entitySnap.data();
-        const currentEntityData: BusinessManagedEntity = {
+        const currentEntityData = {
             ...rawData,
             id: entitySnap.id,
             startDate: toSafeISOString(rawData.startDate),
@@ -306,7 +312,10 @@ export default function BusinessPublicPageById() {
             (gc) => gc.value.toUpperCase() === codeToValidate
         );
 
-        if (foundCodeObject && foundCodeObject.status === 'available' && isEntityCurrentlyActivatable(currentEntityData)) {
+        // Treat codes without status as 'available' for backward compatibility
+        const isCodeAvailable = foundCodeObject && (foundCodeObject.status === 'available' || !foundCodeObject.status);
+
+        if (isCodeAvailable) {
             setActiveEntityForQr(currentEntityData);
             setValidatedSpecificCode(codeToValidate); 
             setCurrentStepInModal('enterDni');
@@ -750,7 +759,7 @@ export default function BusinessPublicPageById() {
                     id={`specificCode-${entity.id}-${businessIdFromParams}`}
                     placeholder="Ingresa código de 9 dígitos"
                     {...field}
-                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/[\s-]/g, ''))}
                     maxLength={9}
                     className="text-sm h-10 w-full"
                     disabled={isLoadingQrFlow}
@@ -1266,5 +1275,6 @@ export default function BusinessPublicPageById() {
 }
 
     
+
 
 
