@@ -1,68 +1,64 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- Helper Functions ---
-    function isSuperAdmin(userId) {
-      return get(/databases/$(database)/documents/platformUsers/$(userId)).data.roles.hasAny(['superadmin']);
-    }
-
-    function isBusinessStaffOrAdmin(userId, businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(userId)).data;
-      return userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
-    }
-    
-    function isHost(userId, businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(userId)).data;
-      return userProfile.businessId == businessId && userProfile.roles.hasAny(['host']);
-    }
-
+    // Helper function to check if a user is authenticated
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // --- Collection Rules ---
+    // Helper function to get user profile data
+    function getUserProfile(userId) {
+      return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
+    }
+    
+    // Helper function to check if a user is a Super Admin
+    function isSuperAdmin() {
+      let userProfile = getUserProfile(request.auth.uid);
+      return isSignedIn() && 'roles' in userProfile && userProfile.roles.hasAny(['superadmin']);
+    }
 
-    // Businesses: Public can read, Super Admin can manage.
+    // Helper function to check if a user is a Business Admin or Staff for a specific business
+    function isBusinessStaffOrAdmin(businessId) {
+      let userProfile = getUserProfile(request.auth.uid);
+      return isSignedIn() && 'businessId' in userProfile && userProfile.businessId == businessId && 'roles' in userProfile && userProfile.roles.hasAny(['business_admin', 'staff']);
+    }
+
+    // --- COLLECTION RULES ---
+
+    // Public business info is readable by anyone, writable only by superadmins.
     match /businesses/{businessId} {
       allow read: if true;
-      allow write: if isSignedIn() && isSuperAdmin(request.auth.uid);
+      allow write: if isSuperAdmin();
     }
 
-    // Platform Users: Admins manage, users can read their own profile.
+    // Platform user profiles can be read by themselves or managed by superadmins.
     match /platformUsers/{userId} {
-      // A user can read their own profile
       allow get: if isSignedIn() && request.auth.uid == userId;
-      
-      // Super Admins can list, create, update, and delete any user profile
-      allow list, write: if isSignedIn() && isSuperAdmin(request.auth.uid);
+      allow list, write: if isSuperAdmin();
     }
     
-    // SocioVip Members: Super Admin management only.
+    // VIP members are managed only by superadmins.
     match /socioVipMembers/{memberId} {
-      allow read, write: if isSignedIn() && isSuperAdmin(request.auth.uid);
+      allow read, write: if isSuperAdmin();
     }
     
-    // QR Clients: Public can create, Admins can manage.
+    // QR clients can be created publicly, but only managed by superadmins.
     match /qrClients/{clientId} {
-        allow read, write: if isSignedIn() && isSuperAdmin(request.auth.uid);
+        allow read, write: if isSuperAdmin();
         allow create: if true;
     }
     
-    // Business Entities (Promos/Events): Public can read, business staff can write.
+    // Promotions/Events are publicly readable, but only writable by the assigned business staff/admin.
     match /businessEntities/{entityId} {
         allow read: if true;
-        allow write: if isSignedIn() && isBusinessStaffOrAdmin(request.auth.uid, request.resource.data.businessId);
+        allow write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
     }
     
-    // Business Promoter Links: Business staff can manage their own links.
+    // Business-Promoter links are managed by the respective business staff/admin.
     match /businessPromoterLinks/{linkId} {
-        allow read, write: if isSignedIn() && isBusinessStaffOrAdmin(request.auth.uid, resource.data.businessId);
+        allow read, write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
     }
-
-    // Storage Rules require reading Firestore, so we need a broad read rule
-    // for authenticated users on their own user document. This is covered by the `get` rule on platformUsers.
   }
 }
