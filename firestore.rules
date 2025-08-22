@@ -1,9 +1,13 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // =================================
+    //         HELPER FUNCTIONS
+    // =================================
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -12,50 +16,59 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
     }
 
-    function isBusinessStaffOrAdmin(businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-      return isSignedIn() && userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
+    // Function to check if a user is an admin or staff for the business associated with the resource
+    function isBusinessOwnerOrStaff(businessId) {
+        let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+        return isSignedIn() && userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
     }
 
-    // --- COLLECTIONS ---
+    // =================================
+    //         COLLECTION RULES
+    // =================================
 
-    // Businesses are public
+    // Businesses can be read by anyone for public pages.
+    // Only Super Admins can create/update/delete them.
     match /businesses/{businessId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
     
-    // Public entities can be read by anyone
-    match /businessEntities/{entityId} {
-      allow read: if true;
-      // Only staff/admin of the specific business can write to their entities
-      allow write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
-    }
-
-    // Platform users can only be managed by Super Admins, but can read their own profile
+    // Platform users can only be managed by Super Admins.
+    // A user can read their own profile.
     match /platformUsers/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
       allow list, write: if isSuperAdmin();
     }
 
-    // QR Clients: Allow public creation and public DNI checks.
-    // Management only by Super Admins.
-    match /qrClients/{clientId} {
-      allow create: if true;
-      // This rule allows anyone to run a query like "where('dni', '==', someDni)"
-      // but does NOT allow them to list the entire collection.
-      allow list: if true;
-      allow read, update, delete: if isSuperAdmin();
+    // Business entities (promos/events) can be read by anyone.
+    // They can only be written to by the staff/admin of the correct business.
+    match /businessEntities/{entityId} {
+      allow read: if true;
+      allow write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
+    }
+
+    // Business promoter links can only be managed by the staff/admin of that business.
+    match /businessPromoterLinks/{linkId} {
+        allow read, write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
     }
     
-    // VIP Members are only managed by Super Admins
+    // New QR Clients can be created publicly.
+    // DNI checks (list query) are public.
+    // Only Super Admins can manage them after creation.
+    match /qrClients/{clientId} {
+       allow create: if true;
+       allow list: if true; // Allows public queries like checking for DNI
+       allow read, update, delete: if isSuperAdmin();
+    }
+    
+    // VIP members are fully managed by Super Admins.
     match /socioVipMembers/{memberId} {
        allow read, write: if isSuperAdmin();
     }
-    
-    // Promoter links can be managed by the business they belong to
-    match /businessPromoterLinks/{linkId} {
-        allow read, write: if isBusinessStaffOrAdmin(request.resource.data.businessId);
+
+    // Fallback rule to deny access to any other collection
+    match /{path=**} {
+      allow read, write: if false;
     }
   }
 }
