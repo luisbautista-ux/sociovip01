@@ -28,6 +28,7 @@ import {
   addDoc,
   serverTimestamp,
   limit,
+  runTransaction
 } from "firebase/firestore";
 import type {
   BusinessManagedEntity,
@@ -82,6 +83,24 @@ import {
   AlertDialogTitle as UIAlertDialogTitleAliased,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+// --- Helpers robustos para códigos ---
+const normalizeCode = (v: unknown) =>
+  String(v ?? "")
+    .toUpperCase()
+    .replace(/[\s-]/g, "")            // quita espacios y guiones
+    .replace(/[^A-Z0-9]/g, "");       // deja solo A-Z0-9
+
+const extractCodeString = (codeObj: any) =>
+  normalizeCode(codeObj?.value ?? codeObj?.code ?? codeObj?.codigo ?? codeObj?.val);
+
+const isCodeAvailableForUse = (codeObj: any) => {
+  const status = String(codeObj?.status ?? codeObj?.estado ?? "").toLowerCase();
+  const usedFlag = Boolean(codeObj?.used ?? codeObj?.redeemed ?? codeObj?.isUsed);
+  // disponible si NO tiene flags de usado y su status es vacío/available/nuevo/libre
+  return !usedFlag && (status === "" || status === "available" || status === "nuevo" || status === "libre");
+};
+
 
 // helper `cn` local
 const cn = (...c: (string | false | undefined | null)[]) => c.filter(Boolean).join(" ");
@@ -281,113 +300,124 @@ const businessIdFromParams = React.useMemo(() => {
   // --------- Código de validación/redención y generación de QR ----------
 
   const markPromoterCodeAsRedeemed = async (
-    entityId: string,
-    promoterCodeValue: string,
-    clientInfo: { dni: string; name: string; surname: string }
-  ) => {
-    const entityRef = doc(db, "businessEntities", entityId);
-    const normalizedCodeValue = promoterCodeValue.trim().toUpperCase().replace(/-/g, "");
-    try {
-      const entitySnap = await getDoc(entityRef);
-      if (entitySnap.exists()) {
-        const entityData = entitySnap.data() as BusinessManagedEntity;
-        const existingCodes = entityData.generatedCodes || [];
-        let codeFoundAndUpdated = false;
-        const updatedCodes = existingCodes.map((code) => {
-          const isCodeMatch = code.value.toUpperCase() === normalizedCodeValue;
-          const isAvailable = code.status === "available" || !code.status;
-          if (isCodeMatch && isAvailable) {
-            codeFoundAndUpdated = true;
-            return {
-              ...code,
-              status: "redeemed" as const,
-              redemptionDate: new Date().toISOString(),
-              redeemedByInfo: {
-                dni: clientInfo.dni,
-                name: `${clientInfo.name} ${clientInfo.surname}`,
-              },
-            };
-          }
-          return code;
-        });
+  entityId: string,
+  promoterCodeValue: string,
+  clientInfo: { dni: string; name: string; surname: string }
+) => {
+  const entityRef = doc(db, "businessEntities", entityId);
+  const normalized = normalizeCode(promoterCodeValue);
 
-        if (codeFoundAndUpdated) {
-          await updateDoc(entityRef, { generatedCodes: updatedCodes });
-          return true;
-        } else {
-          return false;
+  try {
+    await runTransaction(db, async (trx) => {
+      const snap = await trx.get(entityRef);
+      if (!snap.exists()) throw new Error("entity-not-found");
+
+      const data = snap.data() as any;
+      const codes: any[] = Array.isArray(data.generatedCodes) ? data.generatedCodes : [];
+
+      let updated = false;
+      const newCodes = codes.map((c) => {
+        const codeStr = extractCodeString(c);
+        const available = isCodeAvailableForUse(c);
+        if (!updated && codeStr === normalized && available) {
+          updated = true;
+          return {
+            ...c,
+            status: "redeemed",
+            used: true, // por si tu backend mira flags booleanos
+            redemptionDate: new Date().toISOString(),
+            redeemedByInfo: {
+              dni: clientInfo.dni,
+              name: `${clientInfo.name} ${clientInfo.surname}`,
+            },
+          };
         }
-      }
-      return false;
-    } catch (error) {
-      toast({
-        title: "Advertencia",
-        description: "No se pudo actualizar el estado del código del promotor, pero tu QR se ha generado.",
-        variant: "destructive",
+        return c;
       });
+
+      if (!updated) throw new Error("code-not-available");
+      await trx.update(entityRef, { generatedCodes: newCodes });
+    });
+
+    console.log(`Code ${normalized} redeemed for entity ${entityId}.`);
+    return true;
+  } catch (err: any) {
+    if (err?.message === "code-not-available") {
+      // no existe o ya no está disponible
       return false;
     }
-  };
+    console.error("Error marking code as redeemed:", err);
+    toast({
+      title: "Advertencia",
+      description: "No se pudo actualizar el estado del código, intenta de nuevo.",
+      variant: "destructive",
+    });
+    return false;
+  }
+};
 
-  const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
-    const codeToValidate = codeInputValue.trim().toUpperCase().replace(/-/g, "");
+const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
+  const codeToValidate = normalizeCode(codeInputValue);
 
-    if (codeToValidate.length !== 9) {
-      toast({ title: "Código Inválido", description: "El código debe tener 9 caracteres alfanuméricos.", variant: "destructive" });
+  if (codeToValidate.length !== 9) {
+    toast({
+      title: "Código inválido",
+      description: "El código debe tener 9 caracteres alfanuméricos.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (!isEntityCurrentlyActivatable(entity)) {
+    toast({
+      title: "Promoción/Evento no disponible",
+      description: "Esta oferta no está vigente en este momento.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setIsLoadingQrFlow(true);
+  try {
+    const entityRef = doc(db, "businessEntities", entity.id);
+    const snap = await getDoc(entityRef);
+    if (!snap.exists()) {
+      toast({ title: "Error", description: "La promoción o evento ya no existe.", variant: "destructive" });
       return;
     }
 
-    if (!isEntityCurrentlyActivatable(entity)) {
+    const data = snap.data() as any;
+    const codes: any[] = Array.isArray(data.generatedCodes) ? data.generatedCodes : [];
+
+    // Busca tolerante a forma y formato
+    const found = codes.find((c) => extractCodeString(c) === codeToValidate);
+    const available = found && isCodeAvailableForUse(found);
+
+    if (available) {
+      setActiveEntityForQr({
+        ...data,
+        id: snap.id,
+        startDate: toSafeISOString(data.startDate),
+        endDate: toSafeISOString(data.endDate),
+      } as BusinessManagedEntity);
+      setValidatedSpecificCode(codeToValidate);
+      setCurrentStepInModal("enterDni");
+      dniForm.reset({ dni: "" });
+      setShowDniModal(true);
+    } else {
       toast({
-        title: "Promoción/Evento no disponible",
-        description: "Esta oferta no está vigente en este momento.",
+        title: "Código inválido o no disponible",
+        description: `El código "${codeToValidate}" no existe, ya fue utilizado o está vencido.`,
         variant: "destructive",
       });
-      return;
     }
-
-    setIsLoadingQrFlow(true);
-    const entityDocRef = doc(db, "businessEntities", entity.id);
-    try {
-      const entitySnap = await getDoc(entityDocRef);
-      if (!entitySnap.exists()) {
-        toast({ title: "Error", description: "La promoción o evento ya no existe.", variant: "destructive" });
-        setIsLoadingQrFlow(false);
-        return;
-      }
-
-      const rawData = entitySnap.data();
-      const currentEntityData = {
-        ...rawData,
-        id: entitySnap.id,
-        startDate: toSafeISOString(rawData.startDate),
-        endDate: toSafeISOString(rawData.endDate),
-      } as BusinessManagedEntity;
-
-      const foundCodeObject = currentEntityData.generatedCodes?.find(
-        (gc) => gc.value.toUpperCase() === codeToValidate
-      );
-      const isCodeAvailable = foundCodeObject && (foundCodeObject.status === "available" || !foundCodeObject.status);
-
-      if (isCodeAvailable) {
-        setActiveEntityForQr(currentEntityData);
-        setValidatedSpecificCode(codeToValidate);
-        setCurrentStepInModal("enterDni");
-        dniForm.reset({ dni: "" });
-        setShowDniModal(true);
-      } else {
-        toast({
-          title: "Código Inválido o No Disponible",
-          description: `El código "${codeToValidate}" no es válido, ya fue utilizado o ha vencido.`,
-          variant: "destructive",
-        });
-      }
-    } catch (e) {
-      toast({ title: "Error de Validación", description: "No se pudo validar el código.", variant: "destructive" });
-    } finally {
-      setIsLoadingQrFlow(false);
-    }
-  };
+  } catch (e) {
+    console.error("Error validating specific code:", e);
+    toast({ title: "Error de validación", description: "No se pudo validar el código.", variant: "destructive" });
+  } finally {
+    setIsLoadingQrFlow(false);
+  }
+};
 
   const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     if (!activeEntityForQr || !validatedSpecificCode || !businessDetails) {
