@@ -367,7 +367,7 @@ export default function BusinessPublicPageByUrl() {
           return; 
         }
         
-        const qrCodeDetailsFromEntity: QrCodeData['entityDetails'] = { 
+        const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
           id: activeEntityForQr.id,
           title: activeEntityForQr.name,
           description: activeEntityForQr.description,
@@ -429,7 +429,7 @@ export default function BusinessPublicPageByUrl() {
             return;
         }
 
-       const qrCodeDetailsFromEntity: QrCodeData['entityDetails'] = { 
+       const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
             id: activeEntityForQr.id,
             title: activeEntityForQr.name,
             description: activeEntityForQr.description,
@@ -1129,7 +1129,7 @@ export default function BusinessPublicPageByUrl() {
                         {...field} 
                         onBlur={(e) => handleNewUserDniChangeDuringRegistration(e.target.value, newQrClientForm.getValues())}
                         maxLength={15} 
-                        disabled={isLoadingQrFlow || true} 
+                        disabled={true} 
                         className="disabled:bg-muted/30"
                       />
                     </FormControl>
@@ -1208,6 +1208,7 @@ export default function BusinessPublicPageByUrl() {
 }
 
     
+
 
 
 

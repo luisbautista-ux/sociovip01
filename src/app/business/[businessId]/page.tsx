@@ -379,7 +379,7 @@ export default function BusinessPublicPageById() {
           return; 
         }
         
-        const qrCodeDetailsFromEntity: QrCodeData['entityDetails'] = { 
+        const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
           id: activeEntityForQr.id,
           title: activeEntityForQr.name,
           description: activeEntityForQr.description,
@@ -441,7 +441,7 @@ export default function BusinessPublicPageById() {
             return;
         }
 
-       const qrCodeDetailsFromEntity: QrCodeData['entityDetails'] = { 
+       const qrCodeDetailsFromEntity: QrCodeData['promotion'] = { 
             id: activeEntityForQr.id,
             title: activeEntityForQr.name,
             description: activeEntityForQr.description,
@@ -1275,6 +1275,7 @@ export default function BusinessPublicPageById() {
 }
 
     
+
 
 
 
