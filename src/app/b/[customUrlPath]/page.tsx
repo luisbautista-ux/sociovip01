@@ -351,17 +351,17 @@ const markPromoterCodeAsRedeemed = async (
     if (err?.message === "code-not-available") {
       toast({
         title: "Error de Código",
-        description: "Este código promocional ya no está disponible. Puede que haya sido utilizado por otra persona.",
+        description: "Este código promocional ya ha sido utilizado. No se puede generar un nuevo QR.",
         variant: "destructive",
       });
-      return false;
+    } else {
+        console.error("Error marking code as redeemed:", err);
+        toast({
+            title: "Error de Sistema",
+            description: "No se pudo actualizar el estado del código. Por favor, intenta de nuevo.",
+            variant: "destructive",
+        });
     }
-    console.error("Error marking code as redeemed:", err);
-    toast({
-      title: "Error de Sistema",
-      description: "No se pudo actualizar el estado del código. Por favor, intenta de nuevo.",
-      variant: "destructive",
-    });
     return false;
   }
 };
