@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -136,7 +137,8 @@ const newQrClientSchema = z.object({
     .max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 
-export default function BusinessPublicPageByUrl() {
+export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
+
   // obtener el slug desde la URL: /b/[customUrlPath]
   const pathname = usePathname();
   const customUrlPath = React.useMemo(() => {
@@ -1505,3 +1507,4 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
