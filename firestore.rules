@@ -1,75 +1,93 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // =================================
-    //         HELPER FUNCTIONS
-    // =================================
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
+    // --- Funciones Helper ---
     function isSuperAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
     }
 
     function isBusinessOwnerOrStaff(businessId) {
-        let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-        return isSignedIn() && userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff']);
     }
 
-    // =================================
-    //         COLLECTION RULES
-    // =================================
+    function isHostForBusiness(businessId) {
+       return isSignedIn() && 
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['host']);
+    }
 
+    function isAnyBusinessRole(businessId) {
+       return isSignedIn() && 
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff', 'host']);
+    }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isPromoter() {
+        return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['promoter']);
+    }
+    
+    // --- Colecciones ---
+
+    // BUSINESSES: Solo SuperAdmin puede gestionar negocios.
     match /businesses/{businessId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
     
-    match /platformUsers/{userId} {
-      allow get: if isSignedIn() && request.auth.uid == userId;
-      allow list, write: if isSuperAdmin();
-    }
-
-    // --- REGLA CORREGIDA ---
-    // Permite lectura pública y escritura controlada para el canje de códigos.
+    // BUSINESS_ENTITIES (Promociones, Eventos, etc.):
+    // Cualquiera puede leer. Solo el personal del negocio asociado puede escribir.
     match /businessEntities/{entityId} {
       allow read: if true;
-      // Permite la escritura si:
-      // 1. Es un staff/admin del negocio.
-      // 2. O si un usuario PÚBLICO está actualizando el array 'generatedCodes'
-      //    para marcar un código como 'redeemed'.
-      allow write: if isBusinessOwnerOrStaff(request.resource.data.businessId) ||
-                      (
-                        // Asegura que solo el array 'generatedCodes' está siendo modificado.
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['generatedCodes']) &&
-                        // Valida cada código en el nuevo array para prevenir cambios maliciosos.
-                        request.resource.data.generatedCodes.size() == resource.data.generatedCodes.size() &&
-                        (size(request.resource.data.generatedCodes.filter(c => c.status == 'redeemed')) 
-                          - size(resource.data.generatedCodes.filter(c => c.status == 'redeemed'))) == 1
-                      );
+      
+      // Permitir creación/eliminación solo a staff/admin del negocio.
+      allow create, delete: if isBusinessOwnerOrStaff(request.resource.data.businessId);
+
+      // Permitir actualización bajo condiciones específicas
+      allow update: if 
+          // 1. El staff del negocio puede actualizar cualquier cosa.
+          isBusinessOwnerOrStaff(resource.data.businessId) ||
+          // 2. Un promotor puede actualizar el array de códigos si añade códigos generados por él.
+          (isPromoter() && request.resource.data.generatedCodes.size() > resource.data.generatedCodes.size()) ||
+          // 3. Un usuario público puede actualizar el array de códigos SI Y SÓLO SI el único cambio es marcar un código como 'redeemed'.
+          (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['generatedCodes']) &&
+          request.resource.data.generatedCodes.size() == resource.data.generatedCodes.size());
     }
 
-    match /businessPromoterLinks/{linkId} {
-      allow read, write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
+    // PLATFORM_USERS: Solo SuperAdmin puede gestionar usuarios de la plataforma.
+    match /platformUsers/{userId} {
+      allow read: if isSuperAdmin() || request.auth.uid == userId;
+      allow write: if isSuperAdmin();
     }
-    
+
+    // QR_CLIENTS:
+    // Permitir lectura pública (get, list) para verificar DNI.
+    // Solo SuperAdmin o personal del negocio puede crear/modificar.
     match /qrClients/{clientId} {
-       allow create: if true;
-       allow list: if true; // Allows public queries like checking for DNI
-       allow read, update, delete: if isSuperAdmin();
+      allow get, list: if true;
+      allow create: if true; // Cualquiera puede crear un perfil de cliente QR al registrarse
+      allow update, delete: if isSuperAdmin() || isAnyBusinessRole(resource.data.businessId);
     }
     
+    // SOCIO_VIP_MEMBERS:
+    // Solo SuperAdmin puede gestionar socios VIP, pero se permite la consulta por DNI.
     match /socioVipMembers/{memberId} {
-       allow read, write: if isSuperAdmin();
+      allow get, list: if true; // Permite la consulta para verificar DNI
+      allow write: if isSuperAdmin();
     }
-
-    match /{path=**} {
-      allow read, write: if false;
+    
+    // BUSINESS_PROMOTER_LINKS:
+    // El personal del negocio puede gestionar los vínculos de su negocio.
+    match /businessPromoterLinks/{linkId} {
+      allow read: if isAnyBusinessRole(resource.data.businessId) || isPromoter();
+      allow write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
     }
   }
 }
