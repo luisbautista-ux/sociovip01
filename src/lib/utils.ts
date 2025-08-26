@@ -15,30 +15,32 @@ export function isEntityCurrentlyActivatable(entity: BusinessManagedEntity | nul
 
   try {
     const now = new Date();
-    // Ensure startDate and endDate are valid date strings or already Date objects
-    const entityStartDateStr = typeof entity.startDate === 'string' ? entity.startDate : (entity.startDate instanceof Date ? entity.startDate.toISOString() : (entity.startDate instanceof Timestamp ? entity.startDate.toDate().toISOString() : undefined));
-    const entityEndDateStr = typeof entity.endDate === 'string' ? entity.endDate : (entity.endDate instanceof Date ? entity.endDate.toISOString() : (entity.endDate instanceof Timestamp ? entity.endDate.toDate().toISOString() : undefined));
 
+    const toDate = (dateValue: any): Date | null => {
+      if (!dateValue) return null;
+      if (dateValue instanceof Date) return dateValue;
+      if (dateValue instanceof Timestamp) return dateValue.toDate();
+      if (typeof dateValue === 'string') {
+        const parsed = new Date(dateValue);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+      return null;
+    };
+    
+    const entityStartDateObj = toDate(entity.startDate);
+    const entityEndDateObj = toDate(entity.endDate);
 
-    if (!entityStartDateStr || !entityEndDateStr) {
-      console.warn("isEntityCurrentlyActivatable: Entity has missing or invalid startDate/endDate:", entity?.name, entityStartDateStr, entityEndDateStr);
+    if (!entityStartDateObj || !entityEndDateObj) {
+      console.warn("isEntityCurrentlyActivatable: Entity has missing or invalid dates:", entity?.name);
       return false;
     }
     
-    const entityStartDateObj = new Date(entityStartDateStr);
-    const entityEndDateObj = new Date(entityEndDateStr);
-
-    if (isNaN(entityStartDateObj.getTime()) || isNaN(entityEndDateObj.getTime())) {
-      console.error("isEntityCurrentlyActivatable: Invalid date string for entity:", entity?.name, entity.startDate, entity.endDate);
-      return false; 
-    }
-
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const effectiveStartDate = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate());
-    // Set end date to the very end of the day for inclusive comparison
-    const effectiveEndDate = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
+    // Set time to the beginning of the start day and end of the end day for accurate comparison
+    entityStartDateObj.setHours(0, 0, 0, 0);
+    entityEndDateObj.setHours(23, 59, 59, 999);
     
-    return today >= effectiveStartDate && today <= effectiveEndDate;
+    return now >= entityStartDateObj && now <= entityEndDateObj;
+    
   } catch (error) {
     console.error("isEntityCurrentlyActivatable: Error parsing dates for entity:", entity?.name, error);
     return false;
