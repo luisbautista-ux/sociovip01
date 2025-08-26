@@ -345,7 +345,7 @@ const businessIdFromParams = React.useMemo(() => {
       });
 
       if (!updated) throw new Error("code-not-available");
-      await trx.update(entityRef, { generatedCodes: newCodes });
+      trx.update(entityRef, { generatedCodes: newCodes });
     });
 
     console.log(`Code ${normalized} redeemed for entity ${entityId}.`);
