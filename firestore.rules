@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -11,62 +10,61 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserData() {
+    // Obtiene los datos del perfil del usuario logueado
+    function getRequestingUserData() {
       return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
     }
 
+    // Verifica si el usuario logueado es Super Admin
     function isSuperAdmin() {
-      return isSignedIn() && 'superadmin' in getUserData().roles;
+      return isSignedIn() && 'superadmin' in getRequestingUserData().roles;
     }
-
+    
+    // Verifica si el usuario logueado tiene un rol específico para un negocio
     function isRoleForBusiness(role, businessId) {
       return isSignedIn() &&
-             role in getUserData().roles &&
-             getUserData().businessId == businessId;
+             role in getRequestingUserData().roles &&
+             getRequestingUserData().businessId == businessId;
     }
 
     // =================================
     //      Collection Rules
     // =================================
 
-    // Negocios y sus entidades (promociones, eventos) son de lectura pública.
+    // Negocios: Públicamente legibles, solo SuperAdmin puede escribir.
     match /businesses/{businessId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
 
+    // Entidades del Negocio (Promociones, Eventos): Legibles por todos, escritura restringida.
     match /businessEntities/{entityId} {
       allow read: if true;
-      // La escritura requiere ser admin o staff del negocio correspondiente.
       allow create, update: if isSignedIn() && (isSuperAdmin() || isRoleForBusiness('business_admin', request.resource.data.businessId) || isRoleForBusiness('staff', request.resource.data.businessId));
       allow delete: if isSignedIn() && (isSuperAdmin() || isRoleForBusiness('business_admin', resource.data.businessId));
     }
-
-    // Clientes QR: **CORRECCIÓN CLAVE**
-    // Permite la consulta pública para verificar DNI.
-    match /qrClients/{clientId} {
-      // Permite la lectura pública (get para un doc, list para queries)
-      allow get, list: if true;
-
-      // La creación es pública desde la página del negocio.
-      allow create: if true;
-
-      // NADIE desde el cliente puede modificar o borrar. Solo el SuperAdmin desde un backend.
-      allow update, delete: if false;
-    }
     
-    // El resto de las colecciones permanecen protegidas.
+    // Usuarios de la Plataforma: Perfiles legibles por cualquier usuario logueado, pero solo SuperAdmin puede escribir.
     match /platformUsers/{userId} {
       allow read: if isSignedIn();
       allow write: if isSuperAdmin();
     }
-
-    match /businessPromoterLinks/{linkId} {
-      allow read, write: if isSignedIn() && (isSuperAdmin() || isRoleForBusiness('business_admin', resource.data.businessId));
+    
+    // Clientes QR: **CORRECCIÓN CLAVE** - Cualquiera puede leer/consultar, pero solo admins pueden modificar/borrar.
+    match /qrClients/{clientId} {
+      allow get, list: if true;
+      allow create: if true; // La creación es pública desde la página del negocio.
+      allow update, delete: if isSuperAdmin();
     }
 
+    // Socios VIP: Solo SuperAdmin puede gestionar.
     match /socioVipMembers/{memberId} {
       allow read, write: if isSuperAdmin();
+    }
+    
+    // Vínculos de Promotores: Solo el admin del negocio o el SuperAdmin pueden gestionar.
+    match /businessPromoterLinks/{linkId} {
+      allow read, write: if isSignedIn() && (isSuperAdmin() || isRoleForBusiness('business_admin', resource.data.businessId));
     }
   }
 }
