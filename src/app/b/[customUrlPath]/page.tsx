@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import NextImage from "next/image";
 import Link from "next/link";
-import { useParams, useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -137,15 +137,14 @@ const newQrClientSchema = z.object({
 });
 
 export default function BusinessPublicPageByUrl() {
-  // useParams sin genérico + normalización
   // obtener el slug desde la URL: /b/[customUrlPath]
-const pathname = usePathname();
-const customUrlPath = React.useMemo(() => {
-  if (!pathname) return undefined;
-  const parts = pathname.split("/").filter(Boolean); // ["b", "{slug}", ...]
-  const i = parts.indexOf("b");
-  return i !== -1 && parts[i + 1] ? decodeURIComponent(parts[i + 1]) : undefined;
-}, [pathname]);
+  const pathname = usePathname();
+  const customUrlPath = React.useMemo(() => {
+    if (!pathname) return undefined;
+    const parts = pathname.split("/").filter(Boolean); // ["b", "{slug}", ...]
+    const i = parts.indexOf("b");
+    return i !== -1 && parts[i + 1] ? decodeURIComponent(parts[i + 1]) : undefined;
+  }, [pathname]);
 
 
   const router = useRouter();
@@ -330,7 +329,7 @@ const markPromoterCodeAsRedeemed = async (
           return {
             ...c,
             status: "redeemed",
-            used: true, // por si tu backend mira flags booleanos
+            used: true, // for backward compatibility
             redemptionDate: new Date().toISOString(),
             redeemedByInfo: {
               dni: clientInfo.dni,
@@ -344,14 +343,13 @@ const markPromoterCodeAsRedeemed = async (
       if (!updated) throw new Error("code-not-available");
       trx.update(entityRef, { generatedCodes: newCodes });
     });
-
     console.log(`Code ${normalized} redeemed successfully for entity ${entityId}.`);
     return true;
   } catch (err: any) {
     if (err?.message === "code-not-available") {
       toast({
         title: "Error de Código",
-        description: "Este código promocional ya ha sido utilizado. No se puede generar un nuevo QR.",
+        description: "Este código promocional ya ha sido utilizado o no está disponible.",
         variant: "destructive",
       });
     } else {
@@ -400,7 +398,6 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     const data = snap.data() as any;
     const codes: any[] = Array.isArray(data.generatedCodes) ? data.generatedCodes : [];
 
-    // Busca tolerante a forma y formato
     const found = codes.find((c) => extractCodeString(c) === codeToValidate);
     const available = found && isCodeAvailableForUse(found);
 
@@ -447,13 +444,10 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
       const q = query(qrClientsRef, where("dni", "==", data.dni), limit(1));
       const querySnapshot = await getDocs(q);
 
-      let clientForQr: QrClient;
-
       if (!querySnapshot.empty) {
-        // --- CLIENTE EXISTENTE ---
         const existingClientDoc = querySnapshot.docs[0];
         const clientData = existingClientDoc.data();
-        clientForQr = {
+        const clientForQr: QrClient = {
           id: existingClientDoc.id,
           dni: clientData.dni,
           name: clientData.name,
@@ -463,50 +457,37 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           registrationDate: toSafeISOString(clientData.registrationDate),
         };
         
-        // Primero, intentar canjear el código
         const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
         
-        if (!redeemSuccess) {
-          // El toast de error ya se muestra dentro de markPromoterCodeAsRedeemed
-          setIsLoadingQrFlow(false);
+        if (redeemSuccess) {
+          toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
+          const qrCodeDetails: QrCodeData["promotion"] = {
+            id: activeEntityForQr.id,
+            title: activeEntityForQr.name,
+            description: activeEntityForQr.description,
+            validUntil: activeEntityForQr.endDate,
+            imageUrl: activeEntityForQr.imageUrl || "",
+            promoCode: validatedSpecificCode,
+            aiHint: activeEntityForQr.aiHint || "",
+            type: activeEntityForQr.type,
+            termsAndConditions: activeEntityForQr.termsAndConditions,
+          };
+          setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedSpecificCode, status: "available" });
           setShowDniModal(false);
-          return;
+          setPageViewState("qrDisplay");
+        } else {
+            // El error ya se muestra en markPromoterCodeAsRedeemed
+            resetQrFlow();
         }
-
-        // Si el canje es exitoso, proceder a generar el QR
-        setShowDniModal(false);
-        toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
-
       } else {
-        // --- CLIENTE NUEVO ---
+        // Cliente nuevo, ir al formulario de registro
         newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: data.dni });
         setCurrentStepInModal("newUserForm");
-        setIsLoadingQrFlow(false);
-        return; // Salir aquí, el flujo continúa en el formulario de nuevo cliente
       }
-
-      // -- Flujo común si se debe generar el QR --
-      const qrCodeDetailsFromEntity: QrCodeData["promotion"] = {
-        id: activeEntityForQr.id,
-        title: activeEntityForQr.name,
-        description: activeEntityForQr.description,
-        validUntil: activeEntityForQr.endDate,
-        imageUrl: activeEntityForQr.imageUrl || "",
-        promoCode: validatedSpecificCode,
-        aiHint: activeEntityForQr.aiHint || "",
-        type: activeEntityForQr.type,
-        termsAndConditions: activeEntityForQr.termsAndConditions,
-      };
-
-      setQrData({ user: clientForQr, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: "available" });
-      setPageViewState("qrDisplay");
     } catch (e: any) {
       toast({ title: "Error de Verificación", description: "No se pudo verificar el DNI. " + e.message, variant: "destructive" });
     } finally {
-      // Solo detener el loader si no pasamos al formulario de nuevo usuario
-      if (currentStepInModal !== "newUserForm") {
-        setIsLoadingQrFlow(false);
-      }
+      setIsLoadingQrFlow(false);
     }
   };
 
@@ -516,23 +497,21 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
       return;
     }
     setIsLoadingQrFlow(true);
-
+  
     const clientForRedeem = {
       dni: enteredDni,
       name: formData.name,
       surname: formData.surname,
     };
-
+  
     try {
-      // 1. Intentar canjear el código PRIMERO
       const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForRedeem);
       if (!redeemSuccess) {
         setIsLoadingQrFlow(false);
-        setShowDniModal(false); // Cierra el modal para que el usuario pueda intentar con otro código
-        return; // Detener todo si el código no se puede canjear
+        resetQrFlow(); 
+        return;
       }
       
-      // 2. Si el canje es exitoso, registrar al nuevo cliente
       const newClientDataToSave = {
         dni: enteredDni,
         name: formData.name,
@@ -553,11 +532,10 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         surname: newClientDataToSave.surname,
         phone: newClientDataToSave.phone,
         dob: newClientDataToSave.dob.toDate().toISOString(),
-        registrationDate: new Date().toISOString(), // Simulación para la UI
+        registrationDate: new Date().toISOString(),
       };
-
-      // 3. Preparar datos y mostrar el QR
-      const qrCodeDetailsFromEntity: QrCodeData["promotion"] = {
+  
+      const qrCodeDetails: QrCodeData["promotion"] = {
         id: activeEntityForQr.id,
         title: activeEntityForQr.name,
         description: activeEntityForQr.description,
@@ -568,8 +546,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         type: activeEntityForQr.type,
         termsAndConditions: activeEntityForQr.termsAndConditions,
       };
-
-      setQrData({ user: clientForQr, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: "available" });
+  
+      setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedSpecificCode, status: "available" });
       setShowDniModal(false);
       setPageViewState("qrDisplay");
       toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
@@ -622,7 +600,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
   };
 
   const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (data) => {
-    // Aunque el campo DNI está deshabilitado, es buena práctica verificar
     if (data.dni.trim() !== enteredDni.trim()) {
       toast({ title: "Inconsistencia de DNI", description: "El DNI del formulario no coincide con el verificado. Por favor, reinicia el proceso.", variant: "destructive" });
       return;
@@ -778,7 +755,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         if (qrData.promotion.termsAndConditions) {
           ctx.font = `italic ${smallTextFontSize - 1}px Arial`;
           ctx.fillStyle = "hsl(var(--muted-foreground))";
-          ctx.textAlign = "center";
           termsLines.forEach((line) => {
             ctx.fillText(line, canvas.width / 2, currentY);
             currentY += smallTextFontSize + 2;
