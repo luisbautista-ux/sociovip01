@@ -1,43 +1,38 @@
-
 rules_version = '2';
-
-// Reglas de Almacenamiento de Firebase
-// Estas reglas controlan quién puede leer y escribir archivos en Firebase Storage.
 
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // Helper function to check if the user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
     // Helper function to get user profile from Firestore
     function getUserProfile(userId) {
       return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
     }
-
-    // Regla para la carpeta de negocios
-    // La ruta es: businesses/{businessId}/{logo|cover}/{fileName}
-    match /businesses/{businessId}/{fileType}/{fileName} {
-      
-      // LECTURA: Cualquiera puede leer las imágenes de los negocios (logos, portadas).
-      // Esto es necesario para que las páginas públicas puedan mostrar estas imágenes.
-      allow read: if true;
-
-      // ESCRITURA (Crear, Actualizar, Borrar):
-      // Permite la escritura solo si el usuario que hace la solicitud está autenticado
-      // Y si el `businessId` de su perfil en Firestore coincide con el {businessId} de la carpeta.
-      // Esto asegura que solo el administrador de un negocio o un superadmin puedan modificar sus propios archivos.
-      allow write: if request.auth != null && 
-                      (
-                        // Opción 1: El businessId del perfil del usuario coincide con el de la carpeta
-                        getUserProfile(request.auth.uid).businessId == businessId ||
-                        // Opción 2: El usuario es un superadmin
-                        'superadmin' in getUserProfile(request.auth.uid).roles
-                      );
+    
+    // Helper function to check if the user is an admin or staff for a specific business
+    function isBusinessAdminOrStaff(businessId) {
+      let userProfile = getUserProfile(request.auth.uid);
+      return isSignedIn() && 
+             (userProfile.businessId == businessId) && 
+             ('business_admin' in userProfile.roles || 'staff' in userProfile.roles);
     }
     
-    // Regla por defecto: Denegar todas las demás operaciones de lectura y escritura en otras rutas.
-    match /{allPaths=**} {
-      allow read, write: if false;
+    // Regla para la carpeta de negocios
+    // businesses/{businessId}/{logo o cover}/{fileName}
+    match /businesses/{businessId}/{imageType}/{fileName} {
+      // Cualquiera puede leer las imágenes (para las páginas públicas)
+      allow read: if true;
+      
+      // Solo el admin o staff de ese negocio específico puede escribir (crear, actualizar, eliminar)
+      // El businessId en la ruta del archivo debe coincidir con el businessId en el perfil del usuario.
+      allow write: if isSignedIn() && isBusinessAdminOrStaff(businessId);
     }
+
+    // Otras reglas para otras carpetas pueden ir aquí.
+    // Por defecto, se deniega el acceso a cualquier otra ruta.
   }
 }
-
-    

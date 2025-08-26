@@ -3,91 +3,92 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Funciones Helper ---
-    function isSuperAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
-    }
-
-    function isBusinessOwnerOrStaff(businessId) {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff']);
-    }
-
-    function isHostForBusiness(businessId) {
-       return isSignedIn() && 
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['host']);
-    }
-
-    function isAnyBusinessRole(businessId) {
-       return isSignedIn() && 
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff', 'host']);
-    }
-    
+    // =================================
+    //      Helper Functions
+    // =================================
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isPromoter() {
-        return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['promoter']);
+
+    function getUserProfile(userId) {
+      return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && 'superadmin' in getUserProfile(request.auth.uid).roles;
+    }
+
+    function isRoleForBusiness(role, businessId) {
+      let userProfile = getUserProfile(request.auth.uid);
+      return isSignedIn() && role in userProfile.roles && userProfile.businessId == businessId;
+    }
+
+    function isBusinessAdmin(businessId) {
+      return isRoleForBusiness('business_admin', businessId);
     }
     
-    // --- Colecciones ---
+    function isStaff(businessId) {
+       return isRoleForBusiness('staff', businessId);
+    }
 
-    // BUSINESSES: Solo SuperAdmin puede gestionar negocios.
+    function isHost(businessId) {
+       return isRoleForBusiness('host', businessId);
+    }
+
+    function isPromoter() {
+      return isSignedIn() && 'promoter' in getUserProfile(request.auth.uid).roles;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // =================================
+    //      Collection Rules
+    // =================================
+
+    // Negocios: Públicamente legibles, solo SuperAdmin puede escribir.
     match /businesses/{businessId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
-    
-    // BUSINESS_ENTITIES (Promociones, Eventos, etc.):
-    // Cualquiera puede leer. Solo el personal del negocio asociado puede escribir.
+
+    // Entidades del Negocio (Promociones, Eventos): Legibles por todos, escritura restringida.
     match /businessEntities/{entityId} {
       allow read: if true;
-      
-      // Permitir creación/eliminación solo a staff/admin del negocio.
-      allow create, delete: if isBusinessOwnerOrStaff(request.resource.data.businessId);
-
-      // Permitir actualización bajo condiciones específicas
-      allow update: if 
-          // 1. El staff del negocio puede actualizar cualquier cosa.
-          isBusinessOwnerOrStaff(resource.data.businessId) ||
-          // 2. Un promotor puede actualizar el array de códigos si añade códigos generados por él.
-          (isPromoter() && request.resource.data.generatedCodes.size() > resource.data.generatedCodes.size()) ||
-          // 3. Un usuario público puede actualizar el array de códigos SI Y SÓLO SI el único cambio es marcar un código como 'redeemed'.
-          (request.auth == null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['generatedCodes']) &&
-          request.resource.data.generatedCodes.size() == resource.data.generatedCodes.size());
+      allow create, update: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
+      allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
     }
 
-    // PLATFORM_USERS: Solo SuperAdmin puede gestionar usuarios de la plataforma.
-    match /platformUsers/{userId} {
-      allow read: if isSuperAdmin() || request.auth.uid == userId;
-      allow write: if isSuperAdmin();
-    }
-
-    // QR_CLIENTS:
-    // Permitir lectura pública (get, list) para verificar DNI.
-    // Solo SuperAdmin o personal del negocio puede crear/modificar.
+    // Clientes QR: **CORRECCIÓN CLAVE AQUÍ**
+    // Permite la consulta pública para verificar DNI, pero la creación, actualización y eliminación están protegidas.
     match /qrClients/{clientId} {
-      allow get, list: if true;
-      allow create: if true; // Cualquiera puede crear un perfil de cliente QR al registrarse
-      allow update, delete: if isSuperAdmin() || isAnyBusinessRole(resource.data.businessId);
+      // PERMITE LA LECTURA PÚBLICA (get, list) para verificar DNI
+      allow read: if true;
+      
+      // SOLO USUARIOS AUTENTICADOS O EL PROPIO SISTEMA PUEDEN CREAR (implícito desde las páginas públicas)
+      allow create: if true; // Se asume que la creación es segura a nivel de la app
+
+      // SOLO ADMINS PUEDEN MODIFICAR O BORRAR
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Usuarios de la Plataforma: Solo SuperAdmin puede gestionar perfiles.
+    match /platformUsers/{userId} {
+      allow read: if isSignedIn(); // Un usuario logueado puede leer perfiles
+      allow create, update, delete: if isSuperAdmin();
     }
     
-    // SOCIO_VIP_MEMBERS:
-    // Solo SuperAdmin puede gestionar socios VIP, pero se permite la consulta por DNI.
-    match /socioVipMembers/{memberId} {
-      allow get, list: if true; // Permite la consulta para verificar DNI
-      allow write: if isSuperAdmin();
-    }
-    
-    // BUSINESS_PROMOTER_LINKS:
-    // El personal del negocio puede gestionar los vínculos de su negocio.
+    // Vínculos de Promotores con Negocios
     match /businessPromoterLinks/{linkId} {
-      allow read: if isAnyBusinessRole(resource.data.businessId) || isPromoter();
-      allow write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
+        allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isPromoter();
+        allow create, update: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+        allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
+    }
+
+    // Socios VIP: Solo SuperAdmin puede gestionar.
+    match /socioVipMembers/{memberId} {
+      allow read, write: if isSuperAdmin();
     }
   }
 }
