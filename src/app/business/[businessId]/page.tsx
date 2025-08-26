@@ -1501,9 +1501,9 @@ export default function BusinessPublicPageById(): React.JSX.Element | null {
           </ShadcnAlertDialogFooterAliased>
         </AlertDialogContent>
       </AlertDialog>
-
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
     </div>
   );
 }
+
 
