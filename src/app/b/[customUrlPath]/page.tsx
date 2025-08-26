@@ -406,7 +406,7 @@ const markPromoterCodeAsRedeemed = async (
       });
 
       if (!updated) throw new Error("code-not-available");
-      trx.update(entityRef, { generatedCodes: newCodes });
+      await trx.update(entityRef, { generatedCodes: newCodes });
     });
 
     console.log(`Code ${normalized} redeemed for entity ${entityId}.`);
@@ -1521,4 +1521,3 @@ const markPromoterCodeAsRedeemed = async (
     </div>
   );
 }
-
