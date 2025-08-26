@@ -16,7 +16,6 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
     }
 
-    // Function to check if a user is an admin or staff for the business associated with the resource
     function isBusinessOwnerOrStaff(businessId) {
         let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
         return isSignedIn() && userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
@@ -26,47 +25,49 @@ service cloud.firestore {
     //         COLLECTION RULES
     // =================================
 
-    // Businesses can be read by anyone for public pages.
-    // Only Super Admins can create/update/delete them.
     match /businesses/{businessId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
     
-    // Platform users can only be managed by Super Admins.
-    // A user can read their own profile.
     match /platformUsers/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
       allow list, write: if isSuperAdmin();
     }
 
-    // Business entities (promos/events) can be read by anyone.
-    // They can only be written to by the staff/admin of the correct business.
+    // --- REGLA CORREGIDA ---
+    // Permite lectura pública y escritura controlada para el canje de códigos.
     match /businessEntities/{entityId} {
       allow read: if true;
-      allow write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
+      // Permite la escritura si:
+      // 1. Es un staff/admin del negocio.
+      // 2. O si un usuario PÚBLICO está actualizando el array 'generatedCodes'
+      //    para marcar un código como 'redeemed'.
+      allow write: if isBusinessOwnerOrStaff(request.resource.data.businessId) ||
+                      (
+                        // Asegura que solo el array 'generatedCodes' está siendo modificado.
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['generatedCodes']) &&
+                        // Valida cada código en el nuevo array para prevenir cambios maliciosos.
+                        request.resource.data.generatedCodes.size() == resource.data.generatedCodes.size() &&
+                        (size(request.resource.data.generatedCodes.filter(c => c.status == 'redeemed')) 
+                          - size(resource.data.generatedCodes.filter(c => c.status == 'redeemed'))) == 1
+                      );
     }
 
-    // Business promoter links can only be managed by the staff/admin of that business.
     match /businessPromoterLinks/{linkId} {
-        allow read, write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
+      allow read, write: if isBusinessOwnerOrStaff(request.resource.data.businessId);
     }
     
-    // New QR Clients can be created publicly.
-    // DNI checks (list query) are public.
-    // Only Super Admins can manage them after creation.
     match /qrClients/{clientId} {
        allow create: if true;
        allow list: if true; // Allows public queries like checking for DNI
        allow read, update, delete: if isSuperAdmin();
     }
     
-    // VIP members are fully managed by Super Admins.
     match /socioVipMembers/{memberId} {
        allow read, write: if isSuperAdmin();
     }
 
-    // Fallback rule to deny access to any other collection
     match /{path=**} {
       allow read, write: if false;
     }
