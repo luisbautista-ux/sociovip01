@@ -8,6 +8,52 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Robustly converts various date formats (Timestamp, Date object, ISO string, etc.) to a JavaScript Date object.
+ * Returns null if the conversion is not possible.
+ */
+function anyToDate(value: any): Date | null {
+  if (!value) return null;
+
+  // Already a Date object
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
+
+  // Firestore Timestamp object (has toDate method)
+  if (typeof value.toDate === 'function') {
+    const d = value.toDate();
+    return isNaN(d.getTime()) ? null : d;
+  }
+  
+  // Firestore-like object from server-side rendering { _seconds, _nanoseconds }
+  if (typeof value._seconds === 'number' || typeof value.seconds === 'number') {
+    const seconds = value._seconds ?? value.seconds;
+    const nanoseconds = value._nanoseconds ?? value.nanoseconds ?? 0;
+    const ms = seconds * 1000 + Math.floor(nanoseconds / 1e6);
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // ISO string or other string parsable by Date constructor
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    // Check if parsing resulted in a valid date
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  
+  // Number (milliseconds since epoch)
+  if (typeof value === 'number') {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  console.warn("anyToDate: Could not parse date value:", value);
+  return null;
+}
+
 export function isEntityCurrentlyActivatable(entity: BusinessManagedEntity | null | undefined): boolean {
   if (!entity || !entity.isActive) {
     return false;
@@ -15,31 +61,20 @@ export function isEntityCurrentlyActivatable(entity: BusinessManagedEntity | nul
 
   try {
     const now = new Date();
-
-    const toDate = (dateValue: any): Date | null => {
-      if (!dateValue) return null;
-      if (dateValue instanceof Date) return dateValue;
-      if (dateValue instanceof Timestamp) return dateValue.toDate();
-      if (typeof dateValue === 'string') {
-        const parsed = new Date(dateValue);
-        if (!isNaN(parsed.getTime())) return parsed;
-      }
-      return null;
-    };
     
-    const entityStartDateObj = toDate(entity.startDate);
-    const entityEndDateObj = toDate(entity.endDate);
+    const entityStartDateObj = anyToDate(entity.startDate);
+    const entityEndDateObj = anyToDate(entity.endDate);
 
     if (!entityStartDateObj || !entityEndDateObj) {
-      console.warn("isEntityCurrentlyActivatable: Entity has missing or invalid dates:", entity?.name);
+      console.warn("isEntityCurrentlyActivatable: Entity has missing or invalid dates:", entity?.name, {start: entity.startDate, end: entity.endDate});
       return false;
     }
     
     // Set time to the beginning of the start day and end of the end day for accurate comparison
-    entityStartDateObj.setHours(0, 0, 0, 0);
-    entityEndDateObj.setHours(23, 59, 59, 999);
+    const start = new Date(entityStartDateObj.getFullYear(), entityStartDateObj.getMonth(), entityStartDateObj.getDate(), 0, 0, 0, 0);
+    const end = new Date(entityEndDateObj.getFullYear(), entityEndDateObj.getMonth(), entityEndDateObj.getDate(), 23, 59, 59, 999);
     
-    return now >= entityStartDateObj && now <= entityEndDateObj;
+    return now >= start && now <= end;
     
   } catch (error) {
     console.error("isEntityCurrentlyActivatable: Error parsing dates for entity:", entity?.name, error);
