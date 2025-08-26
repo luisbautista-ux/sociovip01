@@ -331,7 +331,7 @@ const markPromoterCodeAsRedeemed = async (
           return {
             ...c,
             status: "redeemed",
-            used: true, // for backward compatibility
+            used: true,
             redemptionDate: new Date().toISOString(),
             redeemedByInfo: {
               dni: clientInfo.dni,
@@ -478,11 +478,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           setShowDniModal(false);
           setPageViewState("qrDisplay");
         } else {
-            // El error ya se muestra en markPromoterCodeAsRedeemed
             resetQrFlow();
         }
       } else {
-        // Cliente nuevo, ir al formulario de registro
         newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: data.dni });
         setCurrentStepInModal("newUserForm");
       }
@@ -1507,5 +1505,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
 
 
