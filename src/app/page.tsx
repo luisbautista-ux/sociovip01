@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -13,7 +12,6 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
 import { Loader2, Building, Tag, Search } from "lucide-react";
-import { SocioVipLogo } from "@/components/icons";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,25 +52,25 @@ export default function HomePage() {
         
         // Helper to safely convert a Firestore Timestamp or a date string to an ISO string
         const toSafeISOString = (dateValue: Timestamp | string | Date | undefined): string => {
-            if (!dateValue) return new Date().toISOString(); // Fallback to now
-            if (dateValue instanceof Timestamp) {
-                return dateValue.toDate().toISOString();
-            }
-            if (dateValue instanceof Date) {
-              return dateValue.toISOString();
-            }
-            // If it's a string, assume it's a valid date string
-            if (typeof dateValue === 'string') {
-                return new Date(dateValue).toISOString();
-            }
-            return new Date().toISOString(); // Final fallback
+          if (!dateValue) return new Date().toISOString(); // Fallback to now
+          if (dateValue instanceof Timestamp) {
+            return dateValue.toDate().toISOString();
+          }
+          if (dateValue instanceof Date) {
+            return dateValue.toISOString();
+          }
+          // If it's a string, assume it's a valid date string
+          if (typeof dateValue === 'string') {
+            return new Date(dateValue).toISOString();
+          }
+          return new Date().toISOString(); // Final fallback
         };
 
         const entityForCheck: BusinessManagedEntity = {
-            id: doc.id,
-            ...promoData,
-            startDate: toSafeISOString(promoData.startDate),
-            endDate: toSafeISOString(promoData.endDate),
+          id: doc.id,
+          ...promoData,
+          startDate: toSafeISOString(promoData.startDate),
+          endDate: toSafeISOString(promoData.endDate),
         };
 
         // 3. Filter for currently valid promotions
@@ -121,13 +119,24 @@ export default function HomePage() {
     <div className="min-h-screen bg-muted/40 text-foreground">
       <header className="py-6 px-4 sm:px-6 lg:px-8 bg-background shadow-md sticky top-0 z-20">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <SocioVipLogo className="h-10 w-10 text-primary" />
-            <div>
+          {/* === Marca: logo (imagen) + texto === */}
+          <div className="flex items-center gap-3 md:gap-4">
+            <NextImage
+              src="https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg"
+              alt="SocioVIP logo"
+              width={44}
+              height={44}
+              priority
+              className="-mt-1 rounded-full ring-1 ring-black/10 object-cover"
+            />
+            <div className="-mt-0.5">
               <h1 className="text-3xl font-bold tracking-tight text-primary">SocioVIP</h1>
-              <p className="text-sm text-muted-foreground">Descubre las mejores promociones cerca de ti</p>
+              <p className="text-sm text-muted-foreground">
+                Descubre las mejores promociones cerca de ti
+              </p>
             </div>
           </div>
+
           <div className="relative w-full sm:w-auto sm:max-w-xs">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -157,14 +166,28 @@ export default function HomePage() {
               return (
                 <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                   <div className="relative aspect-[16/9] w-full">
-                    <NextImage src={promo.imageUrl || "https://placehold.co/600x400.png"} alt={promo.name} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover" data-ai-hint={promo.aiHint || "discount offer"}/>
+                    <NextImage
+                      src={promo.imageUrl || "https://placehold.co/600x400.png"}
+                      alt={promo.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover"
+                      data-ai-hint={promo.aiHint || "discount offer"}
+                    />
                   </div>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xl">{promo.name}</CardTitle>
                     <CardDescription className="text-xs pt-1">
                       <Link href={businessUrl} className="flex items-center text-muted-foreground hover:text-primary transition-colors">
                         {promo.businessLogoUrl ? (
-                           <NextImage src={promo.businessLogoUrl} alt={`${promo.businessName} logo`} width={16} height={16} className="h-4 w-4 mr-1.5 rounded-full object-contain" data-ai-hint="logo business"/>
+                          <NextImage
+                            src={promo.businessLogoUrl}
+                            alt={`${promo.businessName} logo`}
+                            width={16}
+                            height={16}
+                            className="h-4 w-4 mr-1.5 rounded-full object-contain"
+                            data-ai-hint="logo business"
+                          />
                         ) : (
                           <Building className="h-4 w-4 mr-1.5" />
                         )}
@@ -176,10 +199,12 @@ export default function HomePage() {
                     <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t bg-muted/50">
-                     <p className="text-xs text-muted-foreground w-full mb-2">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p>
+                    <p className="text-xs text-muted-foreground w-full mb-2">
+                      Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
+                    </p>
                     <Link href={businessUrl} passHref className="w-full">
                       <Button className="w-full bg-primary hover:bg-primary/90">
-                        <Tag className="mr-2 h-4 w-4"/> Ver Promoción
+                        <Tag className="mr-2 h-4 w-4" /> Ver Promoción
                       </Button>
                     </Link>
                   </CardFooter>
@@ -197,12 +222,14 @@ export default function HomePage() {
         )}
       </main>
 
-       <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-background text-sm border-t">
+      <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-background text-sm border-t">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-muted-foreground">&copy; {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.</p>
-           <Link href="/login" passHref>
-             <Button variant="ghost" size="sm">Acceso a Paneles</Button>
-           </Link>
+          <p className="text-muted-foreground">
+            &copy; {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.
+          </p>
+          <Link href="/login" passHref>
+            <Button variant="ghost" size="sm">Acceso a Paneles</Button>
+          </Link>
         </div>
       </footer>
     </div>

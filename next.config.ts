@@ -1,20 +1,27 @@
-import type {NextConfig} from 'next';
+// next.config.ts
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Opcional: evita que el build falle por warnings de TS/ESLint en desarrollo
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
+
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "i.ibb.co",               // Logo alojado en imgbb
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",    // Fondos de Unsplash (si los usas)
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",           // Placeholders, SOLO si los usas
+        pathname: "/**",
       },
     ],
   },

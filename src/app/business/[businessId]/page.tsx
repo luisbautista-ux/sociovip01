@@ -126,7 +126,7 @@ const newQrClientSchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 
-export default function BusinessPublicPageById() {
+export default function BusinessPublicPageById(): React.JSX.Element | null {
   // useParams sin genérico + normalización
   // obtener el id desde la URL: /business/[businessId]
 const pathname = usePathname();
@@ -171,7 +171,14 @@ const businessIdFromParams = React.useMemo(() => {
     if (!dateValue) return new Date().toISOString();
     if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
     if (dateValue instanceof Date) return dateValue.toISOString();
-    if (typeof dateValue === "string") return new Date(dateValue).toISOString();
+    if (typeof dateValue === "string") {
+      try {
+        return new Date(dateValue).toISOString();
+      } catch(e) {
+        console.error("Could not parse date string:", dateValue);
+        return new Date().toISOString();
+      }
+    }
     return new Date().toISOString();
   };
 

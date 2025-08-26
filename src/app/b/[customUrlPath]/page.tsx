@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, usePathname } from "next/navigation";
@@ -185,7 +185,14 @@ const customUrlPath = React.useMemo(() => {
     if (!dateValue) return new Date().toISOString();
     if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
     if (dateValue instanceof Date) return dateValue.toISOString();
-    if (typeof dateValue === "string") return new Date(dateValue).toISOString();
+    if (typeof dateValue === "string") {
+      try {
+        return new Date(dateValue).toISOString();
+      } catch (e) {
+         console.error("Could not parse date string:", dateValue);
+         return new Date().toISOString();
+      }
+    }
     return new Date().toISOString();
   };
 
