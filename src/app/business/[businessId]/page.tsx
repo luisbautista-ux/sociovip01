@@ -312,7 +312,7 @@ const businessIdFromParams = React.useMemo(() => {
   entityId: string,
   promoterCodeValue: string,
   clientInfo: { dni: string; name: string; surname: string }
-) => {
+): Promise<boolean> => {
   const entityRef = doc(db, "businessEntities", entityId);
   const normalized = normalizeCode(promoterCodeValue);
 
@@ -348,16 +348,21 @@ const businessIdFromParams = React.useMemo(() => {
       trx.update(entityRef, { generatedCodes: newCodes });
     });
 
-    console.log(`Code ${normalized} redeemed for entity ${entityId}.`);
+    console.log(`Code ${normalized} redeemed successfully for entity ${entityId}.`);
     return true;
   } catch (err: any) {
     if (err?.message === "code-not-available") {
+      toast({
+        title: "Error de Código",
+        description: "Este código promocional ya no está disponible. Puede que haya sido utilizado por otra persona.",
+        variant: "destructive",
+      });
       return false;
     }
     console.error("Error marking code as redeemed:", err);
     toast({
-      title: "Advertencia",
-      description: "No se pudo actualizar el estado del código, intenta de nuevo.",
+      title: "Error de Sistema",
+      description: "No se pudo actualizar el estado del código. Por favor, intenta de nuevo.",
       variant: "destructive",
     });
     return false;
@@ -448,6 +453,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
       let clientForQr: QrClient;
 
       if (!querySnapshot.empty) {
+        // --- CLIENTE EXISTENTE ---
         const existingClientDoc = querySnapshot.docs[0];
         const clientData = existingClientDoc.data();
         clientForQr = {
@@ -460,27 +466,29 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
           registrationDate: toSafeISOString(clientData.registrationDate),
         };
         
+        // Primero, intentar canjear el código
         const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
+        
         if (!redeemSuccess) {
-          toast({
-            title: "Error de Código",
-            description: "Este código promocional ya ha sido utilizado. No se puede generar un nuevo QR.",
-            variant: "destructive",
-          });
+          // El toast de error ya se muestra dentro de markPromoterCodeAsRedeemed
           setIsLoadingQrFlow(false);
           setShowDniModal(false);
           return;
         }
+
+        // Si el canje es exitoso, proceder a generar el QR
         setShowDniModal(false);
         toast({ title: "DNI Verificado", description: "Cliente encontrado. Generando QR." });
 
       } else {
+        // --- CLIENTE NUEVO ---
         newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: data.dni });
         setCurrentStepInModal("newUserForm");
         setIsLoadingQrFlow(false);
-        return;
+        return; // Salir aquí, el flujo continúa en el formulario de nuevo cliente
       }
 
+      // -- Flujo común si se debe generar el QR --
       const qrCodeDetailsFromEntity: QrCodeData["promotion"] = {
         id: activeEntityForQr.id,
         title: activeEntityForQr.name,
@@ -498,6 +506,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     } catch (e: any) {
       toast({ title: "Error de Verificación", description: "No se pudo verificar el DNI. " + e.message, variant: "destructive" });
     } finally {
+      // Solo detener el loader si no pasamos al formulario de nuevo usuario
       if (currentStepInModal !== "newUserForm") {
         setIsLoadingQrFlow(false);
       }
@@ -510,44 +519,47 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
       return;
     }
     setIsLoadingQrFlow(true);
-
-    const newClientDataToSave = {
+    
+    const clientForRedeem = {
       dni: enteredDni,
       name: formData.name,
       surname: formData.surname,
-      phone: formData.phone,
-      dob: Timestamp.fromDate(formData.dob),
-      registrationDate: serverTimestamp(),
-      generatedForBusinessId: businessDetails.id,
-      generatedForEntityId: activeEntityForQr.id,
     };
-    
-    const clientForQr: QrClient = {
-        id: '', // Will be set after creation
+
+    try {
+      // 1. Intentar canjear el código PRIMERO
+      const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForRedeem);
+      if (!redeemSuccess) {
+        setIsLoadingQrFlow(false);
+        setShowDniModal(false); // Cierra el modal para que el usuario pueda intentar con otro código
+        return; // Detener todo si el código no se puede canjear
+      }
+      
+      // 2. Si el canje es exitoso, registrar al nuevo cliente
+      const newClientDataToSave = {
+        dni: enteredDni,
+        name: formData.name,
+        surname: formData.surname,
+        phone: formData.phone,
+        dob: Timestamp.fromDate(formData.dob),
+        registrationDate: serverTimestamp(),
+        generatedForBusinessId: businessDetails.id,
+        generatedForEntityId: activeEntityForQr.id,
+      };
+      
+      const docRef = await addDoc(collection(db, "qrClients"), sanitizeObjectForFirestore(newClientDataToSave));
+      
+      const clientForQr: QrClient = {
+        id: docRef.id,
         dni: newClientDataToSave.dni,
         name: newClientDataToSave.name,
         surname: newClientDataToSave.surname,
         phone: newClientDataToSave.phone,
         dob: newClientDataToSave.dob.toDate().toISOString(),
-        registrationDate: new Date().toISOString(),
+        registrationDate: new Date().toISOString(), // Simulación para la UI
       };
 
-    try {
-      const redeemSuccess = await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
-      if (!redeemSuccess) {
-        toast({
-          title: "Error de Código",
-          description: "Este código promocional ya ha sido utilizado. No se puede generar un nuevo QR.",
-          variant: "destructive",
-        });
-        setIsLoadingQrFlow(false);
-        setShowDniModal(false);
-        return;
-      }
-      
-      const docRef = await addDoc(collection(db, "qrClients"), sanitizeObjectForFirestore(newClientDataToSave));
-      clientForQr.id = docRef.id;
-
+      // 3. Preparar datos y mostrar el QR
       const qrCodeDetailsFromEntity: QrCodeData["promotion"] = {
         id: activeEntityForQr.id,
         title: activeEntityForQr.name,
@@ -559,6 +571,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
         type: activeEntityForQr.type,
         termsAndConditions: activeEntityForQr.termsAndConditions,
       };
+
       setQrData({ user: clientForQr, promotion: qrCodeDetailsFromEntity, code: validatedSpecificCode, status: "available" });
       setShowDniModal(false);
       setPageViewState("qrDisplay");
@@ -612,14 +625,12 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
   };
 
   const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (data) => {
+    // Aunque el campo DNI está deshabilitado, es buena práctica verificar
     if (data.dni.trim() !== enteredDni.trim()) {
-      const dniIsValidForCreation = await handleNewUserDniChangeDuringRegistration(data.dni, data);
-      if (dniIsValidForCreation) {
-        await processNewQrClientRegistration(data);
-      }
-    } else {
-      await processNewQrClientRegistration(data);
+      toast({ title: "Inconsistencia de DNI", description: "El DNI del formulario no coincide con el verificado. Por favor, reinicia el proceso.", variant: "destructive" });
+      return;
     }
+    await processNewQrClientRegistration(data);
   };
 
   useEffect(() => {
@@ -770,7 +781,6 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
         if (qrData.promotion.termsAndConditions) {
           ctx.font = `italic ${smallTextFontSize - 1}px Arial`;
           ctx.fillStyle = "hsl(var(--muted-foreground))";
-          ctx.textAlign = "center";
           termsLines.forEach((line) => {
             ctx.fillText(line, canvas.width / 2, currentY);
             currentY += smallTextFontSize + 2;
@@ -908,7 +918,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
                     id={`specificCode-${entity.id}`}
                     placeholder="ABC123XYZ"
                     {...field}
-                    onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/[\s-]/g, ""))}
+                    onChange={(e) => field.onChange(normalizeCode(e.target.value))}
                     maxLength={9}
                     className="text-sm h-9 w-full"
                     disabled={isLoadingQrFlow}
@@ -1374,8 +1384,6 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
                         <Input
                           placeholder="Confirma tu número de documento"
                           {...field}
-                          onBlur={(e) => handleNewUserDniChangeDuringRegistration(e.target.value, newQrClientForm.getValues())}
-                          maxLength={15}
                           disabled={true}
                           className="disabled:bg-muted/30"
                         />
