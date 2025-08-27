@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { BusinessManagedEntity, TicketType } from "./types";
@@ -12,7 +11,7 @@ export function cn(...inputs: ClassValue[]) {
  * Robustly converts various date formats (Timestamp, Date object, ISO string, etc.) to a JavaScript Date object.
  * Returns null if the conversion is not possible.
  */
-function anyToDate(value: any): Date | null {
+export function anyToDate(value: any): Date | null {
   if (!value) return null;
 
   // Already a Date object
