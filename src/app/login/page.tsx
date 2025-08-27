@@ -103,87 +103,114 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen grid grid-cols-1 md:grid-cols-2 bg-[#f4eef7]">
-      {/* Volver al inicio — morado (primary) */}
+    <div className="relative min-h-screen bg-[#f4eef7]">
+      {/* Volver al inicio — fuera de la tarjeta, en la esquina superior izquierda */}
       <Link
-        href="/"
-        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2
-                   text-[17px] md:text-[20px] font-semibold text-primary hover:text-primary/80"
-      >
-        <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
-        Volver al inicio
-      </Link>
+  href="/"
+  className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text hover:text-primary/80"
+>
+  <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+  Volver al inicio
+</Link>
 
-      {/* Columna izquierda */}
-      <div className="relative flex items-center">
+
+      {/* Columna izquierda con el título "Bienvenido a SocioVIP" dentro de una tarjeta */}
+      <div className="relative flex items-center justify-center min-h-screen">
         <div className="w-full max-w-xl mx-auto px-6 md:px-12 pt-20 md:pt-28">
-          <div className="mb-8">
-            <h1 className="text-3xl md:text-[40px] font-extrabold leading-tight text-gray-800">
-              Bienvenido a
-            </h1>
-            <h2 className="text-3xl md:text-[40px] font-extrabold leading-tight text-gray-800">
-              SocioVIP
-            </h2>
-          </div>
-
+          {/* Tarjeta que contiene el título */}
           <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md md:shadow-lg">
             <CardHeader className="py-6">
-              <div className="w-full flex justify-center mb-4">
-                <Image
-                  src={LOGO_IMG}
-                  alt="SocioVIP"
-                  width={56}
-                  height={56}
-                  className="rounded-full shadow-sm ring-1 ring-black/10"
-                  priority
-                />
-              </div>
-              <CardTitle className="text-center">Iniciar Sesión</CardTitle>
-              <CardDescription className="text-center">
-                Accede a tu panel de SocioVIP.
-              </CardDescription>
+              {/* Título "Bienvenido a SocioVIP" dentro de la tarjeta */}
+              <CardTitle className="text-center text-3xl font-extrabold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
+                Bienvenido a
+              </CardTitle>
+              <CardTitle className="text-center text-3xl font-extrabold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
+                SocioVIP
+              </CardTitle>
             </CardHeader>
 
             <CardContent className="pb-2">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-5">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Tu correo electrónico <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              {/* Tarjeta interna que contiene el formulario de login */}
+              <Card className="bg-white/90 rounded-xl shadow-md">
+                <CardHeader className="py-6">
+                  <div className="w-full flex justify-center mb-4">
+                    <Image
+                      src={LOGO_IMG}
+                      alt="SocioVIP"
+                      width={96} // Tamaño más grande
+                      height={96} // Tamaño más grande
+                      className="rounded-full shadow-sm ring-1 ring-black/10"
+                      priority
+                    />
+                  </div>
+                  <CardTitle className="text-center">Iniciar Sesión</CardTitle>
+                  <CardDescription className="text-center">
+                    Accede a tu panel de SocioVIP.
+                  </CardDescription>
+                </CardHeader>
 
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Ingresa 6 caracteres o más <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <CardContent className="pb-2">
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-5">
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Tu correo electrónico <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="email"
+                                placeholder="tu@email.com"
+                                {...field}
+                                disabled={isSubmitting}
+                                className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Ingresar"}
-                  </Button>
-                </form>
-              </Form>
+                      <FormField
+                        control={form.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Ingresa 6 caracteres o más <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="password"
+                                placeholder="••••••••"
+                                {...field}
+                                disabled={isSubmitting}
+                                className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <Button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:bg-gradient-to-l text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          "Ingresar"
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
             </CardContent>
 
             <CardFooter className="flex-col items-center text-sm">
@@ -193,25 +220,9 @@ export default function LoginPage() {
                   Regístrate aquí
                 </Link>
               </p>
-              <p className="mt-4 text-muted-foreground">
-              </p>
             </CardFooter>
           </Card>
         </div>
-      </div>
-
-      {/* Columna derecha — imagen 4K, nítida y bien encuadrada */}
-      <div className="relative hidden md:block md:sticky md:top-0 md:h-screen">
-        <Image
-          src={HERO_IMG}
-          alt="Concierto / público"
-          fill
-          priority
-          quality={100}
-          sizes="(min-width:1536px) 60vw, (min-width:1280px) 55vw, (min-width:1024px) 50vw, 100vw"
-          className="object-cover object-[60%_center] will-change-transform"
-        />
-        <div className="absolute inset-0 bg-gradient-to-l from-black/35 via-black/20 to-transparent" />
       </div>
     </div>
   );

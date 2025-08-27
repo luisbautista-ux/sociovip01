@@ -330,14 +330,14 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
+        <h1 className="text-3xl font-bold text-gradient flex items-center">
           <Star className="h-8 w-8 mr-2" /> Gestión de Socios VIP
         </h1>
         <div className="flex space-x-2">
           <Button onClick={handleExport} variant="outline" disabled={isLoading || members.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={handleOpenCreateSocioVipFlow} className="bg-primary hover:bg-primary/90" disabled={isLoading}>
+          <Button onClick={handleOpenCreateSocioVipFlow} variant="gradient" disabled={isLoading}>
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Socio VIP
           </Button>
         </div>
@@ -522,7 +522,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                 <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                <Button type="submit" variant="gradient" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI/CE"}
                 </Button>
               </UIDialogFooter>

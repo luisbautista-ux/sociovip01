@@ -134,7 +134,7 @@ export function SocioVipMemberForm({
            <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <AlertTitle className="text-blue-700 dark:text-blue-300">
-              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialData?.existingUserType as PlatformUserRole] || initialData?.existingUserType}
+              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialData?.existingUserType as keyof typeof PLATFORM_USER_ROLE_TRANSLATIONS] || initialData?.existingUserType}
             </AlertTitle>
             <AlertDescription className="text-blue-600 dark:text-blue-400">
               Este DNI pertenece a un {initialData?.existingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
@@ -246,7 +246,7 @@ export function SocioVipMemberForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Dirección (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Ej: Av. Principal 123" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: Av. Principal 123" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -257,7 +257,7 @@ export function SocioVipMemberForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Profesión (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Ej: Ingeniero, Abogada" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: Ingeniero, Abogada" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -268,7 +268,7 @@ export function SocioVipMemberForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Preferencias (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Ej: Viajes, Cocina, Música Rock (separadas por comas)" {...field} rows={2} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Ej: Viajes, Cocina, Música Rock (separadas por comas)" {...field} value={field.value || ''} rows={2} disabled={isSubmitting} /></FormControl>
               <FormDescription>Separa las preferencias por comas.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -314,7 +314,7 @@ export function SocioVipMemberForm({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableSubmitOverride}>
+          <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {member ? "Guardar Cambios" : "Crear Socio VIP"}
           </Button>

@@ -84,7 +84,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary">Dashboard de Administración</h1>
+      <h1 className="text-3xl font-bold text-gradient">Dashboard de Administración</h1>
       
       {configError && (
         <Card className="shadow-lg border-destructive">

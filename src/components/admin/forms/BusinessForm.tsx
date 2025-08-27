@@ -309,7 +309,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
 
         <DialogFooter className="pt-6 sticky bottom-0 bg-background pb-4 -mb-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmittingForm}>Cancelar</Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmittingForm}>
+          <Button type="submit" variant="gradient" disabled={isSubmittingForm}>
             {isSubmittingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {business ? "Guardar Cambios" : "Crear Negocio"}
           </Button>

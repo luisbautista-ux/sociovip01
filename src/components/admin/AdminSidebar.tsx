@@ -37,8 +37,8 @@ export function AdminSidebar() {
   return (
     <aside className="w-64 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
       <div className="p-4 border-b border-border flex items-center space-x-2">
-        <SocioVipLogo className="h-8 w-8 text-primary" />
-        <h1 className="text-xl font-semibold text-primary">SocioVIP Admin</h1>
+        <SocioVipLogo className="h-8 w-8" />
+        <h1 className="text-xl font-bold text-gradient">SocioVIP Admin</h1>
       </div>
       <nav className="flex-grow p-4 space-y-2">
         {navItems.map((item) => (

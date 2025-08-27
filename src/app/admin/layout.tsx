@@ -67,7 +67,7 @@ export default function AdminLayout({
               No se encontró un perfil de usuario en la base de datos para tu cuenta de autenticación (UID: {currentUser.uid}).
               Asegúrate de que este UID esté correctamente vinculado a un perfil en la colección 'platformUsers' y que dicho perfil tenga un campo 'roles' (array de strings).
             </CardDescription>
-            <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
+            <Button onClick={() => { logout(); router.push('/login'); }} variant="gradient" className="mt-6">
               Cerrar Sesión e Ir a Login
             </Button>
           </CardContent>
@@ -90,7 +90,7 @@ export default function AdminLayout({
               Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
               Si crees que esto es un error, por favor contacta al soporte.
             </CardDescription>
-            <Button onClick={() => router.push('/')} className="mt-6">
+            <Button onClick={() => router.push('/')} variant="gradient" className="mt-6">
               Ir a la Página Principal
             </Button>
           </CardContent>

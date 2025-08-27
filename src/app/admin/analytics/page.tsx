@@ -30,7 +30,7 @@ const mockClientRegistrations = Array.from({ length: 30 }, (_, i) => {
 export default function AdminAnalyticsPage() {
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary flex items-center">
+      <h1 className="text-3xl font-bold text-gradient flex items-center">
         <BarChart3 className="h-8 w-8 mr-2" /> Analíticas Generales
       </h1>
 

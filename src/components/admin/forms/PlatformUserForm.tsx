@@ -156,7 +156,7 @@ export function PlatformUserForm({
   };
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);
-  const isPrePopulatedFromOtherSource = !isEditing && initialDataForCreation?.userType && initialDataForCreation.userType !== 'PlatformUser';
+  const isPrePopulatedFromOtherSource = !isEditing && initialDataForCreation?.preExistingUserType && initialDataForCreation.preExistingUserType !== 'PlatformUser';
 
   return (
     <Form {...form}>
@@ -165,10 +165,10 @@ export function PlatformUserForm({
           <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <AlertTitle className="text-blue-700 dark:text-blue-300">
-              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation?.userType as PlatformUserRole] || initialDataForCreation?.userType}
+              DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation?.preExistingUserType as PlatformUserRole] || initialDataForCreation?.preExistingUserType}
             </AlertTitle>
             <AlertDescription className="text-blue-600 dark:text-blue-400">
-              Este DNI pertenece a un {initialDataForCreation?.userType === 'QrClient' ? 'Cliente QR' : 'Socio VIP'} existente.
+              Este DNI pertenece a un {initialDataForCreation?.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Socio VIP'} existente.
               Se han pre-rellenado los datos conocidos. Por favor, complete y asigne roles de plataforma.
             </AlertDescription>
           </Alert>
@@ -322,7 +322,7 @@ export function PlatformUserForm({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableSubmitOverride}>
+          <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEditing ? "Guardar Cambios" : "Crear Perfil de Usuario"}
           </Button>

@@ -4,33 +4,33 @@
 
 @layer base {
   :root {
-    --background: 280 30% 96%; /* #F5F0F9 Very Light Purple */
-    --foreground: 283 10% 25%; /* #4A424E Dark Purple-Gray text */
+    --background: 282 33% 95%; /* #f4eef7 */
+    --foreground: 275 25% 15%; /* Dark Purple-Gray text */
 
     --card: 0 0% 100%;
-    --card-foreground: 283 10% 25%;
+    --card-foreground: 275 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 283 10% 25%;
+    --popover-foreground: 275 25% 15%;
 
-    --primary: 280 43% 63%;  /* #B080D0 User's Primary */
+    --primary: 266 83% 56%;  /* purple-600 #9333ea - Base for non-gradient elements */
     --primary-foreground: 0 0% 98%; /* White */
 
-    --secondary: 280 30% 88%; /* Lighter version of primary for secondary elements */
-    --secondary-foreground: 280 43% 45%; /* Darker primary for text on secondary */
+    --secondary: 270 50% 95%; /* Lighter purple for secondary elements */
+    --secondary-foreground: 270 50% 30%; /* Darker purple for text on secondary */
 
-    --muted: 280 20% 90%;
-    --muted-foreground: 280 10% 45%;
+    --muted: 270 30% 94%;
+    --muted-foreground: 270 10% 45%;
 
-    --accent: 280 27% 59%;   /* #8E5EA2 User's Accent */
+    --accent: 268 70% 65%;   /* A slightly lighter purple for accents */
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 280 15% 85%;
-    --input: 0 0% 100%;
-    --ring: 280 43% 70%;     /* Lighter primary for focus */
+    --border: 270 20% 88%;
+    --input: 270 20% 98%;
+    --ring: 266 83% 66%;     /* Lighter primary for focus rings */
 
     --radius: 0.5rem;
 
@@ -42,33 +42,33 @@
   }
 
   .dark {
-    --background: 283 10% 15%; /* Dark Purple-Gray for dark mode background */
-    --foreground: 280 30% 90%; /* Light Purple-Gray for dark mode text */
+    --background: 275 25% 10%; 
+    --foreground: 270 30% 90%; 
 
-    --card: 283 10% 20%;
-    --card-foreground: 280 30% 90%;
+    --card: 275 25% 15%;
+    --card-foreground: 270 30% 90%;
 
-    --popover: 283 10% 10%;
-    --popover-foreground: 280 30% 90%;
+    --popover: 275 25% 5%;
+    --popover-foreground: 270 30% 90%;
 
-    --primary: 280 50% 70%; /* Brighter Primary for dark mode */
-    --primary-foreground: 283 10% 15%;
+    --primary: 266 90% 70%; 
+    --primary-foreground: 275 25% 10%;
 
-    --secondary: 283 15% 25%;
-    --secondary-foreground: 280 30% 90%;
+    --secondary: 270 20% 20%;
+    --secondary-foreground: 270 30% 90%;
 
-    --muted: 283 10% 22%;
-    --muted-foreground: 280 20% 70%;
+    --muted: 270 15% 25%;
+    --muted-foreground: 270 15% 65%;
 
-    --accent: 280 35% 65%;   /* Brighter Accent for dark mode */
-    --accent-foreground: 283 10% 15%;
+    --accent: 268 80% 75%;
+    --accent-foreground: 275 25% 10%;
 
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 283 10% 30%;
-    --input: 283 10% 20%;
-    --ring: 280 50% 75%;
+    --border: 270 15% 28%;
+    --input: 270 15% 20%;
+    --ring: 266 90% 75%;
 
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -88,5 +88,12 @@
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline; /* Apply Poppins to all headings */
+  }
+}
+
+/* Custom utility for gradient text */
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text;
   }
 }

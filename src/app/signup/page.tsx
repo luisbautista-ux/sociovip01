@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,15 +13,25 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { SocioVipLogo } from "@/components/icons";
+import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import type { AuthError } from "firebase/auth";
+
+// URL del logo directamente en una constante
+const LOGO_IMG = "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
 
 const signupFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -91,13 +100,35 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/40">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="items-center text-center">
-          <SocioVipLogo className="h-14 w-14 text-primary mb-3" />
-          <CardTitle className="text-3xl">Crear Cuenta Super Admin</CardTitle>
-          <CardDescription>Registra un nuevo usuario Super Administrador.</CardDescription>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#f4eef7]">
+      <Link
+        href="/"
+        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text hover:text-primary/80"
+      >
+        Volver al inicio
+      </Link>
+
+      <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
+        <CardHeader className="items-center text-center py-6">
+          {/* Logo con la URL de la constante LOGO_IMG */}
+          <div className="w-full flex justify-center mb-4">
+            <Image
+              src={LOGO_IMG}
+              alt="SocioVIP"
+              width={96} // Tamaño más grande
+              height={96} // Tamaño más grande
+              className="rounded-full shadow-sm ring-1 ring-black/10"
+              priority
+            />
+          </div>
+          <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
+            Crear Cuenta Super Admin
+          </CardTitle>
+          <CardDescription className="text-center">
+            Registra un nuevo usuario Super Administrador.
+          </CardDescription>
         </CardHeader>
+
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-6">
@@ -108,7 +139,12 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Nombre Completo</FormLabel>
                     <FormControl>
-                      <Input placeholder="Tu nombre completo" {...field} disabled={isSubmitting} />
+                      <Input
+                        placeholder="Tu nombre completo"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -121,7 +157,13 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="admin@email.com" {...field} disabled={isSubmitting} />
+                      <Input
+                        type="email"
+                        placeholder="admin@email.com"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -134,7 +176,13 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Contraseña</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -147,14 +195,28 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Confirmar Contraseña</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
+                        disabled={isSubmitting}
+                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar Cuenta"}
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:bg-gradient-to-l text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  "Registrar Cuenta"
+                )}
               </Button>
             </form>
           </Form>
