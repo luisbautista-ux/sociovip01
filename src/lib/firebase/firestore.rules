@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Funciones de Ayuda ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && 'superadmin' in getUserData().roles;
+    }
+
+    // Un miembro del negocio es un 'business_admin' o 'staff'
+    function isBusinessMember() {
+      let userRoles = getUserData().roles;
+      return isSignedIn() && ('business_admin' in userRoles || 'staff' in userRoles);
+    }
+    
+    // Función de ayuda principal para lectura de datos de un negocio
+    function isAllowedToReadBusinessData(businessId) {
+      return isSuperAdmin() || (isBusinessMember() && getUserData().businessId == businessId);
+    }
+    
+    // --- Reglas por Colección ---
+
+    // Perfiles de Usuario: Solo SuperAdmin puede gestionar. El propio usuario puede leer su perfil.
+    match /platformUsers/{userId} {
+      allow read, write: if isSuperAdmin();
+      allow get: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Negocios: Lectura pública, escritura solo para SuperAdmin.
+    match /businesses/{businessId} {
+      allow read: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+    
+    // Entidades del Negocio (Promociones/Eventos): Lectura pública, escritura para miembros del negocio.
+    match /businessEntities/{entityId} {
+      allow read: if true;
+      allow create: if isSuperAdmin() || (isBusinessMember() && getUserData().businessId == request.resource.data.businessId);
+      allow update, delete: if isSuperAdmin() || (isBusinessMember() && getUserData().businessId == resource.data.businessId);
+    }
+    
+    // Clientes QR: Creación pública, lectura restringida a miembros del negocio.
+    match /qrClients/{clientId} {
+      allow create: if true;
+      // ¡REGLA CORREGIDA! Permite la lectura si el usuario es SuperAdmin o si es un miembro del negocio
+      // y está solicitando clientes que coinciden con su businessId.
+      allow read: if isSignedIn() && isAllowedToReadBusinessData(resource.data.generatedForBusinessId);
+      allow update, delete: if false; // No se permite editar/borrar clientes QR desde el frontend.
+    }
+
+    // Socios VIP: Gestión solo por SuperAdmin.
+    // Esta regla evita que los Admins/Staff de negocio puedan acceder a la lista completa si no hay un businessId.
+    match /socioVipMembers/{memberId} {
+       allow read, write: if isSuperAdmin();
+    }
+    
+    // Vínculos de Promotores: Gestión por miembros del negocio.
+    match /businessPromoterLinks/{linkId} {
+      allow read, write: if isSignedIn() && isAllowedToReadBusinessData(resource.data.businessId);
+    }
+  }
+}

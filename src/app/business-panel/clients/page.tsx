@@ -93,7 +93,7 @@ type QrClient = {
   phone?: string;
   dni: string;
   registrationDate: any; // Timestamp/Date/string/number
-  businessId: string;
+  generatedForBusinessId: string;
 };
 
 type SocioVipMember = {
@@ -106,7 +106,7 @@ type SocioVipMember = {
   joinDate: any; // Timestamp/Date/string/number
   loyaltyPoints?: number;
   membershipStatus?: "active" | "inactive" | "pending_payment" | "cancelled";
-  businessId: string;
+  businessId?: string; // Es opcional y puede no estar
 };
 
 type BusinessClientView = {
@@ -153,30 +153,43 @@ export default function AdminQrClientsPage() {
 
       setLoading(true);
       try {
-        // ====== VIP ======
-        const vipRef = collection(db, "socioVipMembers");
-        const vipQ = isSuperAdmin
-          ? vipRef
-          : query(vipRef, where("businessId", "==", userProfile.businessId));
-        const vipSnap = await getDocs(vipQ);
-        setVipMembers(
-          vipSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as SocioVipMember[]
-        );
+        const fetchQrClients = async () => {
+          const qrRef = collection(db, "qrClients");
+          const qrQuery = isSuperAdmin
+            ? qrRef
+            : query(qrRef, where("generatedForBusinessId", "==", userProfile.businessId));
+          const qrSnap = await getDocs(qrQuery);
+          return qrSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
+        };
 
-        // ====== QR ======
-        const qrRef = collection(db, "qrClients");
-        const qrQ = isSuperAdmin
-          ? qrRef
-          : query(qrRef, where("businessId", "==", userProfile.businessId));
-        const qrSnap = await getDocs(qrQ);
-        setQrClients(
-          qrSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as QrClient[]
-        );
+        const fetchVipMembers = async () => {
+          if (!isSuperAdmin) {
+            // Un admin de negocio no puede consultar la lista de todos los VIPs
+            // si la colección no tiene businessId para filtrar.
+            // Se asume que solo el superadmin ve esta lista por ahora para evitar errores.
+            return [];
+          }
+          const vipRef = collection(db, "socioVipMembers");
+          const vipQuery = isSuperAdmin
+            ? vipRef
+            : query(vipRef, where("businessId", "==", userProfile.businessId)); // Esta línea fallaría si businessId no existe en todos los docs
+          const vipSnap = await getDocs(vipQuery);
+          return vipSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as SocioVipMember[];
+        };
+        
+        const [qrData, vipData] = await Promise.all([
+          fetchQrClients(),
+          fetchVipMembers()
+        ]);
+
+        setQrClients(qrData);
+        setVipMembers(vipData);
+
       } catch (e: any) {
         console.error("Error cargando clientes (admin):", e?.code, e?.message);
         toast({
-          title: "Error al cargar",
-          description: e?.message ?? "No se pudieron obtener los datos.",
+          title: "Error al cargar clientes",
+          description: e?.message ?? "No se pudieron obtener los datos. Revisa las reglas de seguridad.",
           variant: "destructive",
         });
       } finally {
@@ -282,7 +295,7 @@ export default function AdminQrClientsPage() {
     link.setAttribute("href", encoded);
     link.setAttribute(
       "download",
-      `admin_clientes_${isSuperAdmin ? "all" : userProfile?.businessId ?? "negocio"}.csv`
+      `clientes_${isSuperAdmin ? "todos_negocios" : userProfile?.businessId ?? "negocio"}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -297,7 +310,7 @@ export default function AdminQrClientsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
         <h1 className="text-3xl font-bold text-primary flex items-center">
-          <Contact className="h-8 w-8 mr-2" /> Clientes (Admin)
+          <Contact className="h-8 w-8 mr-2" /> Mis Clientes
         </h1>
         <Button onClick={handleExportCsv} variant="outline">
           <Download className="mr-2 h-4 w-4" /> Exportar CSV
@@ -308,7 +321,7 @@ export default function AdminQrClientsPage() {
         <CardHeader>
           <CardTitle>Listado de Clientes</CardTitle>
           <CardDescription>
-            {isSuperAdmin ? "Todos los negocios" : "Clientes del negocio asignado"}
+            {isSuperAdmin ? "Visualizando clientes de todos los negocios." : "Visualizando clientes de tu negocio asignado."}
           </CardDescription>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
             <div className="relative">
@@ -331,7 +344,7 @@ export default function AdminQrClientsPage() {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="qr">Clientes QR</SelectItem>
-                <SelectItem value="vip">Socios VIP</SelectItem>
+                {isSuperAdmin && <SelectItem value="vip">Socios VIP</SelectItem>}
               </SelectContent>
             </Select>
           </div>

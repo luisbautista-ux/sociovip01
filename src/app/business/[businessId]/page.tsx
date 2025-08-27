@@ -488,7 +488,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       phone: formData.phone,
       dob: Timestamp.fromDate(formData.dob),
       registrationDate: serverTimestamp(),
-      generatedForBusinessId: businessDetails.id,
+      generatedForBusinessId: businessDetails.id, // Campo corregido
       generatedForEntityId: activeEntityForQr.id,
     };
     
@@ -1474,6 +1474,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
