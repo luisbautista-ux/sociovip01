@@ -1,18 +1,16 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ================== Funciones de Utilidad ==================
-    // Funciones para verificar roles y permisos del usuario autenticado.
-    
+    // ===============================
+    //            Helpers
+    // ===============================
     function isSignedIn() {
       return request.auth != null;
     }
 
     function getUserProfile(userId) {
-      // Nota: get() en reglas puede leer sin depender de permisos de cliente
       return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
     }
 
@@ -20,80 +18,81 @@ service cloud.firestore {
       return isSignedIn() && 'superadmin' in getUserProfile(request.auth.uid).roles;
     }
 
-    function isBusinessAdmin(businessId) {
-      let userProfile = getUserProfile(request.auth.uid);
-      return isSignedIn() && 
-             'business_admin' in userProfile.roles &&
-             userProfile.businessId == businessId;
-    }
-    
-    function isStaff(businessId) {
-      let userProfile = getUserProfile(request.auth.uid);
-      return isSignedIn() &&
-             'staff' in userProfile.roles &&
-             userProfile.businessId == businessId;
+    function isRoleForBusiness(role, businessId) {
+      if (!isSignedIn()) { return false; }
+      let profile = getUserProfile(request.auth.uid);
+      return role in profile.roles && profile.businessId == businessId;
     }
 
-    function isHost(businessId) {
-      let userProfile = getUserProfile(request.auth.uid);
-      return isSignedIn() &&
-             'host' in userProfile.roles &&
-             userProfile.businessId == businessId;
+    function isBusinessAdmin(businessId) {
+      return isRoleForBusiness('business_admin', businessId);
+    }
+
+    function isStaff(businessId) {
+      return isRoleForBusiness('staff', businessId);
     }
 
     function isBusinessMember(businessId) {
-      let userProfile = getUserProfile(request.auth.uid);
-      return isSignedIn() &&
-             userProfile.businessId == businessId &&
-             ('business_admin' in userProfile.roles || 'staff' in userProfile.roles || 'host' in userProfile.roles);
+      return isBusinessAdmin(businessId) || isStaff(businessId);
     }
-    
+
+    function isHost(businessId) {
+      return isRoleForBusiness('host', businessId);
+    }
+
     function isPromoter() {
       return isSignedIn() && 'promoter' in getUserProfile(request.auth.uid).roles;
     }
 
-    // ================== Reglas por Colección ==================
+    // ===============================
+    //          Collections
+    // ===============================
 
+    // Negocios: lectura pública; solo superadmin escribe
     match /businesses/{businessId} {
       allow read: if true;
       allow create, update, delete: if isSuperAdmin();
     }
 
-    match /platformUsers/{userId} {
-      allow get: if isSignedIn() && request.auth.uid == userId;
-      allow list, create, update, delete: if isSuperAdmin();
-    }
-    
+    // Entidades del negocio (promos/eventos):
+    // lectura pública; escribir SOLO superadmin/admin/staff del negocio.
     match /businessEntities/{entityId} {
       allow read: if true;
       allow create: if isSuperAdmin() || isBusinessMember(request.resource.data.businessId);
       allow update: if isSuperAdmin() || isBusinessMember(get(/databases/$(database)/documents/businessEntities/$(entityId)).data.businessId);
-      allow delete: if isSuperAdmin() || isBusinessMember(resource.data.businessId);
+      allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
+    }
+    
+    // --- Clientes QR ---
+    // Un cliente QR puede ser creado por cualquier persona (página pública).
+    // La lista de clientes solo puede ser leída por superadmin o por miembros del negocio al que pertenecen los clientes.
+    match /qrClients/{clientId} {
+      allow create: if true;
+      allow get, list: if isSuperAdmin() || isBusinessMember(getUserProfile(request.auth.uid).businessId);
+      allow update, delete: if false; // Nadie puede modificar o borrar desde el cliente.
+    }
+    
+    // --- Socios VIP ---
+    // Solo Super Admin puede gestionar (crear, editar, borrar) socios VIP.
+    // Super Admin y miembros del negocio pueden leer la lista de sus socios.
+    match /socioVipMembers/{memberId} {
+      allow write: if isSuperAdmin();
+      allow read: if isSuperAdmin() || isBusinessMember(resource.data.businessId);
+    }
+    
+    // Usuarios de la plataforma:
+    // Solo superadmin puede crear/editar/borrar.
+    // Cualquier usuario logueado puede leer perfiles (necesario para varias funciones).
+    match /platformUsers/{userId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSuperAdmin();
     }
 
+    // Vínculos de promotores con negocios
     match /businessPromoterLinks/{linkId} {
-      allow read: if isSuperAdmin() || isBusinessMember(resource.data.businessId) || (isPromoter() && resource.data.platformUserUid == request.auth.uid);
+      allow read: if isSuperAdmin() || isBusinessMember(resource.data.businessId) || isPromoter();
       allow create: if isSuperAdmin() || isBusinessMember(request.resource.data.businessId);
       allow update, delete: if isSuperAdmin() || isBusinessMember(resource.data.businessId);
-    }
-
-    // --- REGLAS CORREGIDAS PARA CLIENTES ---
-    match /qrClients/{clientId} {
-      // Cualquiera puede crear un cliente QR al generar su primer código.
-      allow create: if true;
-      // Lectura permitida a SuperAdmins o miembros del negocio al que pertenece el cliente
-      allow read: if isSuperAdmin() || isBusinessMember(resource.data.generatedForBusinessId);
-      // Nadie puede modificar o eliminar directamente desde el cliente.
-      allow update, delete: if isSuperAdmin();
-    }
-
-    match /socioVipMembers/{memberId} {
-      // SuperAdmins pueden hacer todo
-      allow write: if isSuperAdmin();
-      // Lectura para SuperAdmin y, en el caso de la app, también para el personal del negocio.
-      // Se asume que el documento socioVipMembers tendrá un campo 'businessId' si es relevante.
-      // Si no hay businessId, esta regla debe ajustarse. Por ahora, se asume que existe.
-      allow read: if isSuperAdmin() || (resource.data.businessId != null && isBusinessMember(resource.data.businessId));
     }
   }
 }
