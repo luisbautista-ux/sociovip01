@@ -50,16 +50,18 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
     
-    // Clientes QR: **CORRECCIÓN CLAVE** - Cualquiera puede leer/consultar, pero solo admins pueden modificar/borrar.
+    // Clientes QR: **CORRECCIÓN CLAVE** - Cualquiera puede leer/consultar (get, list). Solo SuperAdmin puede modificar/borrar. Admin/Staff pueden leer la lista de su negocio.
     match /qrClients/{clientId} {
-      allow get, list: if true;
+      allow get, list: if true; // Permite consulta pública por DNI y lectura de listas por parte de roles autorizados
       allow create: if true; // La creación es pública desde la página del negocio.
       allow update, delete: if isSuperAdmin();
     }
 
     // Socios VIP: Solo SuperAdmin puede gestionar.
+    // **CORRECCIÓN**: Permitir que el admin/staff del negocio pueda leer la lista de socios de su negocio.
     match /socioVipMembers/{memberId} {
-      allow read, write: if isSuperAdmin();
+      allow get, list: if isSuperAdmin() || (isSignedIn() && request.query.resource.data.businessId == getRequestingUserData().businessId);
+      allow create, update, delete: if isSuperAdmin();
     }
     
     // Vínculos de Promotores: Solo el admin del negocio o el SuperAdmin pueden gestionar.
