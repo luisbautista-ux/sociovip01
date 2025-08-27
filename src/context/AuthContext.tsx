@@ -22,7 +22,7 @@ interface AuthContextType {
   loadingAuth: boolean; 
   loadingProfile: boolean; 
   login: (email: string, pass: string) => Promise<UserCredential | AuthError>;
-  signup: (email: string, pass: string, name?: string) => Promise<UserCredential | AuthError>;
+  signup: (email: string, pass: string, name?: string, role?: PlatformUserRole) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
 }
 
@@ -129,7 +129,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  const signup = useCallback(async (email: string, pass: string, name?: string): Promise<UserCredential | AuthError> => {
+  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'superadmin'): Promise<UserCredential | AuthError> => {
     if (!auth || !db) return { code: "auth/internal-error", message: "Firebase Auth/DB not initialized" } as AuthError;
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -138,20 +138,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'dni'> & { lastLogin: any; businessId: string | null; dni: string; } = {
           uid: userCredential.user.uid,
           email: userCredential.user.email || "",
-          name: name || userCredential.user.email?.split('@')[0] || "Super Admin", // Use provided name or derive
-          roles: ['superadmin'], 
-          dni: "", // DNI can be empty initially for superadmin, to be filled later if needed
+          name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
+          roles: [role], 
+          dni: "",
           businessId: null,
           lastLogin: serverTimestamp(),
         };
         await setDoc(userDocRef, newProfile);
-        console.log("AuthContext: Superadmin profile created in Firestore for UID:", userCredential.user.uid);
+        console.log(`AuthContext: Profile with role '${role}' created in Firestore for UID:`, userCredential.user.uid);
       }
       return userCredential;
     } catch (error) {
       return error as AuthError;
     }
-  }, [router]); // router is a stable dependency from next/navigation
+  }, [router]);
 
   const logout = useCallback(async () => {
     if (!auth) return;

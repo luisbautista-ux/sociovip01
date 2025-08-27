@@ -64,11 +64,12 @@ export default function SignupPage() {
   const handleSignup = async (values: SignupFormValues) => {
     setIsSubmitting(true);
     try {
-      const result = await signup(values.email, values.password, values.name);
+      // Pass 'promoter' role to the signup function
+      const result = await signup(values.email, values.password, values.name, 'promoter');
       if ("user" in result) { // UserCredential
         toast({
-          title: "Registro Exitoso",
-          description: "Tu cuenta de Super Admin ha sido creada. Por favor, inicia sesión.",
+          title: "Registro de Promotor Exitoso",
+          description: "Tu cuenta de Promotor ha sido creada. Por favor, inicia sesión.",
         });
         router.push("/login");
       } else { // AuthError
@@ -122,10 +123,10 @@ export default function SignupPage() {
             />
           </div>
           <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
-            Crear Cuenta Super Admin
+            Crear Cuenta de Promotor
           </CardTitle>
           <CardDescription className="text-center">
-            Registra un nuevo usuario Super Administrador.
+            Registra un nuevo usuario con rol de Promotor.
           </CardDescription>
         </CardHeader>
 
@@ -159,7 +160,7 @@ export default function SignupPage() {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="admin@email.com"
+                        placeholder="tu@email.com"
                         {...field}
                         disabled={isSubmitting}
                         className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
@@ -215,7 +216,7 @@ export default function SignupPage() {
                 {isSubmitting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  "Registrar Cuenta"
+                  "Registrar Cuenta de Promotor"
                 )}
               </Button>
             </form>
