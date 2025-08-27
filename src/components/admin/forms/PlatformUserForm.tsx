@@ -25,7 +25,6 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { ALL_PLATFORM_USER_ROLES, PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 
 const platformUserFormSchemaBase = z.object({
-  uid: z.string().optional(), // UID de Firebase Auth, opcional aquí porque puede ser para edición
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
@@ -33,9 +32,9 @@ const platformUserFormSchemaBase = z.object({
   businessId: z.string().optional(),
 });
 
-// Refine for creation: UID must be present and have 28 characters
+// Schema for creation includes password
 const platformUserFormSchemaCreate = platformUserFormSchemaBase.extend({
-  uid: z.string().length(28, { message: "El UID de Firebase Authentication no es válido." }),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
 }).refine(data => {
   const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
   if (rolesThatNeedBusiness.length > 0) {
@@ -47,8 +46,8 @@ const platformUserFormSchemaCreate = platformUserFormSchemaBase.extend({
   path: ["businessId"], 
 });
 
-// Refine for editing: UID is not part of the form values to be validated for length as it's not editable
-const platformUserFormSchemaEdit = platformUserFormSchemaBase.omit({ uid: true }).refine(data => {
+// Schema for editing does not include password
+const platformUserFormSchemaEdit = platformUserFormSchemaBase.refine(data => {
   const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
   if (rolesThatNeedBusiness.length > 0) {
     return !!data.businessId && data.businessId.length > 0; 
@@ -59,8 +58,8 @@ const platformUserFormSchemaEdit = platformUserFormSchemaBase.omit({ uid: true }
   path: ["businessId"], 
 });
 
-
-type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase>;
+// Merged type for the form, password is optional
+type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase> & { password?: string };
 
 interface PlatformUserFormProps {
   user?: PlatformUser; 
@@ -87,12 +86,12 @@ export function PlatformUserForm({
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(isEditing ? platformUserFormSchemaEdit : platformUserFormSchemaCreate),
     defaultValues: {
-      uid: user?.uid || "", // Cargar UID si se está editando, no se muestra pero es parte del defaultValues
       dni: initialDataForCreation?.dni || user?.dni || "",
       name: initialDataForCreation?.name || user?.name || "",
       email: initialDataForCreation?.email || user?.email || "",
       roles: initialDataForCreation?.existingPlatformUserRoles || user?.roles || [],
       businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || undefined,
+      password: initialDataForCreation?.dni || "", // Default password to DNI
     },
   });
 
@@ -106,30 +105,30 @@ export function PlatformUserForm({
   React.useEffect(() => {
     if (isEditing && user) {
       form.reset({
-        uid: user.uid || "", // Aunque no se valide en edit, es bueno tenerlo en el form state
         dni: user.dni || "",
         name: user.name || "",
         email: user.email || "",
         roles: user.roles || [],
         businessId: user.businessId || undefined,
+        password: "", // No password field in edit mode
       });
     } else if (!isEditing && initialDataForCreation) {
       form.reset({
-        uid: "", // UID estará vacío para que el admin lo ingrese
         dni: initialDataForCreation.dni,
         name: initialDataForCreation.name || "",
         email: initialDataForCreation.email || "",
         roles: initialDataForCreation.existingPlatformUserRoles || [],
         businessId: initialDataForCreation.existingPlatformUser?.businessId || undefined,
+        password: initialDataForCreation.dni, // Default password to DNI
       });
     } else if (!isEditing && !initialDataForCreation) { // Caso de DNI completamente nuevo
         form.reset({ 
-          uid: "", // UID vacío para ingreso
           dni: initialDataForCreation?.dni || "", // DNI ya verificado
           name: "", 
           email: "", 
           roles: [], 
-          businessId: undefined 
+          businessId: undefined,
+          password: initialDataForCreation?.dni || "" // Default password to DNI
         });
     }
   }, [user, initialDataForCreation, isEditing, form]);
@@ -142,15 +141,14 @@ export function PlatformUserForm({
   }, [showBusinessIdField, form]);
 
   const handleSubmit = async (values: PlatformUserFormValues) => {
-    // UID para creación viene directamente de values.uid
-    // UID para edición no está en values si usamos platformUserFormSchemaEdit, se usa user.uid
     const dataToSubmit: PlatformUserFormData = { 
-      uid: isEditing ? user.uid : values.uid, // Usar user.uid para edición, values.uid para creación
+      uid: user?.uid, // Only present when editing
       dni: values.dni,
       name: values.name,
       email: values.email,
       roles: values.roles,
       businessId: showBusinessIdField ? values.businessId : undefined,
+      password: values.password, // Only present when creating
     };
     await onSubmit(dataToSubmit, isEditing);
   };
@@ -172,28 +170,6 @@ export function PlatformUserForm({
               Se han pre-rellenado los datos conocidos. Por favor, complete y asigne roles de plataforma.
             </AlertDescription>
           </Alert>
-        )}
-        {!isEditing && (
-          <FormField
-            control={form.control}
-            name="uid"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Firebase Auth UID <span className="text-destructive">*</span></FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="UID de Firebase Authentication"
-                    {...field}
-                    disabled={isSubmitting}
-                  />
-                </FormControl>
-                <FormDescription className="text-xs">
-                  Crea primero el usuario en Firebase Authentication (Consola) y pega su UID aquí.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         )}
         <FormField
           control={form.control}
@@ -245,6 +221,30 @@ export function PlatformUserForm({
             </FormItem>
           )}
         />
+
+        {!isEditing && (
+            <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Contraseña Inicial <span className="text-destructive">*</span></FormLabel>
+                <FormControl>
+                    <Input
+                    type="text" // text para que el admin pueda verla
+                    placeholder="Contraseña para el nuevo usuario"
+                    {...field}
+                    disabled={isSubmitting}
+                    />
+                </FormControl>
+                <FormDescription className="text-xs">
+                  Por defecto, es el DNI. Comunica esta contraseña al nuevo usuario para que pueda iniciar sesión.
+                </FormDescription>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        )}
         
         <FormItem>
           <FormLabel>Roles de Plataforma <span className="text-destructive">*</span></FormLabel>
@@ -324,7 +324,7 @@ export function PlatformUserForm({
           </Button>
           <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? "Guardar Cambios" : "Crear Perfil de Usuario"}
+            {isEditing ? "Guardar Cambios" : "Crear Usuario"}
           </Button>
         </DialogFooter>
       </form>

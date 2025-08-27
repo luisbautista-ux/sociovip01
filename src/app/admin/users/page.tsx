@@ -282,12 +282,9 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
   const handleEditExistingPlatformUser = () => {
       setShowDniIsPlatformUserAlert(false); 
       if (existingPlatformUserToEdit) {
+          fetchBusinessesForForm(); // Ensure businesses are loaded for edit form
           setEditingUser(existingPlatformUserToEdit);
-          setVerifiedDniResult({ 
-            dni: existingPlatformUserToEdit.dni,
-            existingPlatformUser: existingPlatformUserToEdit,
-            existingPlatformUserRoles: existingPlatformUserToEdit.roles
-          });
+          setVerifiedDniResult(null); // Clear initial data as we are editing
           setShowCreateEditModal(true); 
       }
       setExistingPlatformUserToEdit(null);
@@ -314,7 +311,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                  return;
             }
         }
-
+        
         const userPayload: Partial<Omit<PlatformUser, 'id' | 'lastLogin'>> = { 
           name: data.name,
           roles: data.roles,
@@ -324,34 +321,35 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         await updateDoc(userRef, userPayload);
         toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
       } else { 
-        if (!data.uid || data.uid.trim() === "") {
-            toast({ title: "Error", description: "El UID de Firebase Authentication es obligatorio para crear un nuevo usuario.", variant: "destructive" });
-            setIsSubmitting(false);
-            return;
-        }
-
-        const dniForCreation = verifiedDniResult?.dni || data.dni; 
-        const dniCheck = await checkDniExists(dniForCreation);
-        if (dniCheck.exists && dniCheck.userType === 'PlatformUser') {
-           toast({ title: "Error", description: `El DNI ${dniForCreation} ya está registrado como Usuario de Plataforma. No se puede crear un duplicado.`, variant: "destructive" });
-           setIsSubmitting(false);
-           return;
-        }
-
-        const newUserPayload: Omit<PlatformUser, 'id'> & { lastLogin: any } = { 
-          uid: data.uid,
-          dni: dniForCreation,
-          name: data.name,
+        // --- CREATION LOGIC ---
+        const creationPayload = {
           email: data.email,
-          roles: data.roles,
-          businessId: finalBusinessId,
-          lastLogin: serverTimestamp(),
+          password: data.password, // This now comes from the form
+          displayName: data.name,
+          firestoreData: {
+            dni: data.dni,
+            name: data.name,
+            email: data.email,
+            roles: data.roles,
+            businessId: finalBusinessId,
+          }
         };
-        
-        await setDoc(doc(db, "platformUsers", data.uid), newUserPayload);
+
+        const response = await fetch('/api/admin/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(creationPayload),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Error desconocido al crear usuario.');
+        }
+
         toast({ 
-          title: "Perfil de Usuario Creado", 
-          description: `El perfil para "${data.name}" (DNI: ${newUserPayload.dni}) ha sido creado con UID/ID: ${data.uid}.`,
+          title: "Usuario Creado Exitosamente", 
+          description: `Se creó el usuario "${data.name}" con UID: ${result.uid}.`,
         });
       }
       
@@ -367,6 +365,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         description = "Error de permisos. Verifica las reglas de Firestore."
       } else if (error.message.includes("Function where() called with invalid data")) {
         description = "Error interno: datos inválidos para la consulta. Revisa el DNI.";
+      } else {
+        description = error.message; // Use error from API call
       }
       toast({ title: "Error al Guardar", description, variant: "destructive"});
     } finally {
@@ -469,10 +469,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                         <TableCell className="hidden xl:table-cell">{user.lastLogin ? format(new Date(user.lastLogin), "P p", { locale: es }) : "N/A"}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => {
-                              fetchBusinessesForForm(); // Load businesses before opening edit modal
-                              setEditingUser(user); 
-                              setVerifiedDniResult(null);
-                              setShowCreateEditModal(true);
+                              handleEditExistingPlatformUser();
+                              setExistingPlatformUserToEdit(user);
                           }} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Editar</span>
@@ -583,9 +581,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             <UIDialogDescription>
               {editingUser 
                 ? "Actualiza los detalles del perfil del usuario." 
-                : (verifiedDniResult?.existingPlatformUser
-                    ? "Este DNI ya está registrado como Usuario de Plataforma. No se puede crear un nuevo perfil aquí. Edite desde la lista principal si tiene los permisos, o cierre este diálogo y edite el perfil que se mostró en la alerta."
-                    : "Completa los detalles para el perfil del usuario en Firestore. La cuenta de Firebase Authentication debe crearse/vincularse por separado (anotar el UID de Auth).")
+                : "Completa los detalles para crear el usuario en Firebase Authentication y su perfil en Firestore."
               }
             </UIDialogDescription>
           </UIDialogHeader>
@@ -597,7 +593,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             ) : (
                 <PlatformUserForm 
                   user={editingUser || undefined} 
-                  initialDataForCreation={!editingUser && verifiedDniResult ? verifiedDniResult : undefined}
+                  initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
                   businesses={availableBusinesses}
                   onSubmit={handleCreateOrEditUser}
                   onCancel={() => { setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
