@@ -90,7 +90,7 @@ type QrClient = {
   id: string;
   name: string;
   surname: string;
-  phone?: string;
+  phone?: string | number;
   dni: string;
   registrationDate: any; // Timestamp/Date/string/number
   generatedForBusinessId: string;
@@ -101,7 +101,7 @@ type SocioVipMember = {
   name: string;
   surname: string;
   email?: string;
-  phone?: string;
+  phone?: string | number;
   dni: string;
   joinDate: any; // Timestamp/Date/string/number
   loyaltyPoints?: number;
@@ -115,7 +115,7 @@ type BusinessClientView = {
   name: string;
   surname: string;
   dni: string;
-  phone?: string;
+  phone?: string | number;
   email?: string;
   relevantDate: any;
   isVip: boolean;
@@ -155,25 +155,20 @@ export default function AdminQrClientsPage() {
       try {
         const fetchQrClients = async () => {
           const qrRef = collection(db, "qrClients");
-          const qrQuery = isSuperAdmin
-            ? qrRef
-            : query(qrRef, where("generatedForBusinessId", "==", userProfile.businessId));
+          const qrQuery = userProfile.businessId
+            ? query(qrRef, where("generatedForBusinessId", "==", userProfile.businessId))
+            : qrRef; // Superadmin gets all
           const qrSnap = await getDocs(qrQuery);
           return qrSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
         };
-
+        
+        // Only superadmin can see VIP members for now to avoid permission errors
+        // since VIP members don't have businessId
         const fetchVipMembers = async () => {
-          if (!isSuperAdmin) {
-            // Un admin de negocio no puede consultar la lista de todos los VIPs
-            // si la colección no tiene businessId para filtrar.
-            // Se asume que solo el superadmin ve esta lista por ahora para evitar errores.
-            return [];
-          }
+          if (!isSuperAdmin) return [];
+
           const vipRef = collection(db, "socioVipMembers");
-          const vipQuery = isSuperAdmin
-            ? vipRef
-            : query(vipRef, where("businessId", "==", userProfile.businessId)); // Esta línea fallaría si businessId no existe en todos los docs
-          const vipSnap = await getDocs(vipQuery);
+          const vipSnap = await getDocs(vipRef);
           return vipSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as SocioVipMember[];
         };
         
@@ -186,7 +181,7 @@ export default function AdminQrClientsPage() {
         setVipMembers(vipData);
 
       } catch (e: any) {
-        console.error("Error cargando clientes (admin):", e?.code, e?.message);
+        console.error("Error cargando clientes:", e?.code, e?.message);
         toast({
           title: "Error al cargar clientes",
           description: e?.message ?? "No se pudieron obtener los datos. Revisa las reglas de seguridad.",
@@ -241,7 +236,7 @@ export default function AdminQrClientsPage() {
       const nameMatch = `${c.name} ${c.surname}`.toLowerCase().includes(searchLower);
       const dniMatch = (c.dni ?? "").toLowerCase().includes(searchLower);
       const emailMatch = (c.email ?? "").toLowerCase().includes(searchLower);
-      const phoneMatch = (c.phone ?? "").includes(searchTerm);
+      const phoneMatch = String(c.phone ?? "").includes(searchTerm);
       return typeMatch && (nameMatch || dniMatch || emailMatch || phoneMatch);
     });
   }, [searchTerm, filterType, combinedClients]);
