@@ -40,7 +40,7 @@ import type {
 } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
+import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import {
   Loader2,
   Building,
@@ -127,21 +127,6 @@ const newQrClientSchema = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
 });
 
-function toDateOrNow(value: any): Date {
-    if (!value) return new Date();
-    if (value instanceof Date) return value;
-    if (value instanceof Timestamp) return value.toDate();
-    if (typeof value === 'string' || typeof value === 'number') {
-        const d = new Date(value);
-        if (!isNaN(d.getTime())) return d;
-    }
-    if (typeof value._seconds === 'number') {
-        const d = new Date(value._seconds * 1000);
-         if (!isNaN(d.getTime())) return d;
-    }
-    return new Date();
-}
-
 export default function BusinessPublicPageById(): React.JSX.Element | null {
   // obtener el id desde la URL: /business/[businessId]
   const pathname = usePathname();
@@ -204,7 +189,7 @@ export default function BusinessPublicPageById(): React.JSX.Element | null {
           id: businessSnap.id,
           name: bizData.name || "Nombre de Negocio Desconocido",
           contactEmail: bizData.contactEmail || "",
-          joinDate: toDateOrNow(bizData.joinDate).toISOString(),
+          joinDate: anyToDate(bizData.joinDate)?.toISOString() || new Date().toISOString(),
           customUrlPath: bizData.customUrlPath || undefined,
           logoUrl: bizData.logoUrl || undefined,
           publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
@@ -247,8 +232,8 @@ export default function BusinessPublicPageById(): React.JSX.Element | null {
             type: entityData.type,
             name: entityData.name || "Entidad sin nombre",
             description: entityData.description || "",
-            startDate: toDateOrNow(entityData.startDate).toISOString(),
-            endDate: toDateOrNow(entityData.endDate).toISOString(),
+            startDate: anyToDate(entityData.startDate)?.toISOString() || "",
+            endDate: anyToDate(entityData.endDate)?.toISOString() || "",
             isActive: entityData.isActive === undefined ? true : entityData.isActive,
             usageLimit: entityData.usageLimit || 0,
             maxAttendance: entityData.maxAttendance || 0,
@@ -267,7 +252,7 @@ export default function BusinessPublicPageById(): React.JSX.Element | null {
             imageUrl: entityData.imageUrl,
             aiHint: entityData.aiHint,
             termsAndConditions: entityData.termsAndConditions,
-            createdAt: toDateOrNow(entityData.createdAt).toISOString(),
+            createdAt: anyToDate(entityData.createdAt)?.toISOString() || "",
           };
 
           if (isEntityCurrentlyActivatable(entityForCheck)) {
@@ -387,8 +372,8 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     const realTimeEntityData: BusinessManagedEntity = { 
         id: snap.id, 
         ...(snap.data() as any),
-        startDate: toDateOrNow(snap.data().startDate).toISOString(),
-        endDate: toDateOrNow(snap.data().endDate).toISOString(),
+        startDate: anyToDate(snap.data().startDate)?.toISOString() || "",
+        endDate: anyToDate(snap.data().endDate)?.toISOString() || "",
     };
 
     if (!isEntityCurrentlyActivatable(realTimeEntityData)) {
@@ -447,8 +432,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               name: clientData.name,
               surname: clientData.surname,
               phone: clientData.phone,
-              dob: toDateOrNow(clientData.dob).toISOString(),
-              registrationDate: toDateOrNow(clientData.registrationDate).toISOString(),
+              dob: anyToDate(clientData.dob)?.toISOString() || "",
+              registrationDate: anyToDate(clientData.registrationDate)?.toISOString() || "",
           };
 
           await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
@@ -832,6 +817,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     if (businessDetails.logoUrl) {
       businessLogo.onload = drawContent;
       businessLogo.onerror = () => {
+        toast({ title: "Advertencia", description: "No se pudo cargar el logo del negocio para incluirlo en la descarga.", variant: "default" });
         drawContent();
       };
       businessLogo.src = businessDetails.logoUrl;
@@ -890,7 +876,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           <Button
             type="submit"
             size="sm"
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-9"
+            className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105 h-9"
             disabled={isLoadingQrFlow}
           >
             {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />}
@@ -973,7 +959,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
           <Card className="w-full max-w-md shadow-xl">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-primary">
+              <CardTitle className="text-2xl font-bold text-gradient">
                 {activeEntityForQr.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción Adquirida"}
               </CardTitle>
               <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
@@ -993,7 +979,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                 </div>
               )}
               <div className="text-center">
-                <p className="text-2xl font-semibold text-primary">
+                <p className="text-2xl font-semibold text-gradient">
                   Hola, {qrData.user.name} {qrData.user.surname}
                 </p>
                 <p className="text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
@@ -1009,7 +995,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
               <Button onClick={handleSaveQrWithDetails} className="w-full sm:flex-1" variant="outline" disabled={!generatedQrDataUrl}>
                 <Download className="mr-2 h-4 w-4" /> Guardar QR con Detalles
               </Button>
-              <Button onClick={resetQrFlow} className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button onClick={resetQrFlow} className="w-full sm:flex-1 bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
                 Ver Otras del Negocio
               </Button>
             </CardFooter>
@@ -1097,7 +1083,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
         {events.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
               <CalendarDays className="h-8 w-8 mr-3" /> Eventos Próximos
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1137,7 +1123,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
 
         {promotions.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-primary mb-6 flex items-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
               <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1322,7 +1308,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                   >
                     Cancelar
                   </Button>
-                  <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isLoadingQrFlow}>
+                  <Button type="submit" className="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105" disabled={isLoadingQrFlow}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
                   </Button>
                 </ShadcnDialogFooter>
@@ -1450,7 +1436,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                   >
                     Volver
                   </Button>
-                  <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isLoadingQrFlow}>
+                  <Button type="submit" className="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105" disabled={isLoadingQrFlow}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar y Generar QR"}
                   </Button>
                 </ShadcnDialogFooter>
@@ -1488,6 +1474,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
