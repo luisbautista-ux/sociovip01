@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp } from '@/lib/firebase/firebaseAdmin';
+import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
 
 export async function POST(request: Request) {
@@ -8,9 +8,11 @@ export async function POST(request: Request) {
   let adminDb;
   
   try {
+    // admin is now imported, so initializeAdminApp can use it.
+    // However, the original initializeAdminApp doesn't return the app object. Let's adjust.
     const adminApp = await initializeAdminApp();
-    adminAuth = admin.auth(adminApp);
-    adminDb = admin.firestore(adminApp);
+    adminAuth = admin.auth();
+    adminDb = admin.firestore();
   } catch (error: any) {
     console.error('API Route (create-user): Firebase Admin initialization failed.', error);
     return NextResponse.json(

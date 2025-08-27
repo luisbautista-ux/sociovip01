@@ -4,7 +4,7 @@ import admin from 'firebase-admin';
 // This function ensures that Firebase Admin is initialized only once.
 export async function initializeAdminApp() {
   if (admin.apps.length > 0) {
-    return admin.firestore();
+    return admin.apps[0]; // Return the existing app instance
   }
 
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -18,14 +18,17 @@ export async function initializeAdminApp() {
   try {
     const serviceAccount = JSON.parse(serviceAccountJson);
 
-    admin.initializeApp({
+    const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
 
     console.log("Firebase Admin SDK initialized successfully.");
-    return admin.firestore();
+    return app;
   } catch (error: any) {
     console.error('Firebase Admin Init Error: Failed to initialize.', error);
     throw new Error(`No se pudo inicializar el Firebase Admin SDK: ${error.message}`);
   }
 }
+
+// Export admin itself so it can be used elsewhere after initialization
+export { admin };
