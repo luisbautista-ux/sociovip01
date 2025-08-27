@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { BusinessPromoterForm } from "@/components/business/forms/BusinessPromoterForm";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
@@ -229,27 +229,26 @@ export default function BusinessPromotersPage() {
         const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
         const updatePayload: Partial<BusinessPromoterLink> = {
             commissionRate: data.commissionRate,
-            // Only update contact details if not a platform user, or if explicitly allowed
             promoterName: editingPromoterLink.isPlatformUser ? editingPromoterLink.promoterName : data.promoterName,
             promoterEmail: editingPromoterLink.isPlatformUser ? editingPromoterLink.promoterEmail : data.promoterEmail,
             promoterPhone: editingPromoterLink.isPlatformUser ? editingPromoterLink.promoterPhone : data.promoterPhone,
         };
-        await updateDoc(linkRef, updatePayload);
+        await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload));
         toast({ title: "Vínculo de Promotor Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
       } else if (verifiedPromoterDniResult) { 
-        const newLinkPayload: Omit<BusinessPromoterLink, 'id' | 'joinDate'> & { joinDate: any } = {
+        const newLinkPayloadRaw: Omit<BusinessPromoterLink, 'id' | 'joinDate'> & { joinDate: any } = {
             businessId: currentBusinessId,
             promoterDni: verifiedPromoterDniResult.dni,
-            promoterName: data.promoterName, // This comes from form, prefilled if existingPlatformUserPromoter
-            promoterEmail: data.promoterEmail, // Same
-            promoterPhone: data.promoterPhone, // Same
+            promoterName: data.promoterName, 
+            promoterEmail: data.promoterEmail,
+            promoterPhone: data.promoterPhone,
             commissionRate: data.commissionRate,
             isActive: true,
             isPlatformUser: !!verifiedPromoterDniResult.existingPlatformUserPromoter,
             platformUserUid: verifiedPromoterDniResult.existingPlatformUserPromoter?.uid,
             joinDate: serverTimestamp(),
         };
-        await addDoc(collection(db, "businessPromoterLinks"), newLinkPayload);
+        await addDoc(collection(db, "businessPromoterLinks"), sanitizeObjectForFirestore(newLinkPayloadRaw));
         toast({ title: "Promotor Vinculado", description: `${data.promoterName} ha sido vinculado a tu negocio.` });
       }
       
@@ -526,5 +525,7 @@ export default function BusinessPromotersPage() {
     </div>
   );
 }
+
+    
 
     
