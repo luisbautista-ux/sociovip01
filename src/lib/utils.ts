@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { BusinessManagedEntity, TicketType } from "./types";
-import { Timestamp } from "firebase/firestore";
+import { Timestamp,FieldValue } from "firebase/firestore";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -95,10 +95,14 @@ export function calculateMaxAttendance(ticketTypes: TicketType[] | undefined): n
 
 // Helper function to sanitize an object for Firestore by converting undefined to null
 export function sanitizeObjectForFirestore(obj: any): any {
+  // If the object is a Firestore special type (like a FieldValue for serverTimestamp), return it directly.
+  if (obj && typeof obj.isEqual === 'function') {
+    // This is a crude way to detect FieldValue types like serverTimestamp() or Timestamp.
+    // A more robust check might be needed if other object types have `isEqual`.
+    return obj;
+  }
+
   if (obj === null || typeof obj !== 'object') {
-    if (obj instanceof Date) { // Firestore Timestamps are fine, Dates from JS forms need conversion before this
-        return Timestamp.fromDate(obj);
-    }
     return obj;
   }
 
@@ -112,8 +116,6 @@ export function sanitizeObjectForFirestore(obj: any): any {
       const value = obj[key];
       if (value === undefined) {
         sanitizedObj[key] = null; // Convert undefined to null
-      } else if (value instanceof Date) { // Handle Date objects explicitly if they appear
-        sanitizedObj[key] = Timestamp.fromDate(value); // Convert to Firestore Timestamp
       } else {
         sanitizedObj[key] = sanitizeObjectForFirestore(value); // Recurse for nested objects
       }
