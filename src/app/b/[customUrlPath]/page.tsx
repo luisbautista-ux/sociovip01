@@ -84,6 +84,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import React from "react";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 // --- Helpers robustos para códigos ---
 const normalizeCode = (v: unknown) =>
@@ -115,13 +117,30 @@ const specificCodeFormSchema = z
   });
 type SpecificCodeFormValues = z.infer<typeof specificCodeFormSchema>;
 
-const dniSchema = z.object({
-  dni: z
-    .string()
-    .min(7, "DNI/CE debe tener al menos 7 caracteres.")
-    .max(15, "DNI/CE no debe exceder 15 caracteres."),
+const DniEntrySchema = z.object({
+  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
+  docNumber: z.string().min(1, "El número de documento es requerido."),
+}).superRefine((data, ctx) => {
+    if (data.docType === 'dni') {
+        if (!/^\d{8}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El DNI debe contener exactamente 8 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    } else if (data.docType === 'ce') {
+        if (!/^\d{10,20}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    }
 });
-type DniFormValues = z.infer<typeof dniSchema>;
+type DniFormValues = z.infer<typeof DniEntrySchema>;
+
 
 const newQrClientSchema = z.object({
   name: z.string().min(2, { message: "Nombre es requerido." }),
@@ -173,9 +192,10 @@ export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   const dniForm = useForm<DniFormValues>({
-    resolver: zodResolver(dniSchema),
-    defaultValues: { dni: "" },
+    resolver: zodResolver(DniEntrySchema),
+    defaultValues: { docType: 'dni', docNumber: "" },
   });
+  const watchedDocType = dniForm.watch('docType');
 
   const newQrClientForm = useForm<NewQrClientFormData>({
     resolver: zodResolver(newQrClientSchema),
@@ -392,7 +412,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
       setActiveEntityForQr(realTimeEntityData);
       setValidatedSpecificCode(codeToValidate);
       setCurrentStepInModal("enterDni");
-      dniForm.reset({ dni: "" });
+      dniForm.reset({ docType: 'dni', docNumber: "" });
       setShowDniModal(true);
     } else {
       toast({
@@ -415,12 +435,12 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         return;
     }
     setIsLoadingQrFlow(true);
-    const dniToVerify = data.dni.trim();
-    setEnteredDni(dniToVerify);
+    const docNumberCleaned = data.docNumber.trim();
+    setEnteredDni(docNumberCleaned);
 
     try {
         const qrClientsRef = collection(db, "qrClients");
-        const q = query(qrClientsRef, where("dni", "==", dniToVerify), limit(1));
+        const q = query(qrClientsRef, where("dni", "==", docNumberCleaned), limit(1));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
@@ -453,9 +473,35 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedSpecificCode, status: "available" });
             setShowDniModal(false);
             setPageViewState("qrDisplay");
-
         } else {
-            newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: dniToVerify });
+             let fetchedNameFromApi: string | undefined = undefined;
+              if (data.docType === 'dni') {
+                try {
+                    const response = await fetch('/api/admin/consult-dni', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dni: docNumberCleaned }),
+                    });
+                    const resData = await response.json();
+                    if (response.ok && resData.nombreCompleto) {
+                        fetchedNameFromApi = resData.nombreCompleto;
+                    }
+                } catch (apiError) {
+                    console.warn("DNI consultation API failed, continuing without prefill.", apiError);
+                }
+            }
+
+            const nameParts = fetchedNameFromApi?.split(' ') || [];
+            const surname = nameParts.slice(0, 2).join(' '); // Apellido paterno y materno
+            const name = nameParts.slice(2).join(' '); // Nombres
+
+            newQrClientForm.reset({ 
+                name: name || "", 
+                surname: surname || "", 
+                phone: "", 
+                dob: undefined, 
+                dni: docNumberCleaned 
+            });
             setCurrentStepInModal("newUserForm");
         }
     } catch (e: any) {
@@ -565,8 +611,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 
   const handleDniExistsWarningConfirm = async () => {
     setShowDniExistsWarningDialog(false);
-    dniForm.setValue("dni", enteredDni);
-    await handleDniSubmitInModal({ dni: enteredDni });
+    dniForm.setValue("docNumber", enteredDni);
+    await handleDniSubmitInModal({ docType: dniForm.getValues("docType"), docNumber: enteredDni });
     setFormDataForDniWarning(null);
   };
 
@@ -1273,7 +1319,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <UIDialogTitleComponent>
-              {currentStepInModal === "enterDni" ? "Ingresa tu DNI/CE" : "Completa tus Datos"}
+              {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
             </UIDialogTitleComponent>
             <UIDialogDescriptionComponent>
               {currentStepInModal === "enterDni"
@@ -1285,15 +1331,75 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             <Form {...dniForm}>
               <form onSubmit={dniForm.handleSubmit(handleDniSubmitInModal)} className="space-y-4 py-2">
                 <FormField
+                control={dniForm.control}
+                name="docType"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel>Tipo de Documento</FormLabel>
+                    <FormControl>
+                        <RadioGroup
+                            onValueChange={(value) => {
+                                field.onChange(value);
+                                dniForm.setValue('docNumber', ''); // Reset docNumber on type change
+                                dniForm.clearErrors('docNumber');
+                            }}
+                            defaultValue={field.value}
+                            className="grid grid-cols-2 gap-2"
+                        >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                <Label
+                                    htmlFor="docType-dni-public"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'dni' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="dni" id="docType-dni-public" className="sr-only" />
+                                    </FormControl>
+                                    DNI
+                                </Label>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                 <Label
+                                    htmlFor="docType-ce-public"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'ce' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="ce" id="docType-ce-public" className="sr-only" />
+                                    </FormControl>
+                                    Carnet de Extranjería
+                                </Label>
+                            </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+                <FormField
                   control={dniForm.control}
-                  name="dni"
+                  name="docNumber"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        DNI / Carnet de Extranjería <span className="text-destructive">*</span>
+                        Número de Documento <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Número de documento" {...field} maxLength={15} disabled={isLoadingQrFlow} autoFocus />
+                        <Input 
+                            placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
+                            {...field} 
+                            maxLength={watchedDocType === 'dni' ? 8 : 20}
+                            onChange={(e) => {
+                                const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(numericValue);
+                            }}
+                            autoFocus 
+                            disabled={isLoadingQrFlow}
+                          />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1312,7 +1418,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                     Cancelar
                   </Button>
                   <Button type="submit" className="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105" disabled={isLoadingQrFlow}>
-                    {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
+                    {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                   </Button>
                 </ShadcnDialogFooter>
               </form>
@@ -1340,22 +1446,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={newQrClientForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Nombre(s) <span className="text-destructive">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input placeholder="Tus nombres" {...field} value={field.value || ""} disabled={isLoadingQrFlow} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
+                <div className="grid grid-cols-2 gap-4">
+                 <FormField
                   control={newQrClientForm.control}
                   name="surname"
                   render={({ field }) => (
@@ -1370,6 +1462,22 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                     </FormItem>
                   )}
                 />
+                 <FormField
+                  control={newQrClientForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Nombre(s) <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tus nombres" {...field} value={field.value || ""} disabled={isLoadingQrFlow} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                </div>
                 <FormField
                   control={newQrClientForm.control}
                   name="phone"
@@ -1433,7 +1541,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                     onClick={() => {
                       setCurrentStepInModal("enterDni");
                       newQrClientForm.reset({ dni: enteredDni });
-                      dniForm.setValue("dni", enteredDni);
+                      dniForm.setValue("docNumber", enteredDni);
                     }}
                     disabled={isLoadingQrFlow}
                   >
@@ -1477,12 +1585,3 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
