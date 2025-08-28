@@ -27,7 +27,8 @@ export async function POST(request: Request) {
 
     const { dni } = validation.data;
 
-    const apiUrl = `https://www.apisperu.net/api/dni/${dni}`;
+    // --- CORRECCIÓN: URL de la API cambiada al endpoint correcto de apis.net.pe ---
+    const apiUrl = `https://apis.net.pe/api/v1/dni?numero=${dni}`;
 
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -37,7 +38,6 @@ export async function POST(request: Request) {
       },
     });
     
-    // Check if the response status is not OK
     if (!response.ok) {
         let errorMessage = `Error de la API externa: ${response.status} ${response.statusText}`;
         try {
@@ -52,26 +52,23 @@ export async function POST(request: Request) {
 
     const data = await response.json();
 
-    // After getting a 200 OK, check if the body contains a specific error message
     if (data.error) {
       console.warn(`DNI API returned an error in the response body for DNI ${dni}:`, data.error);
       return NextResponse.json(
         { error: data.error },
-        { status: 404 } // Not Found is a common status for this case
+        { status: 404 } 
       );
     }
     
-    // Check if essential data is present
-    if (!data.nombres || !data.apellido_paterno) {
+    if (!data.nombres || !data.apellidoPaterno) {
         console.warn(`DNI API returned incomplete data for DNI ${dni}:`, data);
         return NextResponse.json({ error: 'La API no devolvió datos completos para este DNI.' }, { status: 404 });
     }
 
-    // Combine names into a single string
     const nombreCompleto = [
       data.nombres,
-      data.apellido_paterno,
-      data.apellido_materno,
+      data.apellidoPaterno,
+      data.apellidoMaterno,
     ].filter(Boolean).join(' ').trim();
 
     return NextResponse.json({ nombreCompleto });
