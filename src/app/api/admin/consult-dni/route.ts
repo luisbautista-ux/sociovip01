@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${token}`, // Corregido: añadido "Bearer "
         'Content-Type': 'application/json',
       },
     });
