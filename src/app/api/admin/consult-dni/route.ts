@@ -27,8 +27,8 @@ export async function POST(request: Request) {
 
     const { dni } = validation.data;
 
-    // --- CORRECCIÓN: URL de la API cambiada al endpoint correcto de apis.net.pe ---
-    const apiUrl = `https://apis.net.pe/api/v1/dni?numero=${dni}`;
+    // --- CORRECCIÓN: URL de la API cambiada al endpoint correcto de Factiliza API ---
+    const apiUrl = `https://api.factiliza.com/v1/dni/info/${dni}`;
 
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -38,38 +38,27 @@ export async function POST(request: Request) {
       },
     });
     
+    const data = await response.json();
+
     if (!response.ok) {
         let errorMessage = `Error de la API externa: ${response.status} ${response.statusText}`;
-        try {
-            const errorBody = await response.json();
-            errorMessage = errorBody.message || errorBody.error || errorMessage;
-        } catch (e) {
-            // Could not parse error JSON, use status text
+        if(data.message) {
+            errorMessage = data.message;
         }
-        console.warn(`DNI API returned a non-OK status for DNI ${dni}:`, errorMessage);
+        console.warn(`DNI API (Factiliza) returned a non-OK status for DNI ${dni}:`, errorMessage);
         return NextResponse.json({ error: errorMessage }, { status: response.status });
     }
 
-    const data = await response.json();
-
-    if (data.error) {
-      console.warn(`DNI API returned an error in the response body for DNI ${dni}:`, data.error);
+    if (data.success === false || !data.data || !data.data.nombre_completo) {
+      console.warn(`DNI API (Factiliza) returned an unsuccessful or incomplete response for DNI ${dni}:`, data);
       return NextResponse.json(
-        { error: data.error },
+        { error: data.message || 'La API no devolvió datos completos para este DNI.' },
         { status: 404 } 
       );
     }
     
-    if (!data.nombres || !data.apellidoPaterno) {
-        console.warn(`DNI API returned incomplete data for DNI ${dni}:`, data);
-        return NextResponse.json({ error: 'La API no devolvió datos completos para este DNI.' }, { status: 404 });
-    }
-
-    const nombreCompleto = [
-      data.nombres,
-      data.apellidoPaterno,
-      data.apellidoMaterno,
-    ].filter(Boolean).join(' ').trim();
+    // --- CORRECCIÓN: Usar el campo "nombre_completo" directamente ---
+    const nombreCompleto = data.data.nombre_completo;
 
     return NextResponse.json({ nombreCompleto });
 
