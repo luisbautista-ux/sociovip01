@@ -14,7 +14,7 @@ import {
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
 import type { PlatformUser, PlatformUserRole } from "@/lib/types"; 
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs, limit, writeBatch } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -49,13 +49,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter(); 
 
   const fetchUserProfile = useCallback(async (user: FirebaseUser | null) => {
+    setLoadingProfile(true);
     if (!user) {
       setUserProfile(null);
       setLoadingProfile(false);
       return;
     }
     
-    setLoadingProfile(true);
     try {
       const userDocRef = doc(db, "platformUsers", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -91,6 +91,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       fetchUserProfile(user);
+      setLoadingAuth(false); // Esta línea es crucial y fue la que eliminé por error.
     });
     return () => unsubscribe();
   }, [fetchUserProfile]);
@@ -113,7 +114,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           email: userCredential.user.email || "",
           name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
           roles: [role], 
-          dni: "",
+          dni: "", // El DNI se debe añadir desde un panel de admin
         };
         await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
       }
@@ -126,7 +127,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
-      // states will be cleared by onAuthStateChanged
       router.push("/login"); 
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
