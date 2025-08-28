@@ -42,7 +42,6 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-// 🔁 NUEVA IMAGEN 4K
 const HERO_IMG = "https://i.ibb.co/Df4TYMDn/concierto1.jpg";
 const LOGO_IMG = "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
 
@@ -58,6 +57,7 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
+    // This effect redirects the user if they are already logged in and have a profile.
     if (!loadingAuth && !loadingProfile && currentUser && userProfile) {
       router.push("/auth/dispatcher");
     }
@@ -68,8 +68,8 @@ export default function LoginPage() {
     try {
       const result = await login(values.email, values.password);
       if ("user" in result) {
-        toast({ title: "Inicio de Sesión Exitoso", description: "Serás redirigido en breve." });
-        router.push("/auth/dispatcher");
+        // Don't push here. Let the useEffect handle redirection after profile loads.
+        toast({ title: "Inicio de Sesión Exitoso", description: "Verificando perfil..." });
       } else {
         const errorCode = (result as AuthError).code;
         let errorMessage = "Ocurrió un error al iniciar sesión.";
@@ -83,6 +83,7 @@ export default function LoginPage() {
           errorMessage = "El formato del email no es válido.";
         }
         toast({ title: "Error de Inicio de Sesión", description: errorMessage, variant: "destructive" });
+        setIsSubmitting(false); // Only set submitting to false on error
       }
     } catch (err) {
       console.error("Unexpected login error", err);
@@ -91,9 +92,9 @@ export default function LoginPage() {
         description: "Ocurrió un error inesperado. Por favor, intenta de nuevo.",
         variant: "destructive",
       });
-    } finally {
       setIsSubmitting(false);
     }
+    // Don't set isSubmitting to false on success, to keep UI disabled during redirection.
   };
 
   const handleGoogleLogin = async () => {
@@ -102,39 +103,49 @@ export default function LoginPage() {
       const authResult = await loginWithGoogle();
 
       if ("user" in authResult) { // Check if it's UserCredential
-        toast({ title: "Autenticación Exitosa", description: "Verificando y creando perfil de usuario...", duration: 2000 });
+        toast({ title: "Autenticación Exitosa", description: "Verificando y actualizando perfil...", duration: 2000 });
         
-        // Now handle profile creation/update
+        // Now handle profile creation/update. Let this complete.
         await handleUserProfileUpdateAfterGoogleLogin(authResult);
         
-        toast({ title: "Inicio de Sesión Completo", description: "¡Bienvenido/a! Serás redirigido." });
-        router.push("/auth/dispatcher");
-
+        // After profile is updated, the onAuthStateChanged listener in AuthContext
+        // will fetch the new profile, and the useEffect on this page will handle the redirect.
+        // No need to push router here.
       } else { // It's an AuthError
         const errorCode = (authResult as AuthError).code;
         let errorMessage = "No se pudo iniciar sesión con Google.";
         if (errorCode === "auth/popup-closed-by-user") {
             errorMessage = "Has cerrado la ventana de inicio de sesión. Inténtalo de nuevo.";
         } else if (errorCode === 'auth/account-exists-with-different-credential') {
-            errorMessage = "Ya existe una cuenta con este email, pero con otra forma de inicio de sesión (ej: contraseña). Por favor, inicia sesión de la forma tradicional."
+            errorMessage = "Ya existe una cuenta con este email, pero con otra forma de inicio de sesión (ej: contraseña)."
         }
         toast({ title: "Error con Google", description: errorMessage, variant: "destructive" });
+        setIsSubmitting(false);
       }
     } catch (err: any) {
        console.error("Unexpected Google login error", err);
        toast({ title: "Error con Google", description: err.message || "Ocurrió un error inesperado.", variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
+       setIsSubmitting(false);
     }
   };
 
-  if (loadingAuth || (currentUser && loadingProfile)) {
+  // If already logged in, show a loading state until redirection happens.
+  if (currentUser && !loadingProfile) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/40">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-muted-foreground">Verificando sesión...</p>
+        <p className="mt-4 text-lg text-muted-foreground">Sesión iniciada. Redirigiendo a tu panel...</p>
       </div>
     );
+  }
+  
+  if (loadingAuth || loadingProfile) {
+    return (
+       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/40">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Cargando...</p>
+      </div>
+    )
   }
 
   return (

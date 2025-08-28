@@ -48,70 +48,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<PlatformUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true); 
-  const [loadingProfile, setLoadingProfile] = useState(false); 
+  const [loadingProfile, setLoadingProfile] = useState(true); // Start as true
   
   const router = useRouter(); 
 
+  const fetchUserProfile = useCallback(async (user: FirebaseUser | null) => {
+    if (!user) {
+      setUserProfile(null);
+      setLoadingProfile(false);
+      return;
+    }
+    
+    setLoadingProfile(true);
+    try {
+      const userDocRef = doc(db, "platformUsers", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      if (userDocSnap.exists()) {
+        const profileDataFromDb = userDocSnap.data();
+        let rolesArray: PlatformUser['roles'] = [];
+        if (profileDataFromDb.roles && Array.isArray(profileDataFromDb.roles)) {
+          rolesArray = profileDataFromDb.roles;
+        } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') {
+          rolesArray = [profileDataFromDb.role as PlatformUserRole];
+        }
+        
+        const profileData = { 
+            id: userDocSnap.id, 
+            uid: user.uid, 
+            ...profileDataFromDb,
+            roles: rolesArray, 
+        } as PlatformUser;
+        setUserProfile(profileData);
+      } else {
+        setUserProfile(null);
+      }
+    } catch (error) {
+      console.error("AuthContext: Error fetching user profile:", error);
+      setUserProfile(null);
+    } finally {
+      setLoadingProfile(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       console.log("AuthContext: onAuthStateChanged triggered. User:", user ? user.uid : null);
       setCurrentUser(user);
-      setLoadingAuth(false); 
-
-      if (user) {
-        setLoadingProfile(true);
-        setUserProfile(null); 
-        
-        // Added timeout to prevent race condition where Firestore read happens before write completes on first login.
-        setTimeout(async () => {
-          try {
-            const userDocRef = doc(db, "platformUsers", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            
-            console.log("AuthContext: Attempting to fetch profile for UID:", user.uid);
-            if (userDocSnap.exists()) {
-              const profileDataFromDb = userDocSnap.data();
-              console.log("AuthContext: Profile data fetched from Firestore:", profileDataFromDb);
-              
-              let rolesArray: PlatformUser['roles'] = [];
-              if (profileDataFromDb.roles && Array.isArray(profileDataFromDb.roles)) {
-                rolesArray = profileDataFromDb.roles;
-              } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') { // Legacy support for single role
-                rolesArray = [profileDataFromDb.role as PlatformUserRole];
-              } else {
-                console.warn(`AuthContext: User profile for UID ${user.uid} has missing or invalid 'roles' field. Defaulting to empty roles array.`);
-              }
-
-              const profileData = { 
-                  id: userDocSnap.id, 
-                  uid: user.uid, 
-                  ...profileDataFromDb,
-                  roles: rolesArray, 
-              } as PlatformUser;
-              setUserProfile(profileData);
-            } else {
-              console.warn(`AuthContext: PROFILE NOT FOUND in Firestore for UID: ${user.uid}. This might happen on first-time social login before profile creation is complete.`);
-              setUserProfile(null); // Explicitly set to null if not found
-            }
-          } catch (error) {
-            console.error("AuthContext: Error fetching user profile:", error);
-            setUserProfile(null);
-          } finally {
-            setLoadingProfile(false);
-          }
-        }, 500); // 500ms delay
-
-      } else { // No user logged in
-        setUserProfile(null); 
-        setLoadingProfile(false); 
-      }
+      setLoadingAuth(false);
+      fetchUserProfile(user);
     });
 
     return () => {
       console.log("AuthContext: Unsubscribing from onAuthStateChanged");
       unsubscribe();
     };
-  }, []); // Empty dependency array means this effect runs once on mount and cleans up on unmount.
+  }, [fetchUserProfile]);
 
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
@@ -132,10 +124,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           email: userCredential.user.email || "",
           name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
           roles: [role], 
-          dni: "", // DNI is not collected at signup, must be added from admin panel
+          dni: "",
         };
         await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
-        console.log(`AuthContext: Profile with role '${role}' created in Firestore for UID:`, userCredential.user.uid);
       }
       return userCredential;
     } catch (error) {
@@ -146,7 +137,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loginWithGoogle = useCallback(async (): Promise<UserCredential | AuthError> => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    
     try {
       const userCredential = await signInWithPopup(auth, provider);
       return userCredential;
@@ -174,34 +164,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ]);
 
     if (userDocSnapByUid.exists()) {
-      console.log("AuthContext (Google): Profile found by UID. Updating lastLogin.");
       await updateDoc(userDocSnapByUid.ref, { lastLogin: serverTimestamp() });
     } else if (!preCreatedUserSnap.empty) {
       const preCreatedDoc = preCreatedUserSnap.docs[0];
       const preCreatedData = preCreatedDoc.data();
-      console.log("AuthContext (Google): Found pre-created profile by email. ID:", preCreatedDoc.id);
-
+      
       if (preCreatedData.uid && preCreatedData.uid !== null) {
-        console.error("AuthContext (Google): Security conflict. Email is already linked to a different UID.");
-        await signOut(auth); // Sign out the current user to prevent inconsistent state
+        await signOut(auth);
         throw new Error("Este email ya está asociado a otra cuenta de autenticación.");
       }
       
       const batch = writeBatch(db);
-      const finalData = {
-        ...preCreatedData,
-        uid: user.uid,
-        lastLogin: serverTimestamp(),
-      };
+      const finalData = { ...preCreatedData, uid: user.uid, lastLogin: serverTimestamp() };
 
       batch.set(userDocRefByUid, finalData);
       batch.delete(preCreatedDoc.ref);
-      
       await batch.commit();
-      console.log("AuthContext (Google): Successfully migrated pre-created profile to Google Auth UID.");
-
     } else {
-      console.log("AuthContext (Google): No existing profile. Creating a new one for a new user.");
       const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
         uid: user.uid,
         email: user.email || "",
@@ -210,14 +189,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         dni: "",
       };
       await setDoc(userDocRefByUid, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
-      console.log("AuthContext (Google): New promoter profile created for UID:", user.uid);
     }
   }, []);
 
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
-      // Clearing local state immediately for a faster UI response
       setCurrentUser(null);
       setUserProfile(null);
       router.push("/login"); 
