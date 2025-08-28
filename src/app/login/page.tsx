@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +30,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Loader2, ArrowLeft } from "lucide-react";
 import type { AuthError } from "firebase/auth";
+import { GoogleIcon, SocioVipLogo } from "@/components/icons";
+import { Separator } from "@/components/ui/separator";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
@@ -46,7 +49,7 @@ const LOGO_IMG = "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { login, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { login, loginWithGoogle, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
   const router = useRouter();
 
   const form = useForm<LoginFormValues>({
@@ -93,6 +96,31 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setIsSubmitting(true);
+    try {
+      const result = await loginWithGoogle();
+      if ("user" in result) {
+        toast({ title: "Inicio de Sesión Exitoso", description: "¡Bienvenido/a de nuevo!" });
+        router.push("/auth/dispatcher");
+      } else {
+        const errorCode = (result as AuthError).code;
+        let errorMessage = "No se pudo iniciar sesión con Google.";
+        if (errorCode === "auth/popup-closed-by-user") {
+            errorMessage = "Has cerrado la ventana de inicio de sesión. Inténtalo de nuevo.";
+        } else if (errorCode === 'auth/account-exists-with-different-credential') {
+            errorMessage = "Ya existe una cuenta con este email pero con un método de inicio de sesión diferente."
+        }
+        toast({ title: "Error con Google", description: errorMessage, variant: "destructive" });
+      }
+    } catch (err) {
+       console.error("Unexpected Google login error", err);
+       toast({ title: "Error con Google", description: "Ocurrió un error inesperado.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loadingAuth || (currentUser && loadingProfile)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/40">
@@ -104,23 +132,18 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen bg-[#f4eef7]">
-      {/* Volver al inicio — fuera de la tarjeta, en la esquina superior izquierda */}
       <Link
-  href="/"
-  className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text hover:text-primary/80"
->
-  <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
-  Volver al inicio
-</Link>
+        href="/"
+        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text hover:text-primary/80"
+      >
+        <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+        Volver al inicio
+      </Link>
 
-
-      {/* Columna izquierda con el título "Bienvenido a SocioVIP" dentro de una tarjeta */}
       <div className="relative flex items-center justify-center min-h-screen">
         <div className="w-full max-w-xl mx-auto px-6 md:px-12 pt-20 md:pt-28">
-          {/* Tarjeta que contiene el título */}
           <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md md:shadow-lg">
             <CardHeader className="py-6">
-              {/* Título "Bienvenido a SocioVIP" dentro de la tarjeta */}
               <CardTitle className="text-center text-3xl font-extrabold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
                 Bienvenido a
               </CardTitle>
@@ -130,18 +153,10 @@ export default function LoginPage() {
             </CardHeader>
 
             <CardContent className="pb-2">
-              {/* Tarjeta interna que contiene el formulario de login */}
               <Card className="bg-white/90 rounded-xl shadow-md">
                 <CardHeader className="py-6">
                   <div className="w-full flex justify-center mb-4">
-                    <Image
-                      src={LOGO_IMG}
-                      alt="SocioVIP"
-                      width={96} // Tamaño más grande
-                      height={96} // Tamaño más grande
-                      className="rounded-full shadow-sm ring-1 ring-black/10"
-                      priority
-                    />
+                    <SocioVipLogo size={96} />
                   </div>
                   <CardTitle className="text-center">Iniciar Sesión</CardTitle>
                   <CardDescription className="text-center">
@@ -209,11 +224,33 @@ export default function LoginPage() {
                       </Button>
                     </form>
                   </Form>
+                  
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">
+                        O continuar con
+                      </span>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleGoogleLogin}
+                    disabled={isSubmitting}
+                  >
+                    <GoogleIcon className="mr-2 h-4 w-4" />
+                    Google
+                  </Button>
+
                 </CardContent>
               </Card>
             </CardContent>
 
-            <CardFooter className="flex-col items-center text-sm">
+            <CardFooter className="flex-col items-center text-sm pt-4">
               <p className="text-muted-foreground">
                 ¿No tienes una cuenta de Super Admin?{" "}
                 <Link href="/signup" className="font-medium text-primary hover:underline">

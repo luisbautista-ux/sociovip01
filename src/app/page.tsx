@@ -125,8 +125,8 @@ export default function HomePage() {
             <NextImage
               src="https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg"
               alt="SocioVIP logo"
-              width={52}
-              height={52}
+              width={65}
+              height={65}
               priority
               className="rounded-full ring-2 ring-purple-200/50 object-cover shadow-sm"
             />

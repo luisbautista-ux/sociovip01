@@ -9,6 +9,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
   UserCredential
 } from "firebase/auth";
 import type { AuthError } from "firebase/auth"; 
@@ -24,6 +26,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<UserCredential | AuthError>;
   signup: (email: string, pass: string, name?: string, role?: PlatformUserRole) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
+  loginWithGoogle: () => Promise<UserCredential | AuthError>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -135,23 +138,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       if (userCredential.user) {
         const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
-        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'dni'> & { lastLogin: any; businessId: string | null; dni: string; } = {
+        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
           uid: userCredential.user.uid,
           email: userCredential.user.email || "",
           name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
           roles: [role], 
-          dni: "",
-          businessId: null,
-          lastLogin: serverTimestamp(),
+          dni: "", // DNI should be added later by an admin if needed
         };
-        await setDoc(userDocRef, newProfile);
+        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
         console.log(`AuthContext: Profile with role '${role}' created in Firestore for UID:`, userCredential.user.uid);
       }
       return userCredential;
     } catch (error) {
       return error as AuthError;
     }
-  }, [router]);
+  }, []);
+
+  const loginWithGoogle = useCallback(async (): Promise<UserCredential | AuthError> => {
+    if (!auth || !db) return { code: "auth/internal-error", message: "Firebase Auth/DB not initialized" } as AuthError;
+    const provider = new GoogleAuthProvider();
+    try {
+        const userCredential = await signInWithPopup(auth, provider);
+        const user = userCredential.user;
+
+        // Check if user profile already exists in Firestore
+        const userDocRef = doc(db, "platformUsers", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (!userDocSnap.exists()) {
+            // User is new, create a profile in Firestore
+            console.log("AuthContext: New Google login. Creating profile for UID:", user.uid);
+            const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
+                uid: user.uid,
+                email: user.email || "",
+                name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
+                roles: ["promoter"], // Default role for new social sign-ups
+                dni: "", // DNI is empty by default
+            };
+            await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
+        } else {
+            console.log("AuthContext: Existing Google login. Profile found for UID:", user.uid);
+        }
+        
+        return userCredential;
+    } catch (error) {
+        return error as AuthError;
+    }
+  }, []);
 
   const logout = useCallback(async () => {
     if (!auth) return;
@@ -161,7 +194,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
     }
-  }, [router]); // router is a stable dependency
+  }, [router]);
 
   const value = useMemo(() => ({
     currentUser,
@@ -171,7 +204,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     signup,
     logout,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout]);
+    loginWithGoogle,
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, loginWithGoogle]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
