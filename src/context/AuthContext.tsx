@@ -48,7 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<PlatformUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true); 
-  const [loadingProfile, setLoadingProfile] = useState(true); // Start as true
+  const [loadingProfile, setLoadingProfile] = useState(true);
   
   const router = useRouter(); 
 
@@ -93,22 +93,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("AuthContext: onAuthStateChanged triggered. User:", user ? user.uid : null);
       setCurrentUser(user);
       setLoadingAuth(false);
       fetchUserProfile(user);
     });
-
-    return () => {
-      console.log("AuthContext: Unsubscribing from onAuthStateChanged");
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [fetchUserProfile]);
 
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      return userCredential;
+      return await signInWithEmailAndPassword(auth, email, pass);
     } catch (error) {
       return error as AuthError;
     }
@@ -138,10 +132,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      const userCredential = await signInWithPopup(auth, provider);
-      return userCredential;
+      return await signInWithPopup(auth, provider);
     } catch (error) {
-      console.error("AuthContext (Google): Login/Signup failed.", error);
       return error as AuthError;
     }
   }, []);
@@ -155,32 +147,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     
     const userDocRefByUid = doc(db, "platformUsers", user.uid);
+    
+    // Primero, verificar si ya existe un perfil con este UID
+    const userDocSnapByUid = await getDoc(userDocRefByUid);
+    if (userDocSnapByUid.exists()) {
+      // El perfil ya existe y está correctamente vinculado. Actualizar último login.
+      await updateDoc(userDocRefByUid, { lastLogin: serverTimestamp() });
+      return; 
+    }
+
+    // Si no existe perfil con el UID, buscar si hay un perfil pre-creado con ese email
     const usersRef = collection(db, "platformUsers");
     const q = query(usersRef, where("email", "==", userEmail), limit(1));
-    
-    const [userDocSnapByUid, preCreatedUserSnap] = await Promise.all([
-      getDoc(userDocRefByUid),
-      getDocs(q)
-    ]);
+    const preCreatedUserSnap = await getDocs(q);
 
-    if (userDocSnapByUid.exists()) {
-      await updateDoc(userDocSnapByUid.ref, { lastLogin: serverTimestamp() });
-    } else if (!preCreatedUserSnap.empty) {
+    if (!preCreatedUserSnap.empty) {
+      // Se encontró un perfil pre-creado. Vincularlo.
       const preCreatedDoc = preCreatedUserSnap.docs[0];
       const preCreatedData = preCreatedDoc.data();
       
-      if (preCreatedData.uid && preCreatedData.uid !== null) {
+      // Si el perfil pre-creado ya tiene un UID diferente, es un conflicto.
+      if (preCreatedData.uid && preCreatedData.uid !== null && preCreatedData.uid !== user.uid) {
         await signOut(auth);
         throw new Error("Este email ya está asociado a otra cuenta de autenticación.");
       }
       
+      // Mover los datos del documento pre-creado al nuevo documento con el UID correcto
       const batch = writeBatch(db);
       const finalData = { ...preCreatedData, uid: user.uid, lastLogin: serverTimestamp() };
-
-      batch.set(userDocRefByUid, finalData);
-      batch.delete(preCreatedDoc.ref);
+      
+      batch.set(userDocRefByUid, finalData); // Crea el nuevo documento con el UID
+      batch.delete(preCreatedDoc.ref);      // Elimina el documento antiguo sin UID
+      
       await batch.commit();
+
     } else {
+      // No existe perfil pre-creado. Crear uno nuevo (flujo de registro).
       const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
         uid: user.uid,
         email: user.email || "",
@@ -195,8 +197,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
-      setCurrentUser(null);
-      setUserProfile(null);
+      // states will be cleared by onAuthStateChanged
       router.push("/login"); 
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
