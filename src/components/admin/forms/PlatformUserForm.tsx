@@ -24,8 +24,6 @@ import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, In
 import { DialogFooter } from "@/components/ui/dialog";
 import { ALL_PLATFORM_USER_ROLES, PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 import { Separator } from "@/components/ui/separator";
-import { GoogleIcon } from "@/components/icons";
-
 
 const platformUserFormSchemaBase = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
@@ -35,9 +33,9 @@ const platformUserFormSchemaBase = z.object({
   businessId: z.string().optional(),
 });
 
-// Schema for creation includes optional password
+// Schema for creation includes password
 const platformUserFormSchemaCreate = platformUserFormSchemaBase.extend({
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres.").optional(),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
 }).refine(data => {
   const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
   if (rolesThatNeedBusiness.length > 0) {
@@ -61,7 +59,7 @@ const platformUserFormSchemaEdit = platformUserFormSchemaBase.refine(data => {
   path: ["businessId"], 
 });
 
-// Merged type for the form, password is optional
+// Merged type for the form, password is for creation only
 type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase> & { password?: string };
 
 interface PlatformUserFormProps {
@@ -143,11 +141,8 @@ export function PlatformUserForm({
     }
   }, [showBusinessIdField, form]);
 
-  const handleSubmit = async (values: PlatformUserFormValues, creationMethod: 'password' | 'google') => {
-    // Si se crea con Google, nos aseguramos que el password sea undefined
-    const finalPassword = creationMethod === 'google' ? undefined : values.password;
-
-    if (creationMethod === 'password' && (!finalPassword || finalPassword.length < 6)) {
+  const handleSubmit = async (values: PlatformUserFormValues) => {
+    if (!isEditing && (!values.password || values.password.length < 6)) {
         form.setError("password", { type: "manual", message: "La contraseña es requerida y debe tener al menos 6 caracteres." });
         return;
     }
@@ -159,7 +154,7 @@ export function PlatformUserForm({
       email: values.email,
       roles: values.roles,
       businessId: showBusinessIdField ? values.businessId : undefined,
-      password: finalPassword, // Only present when creating
+      password: values.password, // Only present when creating
     };
     await onSubmit(dataToSubmit, isEditing);
   };
@@ -169,7 +164,7 @@ export function PlatformUserForm({
 
   return (
     <Form {...form}>
-      <form className="space-y-4 max-h-[70vh] overflow-y-auto pr-3">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-3">
         {isPrePopulatedFromOtherSource && (
           <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
             <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -234,13 +229,12 @@ export function PlatformUserForm({
         />
 
         {!isEditing && (
-            <>
             <FormField
                 control={form.control}
                 name="password"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Contraseña Inicial</FormLabel>
+                    <FormLabel>Contraseña Inicial <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                         <Input
                         type="text" // text para que el admin pueda verla
@@ -256,28 +250,6 @@ export function PlatformUserForm({
                     </FormItem>
                 )}
             />
-             <Button type="button" className="w-full" onClick={form.handleSubmit((values) => handleSubmit(values, 'password'))} disabled={isSubmitting || disableSubmitOverride}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Crear Usuario con Contraseña
-             </Button>
-
-            <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
-                        O
-                    </span>
-                </div>
-            </div>
-
-            <Button type="button" variant="outline" className="w-full" onClick={form.handleSubmit((values) => handleSubmit(values, 'google'))} disabled={isSubmitting || disableSubmitOverride}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <GoogleIcon className="mr-2 h-5 w-5" />
-                Crear para que inicie con Google
-             </Button>
-            </>
         )}
         
         <FormItem>
@@ -356,12 +328,10 @@ export function PlatformUserForm({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          {isEditing && (
-            <Button type="button" onClick={form.handleSubmit((values) => handleSubmit(values, 'password'))} variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar Cambios
-            </Button>
-          )}
+          <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? "Guardar Cambios" : "Crear Usuario"}
+          </Button>
         </DialogFooter>
       </form>
     </Form>

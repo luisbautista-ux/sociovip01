@@ -30,7 +30,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Loader2, ArrowLeft } from "lucide-react";
 import type { AuthError, UserCredential } from "firebase/auth";
-import { GoogleIcon, SocioVipLogo } from "@/components/icons";
+import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 
 const loginFormSchema = z.object({
@@ -42,13 +42,10 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-const HERO_IMG = "https://i.ibb.co/Df4TYMDn/concierto1.jpg";
-const LOGO_IMG = "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
-
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { login, loginWithGoogle, handleUserProfileUpdateAfterGoogleLogin, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { login, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
   const router = useRouter();
 
   const form = useForm<LoginFormValues>({
@@ -95,38 +92,6 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
     // Don't set isSubmitting to false on success, to keep UI disabled during redirection.
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsSubmitting(true);
-    try {
-      const authResult = await loginWithGoogle();
-
-      if ("user" in authResult) { // Check if it's UserCredential
-        toast({ title: "Autenticación Exitosa", description: "Verificando y actualizando perfil...", duration: 2000 });
-        
-        // Now handle profile creation/update. Let this complete.
-        await handleUserProfileUpdateAfterGoogleLogin(authResult);
-        
-        // After profile is updated, the onAuthStateChanged listener in AuthContext
-        // will fetch the new profile, and the useEffect on this page will handle the redirect.
-        // No need to push router here.
-      } else { // It's an AuthError
-        const errorCode = (authResult as AuthError).code;
-        let errorMessage = "No se pudo iniciar sesión con Google.";
-        if (errorCode === "auth/popup-closed-by-user") {
-            errorMessage = "Has cerrado la ventana de inicio de sesión. Inténtalo de nuevo.";
-        } else if (errorCode === 'auth/account-exists-with-different-credential') {
-            errorMessage = "Ya existe una cuenta con este email, pero con otra forma de inicio de sesión (ej: contraseña)."
-        }
-        toast({ title: "Error con Google", description: errorMessage, variant: "destructive" });
-        setIsSubmitting(false);
-      }
-    } catch (err: any) {
-       console.error("Unexpected Google login error", err);
-       toast({ title: "Error con Google", description: err.message || "Ocurrió un error inesperado.", variant: "destructive" });
-       setIsSubmitting(false);
-    }
   };
 
   // If already logged in, show a loading state until redirection happens.
@@ -242,25 +207,6 @@ export default function LoginPage() {
                       </Button>
                     </form>
                   </Form>
-                  <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-white px-2 text-muted-foreground">
-                            O continuar con
-                        </span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleGoogleLogin}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <GoogleIcon className="mr-2 h-4 w-4" />}
-                    Iniciar Sesión con Google
-                  </Button>
                 </CardContent>
               </Card>
             </CardContent>
