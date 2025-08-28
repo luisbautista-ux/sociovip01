@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
 import { Star, PlusCircle, Download, Search, Edit, Trash2, Mail, Phone, Award, ShieldCheck, CalendarDays, Cake, Filter, Loader2, AlertTriangle, Info } from "lucide-react";
 import type { SocioVipMember, SocioVipMemberFormData, QrClient, PlatformUser, InitialDataForSocioVipCreation } from "@/lib/types";
-import { format, getMonth, parseISO } from "date-fns";
+import { format, getMonth, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useCallback } from "react";
@@ -41,10 +41,10 @@ const DniEntrySchema = z.object({
             });
         }
     } else if (data.docType === 'ce') {
-        if (!/^\d{10,20}$/.test(data.docNumber)) {
+        if (!/^\d{1,20}$/.test(data.docNumber)) { // Permitir cualquier longitud de 1 a 20 para CE
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
+                message: "El Carnet de Extranjería debe contener solo dígitos numéricos.",
                 path: ['docNumber'],
             });
         }
@@ -95,6 +95,18 @@ export default function AdminSocioVipPage() {
       const querySnapshot = await getDocs(collection(db, "socioVipMembers"));
       const fetchedMembers: SocioVipMember[] = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
+        
+        const toSafeISOString = (dateValue: any): string | undefined => {
+            if (!dateValue) return undefined;
+            if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
+            if (dateValue instanceof Date) return dateValue.toISOString();
+            if (typeof dateValue === 'string') {
+              const parsedDate = new Date(dateValue);
+              return isValid(parsedDate) ? parsedDate.toISOString() : undefined;
+            }
+            return undefined;
+        };
+
         return {
           id: docSnap.id,
           name: data.name,
@@ -109,8 +121,8 @@ export default function AdminSocioVipPage() {
           membershipStatus: data.membershipStatus || 'inactive',
           staticQrCodeUrl: data.staticQrCodeUrl,
           authUid: data.authUid,
-          joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate ? parseISO(data.joinDate as string).toISOString() : new Date().toISOString()),
-          dob: data.dob instanceof Timestamp ? data.dob.toDate().toISOString() : (data.dob ? parseISO(data.dob as string).toISOString() : new Date().toISOString()),
+          joinDate: toSafeISOString(data.joinDate) || new Date().toISOString(),
+          dob: toSafeISOString(data.dob)
         } as SocioVipMember;
       });
       setMembers(fetchedMembers);
@@ -140,10 +152,10 @@ export default function AdminSocioVipPage() {
     );
 
     const birthdayMatch = birthdayMonthFilter === "all" ||
-      (member.dob && getMonth(parseISO(member.dob as string)) === parseInt(birthdayMonthFilter));
+      (member.dob && typeof member.dob === 'string' && getMonth(parseISO(member.dob)) === parseInt(birthdayMonthFilter));
 
     const joinMatch = joinMonthFilter === "all" ||
-      (member.joinDate && getMonth(parseISO(member.joinDate as string)) === parseInt(joinMonthFilter));
+      (member.joinDate && typeof member.joinDate === 'string' && getMonth(parseISO(member.joinDate)) === parseInt(joinMonthFilter));
 
     return searchMatch && birthdayMatch && joinMatch;
   });
@@ -156,7 +168,7 @@ export default function AdminSocioVipPage() {
     const headers = ["ID", "Nombre", "Apellido", "Email", "Teléfono", "DNI/CE", "Fec. Nac.", "Puntos", "Estado Membresía", "Fecha Ingreso", "Dirección", "Profesión", "Preferencias"];
     const rows = filteredMembers.map(mem => [
       mem.id, mem.name, mem.surname, mem.email, mem.phone, mem.dni,
-      mem.dob ? format(parseISO(mem.dob as string), "dd/MM/yyyy", { locale: es }) : "N/A",
+      mem.dob && typeof mem.dob === 'string' ? format(parseISO(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.loyaltyPoints, MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS],
       mem.joinDate ? format(parseISO(mem.joinDate as string), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.address || "N/A", mem.profession || "N/A", mem.preferences?.join(', ') || "N/A"
@@ -273,7 +285,19 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             if(!initialData.name) initialData.name = result.qrClientData.name;
             if(!initialData.surname) initialData.surname = result.qrClientData.surname;
             initialData.phone = result.qrClientData.phone;
-            initialData.dob = result.qrClientData.dob instanceof Timestamp ? result.qrClientData.dob.toDate().toISOString() : result.qrClientData.dob as string;
+            
+            // --- FIX ---
+            // Ensure `dob` is always a string when passed as initial data
+            if (result.qrClientData.dob) {
+              if (result.qrClientData.dob instanceof Timestamp) {
+                  initialData.dob = result.qrClientData.dob.toDate().toISOString();
+              } else if (typeof result.qrClientData.dob === 'string') {
+                  initialData.dob = result.qrClientData.dob;
+              } else if (result.qrClientData.dob instanceof Date) {
+                  initialData.dob = result.qrClientData.dob.toISOString();
+              }
+            }
+
         } else if (result.existsAsPlatformUser && result.platformUserData) {
             initialData.existingUserType = 'PlatformUser';
             if (!initialData.name && !initialData.surname) { // only if API fails
@@ -483,14 +507,14 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                       <TableCell className="hidden lg:table-cell">{member.email}</TableCell>
                       <TableCell className="hidden md:table-cell">{member.phone}</TableCell>
                       <TableCell className="hidden xl:table-cell">{member.dni}</TableCell>
-                      <TableCell>{member.dob ? format(parseISO(member.dob as string), "P", { locale: es }) : "N/A"}</TableCell>
+                      <TableCell>{member.dob && typeof member.dob === 'string' ? format(parseISO(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
                       <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
                       <TableCell>
                         <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS]}>
                           {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS]}
                         </Badge>
                       </TableCell>
-                      <TableCell className="hidden lg:table-cell">{member.joinDate ? format(parseISO(member.joinDate as string), "P", { locale: es }) : "N/A"}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{member.joinDate && typeof member.joinDate === 'string' ? format(parseISO(member.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button variant="ghost" size="icon" onClick={() => {
                             setEditingMember(member);
@@ -618,10 +642,14 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                       <Input 
                         placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
                         {...field} 
-                        maxLength={watchedDocType === 'dni' ? 8 : 20}
+                        maxLength={20}
                         onChange={(e) => {
                             const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                            field.onChange(numericValue);
+                            if (watchedDocType === 'dni' && numericValue.length > 8) {
+                                field.onChange(numericValue.slice(0, 8));
+                            } else {
+                                field.onChange(numericValue);
+                            }
                         }}
                         autoFocus 
                         disabled={isSubmitting}
@@ -704,4 +732,3 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     </div>
   );
 }
-
