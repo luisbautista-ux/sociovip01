@@ -61,7 +61,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setLoadingProfile(true);
         setUserProfile(null); 
         
-        // Add a small delay to allow for Firestore propagation after a new Google sign-in/profile update
         setTimeout(async () => {
           try {
             const userDocRef = doc(db, "platformUsers", user.uid);
@@ -98,7 +97,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           } finally {
             setLoadingProfile(false);
           }
-        }, 500); // 500ms delay
+        }, 500); 
 
       } else { 
         setUserProfile(null); 
@@ -131,7 +130,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           email: userCredential.user.email || "",
           name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
           roles: [role], 
-          dni: "", // DNI should be added later by an admin if needed
+          dni: "", 
         };
         await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
         console.log(`AuthContext: Profile with role '${role}' created in Firestore for UID:`, userCredential.user.uid);
@@ -145,6 +144,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loginWithGoogle = useCallback(async (): Promise<UserCredential | AuthError> => {
     const provider = new GoogleAuthProvider();
     try {
+      // Force the auth domain from the config to prevent mismatches
+      if (auth.config.authDomain) {
+          auth.tenantId = auth.config.authDomain;
+          console.log(`AuthContext (Google): Forcing auth domain to: ${auth.config.authDomain}`);
+      }
+
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
       const userEmail = user.email;
@@ -152,18 +157,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!userEmail) {
         throw new Error("El proveedor de Google no proporcionó un email.");
       }
-
-      // Buscar si ya existe un documento para este UID
+      
       const userDocRefByUid = doc(db, "platformUsers", user.uid);
       const userDocSnapByUid = await getDoc(userDocRefByUid);
 
       if (userDocSnapByUid.exists()) {
         console.log("AuthContext (Google): Profile found by UID. Updating lastLogin.");
         await updateDoc(userDocSnapByUid.ref, { lastLogin: serverTimestamp() });
-        return userCredential; // User exists and is linked, process finished.
+        return userCredential;
       }
 
-      // Si no se encontró por UID, buscar por email
       console.log("AuthContext (Google): Profile not found by UID, searching by email:", userEmail);
       const usersRef = collection(db, "platformUsers");
       const q = query(usersRef, where("email", "==", userEmail), limit(1));
@@ -179,36 +182,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
           throw new Error("Este email ya está asociado a otra cuenta de autenticación.");
         }
 
-        if (!preCreatedData.uid) { // This is a pre-created profile
+        if (!preCreatedData.uid) {
           console.log("AuthContext (Google): Profile is pre-created (no UID). Linking now.");
-          // This profile was created by an admin. We need to move it to the correct UID document.
           const batch = writeBatch(db);
-
-          // 1. Create the new document with the correct UID from Google Auth
           batch.set(userDocRefByUid, {
             ...preCreatedData,
             uid: user.uid,
             lastLogin: serverTimestamp(),
           });
-
-          // 2. Delete the old document which had an auto-generated ID
           batch.delete(preCreatedDoc.ref);
-
           await batch.commit();
           console.log("AuthContext (Google): Successfully linked pre-created profile to Google Auth UID.");
         } else {
-          // This case is unlikely if the UID check above passed, but as a safeguard...
           console.log("AuthContext (Google): Profile found by email has a matching UID. Updating lastLogin.");
           await updateDoc(preCreatedDoc.ref, { lastLogin: serverTimestamp() });
         }
       } else {
-        // No profile found by UID or email, create a new one (e.g., for a new promoter signing up)
         console.log("AuthContext (Google): No existing profile. Creating a new one for a new user.");
         const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
           uid: user.uid,
           email: user.email || "",
           name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
-          roles: ["promoter"], // Default role for new Google signups
+          roles: ["promoter"], 
           dni: "",
         };
         await setDoc(userDocRefByUid, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
