@@ -144,12 +144,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loginWithGoogle = useCallback(async (): Promise<UserCredential | AuthError> => {
     const provider = new GoogleAuthProvider();
     try {
-      // Force the auth domain from the config to prevent mismatches
-      if (auth.config.authDomain) {
-          auth.tenantId = auth.config.authDomain;
-          console.log(`AuthContext (Google): Forcing auth domain to: ${auth.config.authDomain}`);
-      }
-
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
       const userEmail = user.email;
