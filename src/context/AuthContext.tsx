@@ -153,18 +153,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       
       const userDocRefByUid = doc(db, "platformUsers", user.uid);
-      const userDocSnapByUid = await getDoc(userDocRefByUid);
+      const usersRef = collection(db, "platformUsers");
+      const q = query(usersRef, where("email", "==", userEmail), limit(1));
+      
+      const [userDocSnapByUid, preCreatedUserSnap] = await Promise.all([
+        getDoc(userDocRefByUid),
+        getDocs(q)
+      ]);
 
       if (userDocSnapByUid.exists()) {
         console.log("AuthContext (Google): Profile found by UID. Updating lastLogin.");
         await updateDoc(userDocSnapByUid.ref, { lastLogin: serverTimestamp() });
         return userCredential;
       }
-
-      console.log("AuthContext (Google): Profile not found by UID, searching by email:", userEmail);
-      const usersRef = collection(db, "platformUsers");
-      const q = query(usersRef, where("email", "==", userEmail), limit(1));
-      const preCreatedUserSnap = await getDocs(q);
 
       if (!preCreatedUserSnap.empty) {
         const preCreatedDoc = preCreatedUserSnap.docs[0];
@@ -175,22 +176,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.error("AuthContext (Google): Security conflict. Email is already linked to a different UID.");
           throw new Error("Este email ya está asociado a otra cuenta de autenticación.");
         }
+        
+        // El perfil pre-creado tiene un ID autogenerado. Hay que moverlo al UID correcto.
+        const batch = writeBatch(db);
+        batch.set(userDocRefByUid, {
+          ...preCreatedData,
+          uid: user.uid,
+          lastLogin: serverTimestamp(),
+        });
+        batch.delete(preCreatedDoc.ref);
+        await batch.commit();
+        console.log("AuthContext (Google): Successfully migrated pre-created profile to Google Auth UID.");
 
-        if (!preCreatedData.uid) {
-          console.log("AuthContext (Google): Profile is pre-created (no UID). Linking now.");
-          const batch = writeBatch(db);
-          batch.set(userDocRefByUid, {
-            ...preCreatedData,
-            uid: user.uid,
-            lastLogin: serverTimestamp(),
-          });
-          batch.delete(preCreatedDoc.ref);
-          await batch.commit();
-          console.log("AuthContext (Google): Successfully linked pre-created profile to Google Auth UID.");
-        } else {
-          console.log("AuthContext (Google): Profile found by email has a matching UID. Updating lastLogin.");
-          await updateDoc(preCreatedDoc.ref, { lastLogin: serverTimestamp() });
-        }
       } else {
         console.log("AuthContext (Google): No existing profile. Creating a new one for a new user.");
         const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {

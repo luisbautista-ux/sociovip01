@@ -9,12 +9,12 @@ import { getStorage, type FirebaseStorage } from "firebase/storage";
 // REEMPLAZA los valores de marcador de posición de abajo con los de tu proyecto de Firebase.
 // Ve a tu consola de Firebase -> Configuración del proyecto -> Tus apps -> SDK de Firebase -> Configuración.
 const firebaseConfig = {
-  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_ID_DE_PROYECTO",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "TUS_NUMEROS",
-  appId: "1:TUS_NUMEROS:web:XXXXXXXXXXXXXXXXXXXXXX"
+  apiKey: "AIzaSyDtMgj_WySsrpmVdYLxem22UzCG8xCKQ4I",
+  authDomain: "cloverpass.firebaseapp.com",
+  projectId: "cloverpass",
+  storageBucket: "cloverpass.appspot.com",
+  messagingSenderId: "564817412003",
+  appId: "1:564817412003:web:8938e8372bb360c0bde416"
 };
 
 // Comprobación para asegurar que los valores han sido cambiados
