@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -124,14 +125,14 @@ export default function HomePage() {
             <NextImage
               src="https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg"
               alt="SocioVIP logo"
-              width={44}
-              height={44}
+              width={52}
+              height={52}
               priority
-              className="-mt-1 rounded-full ring-1 ring-black/10 object-cover"
+              className="rounded-full ring-2 ring-purple-200/50 object-cover shadow-sm"
             />
-            <div className="-mt-0.5">
-              <h1 className="text-3xl font-bold tracking-tight text-primary">SocioVIP</h1>
-              <p className="text-sm text-muted-foreground">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">SocioVIP</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 Descubre las mejores promociones cerca de ti
               </p>
             </div>
