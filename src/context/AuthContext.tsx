@@ -132,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'superadmin'): Promise<UserCredential | AuthError> => {
+  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'promoter'): Promise<UserCredential | AuthError> => {
     if (!auth || !db) return { code: "auth/internal-error", message: "Firebase Auth/DB not initialized" } as AuthError;
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);

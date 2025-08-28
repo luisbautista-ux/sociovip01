@@ -252,7 +252,7 @@ export default function LoginPage() {
 
             <CardFooter className="flex-col items-center text-sm pt-4">
               <p className="text-muted-foreground">
-                ¿No tienes una cuenta de Super Admin?{" "}
+                ¿Aún no eres Promotor?{" "}
                 <Link href="/signup" className="font-medium text-primary hover:underline">
                   Regístrate aquí
                 </Link>

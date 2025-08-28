@@ -29,9 +29,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import type { AuthError } from "firebase/auth";
+import { SocioVipLogo } from "@/components/icons";
 
-// URL del logo directamente en una constante
-const LOGO_IMG = "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
 
 const signupFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
@@ -111,16 +110,8 @@ export default function SignupPage() {
 
       <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
         <CardHeader className="items-center text-center py-6">
-          {/* Logo con la URL de la constante LOGO_IMG */}
           <div className="w-full flex justify-center mb-4">
-            <Image
-              src={LOGO_IMG}
-              alt="SocioVIP"
-              width={96} // Tamaño más grande
-              height={96} // Tamaño más grande
-              className="rounded-full shadow-sm ring-1 ring-black/10"
-              priority
-            />
+            <SocioVipLogo size={96} />
           </div>
           <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
             Crear Cuenta de Promotor
