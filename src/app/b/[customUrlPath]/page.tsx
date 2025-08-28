@@ -145,10 +145,7 @@ type DniFormValues = z.infer<typeof DniEntrySchema>;
 const newQrClientSchema = z.object({
   name: z.string().min(2, { message: "Nombre es requerido." }),
   surname: z.string().min(2, { message: "Apellido es requerido." }),
-  phone: z
-    .string()
-    .min(7, { message: "Celular es requerido." })
-    .regex(/^\+?[0-9\s-()]*$/, "Número de celular inválido."),
+  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9."),
   dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
   dni: z
     .string()
@@ -1487,7 +1484,16 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                         Celular <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isLoadingQrFlow} />
+                        <Input 
+                            type="tel" 
+                            placeholder="987654321" 
+                            {...field} 
+                            maxLength={9}
+                            onChange={(e) => {
+                                const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(numericValue);
+                            }}
+                            disabled={isLoadingQrFlow} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
