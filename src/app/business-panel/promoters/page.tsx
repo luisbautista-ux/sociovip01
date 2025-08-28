@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog"; // Renamed to avoid conflict
+import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog"; 
 import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle } from "lucide-react";
 import type { BusinessPromoterLink, PromoterProfile, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember } from "@/lib/types";
 import { format, parseISO } from "date-fns";
@@ -22,11 +22,33 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormM
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 const DniEntrySchema = z.object({
-  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
+  docNumber: z.string().min(1, "El número de documento es requerido."),
+}).superRefine((data, ctx) => {
+    if (data.docType === 'dni') {
+        if (!/^\d{8}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El DNI debe contener exactamente 8 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    } else if (data.docType === 'ce') {
+        if (!/^\d{10,20}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    }
 });
 type DniEntryValues = z.infer<typeof DniEntrySchema>;
+
 
 interface CheckDniForPromoterResult {
   dni: string;
@@ -60,8 +82,9 @@ export default function BusinessPromotersPage() {
 
   const dniEntryForm = useForm<DniEntryValues>({
     resolver: zodResolver(DniEntrySchema),
-    defaultValues: { dni: "" },
+    defaultValues: { docType: 'dni', docNumber: "" },
   });
+  const watchedDocType = dniEntryForm.watch('docType');
 
   const fetchPromoterLinks = useCallback(async () => {
     if (!currentBusinessId) {
@@ -113,11 +136,10 @@ export default function BusinessPromotersPage() {
   useEffect(() => {
     if (currentBusinessId) {
       fetchPromoterLinks();
-    } else if (userProfile === null) { // userProfile loaded and is null
+    } else if (userProfile === null) { 
         setIsLoading(false);
         setPromoterLinks([]);
     }
-    // Only run when currentBusinessId or userProfile (itself, not its content) changes
   }, [currentBusinessId, userProfile, fetchPromoterLinks]);
 
 
@@ -135,8 +157,6 @@ export default function BusinessPromotersPage() {
     const linksSnapshot = await getDocs(linksQuery);
     if (!linksSnapshot.empty) {
       result.existingLink = { id: linksSnapshot.docs[0].id, ...linksSnapshot.docs[0].data() } as BusinessPromoterLink;
-      // If already linked, we might not need to check other collections unless we want to update info
-      // or ensure the "isPlatformUser" flag is correct.
     }
 
     // 2. Check if DNI exists as a PlatformUser with role 'promoter'
@@ -144,18 +164,8 @@ export default function BusinessPromotersPage() {
     const platformUserSnapshot = await getDocs(platformUserQuery);
     if (!platformUserSnapshot.empty) {
         result.existingPlatformUserPromoter = { id: platformUserSnapshot.docs[0].id, ...platformUserSnapshot.docs[0].data() } as PlatformUser;
-    } else {
-      // 2.b If not found as promoter, check if DNI exists as PlatformUser with *any* role (for data prefill)
-      const anyPlatformUserQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
-      const anyPlatformUserSnapshot = await getDocs(anyPlatformUserQuery);
-      if(!anyPlatformUserSnapshot.empty){
-         // Not setting existingPlatformUserPromoter if not actual promoter role
-         // but could use this data for prefill if needed
-      }
     }
     
-    // 3. If not a PlatformUser promoter, check QrClient (for pre-filling name, phone)
-    // Only check if we don't already have PlatformUser data (as PlatformUser data is richer)
     if (!result.existingPlatformUserPromoter) {
         const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
         const qrClientSnapshot = await getDocs(qrClientQuery);
@@ -164,7 +174,6 @@ export default function BusinessPromotersPage() {
         }
     }
 
-    // 4. If not PlatformUser promoter or QrClient, check SocioVipMember (for pre-filling name, email, phone)
     if (!result.existingPlatformUserPromoter && !result.qrClientData) {
         const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dni));
         const socioVipSnapshot = await getDocs(socioVipQuery);
@@ -178,9 +187,9 @@ export default function BusinessPromotersPage() {
   const handleOpenAddPromoterFlow = () => {
     setEditingPromoterLink(null);
     setVerifiedPromoterDniResult(null);
-    dniEntryForm.reset({ dni: "" });
-    setPromoterLinkToEditFromAlert(null); // Clear this as well
-    setShowAlreadyLinkedAlert(false); // Ensure alert is hidden
+    dniEntryForm.reset({ docType: 'dni', docNumber: "" });
+    setPromoterLinkToEditFromAlert(null); 
+    setShowAlreadyLinkedAlert(false); 
     setShowDniEntryModal(true);
   };
 
@@ -190,11 +199,44 @@ export default function BusinessPromotersPage() {
         return;
     }
     if (isSubmitting) return;
+    
+    const docNumberCleaned = values.docNumber.trim();
+    if (!docNumberCleaned) {
+        toast({ title: "Número de Documento Requerido", description: "Por favor, ingresa un número válido.", variant: "destructive"});
+        return;
+    }
+    
     setIsSubmitting(true);
-    const dniToVerify = values.dni.trim();
-    setDniForPromoterVerification(dniToVerify);
+    setDniForPromoterVerification(docNumberCleaned);
 
-    const checkResult = await checkDniForPromoterAndLink(dniToVerify, currentBusinessId);
+    let fetchedNameFromApi: string | undefined = undefined;
+
+    if (values.docType === 'dni') {
+      try {
+        const response = await fetch('/api/admin/consult-dni', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dni: docNumberCleaned }),
+        });
+        const data = await response.json();
+        if (response.ok && data.nombreCompleto) {
+          fetchedNameFromApi = data.nombreCompleto;
+          toast({ title: "DNI Encontrado", description: `Nombre: ${fetchedNameFromApi}` });
+        } else if (!response.ok) {
+           toast({ title: "Consulta DNI", description: data.error || "No se pudo obtener el nombre para este DNI.", variant: "default" });
+        }
+      } catch (error) {
+        console.error("Error calling DNI consultation API route:", error);
+        toast({ title: "Error de Red", description: "No se pudo comunicar con el servicio de consulta de DNI.", variant: "destructive" });
+      }
+    }
+    
+    const checkResult = await checkDniForPromoterAndLink(docNumberCleaned, currentBusinessId);
+    
+    if (fetchedNameFromApi) {
+        checkResult.qrClientData = { ...checkResult.qrClientData, name: fetchedNameFromApi } as QrClient;
+    }
+    
     setIsSubmitting(false);
     setShowDniEntryModal(false);
 
@@ -202,7 +244,7 @@ export default function BusinessPromotersPage() {
         setPromoterLinkToEditFromAlert(checkResult.existingLink);
         setShowAlreadyLinkedAlert(true);
     } else {
-        setVerifiedPromoterDniResult(checkResult); // Pass the full checkResult
+        setVerifiedPromoterDniResult(checkResult); 
         setEditingPromoterLink(null); 
         setShowAddEditModal(true);
     }
@@ -425,29 +467,88 @@ export default function BusinessPromotersPage() {
       
       <UIDialog open={showDniEntryModal} onOpenChange={(isOpen) => {
           if (!isOpen) {
-            dniEntryForm.reset();
+            dniEntryForm.reset({ docType: 'dni', docNumber: "" });
             setDniForPromoterVerification("");
-            // Do not clear verifiedPromoterDniResult here, it's needed if dialog is submitted
           }
           setShowDniEntryModal(isOpen);
       }}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader>
-            <UIDialogTitle>Paso 1: Verificar DNI/CE del Promotor</UIDialogTitle>
+            <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
             <UIDialogDescription>
-              Ingresa el DNI o Carnet de Extranjería del promotor para verificar si ya existe o está vinculado.
+              Ingresa el documento del promotor para verificar si ya existe o está vinculado.
             </UIDialogDescription>
           </UIDialogHeader>
           <Form {...dniEntryForm}>
             <form onSubmit={dniEntryForm.handleSubmit(handlePromoterDniVerificationSubmit)} className="space-y-4 py-2">
               <FormField
                 control={dniEntryForm.control}
-                name="dni"
+                name="docType"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel>Tipo de Documento</FormLabel>
+                    <FormControl>
+                        <RadioGroup
+                            onValueChange={(value) => {
+                                field.onChange(value);
+                                dniEntryForm.setValue('docNumber', '');
+                                dniEntryForm.clearErrors('docNumber');
+                            }}
+                            defaultValue={field.value}
+                            className="grid grid-cols-2 gap-2"
+                        >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                <Label
+                                    htmlFor="docType-dni-promoter"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'dni' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="dni" id="docType-dni-promoter" className="sr-only" />
+                                    </FormControl>
+                                    DNI
+                                </Label>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                 <Label
+                                    htmlFor="docType-ce-promoter"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'ce' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="ce" id="docType-ce-promoter" className="sr-only" />
+                                    </FormControl>
+                                    Carnet de Extranjería
+                                </Label>
+                            </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessageHook />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={dniEntryForm.control}
+                name="docNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="Número de documento" {...field} maxLength={15} autoFocus disabled={isSubmitting}/>
+                      <Input 
+                        placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
+                        {...field} 
+                        maxLength={watchedDocType === 'dni' ? 8 : 20}
+                        onChange={(e) => {
+                            const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                            field.onChange(numericValue);
+                        }}
+                        autoFocus 
+                        disabled={isSubmitting}
+                      />
                     </FormControl>
                     <FormMessageHook />
                   </FormItem>
@@ -458,7 +559,7 @@ export default function BusinessPromotersPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                 </Button>
               </UIDialogFooter>
             </form>
@@ -500,7 +601,7 @@ export default function BusinessPromotersPage() {
       </UIDialog>
 
        <AlertDialog open={showAlreadyLinkedAlert} onOpenChange={(isOpen) => {
-           if(!isOpen) setPromoterLinkToEditFromAlert(null); // Clear if dialog closes
+           if(!isOpen) setPromoterLinkToEditFromAlert(null);
            setShowAlreadyLinkedAlert(isOpen);
         }}>
         <AlertDialogContent>
@@ -526,6 +627,3 @@ export default function BusinessPromotersPage() {
   );
 }
 
-    
-
-    

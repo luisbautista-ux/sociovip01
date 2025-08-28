@@ -17,19 +17,41 @@ import { Label } from "@/components/ui/label";
 import { SocioVipMemberForm } from "@/components/admin/forms/SocioVipMemberForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { MEMBERSHIP_STATUS_TRANSLATIONS, MEMBERSHIP_STATUS_COLORS, MESES_DEL_ANO_ES } from "@/lib/constants";
+import { MEMBERSHIP_STATUS_TRANSLATIONS, MEMBERSHIP_STATUS_COLORS, MESES_DEL_ANO_ES, PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, query, where, DocumentData } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form"; 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 
 
 const DniEntrySchema = z.object({
-  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
+  docNumber: z.string().min(1, "El número de documento es requerido."),
+}).superRefine((data, ctx) => {
+    if (data.docType === 'dni') {
+        if (!/^\d{8}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El DNI debe contener exactamente 8 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    } else if (data.docType === 'ce') {
+        if (!/^\d{10,20}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    }
 });
 type DniEntryValues = z.infer<typeof DniEntrySchema>;
+
 
 interface CheckSocioDniResult {
   existsAsSocioVip: boolean;
@@ -63,8 +85,9 @@ export default function AdminSocioVipPage() {
 
   const dniEntryForm = useForm<DniEntryValues>({
     resolver: zodResolver(DniEntrySchema),
-    defaultValues: { dni: "" },
+    defaultValues: { docType: 'dni', docNumber: "" },
   });
+  const watchedDocType = dniEntryForm.watch('docType');
 
   const fetchSocioVipMembers = useCallback(async () => {
     setIsLoading(true);
@@ -188,7 +211,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
   const handleOpenCreateSocioVipFlow = () => {
     setEditingMember(null);
     setVerifiedSocioDniResult(null);
-    dniEntryForm.reset({ dni: "" });
+    dniEntryForm.reset({ docType: 'dni', docNumber: "" });
     setShowDniIsAlreadySocioVipAlert(false);
     setExistingSocioVipToEdit(null);
     setDniForSocioVerification("");
@@ -198,15 +221,40 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
   const handleSocioDniVerificationSubmit = async (values: DniEntryValues) => {
     if (isSubmitting) return;
 
-    const dniToVerifyCleaned = values.dni.trim();
-    if (!dniToVerifyCleaned) {
-        toast({ title: "DNI Requerido", description: "Por favor, ingresa un DNI/CE válido.", variant: "destructive"});
+    const docNumberCleaned = values.docNumber.trim();
+    if (!docNumberCleaned) {
+        toast({ title: "Número de Documento Requerido", description: "Por favor, ingresa un número de documento válido.", variant: "destructive"});
         return;
     }
     setIsSubmitting(true);
-    setDniForSocioVerification(dniToVerifyCleaned);
+    setDniForSocioVerification(docNumberCleaned);
 
-    const result = await checkDniAcrossCollections(dniToVerifyCleaned);
+    let fetchedNameFromApi: string | undefined = undefined;
+    let fetchedSurnameFromApi: string | undefined = undefined;
+
+    if (values.docType === 'dni') {
+      try {
+        const response = await fetch('/api/admin/consult-dni', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dni: docNumberCleaned }),
+        });
+        const data = await response.json();
+        if (response.ok && data.nombreCompleto) {
+          const nameParts = data.nombreCompleto.split(' ');
+          fetchedSurnameFromApi = nameParts.slice(0, 2).join(' '); // Apellido paterno y materno
+          fetchedNameFromApi = nameParts.slice(2).join(' '); // Nombres
+          toast({ title: "DNI Encontrado", description: `Nombre: ${data.nombreCompleto}` });
+        } else if (!response.ok) {
+           toast({ title: "Consulta DNI", description: data.error || "No se pudo obtener el nombre para este DNI.", variant: "default" });
+        }
+      } catch (error) {
+        console.error("Error calling DNI consultation API route:", error);
+        toast({ title: "Error de Red", description: "No se pudo comunicar con el servicio de consulta de DNI.", variant: "destructive" });
+      }
+    }
+    
+    const result = await checkDniAcrossCollections(docNumberCleaned);
     setIsSubmitting(false);
     
     if (result.existsAsSocioVip && result.socioVipData) {
@@ -214,19 +262,26 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         setShowDniIsAlreadySocioVipAlert(true);
         setShowDniEntryModal(false);
     } else {
-        let initialData: InitialDataForSocioVipCreation = { dni: dniToVerifyCleaned };
+        let initialData: InitialDataForSocioVipCreation = { dni: docNumberCleaned };
+        
+        // Prioritize API data for name if available
+        if(fetchedNameFromApi) initialData.name = fetchedNameFromApi;
+        if(fetchedSurnameFromApi) initialData.surname = fetchedSurnameFromApi;
+
         if (result.existsAsQrClient && result.qrClientData) {
             initialData.existingUserType = 'QrClient';
-            initialData.name = result.qrClientData.name;
-            initialData.surname = result.qrClientData.surname;
+            if(!initialData.name) initialData.name = result.qrClientData.name;
+            if(!initialData.surname) initialData.surname = result.qrClientData.surname;
             initialData.phone = result.qrClientData.phone;
             initialData.dob = result.qrClientData.dob instanceof Timestamp ? result.qrClientData.dob.toDate().toISOString() : result.qrClientData.dob as string;
         } else if (result.existsAsPlatformUser && result.platformUserData) {
             initialData.existingUserType = 'PlatformUser';
-            initialData.name = result.platformUserData.name.split(' ')[0] || ''; // Asumir primer nombre
-            initialData.surname = result.platformUserData.name.split(' ').slice(1).join(' ') || ''; // Asumir resto como apellido
+            if (!initialData.name && !initialData.surname) { // only if API fails
+              const nameParts = result.platformUserData.name.split(' ');
+              initialData.name = nameParts.slice(1).join(' ');
+              initialData.surname = nameParts[0];
+            }
             initialData.email = result.platformUserData.email;
-            // PlatformUsers no tienen DOB o Phone por defecto en el tipo
         }
         setVerifiedSocioDniResult(initialData); 
         setShowDniEntryModal(false);
@@ -268,20 +323,18 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         const memberRef = doc(db, "socioVipMembers", editingMember.id);
         await updateDoc(memberRef, {
           ...data,
-          dni: data.dni, // Asegurar que el DNI se actualice si cambió
+          dni: data.dni,
           dob: Timestamp.fromDate(data.dob),
           preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
         });
         toast({ title: "Socio VIP Actualizado", description: `El socio "${data.name} ${data.surname}" ha sido actualizado.` });
       } else { 
-        if (!verifiedSocioDniResult?.dni) { // Debe venir de la verificación
+        if (!verifiedSocioDniResult?.dni) { 
           toast({ title: "Error Interno", description: "No se pudo obtener el DNI/CE verificado.", variant: "destructive"});
           setIsSubmitting(false);
           return;
         }
         
-        // El flujo de DNI-primero ya debería haber manejado si el DNI es de un SocioVIP existente.
-        // Aquí solo creamos un nuevo SocioVIP.
         const newMemberPayload = {
           ...data,
           dni: verifiedSocioDniResult.dni, 
@@ -289,7 +342,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
           dob: Timestamp.fromDate(data.dob),
           preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
           staticQrCodeUrl: `https://placehold.co/100x100.png?text=${(data.name || '').substring(0,3).toUpperCase()}QR`,
-          authUid: null, // Se podría vincular a un Auth UID más tarde
+          authUid: null, 
         };
         const docRef = await addDoc(collection(db, "socioVipMembers"), newMemberPayload);
         toast({ title: "Socio VIP Creado", description: `El socio "${data.name} ${data.surname}" ha sido creado con ID: ${docRef.id}.` });
@@ -491,28 +544,88 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
 
       <UIDialog open={showDniEntryModal} onOpenChange={(isOpen) => {
           if (!isOpen) {
-            dniEntryForm.reset();
+            dniEntryForm.reset({ docType: 'dni', docNumber: "" });
             setDniForSocioVerification("");
           }
           setShowDniEntryModal(isOpen);
       }}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader>
-            <UIDialogTitle>Paso 1: Verificar DNI/CE del Socio VIP</UIDialogTitle>
+            <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
             <UIDialogDescription>
-              Ingresa el DNI o Carnet de Extranjería del nuevo Socio VIP para verificar su existencia.
+              Ingresa el documento para verificar si la persona ya existe en la plataforma.
             </UIDialogDescription>
           </UIDialogHeader>
           <Form {...dniEntryForm}>
             <form onSubmit={dniEntryForm.handleSubmit(handleSocioDniVerificationSubmit)} className="space-y-4 py-2">
+               <FormField
+                control={dniEntryForm.control}
+                name="docType"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel>Tipo de Documento</FormLabel>
+                    <FormControl>
+                        <RadioGroup
+                            onValueChange={(value) => {
+                                field.onChange(value);
+                                dniEntryForm.setValue('docNumber', '');
+                                dniEntryForm.clearErrors('docNumber');
+                            }}
+                            defaultValue={field.value}
+                            className="grid grid-cols-2 gap-2"
+                        >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                <Label
+                                    htmlFor="docType-dni-sociovip"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'dni' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="dni" id="docType-dni-sociovip" className="sr-only" />
+                                    </FormControl>
+                                    DNI
+                                </Label>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                 <Label
+                                    htmlFor="docType-ce-sociovip"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'ce' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="ce" id="docType-ce-sociovip" className="sr-only" />
+                                    </FormControl>
+                                    Carnet de Extranjería
+                                </Label>
+                            </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessageHook />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={dniEntryForm.control}
-                name="dni"
+                name="docNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="Número de documento" {...field} maxLength={15} autoFocus disabled={isSubmitting}/>
+                      <Input 
+                        placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
+                        {...field} 
+                        maxLength={watchedDocType === 'dni' ? 8 : 20}
+                        onChange={(e) => {
+                            const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                            field.onChange(numericValue);
+                        }}
+                        autoFocus 
+                        disabled={isSubmitting}
+                      />
                     </FormControl>
                     <FormMessageHook />
                   </FormItem>
@@ -523,7 +636,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                   Cancelar
                 </Button>
                 <Button type="submit" variant="gradient" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI/CE"}
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                 </Button>
               </UIDialogFooter>
             </form>
@@ -561,7 +674,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             onSubmit={handleCreateOrEditMember}
             onCancel={() => { setShowCreateEditModal(false); setEditingMember(null); setVerifiedSocioDniResult(null);}}
             isSubmitting={isSubmitting}
-            disableSubmitOverride={false} // No necesitamos esta lógica aquí ya que la alerta de DNI-ya-es-SocioVIP maneja el bloqueo de creación.
+            disableSubmitOverride={false}
           />
         </UIDialogContent>
       </UIDialog>
@@ -591,3 +704,4 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     </div>
   );
 }
+
