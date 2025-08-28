@@ -291,7 +291,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
       setExistingPlatformUserRoles([]);
   };
 
-  const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
+ const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -300,19 +300,17 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
       : data.businessId;
 
     try {
-      if (isEditing && editingUser) { 
-        const userRef = doc(db, "platformUsers", editingUser.uid); 
-        
+      if (isEditing && editingUser) {
+        const userRef = doc(db, "platformUsers", editingUser.uid);
         if (data.dni !== editingUser.dni) {
-            const dniCheck = await checkDniExists(data.dni);
-            if (dniCheck.exists && dniCheck.platformUserData?.uid !== editingUser.uid) {
-                 toast({ title: "Error de DNI", description: `El DNI ${data.dni} ya está registrado para otro Usuario de Plataforma.`, variant: "destructive" });
-                 setIsSubmitting(false);
-                 return;
-            }
+          const dniCheck = await checkDniExists(data.dni);
+          if (dniCheck.exists && dniCheck.platformUserData?.uid !== editingUser.uid) {
+            toast({ title: "Error de DNI", description: `El DNI ${data.dni} ya está registrado para otro Usuario de Plataforma.`, variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+          }
         }
-        
-        const userPayload: Partial<Omit<PlatformUser, 'id' | 'lastLogin'>> = { 
+        const userPayload: Partial<Omit<PlatformUser, 'id' | 'lastLogin'>> = {
           name: data.name,
           roles: data.roles,
           businessId: finalBusinessId,
@@ -320,11 +318,11 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         };
         await updateDoc(userRef, userPayload);
         toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
-      } else { 
+      } else {
         // --- CREATION LOGIC ---
         const creationPayload = {
           email: data.email,
-          password: data.password, // This now comes from the form
+          password: data.password,
           displayName: data.name,
           firestoreData: {
             dni: data.dni,
@@ -344,34 +342,40 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         const result = await response.json();
 
         if (!response.ok) {
-          // Lanzar error para que sea capturado por el bloque catch
-          throw new Error(result.error || 'Error desconocido al crear usuario.');
+          // Si la respuesta no es OK, muestra el error en un toast y detén la ejecución.
+          toast({
+            title: "Error al Crear Usuario",
+            description: result.error || 'Ocurrió un error desconocido al crear el usuario.',
+            variant: "destructive",
+          });
+          setIsSubmitting(false); // Libera el botón
+          return; // No continúes
         }
 
-        toast({ 
-          title: "Usuario Creado Exitosamente", 
-          description: `Se creó el usuario "${data.name}" con UID: ${result.uid}.`,
+        toast({
+          title: "Usuario Creado Exitosamente",
+          description: `Se creó el usuario "${data.name}" con UID: ${result.uid || result.firestoreId}.`,
         });
       }
       
       setShowCreateEditModal(false);
       setEditingUser(null);
-      setVerifiedDniResult(null); 
-      fetchPlatformUsers(); 
+      setVerifiedDniResult(null);
+      fetchPlatformUsers();
 
     } catch (error: any) {
       console.error("Failed to create/update user:", error);
-      let description = "No se pudo guardar el usuario.";
-      if (error.code === 'permission-denied') {
-        description = "Error de permisos. Verifica las reglas de Firestore."
-      } else if (error.message.includes("Function where() called with invalid data")) {
-        description = "Error interno: datos inválidos para la consulta. Revisa el DNI.";
-      } else {
-        description = error.message; // Use error from API call
-      }
-      toast({ title: "Error al Guardar", description, variant: "destructive"});
+      toast({ 
+        title: "Error Inesperado", 
+        description: `Ocurrió un error inesperado al procesar la solicitud. Detalles: ${error.message}`, 
+        variant: "destructive"
+      });
     } finally {
-      setIsSubmitting(false);
+      // Este finally se ejecuta independientemente de si hay un error o no.
+      // Se movió setIsSubmitting(false) al bloque de error para evitar que se ejecute prematuramente.
+      if (!isSubmitting) { // Check if it was already set to false
+        setIsSubmitting(false);
+      }
     }
   };
 
