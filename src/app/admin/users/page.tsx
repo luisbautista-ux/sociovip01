@@ -344,6 +344,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         const result = await response.json();
 
         if (!response.ok) {
+          // Lanzar error para que sea capturado por el bloque catch
           throw new Error(result.error || 'Error desconocido al crear usuario.');
         }
 
