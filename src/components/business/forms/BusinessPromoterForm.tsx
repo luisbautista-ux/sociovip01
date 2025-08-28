@@ -25,7 +25,10 @@ const promoterFormSchema = z.object({
   promoterDni: z.string(), 
   promoterName: z.string().min(3, "Nombre del promotor es requerido."),
   promoterEmail: z.string().email("Email del promotor inválido."),
-  promoterPhone: z.string().optional(),
+  promoterPhone: z.string()
+    .regex(/^9\d{8}$/, "El celular debe empezar con 9 y tener 9 dígitos.")
+    .optional()
+    .or(z.literal('')),
   commissionRate: z.string().optional(),
 });
 
@@ -185,7 +188,20 @@ export function BusinessPromoterForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Teléfono del Promotor (Opcional)</FormLabel>
-              <FormControl><Input type="tel" placeholder="+51 987654321" {...field} disabled={isSubmitting || disableContactFields} className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""} /></FormControl>
+              <FormControl>
+                <Input 
+                  type="tel" 
+                  placeholder="987654321" 
+                  {...field} 
+                  maxLength={9}
+                  onChange={(e) => {
+                    const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                    field.onChange(numericValue);
+                  }}
+                  disabled={isSubmitting || disableContactFields} 
+                  className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
