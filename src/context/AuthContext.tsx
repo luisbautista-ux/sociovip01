@@ -27,6 +27,7 @@ interface AuthContextType {
   signup: (email: string, pass: string, name?: string, role?: PlatformUserRole) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<UserCredential | AuthError>;
+  handleUserProfileUpdateAfterGoogleLogin: (credential: UserCredential) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -148,67 +149,68 @@ export function AuthProvider({ children }: AuthProviderProps) {
     
     try {
       const userCredential = await signInWithPopup(auth, provider);
-      const user = userCredential.user;
-      const userEmail = user.email;
-
-      if (!userEmail) {
-        throw new Error("El proveedor de Google no proporcionó un email.");
-      }
-      
-      const userDocRefByUid = doc(db, "platformUsers", user.uid);
-      const usersRef = collection(db, "platformUsers");
-      const q = query(usersRef, where("email", "==", userEmail), limit(1));
-      
-      const [userDocSnapByUid, preCreatedUserSnap] = await Promise.all([
-        getDoc(userDocRefByUid),
-        getDocs(q)
-      ]);
-
-      if (userDocSnapByUid.exists()) {
-        console.log("AuthContext (Google): Profile found by UID. Updating lastLogin.");
-        await updateDoc(userDocSnapByUid.ref, { lastLogin: serverTimestamp() });
-      } else if (!preCreatedUserSnap.empty) {
-        const preCreatedDoc = preCreatedUserSnap.docs[0];
-        const preCreatedData = preCreatedDoc.data();
-        console.log("AuthContext (Google): Found pre-created profile by email. ID:", preCreatedDoc.id);
-
-        if (preCreatedData.uid && preCreatedData.uid !== null) {
-          console.error("AuthContext (Google): Security conflict. Email is already linked to a different UID.");
-          await signOut(auth); // Sign out the current user to prevent inconsistent state
-          throw new Error("Este email ya está asociado a otra cuenta de autenticación.");
-        }
-        
-        // This is a pre-created account (uid is null). Let's claim it.
-        const batch = writeBatch(db);
-        const finalData = {
-          ...preCreatedData,
-          uid: user.uid, // Assign the correct Google Auth UID
-          lastLogin: serverTimestamp(),
-        };
-
-        batch.set(userDocRefByUid, finalData); // Create the new document with the correct UID
-        batch.delete(preCreatedDoc.ref);      // Delete the old document with the temporary ID
-        
-        await batch.commit();
-        console.log("AuthContext (Google): Successfully migrated pre-created profile to Google Auth UID.");
-
-      } else {
-        console.log("AuthContext (Google): No existing profile. Creating a new one for a new user.");
-        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
-          uid: user.uid,
-          email: user.email || "",
-          name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
-          roles: ["promoter"], // Default role for new signups
-          dni: "",
-        };
-        await setDoc(userDocRefByUid, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
-        console.log("AuthContext (Google): New promoter profile created for UID:", user.uid);
-      }
-      
       return userCredential;
     } catch (error) {
       console.error("AuthContext (Google): Login/Signup failed.", error);
       return error as AuthError;
+    }
+  }, []);
+
+  const handleUserProfileUpdateAfterGoogleLogin = useCallback(async (credential: UserCredential): Promise<void> => {
+    const user = credential.user;
+    const userEmail = user.email;
+
+    if (!userEmail) {
+      throw new Error("El proveedor de Google no proporcionó un email.");
+    }
+    
+    const userDocRefByUid = doc(db, "platformUsers", user.uid);
+    const usersRef = collection(db, "platformUsers");
+    const q = query(usersRef, where("email", "==", userEmail), limit(1));
+    
+    const [userDocSnapByUid, preCreatedUserSnap] = await Promise.all([
+      getDoc(userDocRefByUid),
+      getDocs(q)
+    ]);
+
+    if (userDocSnapByUid.exists()) {
+      console.log("AuthContext (Google): Profile found by UID. Updating lastLogin.");
+      await updateDoc(userDocSnapByUid.ref, { lastLogin: serverTimestamp() });
+    } else if (!preCreatedUserSnap.empty) {
+      const preCreatedDoc = preCreatedUserSnap.docs[0];
+      const preCreatedData = preCreatedDoc.data();
+      console.log("AuthContext (Google): Found pre-created profile by email. ID:", preCreatedDoc.id);
+
+      if (preCreatedData.uid && preCreatedData.uid !== null) {
+        console.error("AuthContext (Google): Security conflict. Email is already linked to a different UID.");
+        await signOut(auth); // Sign out the current user to prevent inconsistent state
+        throw new Error("Este email ya está asociado a otra cuenta de autenticación.");
+      }
+      
+      const batch = writeBatch(db);
+      const finalData = {
+        ...preCreatedData,
+        uid: user.uid,
+        lastLogin: serverTimestamp(),
+      };
+
+      batch.set(userDocRefByUid, finalData);
+      batch.delete(preCreatedDoc.ref);
+      
+      await batch.commit();
+      console.log("AuthContext (Google): Successfully migrated pre-created profile to Google Auth UID.");
+
+    } else {
+      console.log("AuthContext (Google): No existing profile. Creating a new one for a new user.");
+      const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
+        uid: user.uid,
+        email: user.email || "",
+        name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
+        roles: ["promoter"],
+        dni: "",
+      };
+      await setDoc(userDocRefByUid, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
+      console.log("AuthContext (Google): New promoter profile created for UID:", user.uid);
     }
   }, []);
 
@@ -233,7 +235,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signup,
     logout,
     loginWithGoogle,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, loginWithGoogle]);
+    handleUserProfileUpdateAfterGoogleLogin,
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, loginWithGoogle, handleUserProfileUpdateAfterGoogleLogin]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

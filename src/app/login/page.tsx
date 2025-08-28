@@ -29,7 +29,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Loader2, ArrowLeft } from "lucide-react";
-import type { AuthError } from "firebase/auth";
+import type { AuthError, UserCredential } from "firebase/auth";
 import { GoogleIcon, SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 
@@ -49,7 +49,7 @@ const LOGO_IMG = "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { login, loginWithGoogle, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { login, loginWithGoogle, handleUserProfileUpdateAfterGoogleLogin, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
   const router = useRouter();
 
   const form = useForm<LoginFormValues>({
@@ -99,12 +99,19 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setIsSubmitting(true);
     try {
-      const result = await loginWithGoogle();
-      if ("user" in result) {
-        toast({ title: "Inicio de Sesión con Google Exitoso", description: "¡Bienvenido/a! Serás redirigido." });
+      const authResult = await loginWithGoogle();
+
+      if ("user" in authResult) { // Check if it's UserCredential
+        toast({ title: "Autenticación Exitosa", description: "Verificando y creando perfil de usuario...", duration: 2000 });
+        
+        // Now handle profile creation/update
+        await handleUserProfileUpdateAfterGoogleLogin(authResult);
+        
+        toast({ title: "Inicio de Sesión Completo", description: "¡Bienvenido/a! Serás redirigido." });
         router.push("/auth/dispatcher");
-      } else {
-        const errorCode = (result as AuthError).code;
+
+      } else { // It's an AuthError
+        const errorCode = (authResult as AuthError).code;
         let errorMessage = "No se pudo iniciar sesión con Google.";
         if (errorCode === "auth/popup-closed-by-user") {
             errorMessage = "Has cerrado la ventana de inicio de sesión. Inténtalo de nuevo.";
@@ -113,9 +120,9 @@ export default function LoginPage() {
         }
         toast({ title: "Error con Google", description: errorMessage, variant: "destructive" });
       }
-    } catch (err) {
+    } catch (err: any) {
        console.error("Unexpected Google login error", err);
-       toast({ title: "Error con Google", description: "Ocurrió un error inesperado.", variant: "destructive" });
+       toast({ title: "Error con Google", description: err.message || "Ocurrió un error inesperado.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
