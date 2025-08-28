@@ -271,10 +271,38 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     setIsSubmitting(true); 
     setDniForVerification(docNumberCleaned); 
     
+    let fetchedNameFromApi: string | undefined = undefined;
+
+    // --- Consulta a API externa si es DNI ---
+    if (values.docType === 'dni') {
+      try {
+        const response = await fetch('/api/admin/consult-dni', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dni: docNumberCleaned }),
+        });
+        const data = await response.json();
+        if (response.ok && data.nombreCompleto) {
+          fetchedNameFromApi = data.nombreCompleto;
+          toast({ title: "DNI Encontrado", description: `Nombre: ${fetchedNameFromApi}` });
+        } else if (!response.ok) {
+           toast({ title: "Consulta DNI", description: data.error || "No se pudo obtener el nombre para este DNI.", variant: "default" });
+        }
+      } catch (error) {
+        console.error("Error calling DNI consultation API route:", error);
+        toast({ title: "Error de Red", description: "No se pudo comunicar con el servicio de consulta de DNI.", variant: "destructive" });
+      }
+    }
+    
+    // --- Consulta a base de datos interna ---
     const result = await checkDniExists(docNumberCleaned);
     setIsSubmitting(false);
     
     let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
+
+    if (fetchedNameFromApi) {
+        initialData.name = fetchedNameFromApi;
+    }
 
     if (result.exists) {
         if (result.userType === 'PlatformUser' && result.platformUserData) {
@@ -286,12 +314,12 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             setShowDniEntryModal(false); 
             return; 
         } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
-            initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
+            // Prioriza el nombre de la API si existe, sino el de la BD
+            initialData.name = fetchedNameFromApi || `${result.socioVipData.name} ${result.socioVipData.surname}`;
             initialData.email = result.socioVipData.email;
             initialData.preExistingUserType = 'SocioVipMember';
         } else if (result.userType === 'QrClient' && result.qrClientData) {
-            initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
-            // QrClients no tienen email por defecto en el tipo
+            initialData.name = fetchedNameFromApi || `${result.qrClientData.name} ${result.qrClientData.surname}`;
             initialData.preExistingUserType = 'QrClient';
         }
     }
