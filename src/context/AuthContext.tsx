@@ -52,27 +52,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter(); 
 
   useEffect(() => {
-    if (!auth) { 
-      console.error("AuthContext: Firebase Auth service is not available. Cannot set up auth listener.");
-      setLoadingAuth(false);
-      setLoadingProfile(false);
-      setCurrentUser(null);
-      setUserProfile(null);
-      return;
-    }
-
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("AuthContext: onAuthStateChanged triggered. User:", user ? user.uid : null);
       setCurrentUser(user);
       setLoadingAuth(false); 
 
       if (user) {
-        if (!db) { 
-            console.error("AuthContext: Firestore DB service is not available. Cannot fetch profile.");
-            setLoadingProfile(false);
-            setUserProfile(null);
-            return;
-        }
         setLoadingProfile(true);
         setUserProfile(null); 
         
@@ -128,7 +113,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []); 
 
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
-    if (!auth) return { code: "auth/internal-error", message: "Firebase Auth not initialized" } as AuthError;
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       return userCredential;
@@ -138,7 +122,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'promoter'): Promise<UserCredential | AuthError> => {
-    if (!auth || !db) return { code: "auth/internal-error", message: "Firebase Auth/DB not initialized" } as AuthError;
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       if (userCredential.user) {
@@ -159,8 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
- const loginWithGoogle = useCallback(async (): Promise<UserCredential | AuthError> => {
-    if (!auth || !db) return { code: "auth/internal-error", message: "Firebase Auth/DB not initialized" } as AuthError;
+  const loginWithGoogle = useCallback(async (): Promise<UserCredential | AuthError> => {
     const provider = new GoogleAuthProvider();
     try {
       const userCredential = await signInWithPopup(auth, provider);
@@ -241,7 +223,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const logout = useCallback(async () => {
-    if (!auth) return;
     try {
       await signOut(auth);
       router.push("/login"); 
