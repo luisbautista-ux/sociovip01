@@ -40,10 +40,10 @@ const DniEntrySchema = z.object({
             });
         }
     } else if (data.docType === 'ce') {
-        if (data.docNumber.length < 10 || data.docNumber.length > 20) {
+        if (!/^\d{10,20}$/.test(data.docNumber)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "El Carnet de Extranjería debe tener entre 10 y 20 caracteres.",
+                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
                 path: ['docNumber'],
             });
         }
@@ -625,16 +625,12 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                     <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 caracteres"} 
+                        placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
                         {...field} 
                         maxLength={watchedDocType === 'dni' ? 8 : 20}
                         onChange={(e) => {
-                            if (watchedDocType === 'dni') {
-                                const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                                field.onChange(numericValue);
-                            } else {
-                                field.onChange(e.target.value);
-                            }
+                            const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                            field.onChange(numericValue);
                         }}
                         autoFocus 
                         disabled={isSubmitting}
