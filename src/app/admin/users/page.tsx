@@ -20,13 +20,35 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, writeBatch, getDoc, setDoc, DocumentData } from "firebase/firestore";
 
 const DniEntrySchema = z.object({
-  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
+  docNumber: z.string().min(1, "El número de documento es requerido."),
+}).superRefine((data, ctx) => {
+    if (data.docType === 'dni') {
+        if (!/^\d{8}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El DNI debe contener exactamente 8 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    } else if (data.docType === 'ce') {
+        if (data.docNumber.length < 10 || data.docNumber.length > 20) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El Carnet de Extranjería debe tener entre 10 y 20 caracteres.",
+                path: ['docNumber'],
+            });
+        }
+    }
 });
+
 type DniEntryValues = z.infer<typeof DniEntrySchema>;
 
 interface CheckDniResult {
@@ -63,7 +85,7 @@ export default function AdminUsersPage() {
 
   const dniEntryForm = useForm<DniEntryValues>({
     resolver: zodResolver(DniEntrySchema),
-    defaultValues: { dni: "" },
+    defaultValues: { docType: 'dni', docNumber: "" },
   });
 
   const fetchBusinessesForForm = useCallback(async () => {
@@ -228,7 +250,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     fetchBusinessesForForm(); // Pre-fetch businesses when flow starts
     setEditingUser(null);
     setVerifiedDniResult(null); 
-    dniEntryForm.reset({ dni: "" }); 
+    dniEntryForm.reset({ docType: 'dni', docNumber: "" }); 
     setShowDniIsPlatformUserAlert(false); 
     setExistingPlatformUserToEdit(null);
     setExistingPlatformUserRoles([]);
@@ -239,19 +261,19 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
   const handleDniVerificationSubmit = async (values: DniEntryValues) => {
     if (isSubmitting) return;
     
-    const dniToVerifyCleaned = values.dni.trim();
-    if (!dniToVerifyCleaned) {
-        toast({ title: "DNI Requerido", description: "Por favor, ingresa un DNI/CE válido.", variant: "destructive"});
+    const docNumberCleaned = values.docNumber.trim();
+    if (!docNumberCleaned) {
+        toast({ title: "Número de Documento Requerido", description: "Por favor, ingresa un número de documento válido.", variant: "destructive"});
         return;
     }
 
     setIsSubmitting(true); 
-    setDniForVerification(dniToVerifyCleaned); 
+    setDniForVerification(docNumberCleaned); 
     
-    const result = await checkDniExists(dniToVerifyCleaned);
+    const result = await checkDniExists(docNumberCleaned);
     setIsSubmitting(false);
     
-    let initialData: InitialDataForPlatformUserCreation = { dni: dniToVerifyCleaned };
+    let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
 
     if (result.exists) {
         if (result.userType === 'PlatformUser' && result.platformUserData) {
@@ -399,6 +421,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     const business = availableBusinesses.find(b => b.id === businessId);
     return business?.name || `ID: ${businessId.substring(0, 6)}...`;
   };
+  
+  const watchedDocType = dniEntryForm.watch('docType');
 
   return (
     <div className="space-y-6">
@@ -525,7 +549,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
       
       <UIDialog open={showDniEntryModal} onOpenChange={(isOpen) => {
           if (!isOpen) {
-            dniEntryForm.reset();
+            dniEntryForm.reset({ docType: 'dni', docNumber: "" });
             setDniForVerification(""); 
             setVerifiedDniResult(null);
             setExistingPlatformUserToEdit(null);
@@ -535,21 +559,85 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
       }}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader>
-            <UIDialogTitle>Paso 1: Verificar DNI/CE</UIDialogTitle>
+            <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
             <UIDialogDescription>
-              Ingresa el DNI o Carnet de Extranjería del nuevo usuario para verificar si ya existe.
+              Selecciona el tipo de documento e ingresa el número para verificar si ya existe.
             </UIDialogDescription>
           </UIDialogHeader>
           <Form {...dniEntryForm}>
             <form onSubmit={dniEntryForm.handleSubmit(handleDniVerificationSubmit)} className="space-y-4 py-2">
               <FormField
                 control={dniEntryForm.control}
-                name="dni"
+                name="docType"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel>Tipo de Documento</FormLabel>
+                    <FormControl>
+                        <RadioGroup
+                            onValueChange={(value) => {
+                                field.onChange(value);
+                                dniEntryForm.setValue('docNumber', ''); // Reset docNumber on type change
+                                dniEntryForm.clearErrors('docNumber');
+                            }}
+                            defaultValue={field.value}
+                            className="grid grid-cols-2 gap-2"
+                        >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                <Label
+                                    htmlFor="docType-dni"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'dni' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="dni" id="docType-dni" className="sr-only" />
+                                    </FormControl>
+                                    DNI
+                                </Label>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                 <Label
+                                    htmlFor="docType-ce"
+                                    className={cn(
+                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                        field.value === 'ce' && "bg-primary text-primary-foreground border-primary"
+                                    )}
+                                >
+                                    <FormControl>
+                                        <RadioGroupItem value="ce" id="docType-ce" className="sr-only" />
+                                    </FormControl>
+                                    Carnet de Extranjería
+                                </Label>
+                            </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessageHook />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={dniEntryForm.control}
+                name="docNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="Número de documento" {...field} maxLength={15} autoFocus disabled={isSubmitting}/>
+                      <Input 
+                        placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 caracteres"} 
+                        {...field} 
+                        maxLength={watchedDocType === 'dni' ? 8 : 20}
+                        onChange={(e) => {
+                            if (watchedDocType === 'dni') {
+                                const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(numericValue);
+                            } else {
+                                field.onChange(e.target.value);
+                            }
+                        }}
+                        autoFocus 
+                        disabled={isSubmitting}
+                      />
                     </FormControl>
                     <FormMessageHook />
                   </FormItem>
@@ -560,7 +648,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                   Cancelar
                 </Button>
                 <Button type="submit" variant="gradient" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                 </Button>
               </UIDialogFooter>
             </form>
@@ -614,10 +702,10 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <UIAlertDialogTitle className="flex items-center">
-                <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI ya Registrado como Usuario de Plataforma
+                <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Documento ya Registrado como Usuario de Plataforma
             </UIAlertDialogTitle>
             <AlertDialogDescription>
-              El DNI <span className="font-semibold">{dniForVerification}</span> ya está registrado en la Plataforma con el/los rol(es) de: <span className="font-semibold">{(existingPlatformUserRoles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
+              El documento <span className="font-semibold">{dniForVerification}</span> ya está registrado en la Plataforma con el/los rol(es) de: <span className="font-semibold">{(existingPlatformUserRoles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
               <br/><br/>
               ¿Desea editar este perfil de usuario existente?
             </AlertDialogDescription>
