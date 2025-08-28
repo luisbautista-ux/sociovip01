@@ -32,9 +32,9 @@ const platformUserFormSchemaBase = z.object({
   businessId: z.string().optional(),
 });
 
-// Schema for creation includes password
+// Schema for creation includes optional password
 const platformUserFormSchemaCreate = platformUserFormSchemaBase.extend({
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres.").optional(),
 }).refine(data => {
   const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
   if (rolesThatNeedBusiness.length > 0) {
@@ -228,7 +228,7 @@ export function PlatformUserForm({
             name="password"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Contraseña Inicial <span className="text-destructive">*</span></FormLabel>
+                <FormLabel>Contraseña Inicial</FormLabel>
                 <FormControl>
                     <Input
                     type="text" // text para que el admin pueda verla
@@ -238,7 +238,7 @@ export function PlatformUserForm({
                     />
                 </FormControl>
                 <FormDescription className="text-xs">
-                  Por defecto, es el DNI. Comunica esta contraseña al nuevo usuario para que pueda iniciar sesión.
+                  Por defecto, es el DNI. Si se deja en blanco, el usuario deberá iniciar sesión usando Google.
                 </FormDescription>
                 <FormMessage />
                 </FormItem>

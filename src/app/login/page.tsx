@@ -49,7 +49,7 @@ const LOGO_IMG = "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { login, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { login, loginWithGoogle, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
   const router = useRouter();
 
   const form = useForm<LoginFormValues>({
@@ -91,6 +91,31 @@ export default function LoginPage() {
         description: "Ocurrió un error inesperado. Por favor, intenta de nuevo.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsSubmitting(true);
+    try {
+      const result = await loginWithGoogle();
+      if ("user" in result) {
+        toast({ title: "Inicio de Sesión con Google Exitoso", description: "¡Bienvenido/a! Serás redirigido." });
+        router.push("/auth/dispatcher");
+      } else {
+        const errorCode = (result as AuthError).code;
+        let errorMessage = "No se pudo iniciar sesión con Google.";
+        if (errorCode === "auth/popup-closed-by-user") {
+            errorMessage = "Has cerrado la ventana de inicio de sesión. Inténtalo de nuevo.";
+        } else if (errorCode === 'auth/account-exists-with-different-credential') {
+            errorMessage = "Ya existe una cuenta con este email, pero con otra forma de inicio de sesión (ej: contraseña). Por favor, inicia sesión de la forma tradicional."
+        }
+        toast({ title: "Error con Google", description: errorMessage, variant: "destructive" });
+      }
+    } catch (err) {
+       console.error("Unexpected Google login error", err);
+       toast({ title: "Error con Google", description: "Ocurrió un error inesperado.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -199,6 +224,25 @@ export default function LoginPage() {
                       </Button>
                     </form>
                   </Form>
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white px-2 text-muted-foreground">
+                            O continuar con
+                        </span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleGoogleLogin}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <GoogleIcon className="mr-2 h-4 w-4" />}
+                    Iniciar Sesión con Google
+                  </Button>
                 </CardContent>
               </Card>
             </CardContent>
