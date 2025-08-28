@@ -32,27 +32,47 @@ export async function POST(request: Request) {
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`, // Corregido: añadido "Bearer "
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
+    
+    // Check if the response status is not OK
+    if (!response.ok) {
+        let errorMessage = `Error de la API externa: ${response.status} ${response.statusText}`;
+        try {
+            const errorBody = await response.json();
+            errorMessage = errorBody.message || errorBody.error || errorMessage;
+        } catch (e) {
+            // Could not parse error JSON, use status text
+        }
+        console.warn(`DNI API returned a non-OK status for DNI ${dni}:`, errorMessage);
+        return NextResponse.json({ error: errorMessage }, { status: response.status });
+    }
 
     const data = await response.json();
 
-    if (!response.ok || data.error) {
-      console.warn(`DNI API returned an error for DNI ${dni}:`, data.error);
+    // After getting a 200 OK, check if the body contains a specific error message
+    if (data.error) {
+      console.warn(`DNI API returned an error in the response body for DNI ${dni}:`, data.error);
       return NextResponse.json(
-        { error: data.error || 'No se pudo obtener la información del DNI.' },
-        { status: response.status }
+        { error: data.error },
+        { status: 404 } // Not Found is a common status for this case
       );
     }
     
+    // Check if essential data is present
+    if (!data.nombres || !data.apellido_paterno) {
+        console.warn(`DNI API returned incomplete data for DNI ${dni}:`, data);
+        return NextResponse.json({ error: 'La API no devolvió datos completos para este DNI.' }, { status: 404 });
+    }
+
     // Combine names into a single string
     const nombreCompleto = [
       data.nombres,
       data.apellido_paterno,
       data.apellido_materno,
-    ].filter(Boolean).join(' ');
+    ].filter(Boolean).join(' ').trim();
 
     return NextResponse.json({ nombreCompleto });
 
