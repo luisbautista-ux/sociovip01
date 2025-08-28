@@ -17,11 +17,6 @@ const firebaseConfig = {
   appId: "1:564817412003:web:8938e8372bb360c0bde416"
 };
 
-// Comprobación para asegurar que los valores han sido cambiados
-if (firebaseConfig.apiKey.startsWith("AIzaSyXXX")) {
-  throw new Error("La configuración de Firebase en src/lib/firebase.ts no ha sido actualizada. Por favor, reemplaza los valores de marcador de posición con los de tu proyecto.");
-}
-
 // Initialize Firebase for SSR
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db: Firestore = getFirestore(app);
