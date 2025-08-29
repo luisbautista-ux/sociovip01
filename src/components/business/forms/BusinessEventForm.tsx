@@ -21,7 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
 import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, anyToDate } from "@/lib/utils";
 import { format, parseISO, startOfDay, isBefore, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessEventFormData } from "@/lib/types";
@@ -60,8 +60,8 @@ export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }:
       name: event?.name || "",
       description: event?.description || "",
       termsAndConditions: event?.termsAndConditions || "",
-      startDate: event?.startDate ? parseISO(event.startDate) : new Date(),
-      endDate: event?.endDate ? parseISO(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
+      startDate: anyToDate(event?.startDate) ?? new Date(),
+      endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
       aiHint: event?.aiHint || "",
@@ -79,8 +79,8 @@ export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }:
           name: event.name || "",
           description: event.description || "",
           termsAndConditions: event.termsAndConditions || "",
-          startDate: event.startDate ? parseISO(event.startDate) : new Date(),
-          endDate: event.endDate ? parseISO(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
+          startDate: anyToDate(event.startDate) ?? new Date(),
+          endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
           isActive: event.isActive === undefined ? true : event.isActive,
           imageUrl: event.imageUrl || "",
           aiHint: event.aiHint || "",
@@ -237,3 +237,5 @@ export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }:
 };
 
 BusinessEventForm.displayName = "BusinessEventForm";
+
+  

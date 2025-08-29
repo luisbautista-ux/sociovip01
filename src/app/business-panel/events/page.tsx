@@ -193,67 +193,6 @@ export default function BusinessEventsPage() {
       
       const fetchedEvents: BusinessManagedEntity[] = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
-        let startDateStr: string;
-        if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
-        else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
-        else { startDateStr = new Date().toISOString(); }
-
-        let endDateStr: string;
-        if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
-        else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
-        else { endDateStr = new Date().toISOString(); }
-        
-        let createdAtStr: string | undefined;
-        if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
-        else if (typeof data.createdAt === 'string') createdAtStr = data.createdAt;
-        else if (data.createdAt instanceof Date) createdAtStr = data.createdAt.toISOString();
-        else createdAtStr = undefined;
-        
-        const ticketTypesData = Array.isArray(data.ticketTypes) ? data.ticketTypes.map((tt: any, index: number) => ({ 
-            id: tt.id || `fs-tt-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}A`, 
-            eventId: tt.eventId || docSnap.id, 
-            businessId: tt.businessId || businessIdToFetch, 
-            name: tt.name || "Entrada sin nombre",
-            cost: typeof tt.cost === 'number' ? tt.cost : 0,
-            description: tt.description || "",
-            quantity: tt.quantity === undefined || tt.quantity === null ? undefined : Number(tt.quantity),
-        })) : [];
-
-        const eventBoxesData = Array.isArray(data.eventBoxes) ? data.eventBoxes.map((eb: any, index: number) => ({ 
-            id: eb.id || `fs-eb-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}B`,
-            eventId: eb.eventId || docSnap.id,
-            businessId: eb.businessId || businessIdToFetch,
-            name: eb.name || "Box sin nombre",
-            cost: typeof eb.cost === 'number' ? eb.cost : 0,
-            description: eb.description || "",
-            status: eb.status || 'available',
-            capacity: eb.capacity === undefined || eb.capacity === null ? undefined : Number(eb.capacity),
-            sellerName: eb.sellerName || "",
-            ownerName: eb.ownerName || "",
-            ownerDni: eb.ownerDni || "",
-        })) : [];
-        
-        const assignedPromotersData = Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map((ap: any, index: number) => {
-             const promoterIdToUse = ap.promoterProfileId || `fs-ap-${docSnap.id}-${index}-${Math.random().toString(36).slice(2)}C`;
-             const commissionRulesData = Array.isArray(ap.commissionRules) ? ap.commissionRules.map((cr: any, crIndex: number) => ({
-                    id: cr.id || `fs-cr-${promoterIdToUse}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}D`,
-                    appliesTo: cr.appliesTo || 'event_general',
-                    appliesToId: cr.appliesToId || undefined,
-                    appliesToName: cr.appliesToName || "General",
-                    commissionType: cr.commissionType || 'fixed',
-                    commissionValue: typeof cr.commissionValue === 'number' ? cr.commissionValue : 0,
-                    description: cr.description || "",
-                })) : [];
-             return {
-                promoterProfileId: promoterIdToUse, 
-                promoterName: ap.promoterName || "Promotor sin nombre",
-                promoterEmail: ap.promoterEmail || "",
-                commissionRules: commissionRulesData,
-                notes: ap.notes || "",
-            };
-        }) : [];
         
         const eventEntity: BusinessManagedEntity = {
           id: docSnap.id,
@@ -262,17 +201,17 @@ export default function BusinessEventsPage() {
           name: data.name || "Evento sin nombre",
           description: data.description || "",
           termsAndConditions: data.termsAndConditions || "",
-          startDate: startDateStr,
-          endDate: endDateStr,
+          startDate: (anyToDate(data.startDate) ?? new Date()).toISOString(),
+          endDate: (anyToDate(data.endDate) ?? new Date()).toISOString(),
           isActive: data.isActive === undefined ? true : data.isActive,
           imageUrl: data.imageUrl || "",
           aiHint: data.aiHint || "",
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore({...gc}) as GeneratedCode) : [],
-          ticketTypes: ticketTypesData,
-          eventBoxes: eventBoxesData,
-          assignedPromoters: assignedPromotersData,
+          ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes.map((tt: any) => sanitizeObjectForFirestore({...tt})) : [],
+          eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes.map((eb: any) => sanitizeObjectForFirestore({...eb})) : [],
+          assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map((ap: any) => sanitizeObjectForFirestore({...ap})) : [],
           maxAttendance: 0, 
-          createdAt: createdAtStr,
+          createdAt: (anyToDate(data.createdAt) ?? new Date()).toISOString(),
         };
         eventEntity.maxAttendance = calculateMaxAttendance(eventEntity.ticketTypes);
         return eventEntity;
@@ -1807,3 +1746,5 @@ export default function BusinessEventsPage() {
   );
 }
     
+
+  
