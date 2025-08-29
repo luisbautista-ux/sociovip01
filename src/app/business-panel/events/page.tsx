@@ -153,38 +153,6 @@ export default function BusinessEventsPage() {
     }
   });
 
-  useEffect(() => {
-    if (loadingAuth || loadingProfile) {
-      setIsLoadingPageData(true);
-      return;
-    }
-
-    if (userProfile) {
-      const fetchedBusinessId = userProfile.businessId;
-      if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
-        setCurrentBusinessId(fetchedBusinessId.trim());
-      } else {
-        setCurrentBusinessId(null);
-        setEvents([]);
-        setAvailablePromotersForAssignment([]);
-        if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
-          toast({
-            title: "Error de Negocio",
-            description: "Tu perfil de usuario no está asociado a un negocio. No se pueden cargar eventos.",
-            variant: "destructive",
-            duration: 7000,
-          });
-        }
-        setIsLoadingPageData(false); 
-      }
-    } else {
-      setCurrentBusinessId(null);
-      setEvents([]);
-      setAvailablePromotersForAssignment([]);
-      setIsLoadingPageData(false);
-    }
-  }, [userProfile, loadingAuth, loadingProfile, toast]);
-
   const fetchBusinessEvents = useCallback(async (businessIdToFetch: string) => {
     try {
       const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToFetch), where("type", "==", "event"));
@@ -274,6 +242,14 @@ export default function BusinessEventsPage() {
   }, [toast, userProfile?.email]);
 
   useEffect(() => {
+    if (userProfile?.businessId) {
+      setCurrentBusinessId(userProfile.businessId);
+    } else {
+      setCurrentBusinessId(null);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
     if (currentBusinessId) {
         setIsLoadingPageData(true);
         Promise.all([
@@ -284,12 +260,12 @@ export default function BusinessEventsPage() {
         }).finally(() => {
             setIsLoadingPageData(false);
         });
-    } else if (!loadingAuth && !loadingProfile) {
+    } else {
         setEvents([]);
         setAvailablePromotersForAssignment([]);
         setIsLoadingPageData(false);
     }
-  }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment, loadingAuth, loadingProfile]);
+  }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment]);
 
 
   const filteredEvents = useMemo(() => {
@@ -328,8 +304,8 @@ export default function BusinessEventsPage() {
             businessId: currentBusinessId, 
             type: 'event',
             name: `${eventToManage.name || 'Evento'} (Copia)`,
-            startDate: eventToManage.startDate ? (anyToDate(eventToManage.startDate) ?? now).toISOString() : now.toISOString(),
-            endDate: eventToManage.endDate ? (anyToDate(eventToManage.endDate) ?? oneWeekFromNow).toISOString() : oneWeekFromNow.toISOString(),     
+            startDate: eventToManage.startDate ? anyToDate(eventToManage.startDate)!.toISOString() : now.toISOString(),
+            endDate: eventToManage.endDate ? anyToDate(eventToManage.endDate)!.toISOString() : oneWeekFromNow.toISOString(),     
             isActive: true, 
             ticketTypes: [], 
             eventBoxes: [],
@@ -343,8 +319,8 @@ export default function BusinessEventsPage() {
     } else if (eventToManage) { 
         setEditingEvent({
             ...eventToManage,
-            startDate: (anyToDate(eventToManage.startDate) ?? new Date()).toISOString(),
-            endDate: (anyToDate(eventToManage.endDate) ?? new Date()).toISOString(),
+            startDate: anyToDate(eventToManage.startDate)!.toISOString(),
+            endDate: anyToDate(eventToManage.endDate)!.toISOString(),
             maxAttendance: calculateMaxAttendance(eventToManage.ticketTypes) 
         });
         setShowManageEventModal(true);
@@ -455,7 +431,7 @@ export default function BusinessEventsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [currentBusinessId, toast, userProfile?.email, initialEventForm]);
+  }, [currentBusinessId, toast, userProfile?.email, fetchBusinessEvents, initialEventForm]);
   
   const handleDeleteEvent = async (eventId: string, eventName?: string) => {
     if (isSubmitting) return;
@@ -528,8 +504,8 @@ export default function BusinessEventsPage() {
             eventBoxes: finalEventBoxes,
             assignedPromoters: finalAssignedPromoters,
             generatedCodes: finalGeneratedCodes,
-            startDate: Timestamp.fromDate(anyToDate(eventToSave.startDate) ?? new Date()),
-            endDate: Timestamp.fromDate(anyToDate(eventToSave.endDate) ?? new Date()),
+            startDate: Timestamp.fromDate(anyToDate(eventToSave.startDate)!),
+            endDate: Timestamp.fromDate(anyToDate(eventToSave.endDate)!),
             createdAt: eventToSave.createdAt ? Timestamp.fromDate(new Date(eventToSave.createdAt)) : serverTimestamp(),
         });
         
@@ -673,7 +649,7 @@ export default function BusinessEventsPage() {
     }
   };
   
-const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
+const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
     const { id, name, isActive } = eventToToggle;
     if (!currentBusinessId || !id) {
         toast({ title: "Error", description: "ID de promoción o negocio no disponible.", variant: "destructive" });
@@ -700,7 +676,7 @@ const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManage
             variant: "destructive"
         });
     }
-}, [currentBusinessId, toast]);
+};
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
@@ -1739,5 +1715,6 @@ const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManage
     
 
   
+
 
 
