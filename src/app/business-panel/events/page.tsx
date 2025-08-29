@@ -44,7 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { CreateBatchBoxesDialog, type BatchBoxFormData } from "@/components/business/dialogs/CreateBatchBoxesDialog";
-import { isEntityCurrentlyActivatable, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
+import { isEntityCurrentlyActivatable, calculateMaxAttendance, sanitizeObjectForFirestore, anyToDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch } from "firebase/firestore";
@@ -392,8 +392,8 @@ export default function BusinessEventsPage() {
             businessId: currentBusinessId, 
             type: 'event',
             name: `${eventToManage.name || 'Evento'} (Copia)`,
-            startDate: eventToManage.startDate ? parseISO(eventToManage.startDate).toISOString() : now.toISOString(),
-            endDate: eventToManage.endDate ? parseISO(eventToManage.endDate).toISOString() : oneWeekFromNow.toISOString(),     
+            startDate: eventToManage.startDate ? (anyToDate(eventToManage.startDate) ?? now).toISOString() : now.toISOString(),
+            endDate: eventToManage.endDate ? (anyToDate(eventToManage.endDate) ?? oneWeekFromNow).toISOString() : oneWeekFromNow.toISOString(),     
             isActive: true, 
             ticketTypes: [], 
             eventBoxes: [],
@@ -407,8 +407,8 @@ export default function BusinessEventsPage() {
     } else if (eventToManage) { 
         setEditingEvent({
             ...eventToManage,
-            startDate: eventToManage.startDate ? parseISO(eventToManage.startDate).toISOString() : new Date().toISOString(),
-            endDate: eventToManage.endDate ? parseISO(eventToManage.endDate).toISOString() : new Date().toISOString(),
+            startDate: (anyToDate(eventToManage.startDate) ?? new Date()).toISOString(),
+            endDate: (anyToDate(eventToManage.endDate) ?? new Date()).toISOString(),
             maxAttendance: calculateMaxAttendance(eventToManage.ticketTypes) 
         });
         setShowManageEventModal(true);
@@ -592,8 +592,8 @@ export default function BusinessEventsPage() {
             eventBoxes: finalEventBoxes,
             assignedPromoters: finalAssignedPromoters,
             generatedCodes: finalGeneratedCodes,
-            startDate: Timestamp.fromDate(new Date(eventToSave.startDate)),
-            endDate: Timestamp.fromDate(new Date(eventToSave.endDate)),
+            startDate: Timestamp.fromDate(anyToDate(eventToSave.startDate) ?? new Date()),
+            endDate: Timestamp.fromDate(anyToDate(eventToSave.endDate) ?? new Date()),
             createdAt: eventToSave.createdAt ? Timestamp.fromDate(new Date(eventToSave.createdAt)) : serverTimestamp(),
         });
         
