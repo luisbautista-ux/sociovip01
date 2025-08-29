@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -44,7 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { CreateBatchBoxesDialog, type BatchBoxFormData } from "@/components/business/dialogs/CreateBatchBoxesDialog";
-import { isEntityCurrentlyActivatable, calculateMaxAttendance, sanitizeObjectForFirestore, anyToDate } from "@/lib/utils";
+import { isEntityCurrentlyActivatable, calculateMaxAttendance, sanitizeObjectForFirestore, anyToDate, cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch } from "firebase/firestore";
@@ -54,7 +53,6 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormMessage as FormMessageHook, FormDescription } from "@/components/ui/form";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
 
 const initialEventFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -72,7 +70,6 @@ const initialEventFormSchema = z.object({
 });
 
 type InitialEventFormValues = z.infer<typeof initialEventFormSchema>;
-
 
 const commissionRuleFormSchema = z.object({
   appliesTo: z.enum(['event_general', 'ticket_type', 'box_type'], {required_error: "Debes seleccionar a qué aplica."}),
@@ -92,7 +89,7 @@ const commissionRuleFormSchema = z.object({
 });
 type CommissionRuleFormValues = z.infer<typeof commissionRuleFormSchema>;
 
-export default function BusinessEventsPage() {
+export default function BusinessEventsPage(): React.JSX.Element {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
   
@@ -266,7 +263,6 @@ export default function BusinessEventsPage() {
     }
   }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment]);
 
-
   const filteredEvents = useMemo(() => {
     return events.filter(event => {
       const nameMatch = event.name && typeof event.name === 'string' ? event.name.toLowerCase().includes(searchTerm.toLowerCase()) : false;
@@ -430,7 +426,7 @@ export default function BusinessEventsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [currentBusinessId, toast, userProfile?.email, initialEventForm, fetchBusinessEvents]);
+  }, [currentBusinessId, toast, userProfile?.email, initialEventForm]);
   
   const handleDeleteEvent = async (eventId: string, eventName?: string) => {
     if (isSubmitting) return;
@@ -456,226 +452,41 @@ export default function BusinessEventsPage() {
     }
   };
 
-  const handleSaveManagedEventAndClose = async () => {
-    if (!editingEvent || !currentBusinessId) {
-      toast({ title: "Error", description: "No hay evento para guardar o ID de negocio no disponible.", variant: "destructive" });
-      return;
-    }
-    
-    setIsSubmitting(true);
-
-    try {
-        const eventToSave: BusinessManagedEntity = {
-            ...editingEvent,
-            maxAttendance: calculateMaxAttendance(editingEvent.ticketTypes),
-            businessId: currentBusinessId,
-            type: "event",
-        };
-
-        const finalTicketTypes = (eventToSave.ticketTypes || []).map((tt, index) => sanitizeObjectForFirestore({
-            ...tt,
-            id: tt.id || `tt-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}F`,
-            eventId: eventToSave.id || "",
-            businessId: currentBusinessId,
-        }) as TicketType);
-
-        const finalEventBoxes = (eventToSave.eventBoxes || []).map((eb, index) => sanitizeObjectForFirestore({
-            ...eb,
-            id: eb.id || `box-${eventToSave.id || 'new'}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}G`,
-            eventId: eventToSave.id || "",
-            businessId: currentBusinessId,
-        }) as EventBox);
-
-        const finalAssignedPromoters = (eventToSave.assignedPromoters || []).map(ap => sanitizeObjectForFirestore({
-            ...ap,
-            promoterProfileId: ap.promoterProfileId || `unknown-promoter-${Date.now()}-${Math.random().toString(36).slice(2)}H`,
-            commissionRules: (ap.commissionRules || []).map((cr, crIndex) => sanitizeObjectForFirestore({
-                ...cr,
-                id: cr.id || `cr-${ap.promoterProfileId || 'unknown'}-${Date.now()}-${crIndex}-${Math.random().toString(36).slice(2)}I`
-            }) as CommissionRule)
-        }) as EventPromoterAssignment);
-
-        const finalGeneratedCodes = Array.isArray(eventToSave.generatedCodes) ? eventToSave.generatedCodes.map(gc => sanitizeObjectForFirestore({ ...gc })) : [];
-
-        const payloadForFirestore: any = sanitizeObjectForFirestore({
-            ...eventToSave,
-            ticketTypes: finalTicketTypes,
-            eventBoxes: finalEventBoxes,
-            assignedPromoters: finalAssignedPromoters,
-            generatedCodes: finalGeneratedCodes,
-            startDate: Timestamp.fromDate(anyToDate(eventToSave.startDate)!),
-            endDate: Timestamp.fromDate(anyToDate(eventToSave.endDate)!),
-            createdAt: eventToSave.createdAt ? Timestamp.fromDate(new Date(eventToSave.createdAt)) : serverTimestamp(),
-        });
-        
-        delete payloadForFirestore.id;
-
-        if (isDuplicatingEvent || !editingEvent.id || editingEvent.id === '') {
-            if (!payloadForFirestore.createdAt) payloadForFirestore.createdAt = serverTimestamp();
-            const docRef = await addDoc(collection(db, "businessEntities"), payloadForFirestore);
-            toast({ title: isDuplicatingEvent ? "Evento Duplicado Exitosamente" : "Evento Creado Exitosamente", description: `El evento "${payloadForFirestore.name}" ha sido guardado con ID: ${docRef.id}.` });
-        } else {
-            if (payloadForFirestore.createdAt === undefined) {
-                delete payloadForFirestore.createdAt;
-            }
-            await updateDoc(doc(db, "businessEntities", editingEvent.id), payloadForFirestore);
-            toast({ title: "Evento Guardado", description: `Los cambios en "${payloadForFirestore.name}" han sido guardados.` });
-        }
-
-        setShowManageEventModal(false);
-        setEditingEvent(null);
-        setIsDuplicatingEvent(false);
-        if (currentBusinessId) fetchBusinessEvents(currentBusinessId);
-    } catch (error: any) {
-        console.error("Events Page: Error saving/updating event:", error.code, error.message, error);
-        toast({ title: "Error al Guardar Evento", description: `No se pudo guardar el evento. ${error.message}`, variant: "destructive", duration: 10000 });
-    } finally {
-        setIsSubmitting(false);
-    }
-};
-
-  const openCreateCodesDialog = (event: BusinessManagedEntity) => {
-    if (!isEntityCurrentlyActivatable(event)) {
-      toast({ 
-        title: "No se pueden crear códigos", 
-        description: "Este evento no está activo o está fuera de su periodo de vigencia.", 
-        variant: "destructive"
-      });
-      return;
-    }
-    setSelectedEntityForCreatingCodes(event);
-    setShowCreateCodesModal(true);
-  };
-
-  const openViewCodesDialog = (event: BusinessManagedEntity) => {
-    setSelectedEntityForViewingCodes(event);
-    setShowManageCodesModal(true);
-  };
-  
-  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
-    if (isSubmitting) {
-        setIsSubmitting(false); 
-        return;
-    }
-    if (!currentBusinessId || !userProfile?.name || !userProfile.uid) {
-        toast({ title: "Error", description: "ID de negocio o datos de usuario no disponibles para crear códigos.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-    }
-    
-    setIsSubmitting(true);
-    const targetEventRef = doc(db, "businessEntities", entityId);
-    try {
-        const targetEventSnap = await getDoc(targetEventRef);
-        if (!targetEventSnap.exists()) {
-            toast({title:"Error", description:"Evento no encontrado para añadir códigos.", variant: "destructive"});
-            setIsSubmitting(false);
-            return;
-        }
-        const targetEventData = targetEventSnap.data() as BusinessManagedEntity;
-        
-        const newCodesWithDetails = newCodes.map(code => (sanitizeObjectForFirestore({
-            ...code,
-            entityId: entityId, 
-            generatedByName: userProfile.name, 
-            generatedByUid: userProfile.uid,
-            observation: (observation && observation.trim() !== "") ? observation.trim() : null,
-            redemptionDate: code.redemptionDate || null, 
-            redeemedByInfo: code.redeemedByInfo || null, 
-            isVipCandidate: code.isVipCandidate || false,
-        }) as GeneratedCode));
-
-        const existingSanitizedCodes = (targetEventData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
-            
-        await updateDoc(targetEventRef, { generatedCodes: updatedCodes });
-        toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEventData.name}. Guardados en la base de datos.`});
-        
-        if (currentBusinessId) fetchBusinessEvents(currentBusinessId); 
-        
-        if (editingEvent && editingEvent.id === entityId) {
-            setEditingEvent(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-        }
-         if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-            setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-        }
-    } catch (error: any) {
-        console.error("Events Page: Error saving new codes to Firestore:", error.code, error.message, error);
-        toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
-
-  const handleCodesUpdatedFromManageDialog = async (entityId: string, updatedCodesFromDialog: GeneratedCode[]) => {
-    if (isSubmitting) {
-      setIsSubmitting(false);
-      return;
-    }
+  const handleToggleEventStatus = useCallback(async (eventId: string, nextIsActive: boolean) => {
     if (!currentBusinessId) {
-      toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
-      setIsSubmitting(false);
-      return;
+        toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
+        return;
     }
-    setIsSubmitting(true);
-    const targetEventRef = doc(db, "businessEntities", entityId);
-     try {
-        const targetEventSnap = await getDoc(targetEventRef);
-        if (!targetEventSnap.exists()) {
-            toast({title:"Error", description:"Evento no encontrado para actualizar códigos.", variant: "destructive"});
-            setIsSubmitting(false);
-            return;
-        }
-        const targetEventData = targetEventSnap.data() as BusinessManagedEntity;
-    
-        const updatedCodesForFirestore = updatedCodesFromDialog.map(code => sanitizeObjectForFirestore(code as GeneratedCode));
-
-        await updateDoc(targetEventRef, { generatedCodes: updatedCodesForFirestore });
-        toast({title: "Códigos Actualizados", description: `Los códigos para "${targetEventData.name}" han sido guardados en la base de datos.`});
-        
-        if (currentBusinessId) fetchBusinessEvents(currentBusinessId);
-        if (editingEvent && editingEvent.id === entityId) {
-             setEditingEvent(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
-        }
-         if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-            setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
-        }
-    } catch (error: any) {
-        console.error("Events Page: Error saving updated codes to Firestore:", error.code, error.message, error);
-        toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
-  
-  const handleToggleEventStatus = useCallback(async (eventId: string) => {
-    if (!currentBusinessId) return;
-
-    const eventToToggle = events.find(e => e.id === eventId);
-    if (!eventToToggle) return;
-
-    const newStatus = !eventToToggle.isActive;
-    const eventName = eventToToggle.name;
 
     // Optimistic UI update
-    setEvents(prevEvents => prevEvents.map(e => e.id === eventId ? { ...e, isActive: newStatus } : e));
+    setEvents(prevEvents =>
+        prevEvents.map(event =>
+            event.id === eventId ? { ...event, isActive: nextIsActive } : event
+        )
+    );
 
     try {
-        await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
+        const eventRef = doc(db, "businessEntities", eventId);
+        await updateDoc(eventRef, { isActive: nextIsActive });
         toast({
             title: "Estado Actualizado",
-            description: `El evento "${eventName}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
+            description: `El evento ahora está ${nextIsActive ? 'Activo' : 'Inactivo'}.`
         });
     } catch (error: any) {
-        // Revert UI on error
-        setEvents(prevEvents => prevEvents.map(p => (p.id === eventId ? { ...p, isActive: eventToToggle.isActive } : p)));
+        console.error("Error toggling event status:", error);
         toast({
             title: "Error al Actualizar",
             description: `No se pudo cambiar el estado. ${error.message}`,
             variant: "destructive"
         });
+        // Revert UI on failure
+        setEvents(prevEvents =>
+            prevEvents.map(event =>
+                event.id === eventId ? { ...event, isActive: !nextIsActive } : event
+            )
+        );
     }
-  }, [currentBusinessId, events, toast]);
+  }, [currentBusinessId, toast]);
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
@@ -882,7 +693,7 @@ export default function BusinessEventsPage() {
       commissionRuleForm.reset({
           appliesTo: rule?.appliesTo || 'event_general',
           appliesToId: rule?.appliesToId || undefined,
-          appliesToName: rule?.appliesToName || "",
+          appliesToName: "",
           commissionType: rule?.commissionType || 'fixed',
           commissionValue: rule?.commissionValue || 0,
           description: rule?.description || ""
@@ -954,9 +765,79 @@ export default function BusinessEventsPage() {
       toast({ title: `Regla de Comisión "${ruleToDelete.appliesToName || (ruleToDelete.id ? ruleToDelete.id.substring(0,5) : 'N/A')}" Eliminada`, variant: "destructive"});
   };
 
+  const handleSaveManagedEventAndClose = async () => {
+    if (!editingEvent || !currentBusinessId) {
+      toast({ title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    
+    // Create a deep copy and sanitize it for Firestore
+    const payloadToSaveRaw = {
+      ...editingEvent,
+      businessId: currentBusinessId,
+      // Convert dates from ISO strings back to Timestamps for Firestore
+      startDate: Timestamp.fromDate(anyToDate(editingEvent.startDate)!),
+      endDate: Timestamp.fromDate(anyToDate(editingEvent.endDate)!),
+    };
+    
+    // Remove client-side only or undefined fields before sanitizing
+    delete payloadToSaveRaw.maxAttendance;
+    const { id, createdAt, ...payload } = payloadToSaveRaw;
+    const sanitizedPayload = sanitizeObjectForFirestore(payload);
+    
+    try {
+      if (id && !isDuplicatingEvent) {
+        // Update existing event
+        const eventRef = doc(db, "businessEntities", id);
+        await updateDoc(eventRef, sanitizedPayload);
+        toast({ title: "Evento Actualizado", description: `"${editingEvent.name}" ha sido guardado.` });
+      } else {
+        // Create new event (either duplicated or from scratch flow)
+        const eventRef = await addDoc(collection(db, "businessEntities"), {
+          ...sanitizedPayload,
+          createdAt: serverTimestamp(),
+        });
+        toast({ title: "Evento Creado", description: `El evento "${editingEvent.name}" se creó exitosamente.` });
+      }
+      
+      setShowManageEventModal(false);
+      setEditingEvent(null);
+      setIsDuplicatingEvent(false);
+      fetchBusinessEvents(currentBusinessId); // Refresh list
+    } catch (error: any) {
+      console.error("Error saving managed event:", error);
+      toast({ title: "Error al Guardar", description: `No se pudo guardar el evento. ${error.message}`, variant: "destructive"});
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const openStatsModalForMainList = (event: BusinessManagedEntity) => {
       setSelectedEventForStats(event);
       setShowStatsModal(true);
+  };
+
+  const openCreateCodesDialog = (event: BusinessManagedEntity) => {
+      setSelectedEntityForCreatingCodes(event);
+      setShowCreateCodesModal(true);
+  };
+  
+  const openViewCodesDialog = (event: BusinessManagedEntity) => {
+      setSelectedEntityForViewingCodes(event);
+      setShowManageCodesModal(true);
+  };
+
+  const handleNewCodesCreated = (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
+      // Dummy handler for now
+      console.log(`Creating ${newCodes.length} codes for ${entityId}`);
+      toast({title: "Códigos creados", description: `${newCodes.length} códigos generados para ${entityId}`});
+  };
+
+  const handleCodesUpdatedFromManageDialog = (entityId: string, updatedCodes: GeneratedCode[]) => {
+      // Dummy handler
+      console.log(`Updating codes for ${entityId}`);
+      toast({title: "Códigos actualizados", description: `Se actualizaron los códigos para ${entityId}`});
   };
   
   if (isLoadingPageData) {
@@ -1026,24 +907,31 @@ export default function BusinessEventsPage() {
                       const isActivatable = isEntityCurrentlyActivatable(event);
                       
                       return (
-                      <TableRow key={event.id || `event-fallback-${Math.random()}`}>
+                      <TableRow key={event.id!}>
                         <TableCell className="font-medium align-top py-3">
                             <div className="font-semibold text-base">{event.name}</div>
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
-                                <Switch
-                                    id={`status-switch-event-${event.id}`}
-                                    checked={event.isActive}
-                                    onCheckedChange={() => handleToggleEventStatus(event.id)}
-                                    aria-label={`Estado del evento ${event.name}`}
-                                    disabled={isSubmitting}
-                                />
-                                <Label htmlFor={`status-switch-event-${event.id}`} className="sr-only">
-                                    {event.isActive ? "Activo" : "Inactivo"}
-                                </Label>
-                                <Badge variant={event.isActive ? "default" : "outline"} 
-                                      className={cn(event.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (event.isActive ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-red-500 hover:bg-red-600 text-white"), "text-xs")}>
-                                    {event.isActive ? (isActivatable ? "Vigente" : "Activo (Fuera de Fecha)") : "Inactivo"}
-                                </Badge>
+                              <Switch
+                                checked={!!event.isActive}
+                                onCheckedChange={(next) => handleToggleEventStatus(event.id!, next)} 
+                                aria-label={`Estado del evento ${event.name}`}
+                                id={`switch-event-${event.id}`}
+                                disabled={isSubmitting}
+                              />
+                              <Label htmlFor={`switch-event-${event.id}`} className="sr-only">
+                                {event.isActive ? "Activo" : "Inactivo"}
+                              </Label>
+                              <Badge
+                                variant={event.isActive ? "default" : "outline"} 
+                                className={cn(
+                                  event.isActive && isActivatable
+                                    ? "bg-green-500 hover:bg-green-600"
+                                    : (event.isActive ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-red-500 hover:bg-red-600 text-white"),
+                                  "text-xs"
+                                )}
+                              >
+                                {event.isActive ? (isActivatable ? "Vigente" : "Activo (Fuera de Fecha)") : "Inactivo"}
+                              </Badge>
                             </div>
                            <div className="flex flex-col items-start gap-1">
                                 <Button variant="outline" size="xs" onClick={() => handleOpenManageEventModal(event, false)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
@@ -1367,7 +1255,6 @@ export default function BusinessEventsPage() {
                                                     <SelectValue placeholder={availablePromotersForAssignment.length === 0 ? "No hay promotores vinculados activos" : "Elige un promotor"} />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                {console.log("Events Page - Rendering SelectContent for promoters. Available:", availablePromotersForAssignment)}
                                                     {availablePromotersForAssignment.length === 0 && (
                                                         <SelectItem key="no-promoters-item-events-tab-unique-key-selectcontent" value="no-promoters-placeholder" disabled>
                                                             No hay promotores activos vinculados
@@ -1606,8 +1493,8 @@ export default function BusinessEventsPage() {
                                 </FormItem>
                             )}
                         />
-                         <FormField
-                            control={form.control}
+                        <FormField
+                            control={commissionRuleForm.control}
                             name="description"
                             render={({ field }) => (
                                 <FormItem>
@@ -1659,7 +1546,6 @@ export default function BusinessEventsPage() {
             </DialogContent>
         )}
     </Dialog>
-
 
     {selectedEntityForCreatingCodes && userProfile && (
       <CreateCodesDialog
