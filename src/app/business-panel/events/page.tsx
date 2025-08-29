@@ -360,7 +360,7 @@ export default function BusinessEventsPage() {
     }
   };
 
-  const handleInitialEventSubmit = async (data: InitialEventFormValues) => {
+  const handleInitialEventSubmit = useCallback(async (data: InitialEventFormValues) => {
     if (!currentBusinessId) {
         toast({ title: "Error de Negocio", description: "Tu perfil de usuario no está asociado a un negocio. No se puede crear el evento.", variant: "destructive", duration: 7000 });
         setIsSubmitting(false);
@@ -455,7 +455,7 @@ export default function BusinessEventsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [currentBusinessId, toast, userProfile?.email, initialEventForm]);
   
   const handleDeleteEvent = async (eventId: string, eventName?: string) => {
     if (isSubmitting) return;
@@ -674,44 +674,41 @@ export default function BusinessEventsPage() {
   };
   
   const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
-    if (isSubmitting) return;
-    if (!currentBusinessId || !eventToToggle.id) {
-        toast({ title: "Error", description: "ID de evento o negocio no disponible.", variant: "destructive" });
-        return;
+    if (!currentBusinessId) {
+      toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
+      return;
     }
     
+    // Optimistic UI update
     const newStatus = !eventToToggle.isActive;
-    const eventName = eventToToggle.name;
-        
-    setIsSubmitting(true); 
+    setEvents(prevEvents => 
+      prevEvents.map(event => 
+        event.id === eventToToggle.id ? { ...event, isActive: newStatus } : event
+      )
+    );
 
+    // Update in backend
     try {
       await updateDoc(doc(db, "businessEntities", eventToToggle.id), { isActive: newStatus });
       toast({
         title: "Estado Actualizado",
-        description: `El evento "${eventName}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
+        description: `El evento "${eventToToggle.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
       });
-      
-      setEvents(prevEvents => 
-        prevEvents.map(event => 
-          event.id === eventToToggle.id ? { ...event, isActive: newStatus } : event
-        )
-      );
-
-       if (editingEvent && editingEvent.id === eventToToggle.id) { 
-          setEditingEvent(prev => prev ? {...prev, isActive: newStatus} : null);
-      }
     } catch (error: any) {
       console.error("Events Page: Error updating event status:", error.code, error.message, error);
+      // Revert optimistic UI update on error
+      setEvents(prevEvents => 
+        prevEvents.map(event => 
+          event.id === eventToToggle.id ? { ...event, isActive: !newStatus } : event
+        )
+      );
       toast({
         title: "Error al Actualizar Estado",
         description: `No se pudo cambiar el estado del evento. ${error.message}`,
         variant: "destructive"
       });
-    } finally {
-        setIsSubmitting(false); 
     }
-  }, [currentBusinessId, isSubmitting, toast, editingEvent]);
+  }, [currentBusinessId, toast]);
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
