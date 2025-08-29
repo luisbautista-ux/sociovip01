@@ -38,8 +38,8 @@ import {
 import { BusinessEventForm, type EventDetailsFormValues } from "@/components/business/forms/BusinessEventForm";
 import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
-import { TicketTypeForm } from "@/components/business/forms/TicketTypeForm";
-import { EventBoxForm } from "@/components/business/forms/EventBoxForm";
+import { TicketTypeForm, type TicketTypeFormData } from "@/components/business/forms/TicketTypeForm";
+import { EventBoxForm, type EventBoxFormData } from "@/components/business/forms/EventBoxForm";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -96,10 +96,6 @@ export default function BusinessEventsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
   
-  // Create a ref for the form inside the manage modal
-  const eventDetailsFormRef = React.useRef<React.ElementRef<typeof BusinessEventForm>>(null);
-
-
   const [events, setEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
@@ -158,7 +154,6 @@ export default function BusinessEventsPage() {
   });
 
   useEffect(() => {
-    console.log("Events Page: Auth/Profile Effect. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "userProfile UID:", userProfile?.uid);
     if (loadingAuth || loadingProfile) {
       setIsLoadingPageData(true);
       return;
@@ -167,11 +162,8 @@ export default function BusinessEventsPage() {
     if (userProfile) {
       const fetchedBusinessId = userProfile.businessId;
       if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
-        console.log("Events Page: UserProfile has businessId:", fetchedBusinessId.trim());
         setCurrentBusinessId(fetchedBusinessId.trim());
-        // isLoadingPageData will be handled by the data fetching useEffect
       } else {
-        console.warn("Events Page: UserProfile loaded but no valid businessId. Roles:", userProfile.roles);
         setCurrentBusinessId(null);
         setEvents([]);
         setAvailablePromotersForAssignment([]);
@@ -186,7 +178,6 @@ export default function BusinessEventsPage() {
         setIsLoadingPageData(false); 
       }
     } else {
-      console.log("Events Page: No userProfile. Clearing data, loading done.");
       setCurrentBusinessId(null);
       setEvents([]);
       setAvailablePromotersForAssignment([]);
@@ -196,11 +187,9 @@ export default function BusinessEventsPage() {
 
 
   const fetchBusinessEvents = useCallback(async (businessIdToFetch: string) => {
-    console.log('Events Page: Fetching events with businessId:', businessIdToFetch);
     try {
       const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToFetch), where("type", "==", "event"));
       const querySnapshot = await getDocs(q);
-      console.log("Events Page: Firestore query executed for events. Snapshot size:", querySnapshot.size);
       
       const fetchedEvents: BusinessManagedEntity[] = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
@@ -294,7 +283,6 @@ export default function BusinessEventsPage() {
         if (b.createdAt) return 1;
         return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
       }));
-      console.log("Events Page: Fetched events successfully:", fetchedEvents.length);
     } catch (error: any) {
       console.error("Events Page: Error fetching events:", error.code, error.message, error);
       toast({
@@ -311,7 +299,6 @@ export default function BusinessEventsPage() {
         setAvailablePromotersForAssignment([]);
         return;
     }
-    console.log('Events Page - Fetching promoter links for assignment for businessId:', businessIdToFetch);
     try {
       const q = query(
         collection(db, "businessPromoterLinks"), 
@@ -336,7 +323,6 @@ export default function BusinessEventsPage() {
         };
       });
       setAvailablePromotersForAssignment(fetchedPromoterLinks);
-      console.log('Events Page - Fetched promoter links for assignment:', fetchedPromoterLinks.length);
     } catch (error: any) { 
       console.error("Events Page: Error fetching promoter profiles for assignment:", error.code, error.message, error);
       setAvailablePromotersForAssignment([]);
@@ -350,7 +336,6 @@ export default function BusinessEventsPage() {
   }, [toast, userProfile]);
 
   useEffect(() => {
-    console.log("Events Page: Data Fetching Effect. currentBusinessId:", currentBusinessId);
     if (currentBusinessId) {
         setIsLoadingPageData(true);
         Promise.all([
@@ -359,16 +344,10 @@ export default function BusinessEventsPage() {
         ]).catch(error => {
             console.error("Events Page: Error during Promise.all data fetch for events/promoters:", error);
         }).finally(() => {
-            console.log("Events Page: Promise.all for events/promoters finished. Setting isLoadingPageData to false.");
             setIsLoadingPageData(false);
         });
     } else {
-        // This case handles when currentBusinessId is initially null or becomes null.
-        // The first useEffect (Auth/Profile Effect) handles setting isLoadingPageData to false
-        // if no businessId is found from the start.
-        // This ensures that if businessId is cleared later, data is cleared and loading stops.
-        if (!loadingAuth && !loadingProfile) { // Only act if auth/profile loading is complete
-             console.log("Events Page: Data Fetching Effect - currentBusinessId is null. Ensuring data is clear and loading is false.");
+        if (!loadingAuth && !loadingProfile) {
             setEvents([]);
             setAvailablePromotersForAssignment([]);
             setIsLoadingPageData(false);
@@ -452,8 +431,6 @@ export default function BusinessEventsPage() {
         return;
     }
     setIsSubmitting(true);
-    console.log("Events Page (Initial Submit): UserProfile:", userProfile);
-    console.log("Events Page (Initial Submit): Current Business ID to be used:", currentBusinessId);
     
     const newEventToSave: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'businessId' | 'startDate' | 'endDate' | 'maxAttendance'> = {
       type: "event",
@@ -494,9 +471,7 @@ export default function BusinessEventsPage() {
           maxAttendance: calculateMaxAttendance(newEventToSave.ticketTypes), 
           createdAt: serverTimestamp(),
       };
-      console.log("handleInitialEventSubmit: Event payload for Firestore:", eventPayloadForFirestore);
       docRef = await addDoc(collection(db, "businessEntities"), sanitizeObjectForFirestore(eventPayloadForFirestore));
-      console.log("Events Page: Event created with ID:", docRef.id);
       
       const finalNewEvent: BusinessManagedEntity = {
         ...newEventToSave,
@@ -554,7 +529,6 @@ export default function BusinessEventsPage() {
       return;
     }
     setIsSubmitting(true);
-    console.log(`Events Page: Deleting event ${eventId} for business ${currentBusinessId}`);
     try {
       await deleteDoc(doc(db, "businessEntities", eventId));
       toast({ title: "Evento Eliminado", description: `El evento "${eventName || 'seleccionado'}" ha sido eliminado.`, variant: "destructive" });
@@ -571,31 +545,18 @@ export default function BusinessEventsPage() {
     }
   };
 
-  const handleSaveManagedEventAndClose = async (eventDetailsFormData?: EventDetailsFormValues) => {
+  const handleSaveManagedEventAndClose = async () => {
     if (!editingEvent || !currentBusinessId) {
       toast({ title: "Error", description: "No hay evento para guardar o ID de negocio no disponible.", variant: "destructive" });
       return;
-    }
-
-    if (!eventDetailsFormData) {
-        toast({ title: "Error de formulario", description: "No se pudieron obtener los datos del formulario de detalles.", variant: "destructive" });
-        return;
     }
     
     setIsSubmitting(true);
 
     try {
-        const combinedEventData: BusinessManagedEntity = {
-            ...editingEvent,
-            ...eventDetailsFormData,
-            startDate: eventDetailsFormData.startDate.toISOString(),
-            endDate: eventDetailsFormData.endDate.toISOString(),
-        };
-
-        const calculatedAtt = calculateMaxAttendance(combinedEventData.ticketTypes);
         const eventToSave: BusinessManagedEntity = {
-            ...combinedEventData,
-            maxAttendance: calculatedAtt,
+            ...editingEvent,
+            maxAttendance: calculateMaxAttendance(editingEvent.ticketTypes),
             businessId: currentBusinessId,
             type: "event",
         };
@@ -1266,7 +1227,6 @@ export default function BusinessEventsPage() {
         </Card>
       )}
 
-    {/* --- MODAL PARA CREACIÓN INICIAL DEL EVENTO --- */}
     <Dialog open={showInitialEventModal} onOpenChange={(isOpen) => {
         if (!isOpen) initialEventForm.reset();
         setShowInitialEventModal(isOpen);
@@ -1396,9 +1356,11 @@ export default function BusinessEventsPage() {
 
                         <TabsContent value="details">
                             <BusinessEventForm
-                                ref={eventDetailsFormRef}
                                 event={editingEvent}
                                 isSubmitting={isSubmitting} 
+                                onFormChange={(updatedDetails) => {
+                                  setEditingEvent(prev => prev ? { ...prev, ...updatedDetails } : null);
+                                }}
                             />
                         </TabsContent>
 
@@ -1576,7 +1538,7 @@ export default function BusinessEventsPage() {
                     Cancelar
                 </Button>
                 <Button 
-                   onClick={() => eventDetailsFormRef.current?.triggerSubmit()}
+                   onClick={handleSaveManagedEventAndClose}
                    className="bg-primary hover:bg-primary/90" 
                    disabled={isSubmitting || !editingEvent}
                 >

@@ -3,7 +3,7 @@
 
 import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +26,6 @@ import { format, parseISO, startOfDay, isBefore, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessEventFormData } from "@/lib/types";
 
-// Schema for the details tab form
 const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
@@ -46,19 +45,15 @@ const eventDetailsFormSchema = z.object({
   path: ["endDate"],
 });
 
-// This type is for what the form itself manages and submits
 export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 
-
 interface BusinessEventFormProps {
-  event?: BusinessManagedEntity; 
+  event: BusinessManagedEntity; 
   isSubmitting?: boolean;
+  onFormChange: (data: EventDetailsFormValues) => void; 
 }
 
-export const BusinessEventForm = React.forwardRef<
-    { triggerSubmit: () => void },
-    BusinessEventFormProps
-  >(({ event, isSubmitting = false }, ref) => {
+export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }: BusinessEventFormProps) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     defaultValues: {
@@ -73,33 +68,29 @@ export const BusinessEventForm = React.forwardRef<
     },
   });
 
-  React.useImperativeHandle(ref, () => ({
-    triggerSubmit: () => {
-        // This function will be called from the parent to get the form data
-        // It does not submit to firestore, it just returns the validated data
-        return form.getValues(); 
-    }
-  }));
-
+  const watchedValues = form.watch();
+  React.useEffect(() => {
+    onFormChange(watchedValues);
+  }, [watchedValues, onFormChange]);
+  
   React.useEffect(() => {
     if (event) {
         form.reset({
-        name: event.name || "",
-        description: event.description || "",
-        termsAndConditions: event.termsAndConditions || "",
-        startDate: event.startDate ? parseISO(event.startDate) : new Date(),
-        endDate: event.endDate ? parseISO(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
-        isActive: event.isActive === undefined ? true : event.isActive,
-        imageUrl: event.imageUrl || "",
-        aiHint: event.aiHint || "",
+          name: event.name || "",
+          description: event.description || "",
+          termsAndConditions: event.termsAndConditions || "",
+          startDate: event.startDate ? parseISO(event.startDate) : new Date(),
+          endDate: event.endDate ? parseISO(event.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
+          isActive: event.isActive === undefined ? true : event.isActive,
+          imageUrl: event.imageUrl || "",
+          aiHint: event.aiHint || "",
         });
     }
   }, [event, form]);
 
   const handleSubmit = (values: EventDetailsFormValues) => {
-    // The form itself doesn't submit. The parent will call the function exposed by the ref.
-    // This is a placeholder or can be used for local state updates if needed.
-    console.log("BusinessEventForm submitted with values (local validation):", values);
+    // The parent component will handle the actual submission.
+    console.log("BusinessEventForm validated with values (local):", values);
   };
 
 
@@ -240,10 +231,9 @@ export const BusinessEventForm = React.forwardRef<
             </FormItem>
           )}
         />
-        {/* The submit button is now in the parent component (the dialog footer) */}
       </form>
     </Form>
   );
-});
+};
 
 BusinessEventForm.displayName = "BusinessEventForm";
