@@ -185,7 +185,6 @@ export default function BusinessEventsPage() {
     }
   }, [userProfile, loadingAuth, loadingProfile, toast]);
 
-
   const fetchBusinessEvents = useCallback(async (businessIdToFetch: string) => {
     try {
       const q = query(collection(db, "businessEntities"), where("businessId", "==", businessIdToFetch), where("type", "==", "event"));
@@ -673,8 +672,8 @@ export default function BusinessEventsPage() {
         setIsSubmitting(false);
     }
   };
-
-  const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
+  
+  const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
     if (isSubmitting) return;
     if (!currentBusinessId || !eventToToggle.id) {
         toast({ title: "Error", description: "ID de evento o negocio no disponible.", variant: "destructive" });
@@ -712,8 +711,7 @@ export default function BusinessEventsPage() {
     } finally {
         setIsSubmitting(false); 
     }
-  }, [currentBusinessId, toast, isSubmitting, editingEvent]);
-
+  };
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
