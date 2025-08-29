@@ -431,7 +431,7 @@ export default function BusinessEventsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [currentBusinessId, toast, userProfile?.email, fetchBusinessEvents, initialEventForm]);
+  }, [currentBusinessId, toast, userProfile?.email, initialEventForm]);
   
   const handleDeleteEvent = async (eventId: string, eventName?: string) => {
     if (isSubmitting) return;
@@ -649,7 +649,7 @@ export default function BusinessEventsPage() {
     }
   };
   
-const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
+  const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
     const { id, name, isActive } = eventToToggle;
     if (!currentBusinessId || !id) {
         toast({ title: "Error", description: "ID de promoción o negocio no disponible.", variant: "destructive" });
@@ -676,7 +676,7 @@ const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => 
             variant: "destructive"
         });
     }
-};
+  };
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
@@ -1131,7 +1131,7 @@ const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => 
             )}
           </CardContent>
         </Card>
-      )}
+      
 
     <Dialog open={showInitialEventModal} onOpenChange={(isOpen) => {
         if (!isOpen) initialEventForm.reset();
@@ -1712,9 +1712,3 @@ const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => 
     </div>
   );
 }
-    
-
-  
-
-
-
