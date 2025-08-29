@@ -185,9 +185,8 @@ export default function BusinessEventsPage() {
       });
       setEvents(fetchedEvents.sort((a,b) => {
         if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        if (a.createdAt) return -1; 
-        if (b.createdAt) return 1;
-        return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+        if (a.startDate && b.startDate) return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+        return 0;
       }));
     } catch (error: any) {
       console.error("Events Page: Error fetching events:", error.code, error.message, error);
@@ -649,34 +648,34 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
-    const { id, name, isActive } = eventToToggle;
-    if (!currentBusinessId || !id) {
-        toast({ title: "Error", description: "ID de promoción o negocio no disponible.", variant: "destructive" });
-        return;
-    }
+  const handleToggleEventStatus = useCallback(async (eventId: string) => {
+    if (!currentBusinessId) return;
 
-    const newStatus = !isActive;
-    
+    const eventToToggle = events.find(e => e.id === eventId);
+    if (!eventToToggle) return;
+
+    const newStatus = !eventToToggle.isActive;
+    const eventName = eventToToggle.name;
+
     // Optimistic UI update
-    setEvents(prev => prev.map(p => (p.id === id ? { ...p, isActive: newStatus } : p)));
+    setEvents(prevEvents => prevEvents.map(e => e.id === eventId ? { ...e, isActive: newStatus } : e));
 
     try {
-        await updateDoc(doc(db, "businessEntities", id), { isActive: newStatus });
+        await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
         toast({
             title: "Estado Actualizado",
-            description: `El evento "${name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
+            description: `El evento "${eventName}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
         });
     } catch (error: any) {
         // Revert UI on error
-        setEvents(prev => prev.map(p => (p.id === id ? { ...p, isActive: isActive } : p)));
+        setEvents(prevEvents => prevEvents.map(p => (p.id === eventId ? { ...p, isActive: eventToToggle.isActive } : p)));
         toast({
             title: "Error al Actualizar",
             description: `No se pudo cambiar el estado. ${error.message}`,
             variant: "destructive"
         });
     }
-  };
+  }, [currentBusinessId, events, toast]);
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
@@ -1033,7 +1032,7 @@ export default function BusinessEventsPage() {
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
                                 <Switch
                                     checked={event.isActive}
-                                    onCheckedChange={() => handleToggleEventStatus(event)}
+                                    onCheckedChange={() => handleToggleEventStatus(event.id)}
                                     aria-label={`Estado del evento ${event.name}`}
                                     id={`status-switch-event-${event.id}`}
                                     disabled={isSubmitting}
