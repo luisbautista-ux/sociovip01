@@ -114,34 +114,38 @@ export default function BusinessSettingsPage() {
     }
   };
 
-  const uploadFileAndGetURL = async (file: File, path: string): Promise<string> => {
-    console.log(`Attempting to upload to Storage. User UID: ${currentUser?.uid || 'N/A'}, Path: ${path}`);
-    if (!currentUser) {
-        toast({ title: "Error de Autenticación", description: "Debes estar logueado para subir archivos.", variant: "destructive" });
-        throw new Error("User not authenticated");
-    }
-    const fileRef = storageRef(storage, path);
-    const uploadTask = uploadBytesResumable(fileRef, file, {
-        customMetadata: { uploaderUid: currentUser.uid } // Pass UID for rules
-    });
-
+  const uploadFileAndGetURL = (file: File, path: string): Promise<string> => {
     return new Promise((resolve, reject) => {
+        if (!currentUser) {
+            const authError = new Error("User not authenticated for upload.");
+            toast({ title: "Error de Autenticación", description: "Debes estar logueado para subir archivos.", variant: "destructive" });
+            reject(authError);
+            return;
+        }
+
+        const fileRef = storageRef(storage, path);
+        const uploadTask = uploadBytesResumable(fileRef, file, {
+            customMetadata: { uploaderUid: currentUser.uid }
+        });
+
         uploadTask.on(
             "state_changed",
-            (snapshot) => { /* Optional: handle progress */ },
+            (snapshot) => { /* Progress handling can be added here */ },
             (error: any) => {
-                console.error("Firebase Storage Upload failed:", error.code, error.message, error.name, error.serverResponse);
-                const errorMessage = `No se pudo subir ${file.name}. Código: ${error.code}. Verifica las reglas de Storage.`;
-                toast({ title: "Error de Subida (Storage)", description: errorMessage, variant: "destructive", duration: 10000 });
-                reject(new Error(errorMessage));
+                console.error("Firebase Storage Upload failed:", error.code, error.message);
+                const userFacingError = new Error(`No se pudo subir ${file.name}. Código: ${error.code}. Verifica los permisos de Storage.`);
+                toast({ title: "Error de Subida", description: userFacingError.message, variant: "destructive", duration: 10000 });
+                reject(userFacingError); // Reject the promise on error
             },
             async () => {
                 try {
                     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    resolve(downloadURL);
+                    resolve(downloadURL); // Resolve the promise on success
                 } catch (downloadUrlError: any) {
-                    console.error("Failed to get download URL:", downloadUrlError);
-                    reject(new Error("No se pudo obtener la URL de descarga."));
+                    console.error("Failed to get download URL after upload:", downloadUrlError);
+                    const finalError = new Error("No se pudo obtener la URL de descarga del archivo.");
+                    toast({ title: "Error de Descarga", description: finalError.message, variant: "destructive"});
+                    reject(finalError);
                 }
             }
         );
@@ -190,14 +194,11 @@ export default function BusinessSettingsPage() {
       });
       setLogoFile(null); 
       setCoverFile(null); 
-      // No necesitamos llamar a fetchBusinessData() aquí si el estado local se actualiza
-      // y la UI ya refleja los cambios (ej. logoPreview). Se recargará en el próximo mount.
     } catch (error: any) {
-      // El toast de error específico ya se muestra en uploadFileAndGetURL
-      // Aquí podemos poner un toast genérico si la actualización de Firestore falla
-      if (!error.message.includes("No se pudo subir")) {
-          toast({ title: "Error al Guardar Branding", description: error.message || "No se pudieron guardar los cambios en la base de datos.", variant: "destructive"});
-      }
+        // Error toasts are now handled inside uploadFileAndGetURL or for Firestore updates
+        if (!String(error.message).includes("subir") && !String(error.message).includes("descarga")) {
+             toast({ title: "Error al Guardar en Base de Datos", description: error.message || "No se pudieron guardar los cambios.", variant: "destructive"});
+        }
     } finally {
       setIsSavingBranding(false);
     }
