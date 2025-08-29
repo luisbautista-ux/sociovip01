@@ -285,12 +285,10 @@ export default function BusinessEventsPage() {
         }).finally(() => {
             setIsLoadingPageData(false);
         });
-    } else {
-        if (!loadingAuth && !loadingProfile) {
-            setEvents([]);
-            setAvailablePromotersForAssignment([]);
-            setIsLoadingPageData(false);
-        }
+    } else if (!loadingAuth && !loadingProfile) {
+        setEvents([]);
+        setAvailablePromotersForAssignment([]);
+        setIsLoadingPageData(false);
     }
   }, [currentBusinessId, fetchBusinessEvents, fetchBusinessPromotersForAssignment, loadingAuth, loadingProfile]);
 
