@@ -430,7 +430,7 @@ export default function BusinessEventsPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [currentBusinessId, toast, userProfile?.email, initialEventForm]);
+  }, [currentBusinessId, toast, userProfile?.email, initialEventForm, fetchBusinessEvents]);
   
   const handleDeleteEvent = async (eventId: string, eventName?: string) => {
     if (isSubmitting) return;
@@ -1031,10 +1031,10 @@ export default function BusinessEventsPage() {
                             <div className="font-semibold text-base">{event.name}</div>
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
                                 <Switch
+                                    id={`status-switch-event-${event.id}`}
                                     checked={event.isActive}
                                     onCheckedChange={() => handleToggleEventStatus(event.id)}
                                     aria-label={`Estado del evento ${event.name}`}
-                                    id={`status-switch-event-${event.id}`}
                                     disabled={isSubmitting}
                                 />
                                 <Label htmlFor={`status-switch-event-${event.id}`} className="sr-only">
