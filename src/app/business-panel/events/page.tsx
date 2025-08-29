@@ -271,7 +271,7 @@ export default function BusinessEventsPage() {
         duration: 10000 
       });
     } 
-  }, [toast, userProfile]);
+  }, [toast, userProfile?.email]);
 
   useEffect(() => {
     if (currentBusinessId) {
@@ -429,7 +429,7 @@ export default function BusinessEventsPage() {
           maxAttendance: finalNewEvent.maxAttendance
       });
       
-      if (currentBusinessId) fetchBusinessEvents(currentBusinessId); 
+      setEvents(prev => [finalNewEvent, ...prev]);
       
       toast({ title: "Evento Creado Inicialmente", description: `El evento "${finalNewEvent.name}" ha sido creado. Ahora puedes configurar más detalles.` });
       setShowInitialEventModal(false);
@@ -673,7 +673,7 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleToggleEventStatus = async (eventToToggle: BusinessManagedEntity) => {
+  const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
     if (isSubmitting) return;
     if (!currentBusinessId || !eventToToggle.id) {
         toast({ title: "Error", description: "ID de evento o negocio no disponible.", variant: "destructive" });
@@ -691,7 +691,7 @@ export default function BusinessEventsPage() {
         title: "Estado Actualizado",
         description: `El evento "${eventName}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
       });
-      // Correctly update local state to avoid re-fetch and infinite loops
+      
       setEvents(prevEvents => 
         prevEvents.map(event => 
           event.id === eventToToggle.id ? { ...event, isActive: newStatus } : event
@@ -711,7 +711,7 @@ export default function BusinessEventsPage() {
     } finally {
         setIsSubmitting(false); 
     }
-  };
+  }, [currentBusinessId, isSubmitting, toast, editingEvent]);
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
@@ -1643,7 +1643,7 @@ export default function BusinessEventsPage() {
                             )}
                         />
                          <FormField
-                            control={commissionRuleForm.control}
+                            control={form.control}
                             name="description"
                             render={({ field }) => (
                                 <FormItem>
@@ -1732,7 +1732,7 @@ export default function BusinessEventsPage() {
                   setShowCreateCodesModal(true);
               } else {
                   toast({
-                      title: "No se pueden crear códigos",
+                      title: "Acción no permitida",
                       description: "Este evento no está activo o está fuera de su periodo de vigencia.",
                       variant: "destructive"
                   });
