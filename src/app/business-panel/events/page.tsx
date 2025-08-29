@@ -673,42 +673,34 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
-    if (!currentBusinessId) {
-      toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
-      return;
+const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
+    const { id, name, isActive } = eventToToggle;
+    if (!currentBusinessId || !id) {
+        toast({ title: "Error", description: "ID de promoción o negocio no disponible.", variant: "destructive" });
+        return;
     }
+
+    const newStatus = !isActive;
     
     // Optimistic UI update
-    const newStatus = !eventToToggle.isActive;
-    setEvents(prevEvents => 
-      prevEvents.map(event => 
-        event.id === eventToToggle.id ? { ...event, isActive: newStatus } : event
-      )
-    );
+    setEvents(prev => prev.map(p => (p.id === id ? { ...p, isActive: newStatus } : p)));
 
-    // Update in backend
     try {
-      await updateDoc(doc(db, "businessEntities", eventToToggle.id), { isActive: newStatus });
-      toast({
-        title: "Estado Actualizado",
-        description: `El evento "${eventToToggle.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
-      });
+        await updateDoc(doc(db, "businessEntities", id), { isActive: newStatus });
+        toast({
+            title: "Estado Actualizado",
+            description: `El evento "${name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
+        });
     } catch (error: any) {
-      console.error("Events Page: Error updating event status:", error.code, error.message, error);
-      // Revert optimistic UI update on error
-      setEvents(prevEvents => 
-        prevEvents.map(event => 
-          event.id === eventToToggle.id ? { ...event, isActive: !newStatus } : event
-        )
-      );
-      toast({
-        title: "Error al Actualizar Estado",
-        description: `No se pudo cambiar el estado del evento. ${error.message}`,
-        variant: "destructive"
-      });
+        // Revert UI on error
+        setEvents(prev => prev.map(p => (p.id === id ? { ...p, isActive: isActive } : p)));
+        toast({
+            title: "Error al Actualizar",
+            description: `No se pudo cambiar el estado. ${error.message}`,
+            variant: "destructive"
+        });
     }
-  }, [currentBusinessId, toast]);
+}, [currentBusinessId, toast]);
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
       if (!editingEvent) { 
@@ -1747,3 +1739,4 @@ export default function BusinessEventsPage() {
     
 
   
+
