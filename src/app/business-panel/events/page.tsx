@@ -694,7 +694,13 @@ export default function BusinessEventsPage() {
         title: "Estado Actualizado",
         description: `El evento "${eventName}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`
       });
-       if (currentBusinessId) fetchBusinessEvents(currentBusinessId); 
+      // Correctly update local state to avoid re-fetch and infinite loops
+      setEvents(prevEvents => 
+        prevEvents.map(event => 
+          event.id === eventToToggle.id ? { ...event, isActive: newStatus } : event
+        )
+      );
+
        if (editingEvent && editingEvent.id === eventToToggle.id) { 
           setEditingEvent(prev => prev ? {...prev, isActive: newStatus} : null);
       }
@@ -708,7 +714,7 @@ export default function BusinessEventsPage() {
     } finally {
         setIsSubmitting(false); 
     }
-  }, [currentBusinessId, toast, isSubmitting, editingEvent, fetchBusinessEvents]);
+  }, [currentBusinessId, toast, isSubmitting, editingEvent]);
 
 
   const handleOpenTicketFormModal = (ticket: TicketType | null) => {
