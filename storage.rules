@@ -1,36 +1,23 @@
 rules_version = '2';
 
-// Reglas de seguridad para Cloud Storage
+// Reglas para el servicio de Firebase Storage
 service firebase.storage {
+  // Coincide con cualquier bucket en tu proyecto
   match /b/{bucket}/o {
 
-    // Regla para la carpeta de imágenes de negocios
-    // businesses/{businessId}/{logo o cover}
+    // Reglas para todos los archivos dentro de la carpeta de un negocio específico
     match /businesses/{businessId}/{allPaths=**} {
-      
-      // PERMITIR LECTURA PÚBLICA:
-      // Cualquiera puede ver las imágenes (logos, portadas) de los negocios.
-      // Esto es necesario para que las páginas públicas puedan mostrarlas.
+
+      // Cualquiera puede leer los archivos (logos, portadas, etc.)
       allow read: if true;
 
-      // PERMITIR ESCRITURA (subir, actualizar, eliminar) SOLO A USUARIOS AUTORIZADOS:
-      // Para escribir, el usuario debe:
-      // 1. Estar autenticado (request.auth != null).
-      // 2. Tener un perfil en Firestore en /platformUsers/{request.auth.uid}.
-      // 3. Su perfil debe tener el 'businessId' que coincide con el de la carpeta.
-      // 4. Su rol debe ser 'business_admin' o 'staff'.
-      allow write: if request.auth != null && 
+      // Un usuario puede escribir (subir, actualizar, borrar) si se cumplen TODAS las condiciones:
+      // 1. El usuario está autenticado (request.auth no es nulo).
+      // 2. Existe un documento en Firestore para ese usuario en la colección 'platformUsers'.
+      // 3. El campo 'businessId' en el perfil de Firestore del usuario coincide con el 'businessId' de la carpeta de la imagen.
+      allow write: if request.auth != null &&
                       exists(/databases/(default)/documents/platformUsers/$(request.auth.uid)) &&
-                      get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-                      ('business_admin' in get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles || 
-                       'staff' in get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles);
+                      get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId;
     }
-
-    // Puedes añadir más reglas para otras carpetas aquí si es necesario
-    // Por ejemplo, para imágenes de perfil de usuario:
-    // match /userProfiles/{userId}/{allPaths=**} {
-    //   allow read;
-    //   allow write: if request.auth != null && request.auth.uid == userId;
-    // }
   }
 }
