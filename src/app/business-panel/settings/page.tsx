@@ -93,28 +93,31 @@ export default function BusinessSettingsPage() {
         // If the above doesn't throw, a file exists. Delete it.
         await deleteObject(storageRef);
     } catch (error: any) {
-        if (error.code !== 'storage/object-not-found') {
+        if (error.code === 'storage/object-not-found') {
+            // This is the expected case if no file exists. Continue silently.
+        } else {
             // Re-throw other errors (like permission issues on getDownloadURL)
             console.error("Error checking for existing file, it might be a permissions issue:", error);
+            // Propagate a user-friendly error message
             throw new Error(`Error de permisos al acceder al almacenamiento: ${error.message}`);
         }
-        // If object-not-found, it's fine, we can proceed to upload.
     }
     
     // Now, upload the new file
-    return new Promise((resolve, reject) => {
-        uploadBytes(storageRef, file).then(snapshot => {
-            getDownloadURL(snapshot.ref).then(url => {
-                resolve(url);
-            }).catch(error => {
-                console.error("Error getting download URL:", error);
-                reject(new Error("No se pudo obtener la URL del archivo subido."));
-            });
-        }).catch(error => {
-            console.error("Error uploading file:", error);
-            reject(new Error(`No se pudo subir el archivo. Código de error: ${error.code}`));
-        });
-    });
+    try {
+        const snapshot = await uploadBytes(storageRef, file);
+        return await getDownloadURL(snapshot.ref);
+    } catch (error: any) {
+        console.error("Error uploading file or getting URL:", error);
+        // Provide a more specific error message based on the Firebase Storage error code
+        let userMessage = "No se pudo subir el archivo.";
+        if (error.code === 'storage/unauthorized') {
+            userMessage = "No tienes permiso para subir archivos. Revisa las Reglas de Storage en Firebase.";
+        } else if (error.code === 'storage/canceled') {
+            userMessage = "La subida del archivo fue cancelada.";
+        }
+        throw new Error(userMessage);
+    }
 };
 
 
@@ -335,3 +338,4 @@ export default function BusinessSettingsPage() {
     </div>
   );
 }
+
