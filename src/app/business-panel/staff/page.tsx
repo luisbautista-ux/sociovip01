@@ -12,14 +12,14 @@ import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
-import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm"; // Reutilizamos el formulario de admin
+import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm"; 
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
-import { PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
+import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,6 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
 
-// --- Validaciones y Tipos ---
 const DniEntrySchema = z.object({
   docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
   docNumber: z.string().min(1, "El número de documento es requerido."),
@@ -85,7 +84,7 @@ export default function BusinessStaffPage() {
     }
     setIsLoading(true);
     try {
-      const staffQuery = query(collection(db, "platformUsers"), where("businessId", "==", currentBusinessId), where("roles", "array-contains-any", ["staff", "host"]));
+      const staffQuery = query(collection(db, "platformUsers"), where("businessId", "==", currentBusinessId), where("roles", "array-contains-any", ["staff", "host", "business_admin"]));
       const querySnapshot = await getDocs(staffQuery);
       const fetchedStaff: PlatformUser[] = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as PlatformUser));
       setStaffMembers(fetchedStaff);
@@ -128,7 +127,7 @@ export default function BusinessStaffPage() {
                 result.userType = 'QrClient';
                 result.qrClientData = { id: docId, ...docData } as QrClient;
             }
-            return result; // Stop checking if found
+            return result;
         }
     }
     return result; 
@@ -277,7 +276,7 @@ export default function BusinessStaffPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Mi Personal</CardTitle>
-          <CardDescription>Administra los usuarios staff de tu negocio.</CardDescription>
+          <CardDescription>Administra los usuarios staff y anfitriones de tu negocio.</CardDescription>
           <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -342,7 +341,6 @@ export default function BusinessStaffPage() {
         </CardContent>
       </Card>
       
-      {/* --- Modals --- */}
       <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader><UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle><UIDialogDescription>Ingresa el documento para verificar si la persona ya existe en la plataforma.</UIDialogDescription></UIDialogHeader>

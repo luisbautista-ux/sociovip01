@@ -1,38 +1,57 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Helper function to check if the user is authenticated
-    function isSignedIn() {
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Helper function to get user profile from Firestore
-    function getUserProfile(userId) {
-      return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
+    // Helper function to get user profile data from Firestore
+    function getUserProfile(uid) {
+      return get(/databases/$(database)/documents/platformUsers/$(uid)).data;
     }
     
-    // Helper function to check if the user is an admin or staff for a specific business
-    function isBusinessAdminOrStaff(businessId) {
-      let userProfile = getUserProfile(request.auth.uid);
-      return isSignedIn() && 
-             (userProfile.businessId == businessId) && 
-             ('business_admin' in userProfile.roles || 'staff' in userProfile.roles);
-    }
-    
-    // Regla para la carpeta de negocios
-    // businesses/{businessId}/{logo o cover}/{fileName}
-    match /businesses/{businessId}/{imageType}/{fileName} {
-      // Cualquiera puede leer las imágenes (para las páginas públicas)
-      allow read: if true;
-      
-      // Solo el admin o staff de ese negocio específico puede escribir (crear, actualizar, eliminar)
-      // El businessId en la ruta del archivo debe coincidir con el businessId en el perfil del usuario.
-      allow write: if isSignedIn() && isBusinessAdminOrStaff(businessId);
+    // Helper function to check if the requesting user has ANY of the specified roles
+    function hasAnyRole(uid, roles) {
+        let userRoles = getUserProfile(uid).roles;
+        return userRoles.hasAny(roles);
     }
 
-    // Otras reglas para otras carpetas pueden ir aquí.
-    // Por defecto, se deniega el acceso a cualquier otra ruta.
+    // Check if the user is a superadmin
+    function isSuperAdmin(uid) {
+      return hasAnyRole(uid, ['superadmin']);
+    }
+    
+    // Check if the user is a staff member (admin or staff role) for a specific business
+    function isStaffFor(uid, businessId) {
+        let profile = getUserProfile(uid);
+        return profile.businessId == businessId && hasAnyRole(uid, ['business_admin', 'staff']);
+    }
+    
+    // Publicly readable content (e.g., logos, cover images)
+    // We can refine this path later if needed, e.g., /public/{allPaths=**}
+    match /public/{allPaths=**} {
+      allow read: if true;
+    }
+    
+    // Business-specific files (e.g., logos, cover images uploaded by business admins)
+    // Path structure: /businesses/{businessId}/{fileName}
+    match /businesses/{businessId}/{fileName} {
+      // Anyone can read business logos and cover images
+      allow read: if true;
+      
+      // Only an authenticated staff member of that specific business or a superadmin can write (upload/update/delete)
+      allow write: if isAuthenticated() && 
+                     (isSuperAdmin(request.auth.uid) || 
+                      isStaffFor(request.auth.uid, businessId));
+    }
+    
+    // Default deny: All other paths are protected
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
   }
 }
