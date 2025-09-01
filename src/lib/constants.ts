@@ -1,16 +1,17 @@
-
 // src/lib/constants.ts
 import type { GeneratedCode, SocioVipMember, PlatformUserRole } from "./types";
 
 export const GENERATED_CODE_STATUS_TRANSLATIONS: Record<GeneratedCode['status'], string> = {
   available: "Disponible",
-  redeemed: "Canjeado/Utilizado",
+  redeemed: "Canjeado (QR Generado)",
+  used: "Utilizado (en Puerta)",
   expired: "Vencido",
 };
 
 export const GENERATED_CODE_STATUS_COLORS: Record<GeneratedCode['status'], "default" | "secondary" | "destructive" | "outline"> = {
     available: "default", 
     redeemed: "secondary",
+    used: "outline",
     expired: "destructive",
 };
 
@@ -259,7 +260,7 @@ export const PERU_LOCATIONS = {
     "PASCO": ["CHAUPIMARCA", "HUACHON", "HUARIACA", "HUAYLLAY", "NINACACA", "PALLANCHACRA", "PAUCARTAMBO", "SAN FRANCISCO DE ASIS DE YARUSYACAN", "SIMON BOLIVAR", "TICLACAYAN", "TINYAHUARCO", "VICCO", "YANACANCHA"]
   },
   "PIURA": {
-    "AYABACA": ["AYABACA", "FRIAS", "JILILI", "LAGUNAS", "MONTERO", "PACAIPAMPA", "PAIMAS", "SAPILLICA", "SICCHEZ", "SUYO"],
+    "AYABACA": ["AYABaca", "FRIAS", "JILILI", "LAGUNAS", "MONTERO", "PACAIPAMPA", "PAIMAS", "SAPILLICA", "SICCHEZ", "SUYO"],
     "HUANCABAMBA": ["CANCHAQUE", "EL CARMEN DE LA FRONTERA", "HUANCABAMBA", "HUARMACA", "LALAQUIZ", "SAN MIGUEL DE EL FAIQUE", "SONDOR", "SONDORILLO"],
     "MORROPON": ["BUENOS AIRES", "CHALACO", "CHULUCANAS", "LA MATANZA", "MORROPON", "SALITRAL", "SAN JUAN DE BIGOTE", "SANTA CATALINA DE MOSSA", "SANTO DOMINGO", "YAMANGO"],
     "PAITA": ["AMOTAPE", "ARENAL", "COLAN", "EL ALTO", "LA HUACA", "PAITA", "TAMARINDO", "VICHAYAL"],
@@ -313,5 +314,3 @@ export const PERU_LOCATIONS = {
     "PURUS": ["PURUS"]
   }
 };
-
-    

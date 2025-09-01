@@ -1,4 +1,3 @@
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -9,13 +8,14 @@ export interface PromotionDetails {
   description: string;
   validUntil: string; 
   imageUrl: string;
-  promoCode: string; 
+  promoCode: string; // The original 9-digit code
+  qrValue: string; // The value embedded in the QR (e.g., the code's unique ID)
   aiHint: string;
   type: 'promotion' | 'event';
   termsAndConditions?: string;
 }
 
-export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'expired';
+export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'used' | 'expired';
 
 export interface QrClient {
   id: string; 
@@ -30,7 +30,7 @@ export interface QrClient {
 export interface QrCodeData { 
   user: QrClient;
   promotion: PromotionDetails; 
-  code: string; 
+  code: string; // The original 9-digit code
   status: QrCodeStatusGenerated;
 }
 
@@ -127,16 +127,21 @@ export type BusinessEntityType = 'promotion' | 'event' | 'survey';
 export interface GeneratedCode { 
   id: string; 
   entityId: string; 
-  value: string; 
-  status: QrCodeStatusGenerated;
+  value: string; // The 9-digit alphanumeric code
+  status: QrCodeStatusGenerated; // available -> redeemed (by client) -> used (at door)
   generatedByName: string; 
-  generatedByUid?: string; // UID del PlatformUser (promotor o staff/admin negocio) que lo creó
+  generatedByUid?: string;
   generatedDate: string; 
-  redemptionDate?: string | null; 
+  redeemedDate?: string | null; // When client generated their QR
   redeemedByInfo?: {
     dni: string;
     name: string;
     phone?: string;
+  } | null;
+  usedDate?: string | null; // When host scanned the QR at the door
+  usedByInfo?: { // Info of the host/staff who scanned
+    uid: string;
+    name: string;
   } | null;
   observation?: string | null;
   isVipCandidate?: boolean;
@@ -155,7 +160,7 @@ export interface CommissionRule {
   description?: string;
 }
 export interface EventPromoterAssignment { 
-  promoterProfileId: string; // ID del BusinessPromoterLink.platformUserUid o DNI del promotor
+  promoterProfileId: string;
   promoterName: string; 
   promoterEmail?: string;
   commissionRules?: CommissionRule[];
@@ -216,7 +221,6 @@ export interface PromoterProfile {
   email: string;
   phone?: string;
   dni?: string;
-  // Otros campos relevantes para un perfil de promotor global
 }
 
 export interface BusinessPromoterLink { 
