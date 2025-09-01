@@ -103,7 +103,7 @@ export default function HostValidateQrPage() {
   const [foundCode, setFoundCode] = useState<GeneratedCode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
-  const [isVipCandidate, setIsVipCandidate] = useState(isScannerActive);
+  const [isVipCandidate, setIsVipCandidate] = useState(false);
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const currentBusinessId = userProfile?.businessId;
@@ -180,10 +180,10 @@ export default function HostValidateQrPage() {
     toast({ title: "QR Escaneado", description: `Verificando código...` });
   }, [findCodeInEntities, toast]);
   
-  const handleScanFailure = (errorMessage: string, error: Html5QrcodeError) => {
+  const handleScanFailure = useCallback((errorMessage: string, error: Html5QrcodeError) => {
     // This can be noisy, so we'll just log it to the console for debugging
     // console.warn(`QR Code no detectado, error: ${errorMessage}`);
-  };
+  }, []);
 
 
   const handleValidateAndRedeem = async () => {
@@ -379,5 +379,3 @@ export default function HostValidateQrPage() {
     </div>
   );
 }
-
-    
