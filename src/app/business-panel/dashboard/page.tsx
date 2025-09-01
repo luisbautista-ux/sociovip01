@@ -1,8 +1,8 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide } from "lucide-react";
+import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide, CheckCircle, TicketCheck, ScanSearch } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useCallback } from "react";
@@ -14,30 +14,26 @@ import { parseISO, isFuture } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 interface BusinessDashboardStats {
-  activePromotions: number;
-  upcomingEvents: number;
+  activeEntities: number;
   totalCodesCreated: number;
-  totalQrUsed: number;
+  totalCodesRedeemed: number; // Claimed by customer (redeemed or used)
+  totalCodesUsed: number; // Scanned at the door (used)
 }
 
 export default function BusinessDashboardPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const [stats, setStats] = useState<BusinessDashboardStats>({
-    activePromotions: 0,
-    upcomingEvents: 0,
+    activeEntities: 0,
     totalCodesCreated: 0,
-    totalQrUsed: 0,
+    totalCodesRedeemed: 0,
+    totalCodesUsed: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Derivar businessId aquí para estabilizarlo como dependencia
   const businessId = userProfile?.businessId;
 
   const fetchBusinessStats = useCallback(async (businessIdForQuery: string) => {
-    // No establecer setIsLoading(true) aquí; se maneja en el useEffect que llama.
-    // setIsLoading(true) was previously here and could contribute to loops if fetchBusinessStats
-    // itself was re-created often and called itself.
     try {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
@@ -71,60 +67,45 @@ export default function BusinessDashboardPage() {
           businessId: data.businessId,
           type: data.type as "promotion" | "event",
           name: data.name || "Entidad sin nombre",
-          description: data.description || "",
+          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
           startDate: startDateStr,
           endDate: endDateStr,
-          usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : Number(data.usageLimit),
-          maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
           isActive: data.isActive === undefined ? true : data.isActive,
-          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
-          ticketTypes: [], 
-          eventBoxes: [],
-          assignedPromoters: [], 
-          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (typeof data.createdAt === 'string' ? data.createdAt : undefined),
         } as BusinessManagedEntity);
       });
 
-      let activePromotionsCount = 0;
-      let upcomingEventsCount = 0;
+      let activeEntitiesCount = 0;
       let totalCodesCreatedCount = 0; 
-      let totalQrUsedCount = 0;
+      let totalCodesRedeemedCount = 0; // status 'redeemed' or 'used'
+      let totalCodesUsedCount = 0; // status 'used'
       
       entities.forEach(entity => {
-        if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
-          activePromotionsCount++;
-        }
-        if (entity.type === 'event' && entity.isActive) {
-          try {
-            const eventStartDate = parseISO(entity.startDate);
-            // Consider active if currently running OR its start date is in the future
-            if (isEntityCurrentlyActivatable(entity) || isFuture(eventStartDate)) {
-              upcomingEventsCount++;
-            }
-          } catch (e) {
-            console.warn("BusinessDashboardPage: Invalid startDate format for event for upcoming check:", entity.id, entity.startDate, e);
-          }
+        if (isEntityCurrentlyActivatable(entity)) {
+          activeEntitiesCount++;
         }
 
         if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
             totalCodesCreatedCount += entity.generatedCodes.length;
             entity.generatedCodes.forEach(code => {
-              if (code.status === 'redeemed') {
-                totalQrUsedCount++;
+              if (code.status === 'redeemed' || code.status === 'used') {
+                totalCodesRedeemedCount++;
+              }
+              if (code.status === 'used') {
+                totalCodesUsedCount++;
               }
             });
         }
       });
       
       setStats({
-        activePromotions: activePromotionsCount,
-        upcomingEvents: upcomingEventsCount,
+        activeEntities: activeEntitiesCount,
         totalCodesCreated: totalCodesCreatedCount,
-        totalQrUsed: totalQrUsedCount,
+        totalCodesRedeemed: totalCodesRedeemedCount,
+        totalCodesUsed: totalCodesUsedCount,
       });
 
     } catch (error: any) {
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
+      setStats({ activeEntities: 0, totalCodesCreated: 0, totalCodesRedeemed: 0, totalCodesUsed: 0 });
       toast({
         title: "Error al Cargar Estadísticas del Negocio",
         description: `No se pudieron obtener las estadísticas. Error: ${error.message}. Asegúrate de que tu perfil de Firestore ('platformUsers') tenga 'businessId' y roles correctos ('business_admin', 'staff') y que las reglas de Firestore permitan el acceso.`,
@@ -138,18 +119,16 @@ export default function BusinessDashboardPage() {
 
   useEffect(() => {
     if (loadingAuth || loadingProfile) {
-      setIsLoading(true); // Keep overall page loading
+      setIsLoading(true);
       return;
     }
 
-    // At this point, auth and profile loading are complete.
     if (businessId) {
-      setIsLoading(true); // Set loading true specifically for data fetching phase
+      setIsLoading(true);
       fetchBusinessStats(businessId);
     } else {
-      // No businessId, or userProfile is null
-      setStats({ activePromotions: 0, upcomingEvents: 0, totalCodesCreated: 0, totalQrUsed: 0 });
-      setIsLoading(false); // No data to fetch, so stop loading.
+      setStats({ activeEntities: 0, totalCodesCreated: 0, totalCodesRedeemed: 0, totalCodesUsed: 0 });
+      setIsLoading(false); 
       if (userProfile && (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff'))) {
         toast({
           title: "Error de Configuración del Negocio",
@@ -188,10 +167,10 @@ export default function BusinessDashboardPage() {
       <h1 className="text-3xl font-bold text-primary">Dashboard de Mi Negocio</h1>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Promociones Activas" value={stats.activePromotions} icon={Ticket} />
-        <StatCard title="Eventos Próximos" value={stats.upcomingEvents} icon={Calendar} />
+        <StatCard title="Promociones/Eventos Activos" value={stats.activeEntities} icon={Ticket} />
         <StatCard title="Códigos Creados" value={stats.totalCodesCreated} icon={QrCodeLucide} />
-        <StatCard title="QRs Usados" value={stats.totalQrUsed} icon={ScanLine} />
+        <StatCard title="Códigos Canjeados (QR Generados)" value={stats.totalCodesRedeemed} icon={TicketCheck} />
+        <StatCard title="QR Validados (Asistencia)" value={stats.totalCodesUsed} icon={ScanSearch} />
       </div>
 
       <Card className="shadow-lg">
@@ -208,4 +187,3 @@ export default function BusinessDashboardPage() {
     </div>
   );
 }
-
