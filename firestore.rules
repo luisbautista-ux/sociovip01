@@ -2,125 +2,97 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check if a user has a specific role
-    function hasRole(role) {
-      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny([role]);
-    }
-    
-    // Helper function to check if a user is an admin of a specific business
-    function isBusinessAdmin(businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-      return userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
-    }
-    
-    // Helper function to check if a user is a host of a specific business
-    function isBusinessHost(businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-      return userProfile.businessId == businessId && userProfile.roles.hasAny(['host', 'staff', 'business_admin']);
+
+    // --- REGLAS GLOBALES ---
+    // Función para verificar si un usuario es Super Administrador
+    function isSuperAdmin(userId) {
+      return exists(/databases/$(database)/documents/platformUsers/$(userId)) &&
+             get(/databases/$(database)/documents/platformUsers/$(userId)).data.roles[0] == 'superadmin';
     }
 
-    // Businesses collection
+    // Función para verificar si un usuario es un Administrador de Negocio o Staff de un negocio específico
+    function isBusinessAdminOrStaff(userId, businessId) {
+      let userRoles = get(/databases/$(database)/documents/platformUsers/$(userId)).data.roles;
+      let userBusinessId = get(/databases/$(database)/documents/platformUsers/$(userId)).data.businessId;
+      return exists(/databases/$(database)/documents/platformUsers/$(userId)) &&
+             (userRoles[0] == 'business_admin' || userRoles[0] == 'staff') &&
+             userBusinessId == businessId;
+    }
+
+    // --- COLECCIÓN DE NEGOCIOS (businesses) ---
     match /businesses/{businessId} {
-      // Anyone can read business public info
-      allow read; 
-      // Only superadmin can create, update, or delete businesses
-      allow write: if hasRole('superadmin');
-    }
-
-    // Platform Users collection
-    match /platformUsers/{userId} {
-      // Superadmin can manage all users
-      allow read, write: if hasRole('superadmin');
-      // Users can read their own profile
-      allow get: if request.auth.uid == userId;
-    }
-
-    // QR Clients collection
-    match /qrClients/{clientId} {
-      // Anyone can create a new QR client profile when generating a QR for the first time
-      allow create;
-      // Only superadmin can read or modify QR client data
-      allow read, update, delete: if hasRole('superadmin');
-    }
-    
-    // Socio VIP Members collection
-    match /socioVipMembers/{memberId} {
-      allow read, write: if hasRole('superadmin');
-    }
-
-    // BusinessPromoterLinks
-    match /businessPromoterLinks/{linkId} {
-      allow read, write: if hasRole('superadmin') || isBusinessAdmin(request.resource.data.businessId);
-      // Promoters can read their own links
-      allow get: if request.auth.uid == resource.data.platformUserUid;
-    }
-
-    // Business Entities (Promotions, Events, etc.)
-    match /businessEntities/{entityId} {
-      // Anyone can read promotions and events
+      // Lectura pública para que las páginas de negocio se muestren a todos.
       allow read: if true;
-      
-      // Creation and deletion is restricted
-      allow create, delete: if hasRole('superadmin') || isBusinessAdmin(request.resource.data.businessId);
 
-      // --- UPDATE LOGIC ---
-      allow update: if 
-        // Superadmin can update anything
-        hasRole('superadmin') || 
-        // Business admin can update their own entities (but not change businessId)
-        (isBusinessAdmin(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
-        // A host can update the status of a code to 'used'
-        (isBusinessHost(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId &&
-         isChangingCodeStatusOnly(request, resource, 'redeemed', 'used')) ||
-        // Anyone can update a code from 'available' to 'redeemed'
-        isChangingCodeStatusOnly(request, resource, 'available', 'redeemed');
+      // Creación, actualización y eliminación solo para Super Administradores.
+      allow create, update, delete: if request.auth != null && isSuperAdmin(request.auth.uid);
     }
+    
+    // --- COLECCIÓN DE USUARIOS DE PLATAFORMA (platformUsers) ---
+    match /platformUsers/{userId} {
+        // Lectura: Un usuario puede leer su propio perfil. Un Super Admin puede leer todos.
+        // Un Admin/Staff de negocio puede leer los perfiles de su mismo negocio.
+        allow read: if request.auth != null && 
+                       (request.auth.uid == userId || isSuperAdmin(request.auth.uid) ||
+                        isBusinessAdminOrStaff(request.auth.uid, resource.data.businessId));
+                        
+        // Escritura (Crear/Actualizar): Un usuario puede actualizar su propio perfil. Un Super Admin puede escribir en todos.
+        allow write: if request.auth != null && (request.auth.uid == userId || isSuperAdmin(request.auth.uid));
+        
+        // Eliminación: Solo un Super Admin puede eliminar perfiles de usuario.
+        allow delete: if request.auth != null && isSuperAdmin(request.auth.uid);
+    }
+
+    // --- COLECCIÓN DE ENTIDADES DE NEGOCIO (businessEntities: promociones, eventos) ---
+    match /businessEntities/{entityId} {
+      // Lectura pública para que las promociones y eventos se muestren a todos.
+      allow read: if true;
+
+      // Creación y actualización: Permitido para Super Admins y para Admins/Staff del negocio correspondiente.
+      allow create, update: if request.auth != null && 
+                               (isSuperAdmin(request.auth.uid) || 
+                                isBusinessAdminOrStaff(request.auth.uid, request.resource.data.businessId));
+                               
+      // Eliminación: Permitido para Super Admins y para Admins del negocio correspondiente.
+      allow delete: if request.auth != null &&
+                        (isSuperAdmin(request.auth.uid) || 
+                         isBusinessAdminOrStaff(request.auth.uid, resource.data.businessId));
+    }
+    
+     // --- COLECCIÓN DE CLIENTES QR (qrClients) ---
+    match /qrClients/{clientId} {
+      // Lectura: Super Admin puede leer todos, Admin/Staff puede leer los de su negocio.
+      allow read: if request.auth != null &&
+                      (isSuperAdmin(request.auth.uid) || 
+                       isBusinessAdminOrStaff(request.auth.uid, resource.data.generatedForBusinessId));
+
+      // Creación: Cualquiera puede crear un nuevo cliente QR (flujo público).
+      allow create: if true;
+    }
+
+    // --- COLECCIÓN DE SOCIOS VIP (socioVipMembers) ---
+    match /socioVipMembers/{socioId} {
+        // Solo los Super Administradores pueden gestionar los Socios VIP.
+        allow read, write, delete: if request.auth != null && isSuperAdmin(request.auth.uid);
+    }
+    
+    // --- COLECCIÓN DE VÍNCULOS PROMOTOR-NEGOCIO (businessPromoterLinks) ---
+    match /businessPromoterLinks/{linkId} {
+        // Lectura: Super Admin y el Admin/Staff del negocio correspondiente.
+        allow read: if request.auth != null &&
+                      (isSuperAdmin(request.auth.uid) ||
+                       isBusinessAdminOrStaff(request.auth.uid, resource.data.businessId));
+                       
+        // Escritura: Super Admin y el Admin/Staff del negocio correspondiente.
+        allow write: if request.auth != null &&
+                       (isSuperAdmin(request.auth.uid) ||
+                        isBusinessAdminOrStaff(request.auth.uid, request.resource.data.businessId));
+                        
+        // Eliminación: Super Admin y el Admin/Staff del negocio correspondiente.
+        allow delete: if request.auth != null &&
+                        (isSuperAdmin(request.auth.uid) ||
+                         isBusinessAdminOrStaff(request.auth.uid, resource.data.businessId));
+    }
+
   }
-}
-
-// Helper function to check if the only change is a code status transition
-function isChangingCodeStatusOnly(request, resource, fromStatus, toStatus) {
-    let incomingCodes = request.resource.data.generatedCodes;
-    let existingCodes = resource.data.generatedCodes;
-
-    // Check if the update modifies anything other than the generatedCodes array
-    let otherFields = request.resource.data.keys().removeAll(['generatedCodes']);
-    if (otherFields.size() > 0) {
-        return false;
-    }
-
-    // Find the code that is being changed
-    let changedCodeIndex = -1;
-    let originalCode;
-    let updatedCode;
-    
-    // This part is tricky in rules, but we can simulate the logic. We assume only one code changes at a time.
-    // We check if the list of codes is the same size.
-    if (incomingCodes.size() != existingCodes.size()) {
-      return false;
-    }
-
-    // A simplified check: Iterate and find the *first* difference.
-    // In a real transaction, we'd know the exact code ID. Here, we must infer.
-    for (let i = 0; i < existingCodes.size(); i = i + 1) {
-      if (existingCodes[i].status != incomingCodes[i].status) {
-        changedCodeIndex = i;
-        break;
-      }
-    }
-    
-    if (changedCodeIndex == -1) {
-      // No code status change found.
-      return false;
-    }
-    
-    originalCode = existingCodes[changedCodeIndex];
-    updatedCode = incomingCodes[changedCodeIndex];
-
-    // Verify the status transition is the one we allow
-    return originalCode.status == fromStatus && updatedCode.status == toStatus &&
-           // Verify no other fields in the code object were tampered with
-           originalCode.id == updatedCode.id &&
-           originalCode.value == updatedCode.value;
 }
