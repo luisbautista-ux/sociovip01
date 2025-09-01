@@ -3,98 +3,84 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =============================== 
-    //            Helpers
+    // ===============================
+    //          Helpers
     // ===============================
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function getUserProfile(userId) {
-      return get(/databases/$(database)/documents/platformUsers/$(userId));
+    function getUserData(userId) {
+      // Nota: get() en reglas puede leer sin depender de permisos de cliente
+      return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
     }
-    
+
     function isSuperAdmin() {
-      return isSignedIn() && getUserProfile(request.auth.uid).data.roles.hasAny(['superadmin']);
+      if (!isSignedIn()) { return false; }
+      let userRoles = getUserData(request.auth.uid).roles;
+      return 'superadmin' in userRoles;
     }
 
-    function isBusinessAdmin(businessId) {
-      return isSignedIn() 
-        && getUserProfile(request.auth.uid).data.roles.hasAny(['business_admin'])
-        && getUserProfile(request.auth.uid).data.businessId == businessId;
-    }
-
-    function isStaff(businessId) {
-      return isSignedIn()
-        && getUserProfile(request.auth.uid).data.roles.hasAny(['staff'])
-        && getUserProfile(request.auth.uid).data.businessId == businessId;
-    }
-
-    function isHost(businessId) {
-      return isSignedIn()
-        && getUserProfile(request.auth.uid).data.roles.hasAny(['host'])
-        && getUserProfile(request.auth.uid).data.businessId == businessId;
-    }
-    
-    function isPromoter() {
-        return isSignedIn() && getUserProfile(request.auth.uid).data.roles.hasAny(['promoter']);
+    function isBusinessAdmin() {
+      if (!isSignedIn()) { return false; }
+      let userRoles = getUserData(request.auth.uid).roles;
+      return 'business_admin' in userRoles;
     }
 
     // ===============================
-    //          Collections
+    //        Collections Rules
     // ===============================
 
     match /businesses/{businessId} {
       allow read: if true;
-      allow create, update, delete: if isSuperAdmin();
-      allow update: if isBusinessAdmin(businessId) || isStaff(businessId);
+      allow write: if isSuperAdmin();
     }
-    
+
     match /businessEntities/{entityId} {
       allow read: if true;
-      allow create, delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
-      allow update: if isSuperAdmin() 
-                      || isBusinessAdmin(request.resource.data.businessId) 
-                      || isStaff(request.resource.data.businessId);
+      allow create: if isSuperAdmin() || (isBusinessAdmin() && request.resource.data.businessId == getUserData(request.auth.uid).businessId);
+      allow update: if isSuperAdmin() || (isBusinessAdmin() && resource.data.businessId == getUserData(request.auth.uid).businessId);
+      allow delete: if isSuperAdmin() || (isBusinessAdmin() && resource.data.businessId == getUserData(request.auth.uid).businessId);
     }
-    
+
     match /qrClients/{clientId} {
-      allow get, list, create: if true;
-      allow update, delete: if false; 
+      allow get, list: if true;
+      allow create: if true;
+      allow update, delete: if false;
     }
-    
+
     match /platformUsers/{userId} {
-      allow read: if isSignedIn();
+      allow get, list: if isSignedIn();
       
-      // Regla corregida para crear personal
-      allow create: if isSuperAdmin() || 
-        (
-            isSignedIn() &&
-            // El que crea es un business_admin
-            getUserProfile(request.auth.uid).data.roles.hasAny(['business_admin']) &&
-            // El businessId del nuevo usuario es el mismo que el del admin que lo crea
-            request.resource.data.businessId == getUserProfile(request.auth.uid).data.businessId &&
-            // El nuevo usuario solo puede tener roles 'staff' o 'host'
-            request.resource.data.roles.hasOnly(['staff', 'host'])
-        );
+      allow create: if isSuperAdmin() || (
+        isBusinessAdmin() &&
+        request.resource.data.businessId == getUserData(request.auth.uid).businessId &&
+        !request.resource.data.roles.hasAny(['superadmin', 'business_admin'])
+      );
       
-      // Reglas para actualizar o borrar
-      allow update, delete: if isSuperAdmin() || 
-        (
-            isSignedIn() &&
-            isBusinessAdmin(resource.data.businessId) &&
-            // No se puede modificar a un superadmin
-            !('superadmin' in resource.data.roles)
-        );
+      allow update: if isSuperAdmin() || (
+        isBusinessAdmin() &&
+        resource.data.businessId == getUserData(request.auth.uid).businessId &&
+        !request.resource.data.roles.hasAny(['superadmin', 'business_admin'])
+      );
+
+      allow delete: if isSuperAdmin() || (
+        isBusinessAdmin() &&
+        resource.data.businessId == getUserData(request.auth.uid).businessId &&
+        !resource.data.roles.hasAny(['superadmin'])
+      );
     }
-    
+
     match /businessPromoterLinks/{linkId} {
-      allow read: if isSuperAdmin() || isPromoter() || isBusinessAdmin(resource.data.businessId);
-      allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+      allow read: if isSignedIn();
+      allow create, update: if isSuperAdmin() || (isBusinessAdmin() && request.resource.data.businessId == getUserData(request.auth.uid).businessId);
+      allow delete: if isSuperAdmin() || (isBusinessAdmin() && resource.data.businessId == getUserData(request.auth.uid).businessId);
     }
-    
+
+    // Socios VIP: Superadmin tiene control total, Business Admin puede leer.
     match /socioVipMembers/{memberId} {
-      allow read, write: if isSuperAdmin();
+      allow read: if isSuperAdmin() || isBusinessAdmin();
+      allow write: if isSuperAdmin();
     }
   }
 }
