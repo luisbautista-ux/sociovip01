@@ -897,26 +897,26 @@ export default function BusinessEventsPage() {
      Switch: activar/inactivar
   ======================== */
   const handleToggleEventStatus = useCallback(async (eventId: string, newStatus: boolean) => {
-    const originalEvent = events.find(e => e.id === eventId);
-    if (!originalEvent) return;
+      const originalEvent = events.find((e) => e.id === eventId);
+      if (!originalEvent) return;
 
-    // Optimistic UI update
-    setEvents(prevEvents =>
-        prevEvents.map(event =>
-            event.id === eventId ? { ...event, isActive: newStatus } : event
+      // Optimistic UI update
+      setEvents((prevEvents) =>
+        prevEvents.map((event) =>
+          event.id === eventId ? { ...event, isActive: newStatus } : event
         )
-    );
+      );
 
-    try {
+      try {
         await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
         toast({
             title: "Estado Actualizado",
             description: `El evento "${originalEvent.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`,
         });
-    } catch (error: any) {
+      } catch (error: any) {
         // Revert UI on failure
-        setEvents(prevEvents =>
-            prevEvents.map(event =>
+        setEvents((prevEvents) =>
+            prevEvents.map((event) =>
                 event.id === eventId ? { ...event, isActive: originalEvent.isActive } : event
             )
         );
@@ -925,8 +925,8 @@ export default function BusinessEventsPage() {
             description: `No se pudo cambiar el estado. ${error.message}`,
             variant: "destructive",
         });
-    }
-  }, [events, toast]);
+      }
+  }, [toast, events]);
 
 
   /* ========================
