@@ -280,6 +280,7 @@ export interface PlatformUserFormData {
   email: string;
   roles: PlatformUserRole[]; 
   businessId?: string | null;
+  password?: string;
 }
 
 export interface SocioVipMemberFormData {
@@ -416,4 +417,10 @@ export interface InitialDataForPromoterLink {
   existingPlatformUserPromoter?: PlatformUser; 
   qrClientData?: QrClient; 
   socioVipData?: SocioVipMember; 
+}
+
+export interface PromoterEntityView extends BusinessManagedEntity {
+    businessName: string;
+    promoterCodesCreated: number;
+    promoterCodesUsed: number;
 }
