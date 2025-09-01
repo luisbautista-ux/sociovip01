@@ -16,11 +16,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
-import { isEntityCurrentlyActivatable, anyToDate, cn } from "@/lib/utils";
+import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
 import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from "firebase/firestore";
+import { cn } from "@/lib/utils";
+
 
 const QR_READER_ELEMENT_ID = "qr-reader-validator";
 
@@ -172,7 +174,7 @@ export default function BusinessValidateQrPage() {
   }, [currentBusinessId, toast]);
 
   const handleScanSuccess = useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
-    stopScanner();
+    setIsScannerActive(false);
     setScannedCodeId(decodedText);
     findCodeInEntities(decodedText);
     toast({ title: "QR Escaneado", description: `Verificando código...` });
@@ -181,10 +183,6 @@ export default function BusinessValidateQrPage() {
   const handleScanFailure = (errorMessage: string, error: Html5QrcodeError) => {
     // This can be noisy, so we'll just log it to the console for debugging
     // console.warn(`QR Code no detectado, error: ${errorMessage}`);
-  };
-
-  const stopScanner = () => {
-    setIsScannerActive(false); 
   };
 
 
@@ -225,7 +223,7 @@ export default function BusinessValidateQrPage() {
           setFoundCode(codes[codeIndex]);
       });
       
-      toast({ title: "¡QR Validado y Utilizado!", description: `Código para "${foundEntity.name}" marcado como utilizado.`, className: "bg-green-500 text-white" });
+      toast({ title: "¡Código Utilizado Exitosamente!", description: `Código para "${foundEntity.name}" marcado como utilizado.`, className: "bg-green-500 text-white" });
       fetchActiveEntities();
     } catch (e: any) {
         console.error("Error in redemption transaction:", e);
@@ -289,8 +287,8 @@ export default function BusinessValidateQrPage() {
                         })
                        }>
                   {foundCode.status === 'used' ? <Info className="h-5 w-5 text-blue-600" /> 
-                    : isCodeCurrentlyRedeemableByHost() ? <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    : <XCircle className="h-5 w-5 text-red-600" /> 
+                    : (foundCode.status === 'redeemed' ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    : <XCircle className="h-5 w-5 text-red-600" /> )
                   }
                   <AlertTitle className={cn("font-bold", {
                         "text-green-800": isCodeCurrentlyRedeemableByHost(),
