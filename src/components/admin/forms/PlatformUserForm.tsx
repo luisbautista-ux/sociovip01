@@ -34,22 +34,34 @@ const platformUserFormSchemaBase = z.object({
   businessId: z.string().optional(),
 });
 
-const refinedSchema = platformUserFormSchemaBase.refine(data => {
-  const rolesThatNeedBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-  if (rolesThatNeedBusiness) {
-    return !!data.businessId && data.businessId.length > 0;
-  }
-  return true;
-}, {
-  message: "Debes seleccionar un negocio para los roles que lo requieren (Admin Negocio, Staff, Anfitrión).",
-  path: ["businessId"],
-});
-
-const platformUserFormSchemaCreate = refinedSchema.extend({
+// --- FIX: Apply .refine() after .extend() ---
+const platformUserFormSchemaCreate = platformUserFormSchemaBase
+  .extend({
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
-});
+  })
+  .refine(data => {
+    const rolesThatNeedBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+    if (rolesThatNeedBusiness) {
+      return !!data.businessId && data.businessId.length > 0;
+    }
+    return true;
+  }, {
+    message: "Debes seleccionar un negocio para los roles que lo requieren.",
+    path: ["businessId"],
+  });
 
-const platformUserFormSchemaEdit = refinedSchema;
+const platformUserFormSchemaEdit = platformUserFormSchemaBase
+  .refine(data => {
+    const rolesThatNeedBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+    if (rolesThatNeedBusiness) {
+      return !!data.businessId && data.businessId.length > 0;
+    }
+    return true;
+  }, {
+    message: "Debes seleccionar un negocio para los roles que lo requieren.",
+    path: ["businessId"],
+  });
+
 
 type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase> & { password?: string };
 
