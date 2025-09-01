@@ -2,71 +2,125 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Función para verificar si un usuario tiene un rol específico.
-    function hasRole(role) {
-      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny([role]);
+ 
+    // =============================== 
+    //            Helpers
+    // ===============================
+    function isSignedIn() {
+      return request.auth != null;
     }
-    
-    // Función para verificar si un usuario es admin de un negocio específico.
+
+    function getUserProfile(userId) {
+      return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && 'superadmin' in getUserProfile(request.auth.uid).roles;
+    }
+
+    function isRoleForBusiness(role, businessId) {
+      if (!isSignedIn()) { return false; }
+      let profile = getUserProfile(request.auth.uid);
+      return role in profile.roles && profile.businessId == businessId;
+    }
+
     function isBusinessAdmin(businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-      return userProfile.roles.hasAny(['business_admin']) && userProfile.businessId == businessId;
+      return isRoleForBusiness('business_admin', businessId);
     }
-    
-    // Función para verificar si el usuario es un miembro del staff de un negocio.
+
     function isStaff(businessId) {
-       let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-       return userProfile.roles.hasAny(['business_admin', 'staff', 'host']) && userProfile.businessId == businessId;
+      return isRoleForBusiness('staff', businessId);
     }
 
-    // Colección de Negocios
+    function isHost(businessId) {
+      return isRoleForBusiness('host', businessId);
+    }
+
+    function isPromoter() {
+      return isSignedIn() && 'promoter' in getUserProfile(request.auth.uid).roles;
+    }
+
+    // ===============================
+    //          Collections
+    // ===============================
+
+    // Negocios:
+    // - Lectura pública para que cualquiera vea las páginas de negocio.
+    // - Creación y eliminación solo para superadmin.
+    // - Actualización permitida por superadmin o por admin del propio negocio.
     match /businesses/{businessId} {
-      allow read: if true; // Cualquiera puede leer la información pública de un negocio.
-      allow write: if hasRole('superadmin'); // Solo Super Admins pueden crear, editar, eliminar negocios.
+      allow read: if true;
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || isBusinessAdmin(businessId);
     }
-    
-    // Colección de Entidades del Negocio (Promociones, Eventos, etc.)
+
+    // Entidades del negocio (promos/eventos):
+    // - Lectura pública.
+    // - Escritura (crear/actualizar/borrar) para superadmin, admin del negocio o staff del negocio.
     match /businessEntities/{entityId} {
-      allow read: if true; // Cualquiera puede leer promociones/eventos.
-      allow create, update: if isBusinessAdmin(request.resource.data.businessId); // Admins de negocio pueden crear/actualizar para SU negocio.
-      allow delete: if isBusinessAdmin(resource.data.businessId); // Admins de negocio pueden borrar de SU negocio.
+      allow read: if true;
+      allow create: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
+      allow update: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
+      allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
     }
 
-    // Colección de Usuarios de la Plataforma (Admins, Staff, etc.)
-    match /platformUsers/{userId} {
-      allow read: if request.auth != null; // Cualquier usuario autenticado puede leer perfiles (para validación de roles, etc).
-      // Superadmin puede escribir cualquier perfil
-      allow write: if hasRole('superadmin');
-
-      // Un business_admin puede crear un nuevo usuario de staff/host para su propio negocio.
-      allow create: if isBusinessAdmin(request.resource.data.businessId) && 
-                      (request.resource.data.roles.hasOnly(['staff']) || 
-                       request.resource.data.roles.hasOnly(['host']) ||
-                       request.resource.data.roles.hasOnly(['staff', 'host']));
-
-      // Un usuario puede actualizar su propio perfil (ej. último login)
-      allow update: if request.auth.uid == userId;
-    }
-    
-    // Colección de Clientes que generaron QR
+    // Clientes QR:
+    // - Permitir a cualquiera crear un documento (al registrarse para un QR).
+    // - Permitir a superadmin y admins/staff del negocio leer los clientes.
     match /qrClients/{clientId} {
-      allow read: if hasRole('superadmin'); // Solo Super Admins pueden ver todos los clientes.
-      allow create: if true; // Cualquiera puede crear un nuevo perfil de cliente QR al generar un código.
-      allow update, delete: if hasRole('superadmin');
-    }
-    
-    // Colección de Socios VIP
-    match /socioVipMembers/{memberId} {
-      allow read: if hasRole('superadmin'); // Por ahora, solo superadmin
-      allow write: if hasRole('superadmin'); // Solo superadmin gestiona VIPs
+      allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.generatedForBusinessId) || isStaff(resource.data.generatedForBusinessId);
+      allow create: if true;
+      allow update, delete: if isSuperAdmin();
     }
 
-    // Colección de Vínculos Promotor-Negocio
+    // Usuarios de la plataforma (platformUsers):
+    match /platformUsers/{userId} {
+      // Permitir a cualquier usuario autenticado leer perfiles (para verificar DNI, etc.).
+      allow read: if isSignedIn();
+
+      // Permitir a un usuario actualizar su propio perfil (útil para cambios de contraseña, etc., en el futuro).
+      allow update: if isSuperAdmin() || request.auth.uid == userId;
+
+      // Un 'superadmin' puede crear/eliminar cualquier usuario.
+      allow create, delete: if isSuperAdmin();
+
+      // REGLA CLAVE CORREGIDA:
+      // Permitir a un 'business_admin' crear un nuevo usuario si y solo si:
+      // 1. El que hace la petición es 'business_admin'
+      // 2. El 'businessId' del nuevo usuario es el mismo que el del 'business_admin'.
+      // 3. El nuevo usuario no está siendo creado con roles de 'superadmin' o 'business_admin'.
+      allow create: if isSuperAdmin() || (
+        isSignedIn()
+        && 'business_admin' in getUserProfile(request.auth.uid).roles
+        && request.resource.data.businessId == getUserProfile(request.auth.uid).businessId
+        && !('superadmin' in request.resource.data.roles)
+        && !('business_admin' in request.resource.data.roles)
+      );
+
+      // Un 'business_admin' puede actualizar o eliminar usuarios de su propio negocio,
+      // siempre que no sean 'superadmin' o 'business_admin'.
+      allow update, delete: if isSuperAdmin() || (
+        isSignedIn()
+        && isBusinessAdmin(resource.data.businessId)
+        && resource.data.businessId == getUserProfile(request.auth.uid).businessId
+        && !('superadmin' in resource.data.roles)
+        && !('business_admin' in resource.data.roles)
+      );
+    }
+
+    // Vínculos de promotores con negocios:
+    // - Leer si eres superadmin, admin del negocio, o el propio promotor.
+    // - Escribir/borrar si eres superadmin o admin del negocio.
     match /businessPromoterLinks/{linkId} {
-      allow read: if isStaff(resource.data.businessId) || hasRole('superadmin'); // Staff puede leer los promotores de su negocio.
-      allow create, delete: if isBusinessAdmin(request.resource.data.businessId) || hasRole('superadmin'); // Admin del negocio puede crear/borrar vínculos.
-      allow update: if isBusinessAdmin(resource.data.businessId) || hasRole('superadmin'); // Admin del negocio puede actualizar vínculos (ej. comisión).
+      allow read: if isSuperAdmin()
+                || isBusinessAdmin(resource.data.businessId)
+                || (isPromoter() && resource.data.platformUserUid == request.auth.uid);
+      allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+    }
+
+    // Socios VIP: gestión total solo por superadmin.
+    match /socioVipMembers/{memberId} {
+      allow read, write: if isSuperAdmin();
     }
   }
 }
