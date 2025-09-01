@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -895,36 +896,38 @@ export default function BusinessEventsPage() {
   /* ========================
      Switch: activar/inactivar
   ======================== */
-  const handleToggleEventStatus = useCallback(
-    async (eventId: string, next: boolean) => {
-      if (!currentBusinessId) return;
+  const handleToggleEventStatus = useCallback(async (eventId: string, newStatus: boolean) => {
+    const originalEvent = events.find(e => e.id === eventId);
+    if (!originalEvent) return;
 
-      const current = events.find((e) => e.id === eventId);
-      if (!current) return;
+    // Optimistic UI update
+    setEvents(prevEvents =>
+        prevEvents.map(event =>
+            event.id === eventId ? { ...event, isActive: newStatus } : event
+        )
+    );
 
-      // Optimistic UI con el valor seleccionado por el usuario
-      setEvents((prev) => prev.map((e) => (e.id === eventId ? { ...e, isActive: next } : e)));
-
-      try {
-        await updateDoc(doc(db, "businessEntities", eventId), { isActive: next });
+    try {
+        await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
         toast({
-          title: "Estado Actualizado",
-          description: `El evento "${current.name}" ahora está ${next ? "Activo" : "Inactivo"}.`,
+            title: "Estado Actualizado",
+            description: `El evento "${originalEvent.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`,
         });
-      } catch (error: any) {
-        // Revertir si falla
-        setEvents((prev) =>
-          prev.map((e) => (e.id === eventId ? { ...e, isActive: current.isActive } : e))
+    } catch (error: any) {
+        // Revert UI on failure
+        setEvents(prevEvents =>
+            prevEvents.map(event =>
+                event.id === eventId ? { ...event, isActive: originalEvent.isActive } : event
+            )
         );
         toast({
-          title: "Error al Actualizar",
-          description: `No se pudo cambiar el estado. ${error.message}`,
-          variant: "destructive",
+            title: "Error al Actualizar",
+            description: `No se pudo cambiar el estado. ${error.message}`,
+            variant: "destructive",
         });
-      }
-    },
-    [currentBusinessId, events, toast]
-  );
+    }
+  }, [events, toast]);
+
 
   /* ========================
      Tickets / Boxes / Promotores
@@ -1395,18 +1398,13 @@ export default function BusinessEventsPage() {
                           <TableCell className="font-medium align-top py-3">
                             <div className="font-semibold text-base">{event.name}</div>
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
-                            <Switch
-  id={`status-switch-event-${event.id}`}
-  checked={!!event.isActive}
-  onCheckedChange={(next) => {
-    // Evita emitir actualizaciones si el valor no cambió (anti-bucle)
-    if (next === !!event.isActive) return;
-    handleToggleEventStatus(event.id, next);
-  }}
-  aria-label={`Estado del evento ${event.name}`}
-  disabled={isSubmitting}
-/>
-
+                              <Switch
+                                id={`status-switch-event-${event.id}`}
+                                checked={!!event.isActive}
+                                onCheckedChange={(newStatus) => handleToggleEventStatus(event.id, newStatus)}
+                                aria-label={`Estado del evento ${event.name}`}
+                                disabled={isSubmitting}
+                              />
                               <Label htmlFor={`status-switch-event-${event.id}`} className="sr-only">
                                 {event.isActive ? "Activo" : "Inactivo"}
                               </Label>
