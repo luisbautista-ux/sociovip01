@@ -265,7 +265,7 @@ export default function BusinessValidateQrPage() {
                       })
                   }>
                     {foundCode.status === 'used' ? 'Este código ya fue utilizado' 
-                     : isCodeCurrentlyRedeemableByHost() ? "Código Válido y Disponible para Canje" 
+                     : isCodeCurrentlyRedeemableByHost() ? "Disponible para Canje" 
                      : `Estado: ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCode.status] || foundCode.status}`}
                   </AlertTitle>
                   <AlertDescription>
@@ -313,5 +313,3 @@ export default function BusinessValidateQrPage() {
     </div>
   );
 }
-
-    
