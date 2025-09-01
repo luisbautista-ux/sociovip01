@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
-import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
+import { isEntityCurrentlyActivatable, anyToDate, cn } from "@/lib/utils";
 import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -313,3 +313,5 @@ export default function BusinessValidateQrPage() {
     </div>
   );
 }
+
+    
