@@ -225,10 +225,10 @@ export default function BusinessStaffPage() {
       } else {
         const creationPayload = {
           email: data.email, password: data.password, displayName: data.name,
-          firestoreData: { dni: data.dni, name: data.name, email: data.email, roles: finalRoles, businessId: currentBusinessId }
+          firestoreData: { dni: data.dni, name: data.name, email: data.email, roles: finalRoles }
         };
 
-        const response = await fetch('/api/admin/create-user', {
+        const response = await fetch('/api/business-panel/create-staff', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(creationPayload)
         });
         const result = await response.json();
