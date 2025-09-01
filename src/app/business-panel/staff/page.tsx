@@ -371,9 +371,18 @@ export default function BusinessStaffPage() {
         </UIDialogContent>
       </UIDialog>
 
-      <UIDialog open={showCreateEditModal} onOpenChange={setShowCreateEditModal}>
+      <UIDialog open={showCreateEditModal} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setEditingUser(null);
+          setVerifiedDniResult(null);
+        }
+        setShowCreateEditModal(isOpen);
+      }}>
         <UIDialogContent className="sm:max-w-lg">
-          <UIDialogHeader><UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle><UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los detalles para crear el usuario."}</UIDialogDescription></UIDialogHeader>
+          <UIDialogHeader>
+            <UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
+            <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los detalles para crear el usuario."}</UIDialogDescription>
+          </UIDialogHeader>
           <PlatformUserForm 
             user={editingUser || undefined}
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
@@ -395,4 +404,3 @@ export default function BusinessStaffPage() {
   );
 }
 
-    
