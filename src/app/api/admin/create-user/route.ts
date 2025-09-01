@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import type { PlatformUser, PlatformUserRole } from '@/lib/types';
 import { getAuth } from 'firebase-admin/auth';
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
       email: firestoreData.email,
       roles: finalRoles,
       businessId: finalBusinessId,
-      lastLogin: serverTimestamp() as any,
+      lastLogin: FieldValue.serverTimestamp() as any, // Use admin SDK FieldValue
     };
     
     await adminDb.collection('platformUsers').doc(userRecord.uid).set(userProfilePayload);
@@ -127,6 +127,8 @@ export async function POST(request: Request) {
       errorMessage = 'El correo electrónico ya está en uso por otro usuario.';
     } else if (error.code === 'auth/invalid-password') {
       errorMessage = `La contraseña proporcionada no es válida. ${error.message}`;
+    } else if (error.message === 'Caller profile not found.') {
+        errorMessage = 'No se encontró el perfil del usuario que realiza la solicitud.'
     }
 
     return NextResponse.json(

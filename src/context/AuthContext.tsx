@@ -15,6 +15,7 @@ import type { AuthError } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import type { PlatformUser, PlatformUserRole } from "@/lib/types"; 
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import Cookies from "js-cookie";
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -88,10 +89,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      fetchUserProfile(user);
-      setLoadingAuth(false); // Esta línea es crucial y fue la que eliminé por error.
+      if (user) {
+        const token = await user.getIdToken();
+        Cookies.set("idToken", token, { path: "/", secure: process.env.NODE_ENV === "production" });
+      } else {
+        Cookies.remove("idToken");
+      }
+      await fetchUserProfile(user);
+      setLoadingAuth(false);
     });
     return () => unsubscribe();
   }, [fetchUserProfile]);
@@ -127,6 +134,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
+      Cookies.remove("idToken");
       router.push("/login"); 
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
