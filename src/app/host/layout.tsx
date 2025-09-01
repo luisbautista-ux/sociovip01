@@ -89,7 +89,9 @@ export default function HostLayout({
     );
   }
 
-  if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('host')) {
+  const hasAccess = userProfile.roles?.includes('host') || userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff');
+
+  if (!userProfile.roles || !Array.isArray(userProfile.roles) || !hasAccess) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -98,7 +100,7 @@ export default function HostLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              No tienes los permisos necesarios para acceder al Panel de Anfitrión.
+              No tienes los permisos necesarios para acceder a esta página de validación.
               Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} className="mt-6">
@@ -110,7 +112,7 @@ export default function HostLayout({
     );
   }
 
-  if (!userProfile.businessId && userProfile.roles.includes('host')) {
+  if (hasAccess && !userProfile.businessId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -119,7 +121,7 @@ export default function HostLayout({
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Tu perfil de anfitrión requiere estar asociado a un negocio, pero no se encontró un ID de negocio vinculado. Por favor, contacta al administrador.
+              Tu perfil requiere estar asociado a un negocio para validar códigos, pero no se encontró un ID de negocio vinculado. Por favor, contacta al administrador.
             </CardDescription>
             <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
               Cerrar Sesión
@@ -129,6 +131,14 @@ export default function HostLayout({
       </div>
     );
   }
+
+  const handleBackToPanel = () => {
+    if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
+      router.push('/business-panel/dashboard');
+    } else {
+      router.push('/');
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
@@ -141,6 +151,9 @@ export default function HostLayout({
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {hostUserName}
           </span>
+           { (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && (
+            <Button onClick={handleBackToPanel} variant="outline" size="sm">Volver al Panel</Button>
+          )}
           <AlertDialog>
             <AlertDialogTrigger asChild>
                 <Button variant="outline" size="icon" title="Cerrar Sesión">
@@ -152,7 +165,7 @@ export default function HostLayout({
                 <AlertDialogHeader>
                 <AlertDialogTitle>¿Cerrar Sesión?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    ¿Estás seguro de que quieres cerrar tu sesión de Anfitrión?
+                    ¿Estás seguro de que quieres cerrar tu sesión?
                 </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -169,7 +182,7 @@ export default function HostLayout({
         {children}
       </main>
       <footer className="py-4 px-6 border-t text-center text-xs text-muted-foreground bg-background sm:bg-transparent">
-        <p>&copy; {new Date().getFullYear()} SocioVIP Anfitrión</p>
+        <p>&copy; {new Date().getFullYear()} SocioVIP Validador</p>
       </footer>
     </div>
   );

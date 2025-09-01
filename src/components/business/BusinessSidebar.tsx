@@ -16,7 +16,8 @@ import {
   Settings,
   Building,
   Contact,
-  LogOut, 
+  LogOut,
+  QrCode,
 } from "lucide-react";
 // SocioVipLogo is not used here, Building icon or Business Logo is used.
 import { useAuth } from "@/context/AuthContext"; 
@@ -47,6 +48,7 @@ const navItems = [
   { href: "/business-panel/staff", label: "Mi Personal", icon: Users },
   { href: "/business-panel/analytics", label: "Analíticas", icon: BarChart3 },
   { href: "/business-panel/settings", label: "Configuración", icon: Settings },
+  { href: "/host/validate", label: "Validar QR", icon: QrCode }, // Added link here
 ];
 
 export function BusinessSidebar() {
