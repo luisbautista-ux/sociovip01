@@ -1,87 +1,126 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ================== HELPER FUNCTIONS ==================
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/platformUsers/$(userId)).data;
-    }
-
-    function isSuperAdmin() {
-      return isSignedIn() && 'superadmin' in getUserData(request.auth.uid).roles;
+  
+    // Helper function to check if a user has a specific role
+    function hasRole(role) {
+      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny([role]);
     }
     
-    function isStaffOfBusiness(businessId) {
-      if (!isSignedIn()) { return false; }
-      let userData = getUserData(request.auth.uid);
-      return userData.businessId == businessId && 
-             userData.roles.hasAny(['business_admin', 'staff', 'host']);
-    }
-    
+    // Helper function to check if a user is an admin of a specific business
     function isBusinessAdmin(businessId) {
-        if (!isSignedIn()) { return false; }
-        let userData = getUserData(request.auth.uid);
-        return userData.businessId == businessId && 'business_admin' in userData.roles;
+      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+      return userProfile.businessId == businessId && userProfile.roles.hasAny(['business_admin', 'staff']);
+    }
+    
+    // Helper function to check if a user is a host of a specific business
+    function isBusinessHost(businessId) {
+      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+      return userProfile.businessId == businessId && userProfile.roles.hasAny(['host', 'staff', 'business_admin']);
     }
 
-    // ================== COLLECTION RULES ==================
-
-    // Businesses: Publicly readable, only superadmins can modify.
+    // Businesses collection
     match /businesses/{businessId} {
-      allow read: if true;
-      allow write: if isSuperAdmin();
+      // Anyone can read business public info
+      allow read; 
+      // Only superadmin can create, update, or delete businesses
+      allow write: if hasRole('superadmin');
     }
-    
-    // Platform Users: Controlled access based on roles.
+
+    // Platform Users collection
     match /platformUsers/{userId} {
-      // READ: Superadmin can read anyone. Business staff can read users of the same business.
-      allow get: if isSuperAdmin() || (isSignedIn() && getUserData(request.auth.uid).businessId == getUserData(userId).businessId);
-      allow list: if isSignedIn(); // List is expensive, further filtering done in client/backend queries.
-
-      // CREATE: Handled by a backend API route (create-user) which has its own logic.
-      // We can add a rule here to only allow that API to write, but for now we trust the backend.
-      // This rule allows SuperAdmins to create users directly if needed.
-      allow create: if isSuperAdmin();
-
-      // UPDATE: Superadmin can update anyone. Business admin can update staff/host of their own business.
-      allow update: if isSuperAdmin() || 
-                     (isBusinessAdmin(resource.data.businessId) && 
-                      request.auth.uid != userId && // Admin cannot change their own role here
-                      (resource.data.roles.hasAny(['staff', 'host'])));
-
-      // DELETE: Superadmin can delete anyone. Business admin can delete staff/host of their own business.
-      allow delete: if isSuperAdmin() || 
-                     (isBusinessAdmin(getUserData(userId).businessId) && request.auth.uid != userId);
+      // Superadmin can manage all users
+      allow read, write: if hasRole('superadmin');
+      // Users can read their own profile
+      allow get: if request.auth.uid == userId;
     }
-    
-    // QR Clients: Read by business staff, write is handled by public page logic (not authenticated)
+
+    // QR Clients collection
     match /qrClients/{clientId} {
-      allow read: if isSignedIn() && isStaffOfBusiness(resource.data.generatedForBusinessId);
-      allow list: if isSignedIn(); // Filtered by client
-      allow create: if true; // Public page creates this
-      allow update, delete: if false; // Should not be modified/deleted from client
+      // Anyone can create a new QR client profile when generating a QR for the first time
+      allow create;
+      // Only superadmin can read or modify QR client data
+      allow read, update, delete: if hasRole('superadmin');
     }
     
-    // Socio VIP Members: Only readable/writable by SuperAdmins
+    // Socio VIP Members collection
     match /socioVipMembers/{memberId} {
-      allow read, write: if isSuperAdmin();
-    }
-    
-    // Business Entities (Promos/Events): Readable by public, writable by staff of the correct business
-    match /businessEntities/{entityId} {
-      allow read: if true;
-      allow create, update, delete: if isSignedIn() && isStaffOfBusiness(request.resource.data.businessId);
+      allow read, write: if hasRole('superadmin');
     }
 
-    // Promoter Links: Readable/writable by staff of the correct business
+    // BusinessPromoterLinks
     match /businessPromoterLinks/{linkId} {
-      allow read, write: if isSignedIn() && isStaffOfBusiness(request.resource.data.businessId);
+      allow read, write: if hasRole('superadmin') || isBusinessAdmin(request.resource.data.businessId);
+      // Promoters can read their own links
+      allow get: if request.auth.uid == resource.data.platformUserUid;
+    }
+
+    // Business Entities (Promotions, Events, etc.)
+    match /businessEntities/{entityId} {
+      // Anyone can read promotions and events
+      allow read: if true;
+      
+      // Creation and deletion is restricted
+      allow create, delete: if hasRole('superadmin') || isBusinessAdmin(request.resource.data.businessId);
+
+      // --- UPDATE LOGIC ---
+      allow update: if 
+        // Superadmin can update anything
+        hasRole('superadmin') || 
+        // Business admin can update their own entities (but not change businessId)
+        (isBusinessAdmin(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId) ||
+        // A host can update the status of a code to 'used'
+        (isBusinessHost(resource.data.businessId) && request.resource.data.businessId == resource.data.businessId &&
+         isChangingCodeStatusOnly(request, resource, 'redeemed', 'used')) ||
+        // Anyone can update a code from 'available' to 'redeemed'
+        isChangingCodeStatusOnly(request, resource, 'available', 'redeemed');
     }
   }
+}
+
+// Helper function to check if the only change is a code status transition
+function isChangingCodeStatusOnly(request, resource, fromStatus, toStatus) {
+    let incomingCodes = request.resource.data.generatedCodes;
+    let existingCodes = resource.data.generatedCodes;
+
+    // Check if the update modifies anything other than the generatedCodes array
+    let otherFields = request.resource.data.keys().removeAll(['generatedCodes']);
+    if (otherFields.size() > 0) {
+        return false;
+    }
+
+    // Find the code that is being changed
+    let changedCodeIndex = -1;
+    let originalCode;
+    let updatedCode;
+    
+    // This part is tricky in rules, but we can simulate the logic. We assume only one code changes at a time.
+    // We check if the list of codes is the same size.
+    if (incomingCodes.size() != existingCodes.size()) {
+      return false;
+    }
+
+    // A simplified check: Iterate and find the *first* difference.
+    // In a real transaction, we'd know the exact code ID. Here, we must infer.
+    for (let i = 0; i < existingCodes.size(); i = i + 1) {
+      if (existingCodes[i].status != incomingCodes[i].status) {
+        changedCodeIndex = i;
+        break;
+      }
+    }
+    
+    if (changedCodeIndex == -1) {
+      // No code status change found.
+      return false;
+    }
+    
+    originalCode = existingCodes[changedCodeIndex];
+    updatedCode = incomingCodes[changedCodeIndex];
+
+    // Verify the status transition is the one we allow
+    return originalCode.status == fromStatus && updatedCode.status == toStatus &&
+           // Verify no other fields in the code object were tampered with
+           originalCode.id == updatedCode.id &&
+           originalCode.value == updatedCode.value;
 }

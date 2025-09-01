@@ -295,7 +295,7 @@ export default function BusinessValidateQrPage() {
                         "text-blue-800": foundCode.status === 'used',
                         "text-red-800": !isCodeCurrentlyRedeemableByHost() && foundCode.status !== 'used'
                       })}>
-                    {foundCode.status === 'used' ? `Este código ya fue utilizado`
+                    {foundCode.status === 'used' ? `Este QR ya fue utilizado`
                      : isCodeCurrentlyRedeemableByHost() ? "Disponible para Canje" 
                      : `Estado: ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCode.status] || foundCode.status}`}
                   </AlertTitle>
