@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { QrCode as QrCodeIcon, Ticket, CalendarDays, User, Info, Search, CheckCircle2, XCircle, AlertTriangle, Clock, Users, Camera, UserCheck } from "lucide-react";
 import type { BusinessManagedEntity, GeneratedCode, Business } from "@/lib/types";
@@ -105,6 +106,26 @@ export default function BusinessValidateQrPage() {
   const { userProfile } = useAuth();
   const currentBusinessId = userProfile?.businessId;
   const [isScannerActive, setIsScannerActive] = useState(false);
+  
+  const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
+
+  const fetchActiveEntities = useCallback(async () => {
+    if (!currentBusinessId) return;
+    try {
+        const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
+        const snap = await getDocs(entitiesQuery);
+        const allEntities = snap.docs.map(d => ({id: d.id, ...d.data()}) as BusinessManagedEntity);
+        const currentlyActive = allEntities.filter(e => isEntityCurrentlyActivatable(e));
+        setActiveBusinessEntities(currentlyActive);
+    } catch (e) {
+        console.error("Error fetching active entities for validator page", e);
+    }
+  }, [currentBusinessId]);
+
+  useEffect(() => {
+    fetchActiveEntities();
+  }, [fetchActiveEntities]);
+
 
   const findCodeInEntities = useCallback(async (codeIdToFind: string) => {
     if (!currentBusinessId) return;
@@ -151,9 +172,9 @@ export default function BusinessValidateQrPage() {
   }, [currentBusinessId, toast]);
 
   const handleScanSuccess = useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
+    stopScanner();
     setScannedCodeId(decodedText);
     findCodeInEntities(decodedText);
-    setIsScannerActive(false); 
     toast({ title: "QR Escaneado", description: `Verificando código...` });
   }, [findCodeInEntities, toast]);
   
@@ -161,6 +182,11 @@ export default function BusinessValidateQrPage() {
     // This can be noisy, so we'll just log it to the console for debugging
     // console.warn(`QR Code no detectado, error: ${errorMessage}`);
   };
+
+  const stopScanner = () => {
+    setIsScannerActive(false); 
+  };
+
 
   const handleValidateAndRedeem = async () => {
     if (!foundEntity || !foundCode || !userProfile?.uid) {
@@ -187,10 +213,10 @@ export default function BusinessValidateQrPage() {
              throw new Error("El código ya no existe en esta entidad.");
           }
           if (codes[codeIndex].status !== 'redeemed') {
-             throw new Error(`El código ya no está disponible para canje (estado actual: ${GENERATED_CODE_STATUS_TRANSLATIONS[codes[codeIndex].status] || codes[codeIndex].status}).`);
+             throw new Error(`Este QR ya fue utilizado o su estado es inválido (estado actual: ${GENERATED_CODE_STATUS_TRANSLATIONS[codes[codeIndex].status] || codes[codeIndex].status}).`);
           }
 
-          codes[codeIndex].status = 'used'; // Cambiamos el estado a 'used'
+          codes[codeIndex].status = 'used'; 
           codes[codeIndex].usedDate = new Date().toISOString();
           codes[codeIndex].usedByInfo = { uid: userProfile.uid, name: userProfile.name };
           codes[codeIndex].isVipCandidate = isVipCandidate;
@@ -199,11 +225,11 @@ export default function BusinessValidateQrPage() {
           setFoundCode(codes[codeIndex]);
       });
       
-      toast({ title: "¡QR Validado y Utilizado!", description: `Código ${foundCode.value} marcado como utilizado.`, className: "bg-green-500 text-white" });
+      toast({ title: "¡QR Validado y Utilizado!", description: `Código para "${foundEntity.name}" marcado como utilizado.`, className: "bg-green-500 text-white" });
+      fetchActiveEntities();
     } catch (e: any) {
         console.error("Error in redemption transaction:", e);
         toast({ title: "Error al Validar", description: e.message, variant: "destructive" });
-        // Re-fetch data to show the actual current state from DB
         if (scannedCodeId) findCodeInEntities(scannedCodeId);
     }
   };
@@ -212,6 +238,12 @@ export default function BusinessValidateQrPage() {
     if (!foundEntity || !foundCode) return false;
     if (!isEntityCurrentlyActivatable(foundEntity)) return false;
     return foundCode.status === 'redeemed';
+  };
+
+   const getEventAttendance = (event: BusinessManagedEntity) => {
+    if (event.type !== 'event') return "";
+    const redeemedCount = event.generatedCodes?.filter(c => c.status === 'used').length || 0;
+    return `Asistencia: ${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
   };
 
   return (
@@ -237,7 +269,7 @@ export default function BusinessValidateQrPage() {
         <Card className="shadow-xl animate-in fade-in-50">
           <CardHeader>
             <CardTitle>Resultado de la Verificación</CardTitle>
-            <CardDescription>Código verificado: <span className="font-mono font-semibold">{foundCode?.value || scannedCodeId}</span></CardDescription>
+            <CardDescription>Código verificado: <span className="font-mono font-semibold">{foundCode?.id || scannedCodeId}</span></CardDescription>
           </CardHeader>
           <CardContent>
             {!foundCode || !foundEntity ? (
@@ -256,15 +288,16 @@ export default function BusinessValidateQrPage() {
                             "bg-yellow-50 border-yellow-400": foundCode.status === 'available' || foundCode.status === 'expired',
                         })
                        }>
-                  {isCodeCurrentlyRedeemableByHost() ? <CheckCircle2 className="h-5 w-5 text-green-600" /> : (foundCode.status === 'used' ? <Info className="h-5 w-5 text-blue-600" /> : <XCircle className="h-5 w-5 text-red-600" />) }
-                  <AlertTitle className={
-                      cn("font-bold", {
+                  {foundCode.status === 'used' ? <Info className="h-5 w-5 text-blue-600" /> 
+                    : isCodeCurrentlyRedeemableByHost() ? <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    : <XCircle className="h-5 w-5 text-red-600" /> 
+                  }
+                  <AlertTitle className={cn("font-bold", {
                         "text-green-800": isCodeCurrentlyRedeemableByHost(),
                         "text-blue-800": foundCode.status === 'used',
                         "text-red-800": !isCodeCurrentlyRedeemableByHost() && foundCode.status !== 'used'
-                      })
-                  }>
-                    {foundCode.status === 'used' ? 'Este código ya fue utilizado' 
+                      })}>
+                    {foundCode.status === 'used' ? `Este código ya fue utilizado`
                      : isCodeCurrentlyRedeemableByHost() ? "Disponible para Canje" 
                      : `Estado: ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCode.status] || foundCode.status}`}
                   </AlertTitle>
@@ -310,6 +343,41 @@ export default function BusinessValidateQrPage() {
           )}
         </Card>
       )}
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Promociones y Eventos Activos Hoy</CardTitle>
+          <CardDescription>Entidades vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activeBusinessEntities.length === 0 ? (
+            <p className="text-muted-foreground">No hay promociones o eventos activos para hoy.</p>
+          ) : (
+            <Accordion type="single" collapsible className="w-full">
+              {activeBusinessEntities.map(entity => (
+                <AccordionItem value={entity.id} key={entity.id}>
+                  <AccordionTrigger>
+                    <div className="flex items-center gap-2">
+                        {entity.type === 'promotion' ? <Ticket className="h-5 w-5 text-primary"/> : <CalendarDays className="h-5 w-5 text-primary"/>}
+                        <span>{entity.name}</span>
+                        <Badge variant={entity.isActive ? "default" : "outline"} className={entity.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
+                            {entity.isActive ? "Activa" : "Inactiva"}
+                        </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-1 text-sm pl-8">
+                    <p>{entity.description}</p>
+                    <p><strong>Vigencia:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(anyToDate(entity.endDate)!, "P", { locale: es }) : 'N/A'}</p>
+                    {entity.type === 'event' && <p><strong>{getEventAttendance(entity)}</strong></p>}
+                    {entity.type === 'promotion' && entity.usageLimit && entity.usageLimit > 0 && <p><strong>Límite de canjes:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.usageLimit}</p>}
+                    <p><strong>Códigos disponibles:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
