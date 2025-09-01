@@ -36,6 +36,7 @@ import type {
   QrClient,
   QrCodeData,
   NewQrClientFormData,
+  GeneratedCode,
 } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -178,7 +179,7 @@ export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
   const [showDniModal, setShowDniModal] = useState(false);
   const [currentStepInModal, setCurrentStepInModal] = useState<"enterDni" | "newUserForm">("enterDni");
   const [activeEntityForQr, setActiveEntityForQr] = useState<BusinessManagedEntity | null>(null);
-  const [validatedSpecificCode, setValidatedSpecificCode] = useState<string | null>(null);
+  const [validatedCodeObject, setValidatedCodeObject] = useState<GeneratedCode | null>(null);
   const [enteredDni, setEnteredDni] = useState<string>("");
   const [qrData, setQrData] = useState<QrCodeData | null>(null);
   const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
@@ -308,12 +309,11 @@ export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
 
 const markPromoterCodeAsRedeemed = async (
   entityId: string,
-  promoterCodeValue: string,
+  codeId: string,
   clientInfo: { dni: string; name: string; surname: string }
 ): Promise<void> => {
   const entityRef = doc(db, "businessEntities", entityId);
-  const normalizedCode = normalizeCode(promoterCodeValue);
-
+  
   try {
     await runTransaction(db, async (transaction) => {
       const entityDoc = await transaction.get(entityRef);
@@ -328,13 +328,12 @@ const markPromoterCodeAsRedeemed = async (
       let codeAlreadyUsed = false;
       
       const newCodes = codes.map(c => {
-        if (extractCodeString(c) === normalizedCode) {
+        if (c.id === codeId) {
           codeFound = true;
           if (isCodeAvailableForUse(c)) {
             return {
               ...c,
               status: "redeemed",
-              used: true,
               redemptionDate: new Date().toISOString(),
               redeemedByInfo: {
                 dni: clientInfo.dni,
@@ -403,11 +402,11 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     }
     
     const codes: any[] = Array.isArray(realTimeEntityData.generatedCodes) ? realTimeEntityData.generatedCodes : [];
-    const found = codes.find((c) => extractCodeString(c) === codeToValidate);
+    const foundCodeObject = codes.find((c) => extractCodeString(c) === codeToValidate);
 
-    if (found && isCodeAvailableForUse(found)) {
+    if (foundCodeObject && isCodeAvailableForUse(foundCodeObject)) {
       setActiveEntityForQr(realTimeEntityData);
-      setValidatedSpecificCode(codeToValidate);
+      setValidatedCodeObject(foundCodeObject);
       setCurrentStepInModal("enterDni");
       dniForm.reset({ docType: 'dni', docNumber: "" });
       setShowDniModal(true);
@@ -427,7 +426,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
 };
 
 const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
-    if (!activeEntityForQr || !validatedSpecificCode) {
+    if (!activeEntityForQr || !validatedCodeObject) {
         toast({ title: "Error interno", description: "Falta información clave para continuar (entidad o código).", variant: "destructive" });
         return;
     }
@@ -453,7 +452,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 registrationDate: anyToDate(clientData.registrationDate)?.toISOString() || "",
             };
             
-            await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForQr);
+            await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedCodeObject.id, clientForQr);
             
             toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
             const qrCodeDetails: QrCodeData["promotion"] = {
@@ -462,12 +461,13 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 description: activeEntityForQr.description,
                 validUntil: activeEntityForQr.endDate,
                 imageUrl: activeEntityForQr.imageUrl || "",
-                promoCode: validatedSpecificCode,
+                promoCode: validatedCodeObject.value,
+                qrValue: validatedCodeObject.id, // THE QR VALUE IS THE UNIQUE ID OF THE CODE
                 aiHint: activeEntityForQr.aiHint || "",
                 type: activeEntityForQr.type,
                 termsAndConditions: activeEntityForQr.termsAndConditions,
             };
-            setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedSpecificCode, status: "available" });
+            setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
             setShowDniModal(false);
             setPageViewState("qrDisplay");
         } else {
@@ -510,7 +510,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 };
 
   const processNewQrClientRegistration = async (formData: NewQrClientFormData) => {
-    if (!activeEntityForQr || !validatedSpecificCode || !enteredDni || !businessDetails) {
+    if (!activeEntityForQr || !validatedCodeObject || !enteredDni || !businessDetails) {
       toast({ title: "Error interno", description: "Falta información para registrar cliente.", variant: "destructive" });
       return;
     }
@@ -523,7 +523,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     };
   
     try {
-      await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedSpecificCode, clientForRedeem);
+      await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedCodeObject.id, clientForRedeem);
       
       const newClientDataToSave = {
         dni: enteredDni,
@@ -532,7 +532,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         phone: formData.phone,
         dob: Timestamp.fromDate(formData.dob),
         registrationDate: serverTimestamp(),
-        generatedForBusinessId: businessDetails.id, // Campo corregido
+        generatedForBusinessId: businessDetails.id,
         generatedForEntityId: activeEntityForQr.id,
       };
       
@@ -554,13 +554,14 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         description: activeEntityForQr.description,
         validUntil: activeEntityForQr.endDate,
         imageUrl: activeEntityForQr.imageUrl || "",
-        promoCode: validatedSpecificCode,
+        promoCode: validatedCodeObject.value,
+        qrValue: validatedCodeObject.id, // THE QR VALUE IS THE UNIQUE ID OF THE CODE
         aiHint: activeEntityForQr.aiHint || "",
         type: activeEntityForQr.type,
         termsAndConditions: activeEntityForQr.termsAndConditions,
       };
   
-      setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedSpecificCode, status: "available" });
+      setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
       setShowDniModal(false);
       setPageViewState("qrDisplay");
       toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
@@ -623,9 +624,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 
   useEffect(() => {
     const generateQrImage = async () => {
-      if (pageViewState === "qrDisplay" && qrData?.code) {
+      if (pageViewState === "qrDisplay" && qrData?.promotion.qrValue) {
         try {
-          const dataUrl = await QRCode.toDataURL(qrData.code, { width: 250, errorCorrectionLevel: "H", margin: 2 });
+          const dataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { width: 250, errorCorrectionLevel: "H", margin: 2 });
           setGeneratedQrDataUrl(dataUrl);
         } catch (err) {
           toast({ title: "Error", description: "No se pudo generar el código QR.", variant: "destructive" });
@@ -845,7 +846,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         const linkElement = document.createElement("a");
         linkElement.href = dataUrl;
         const entityTypeForFilename = qrData.promotion.type === "event" ? "Evento" : "Promo";
-        linkElement.download = `SocioVIP_QR_${entityTypeForFilename}_${qrData.code}.png`;
+        linkElement.download = `SocioVIP_QR_${entityTypeForFilename}_${qrData.promotion.promoCode}.png`;
         document.body.appendChild(linkElement);
         linkElement.click();
         document.body.removeChild(linkElement);
@@ -875,7 +876,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     setQrData(null);
     setGeneratedQrDataUrl(null);
     setActiveEntityForQr(null);
-    setValidatedSpecificCode(null);
+    setValidatedCodeObject(null);
     setEnteredDni("");
     dniForm.reset();
     newQrClientForm.reset();
