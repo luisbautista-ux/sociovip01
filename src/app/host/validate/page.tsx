@@ -38,7 +38,11 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure, isScannerActive }:
 
   const stopScanner = useCallback(() => {
     if (scannerRef.current && scannerRef.current.isScanning) {
-      scannerRef.current.stop().catch(err => console.error("Failed to stop scanner.", err));
+      const qrReaderElement = document.getElementById(QR_READER_ELEMENT_ID);
+      // Only stop if the element is still in the DOM to prevent race condition errors
+      if (qrReaderElement) {
+        scannerRef.current.stop().catch(err => console.error("Failed to stop scanner.", err));
+      }
     }
   }, []);
 
