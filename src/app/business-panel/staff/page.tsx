@@ -52,7 +52,7 @@ interface CheckDniResult {
 }
 
 export default function BusinessStaffPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, currentUser } = useAuth();
   const currentBusinessId = userProfile?.businessId;
   const { toast } = useToast();
   
@@ -209,7 +209,7 @@ export default function BusinessStaffPage() {
     setIsSubmitting(true);
 
     const rolesAllowed: PlatformUserRole[] = ['staff', 'host'];
-    const finalRoles = data.roles.filter(role => rolesAllowed.includes(role));
+    const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
     if (finalRoles.length === 0) {
         toast({ title: "Rol no válido", description: "Solo puedes asignar los roles 'Staff' o 'Anfitrión'.", variant: "destructive" });
         setIsSubmitting(false);
@@ -217,6 +217,11 @@ export default function BusinessStaffPage() {
     }
 
     try {
+      const idToken = await currentUser?.getIdToken();
+      if (!idToken) {
+          throw new Error("No se pudo obtener el token de autenticación del usuario actual.");
+      }
+
       if (isEditing && editingUser) {
         const userRef = doc(db, "platformUsers", editingUser.uid);
         const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
@@ -229,7 +234,12 @@ export default function BusinessStaffPage() {
         };
 
         const response = await fetch('/api/business-panel/create-staff', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(creationPayload)
+          method: 'POST', 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          }, 
+          body: JSON.stringify(creationPayload)
         });
         const result = await response.json();
         if (!response.ok) {

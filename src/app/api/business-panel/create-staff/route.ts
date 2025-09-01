@@ -5,7 +5,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import type { PlatformUser, PlatformUserRole } from '@/lib/types';
 import { getAuth } from 'firebase-admin/auth';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 
 const CreateStaffSchema = z.object({
   email: z.string().email(),
@@ -19,7 +19,11 @@ const CreateStaffSchema = z.object({
   }),
 });
 
-async function getCallerProfile(idToken: string) {
+async function getCallerProfile(authorizationHeader: string) {
+    if (!authorizationHeader.startsWith('Bearer ')) {
+        throw new Error('Invalid authorization header format.');
+    }
+    const idToken = authorizationHeader.split('Bearer ')[1];
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const uid = decodedToken.uid;
     const adminDb = admin.firestore();
@@ -47,16 +51,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const idToken = cookies().get('idToken')?.value;
-    if (!idToken) {
+    const authorization = headers().get('Authorization');
+    if (!authorization) {
         return NextResponse.json({ error: 'No autenticado. Token no proporcionado.' }, { status: 401 });
     }
     
-    const callerProfile = await getCallerProfile(idToken);
-    const isBusinessAdmin = callerProfile.roles.includes('business_admin') || callerProfile.roles.includes('staff');
+    const callerProfile = await getCallerProfile(authorization);
+    const isBusinessAdminOrStaff = callerProfile.roles.includes('business_admin') || callerProfile.roles.includes('staff');
     
-    if (!isBusinessAdmin || !callerProfile.businessId) {
-        return NextResponse.json({ error: 'Permiso denegado. No eres admin de un negocio o no tienes un negocio asociado.' }, { status: 403 });
+    if (!isBusinessAdminOrStaff || !callerProfile.businessId) {
+        return NextResponse.json({ error: 'Permiso denegado. No eres admin/staff de un negocio o no tienes un negocio asociado.' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -68,7 +72,6 @@ export async function POST(request: Request) {
     
     const { email, password, displayName, firestoreData } = validation.data;
     
-    // --- Security Validation ---
     const allowedRoles: PlatformUserRole[] = ['staff', 'host'];
     const finalRoles = firestoreData.roles.filter(role => allowedRoles.includes(role as PlatformUserRole)) as PlatformUserRole[];
     
@@ -117,8 +120,8 @@ export async function POST(request: Request) {
       errorMessage = 'El correo electrónico ya está en uso por otro usuario.';
     } else if (error.code === 'auth/invalid-password') {
       errorMessage = `La contraseña proporcionada no es válida. ${error.message}`;
-    } else if (error.message === 'Caller profile not found.') {
-        errorMessage = 'No se encontró el perfil del usuario que realiza la solicitud.'
+    } else if (error.message.includes('Caller profile not found') || error.message.includes('Invalid authorization header')) {
+        errorMessage = 'No se pudo verificar tu identidad para realizar esta acción.'
     }
 
     return NextResponse.json(
