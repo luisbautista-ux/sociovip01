@@ -1,6 +1,7 @@
 
 "use client";
 
+import * as React from "react"; // <--- CORRECCIÓN: Importación añadida
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
