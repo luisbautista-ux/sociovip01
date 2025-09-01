@@ -30,7 +30,7 @@ export interface QrClient {
 export interface QrCodeData { 
   user: QrClient;
   promotion: PromotionDetails; 
-  code: string; // The original 9-digit code
+  code: string; // This will now be the code's unique ID, not the 9-digit value
   status: QrCodeStatusGenerated;
 }
 
