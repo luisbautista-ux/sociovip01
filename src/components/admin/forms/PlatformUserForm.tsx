@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -33,33 +34,23 @@ const platformUserFormSchemaBase = z.object({
   businessId: z.string().optional(),
 });
 
-// Schema for creation includes password
-const platformUserFormSchemaCreate = platformUserFormSchemaBase.extend({
+const refinedSchema = platformUserFormSchemaBase.refine(data => {
+  const rolesThatNeedBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+  if (rolesThatNeedBusiness) {
+    return !!data.businessId && data.businessId.length > 0;
+  }
+  return true;
+}, {
+  message: "Debes seleccionar un negocio para los roles que lo requieren (Admin Negocio, Staff, Anfitrión).",
+  path: ["businessId"],
+});
+
+const platformUserFormSchemaCreate = refinedSchema.extend({
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
-}).refine(data => {
-  const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-  if (rolesThatNeedBusiness.length > 0) {
-    return !!data.businessId && data.businessId.length > 0; 
-  }
-  return true; 
-}, {
-  message: "Debes seleccionar un negocio para los roles que lo requieren (Admin Negocio, Staff, Anfitrión).",
-  path: ["businessId"], 
 });
 
-// Schema for editing does not include password
-const platformUserFormSchemaEdit = platformUserFormSchemaBase.refine(data => {
-  const rolesThatNeedBusiness = data.roles.filter(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-  if (rolesThatNeedBusiness.length > 0) {
-    return !!data.businessId && data.businessId.length > 0; 
-  }
-  return true; 
-}, {
-  message: "Debes seleccionar un negocio para los roles que lo requieren (Admin Negocio, Staff, Anfitrión).",
-  path: ["businessId"], 
-});
+const platformUserFormSchemaEdit = refinedSchema;
 
-// Merged type for the form, password is for creation only
 type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase> & { password?: string };
 
 interface PlatformUserFormProps {
@@ -95,7 +86,7 @@ export function PlatformUserForm({
       name: initialDataForCreation?.name || user?.name || "",
       email: initialDataForCreation?.email || user?.email || "",
       roles: initialDataForCreation?.existingPlatformUserRoles || user?.roles || (isBusinessAdminView ? ['staff'] : []),
-      businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || undefined,
+      businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
       password: initialDataForCreation?.dni || "", // Default password to DNI
     },
   });
@@ -103,47 +94,52 @@ export function PlatformUserForm({
   const watchedRoles = form.watch("roles");
   
   const showBusinessIdField = React.useMemo(() => {
+    if (!isSuperAdminView) return false; // Business admins don't get to choose, it's fixed.
     if (!watchedRoles || watchedRoles.length === 0) return false;
     return watchedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-  }, [watchedRoles]);
+  }, [watchedRoles, isSuperAdminView]);
 
   React.useEffect(() => {
     if (isEditing && user) {
       form.reset({
-        dni: user.dni || "",
-        name: user.name || "",
-        email: user.email || "",
-        roles: user.roles || [],
-        businessId: user.businessId || undefined,
-        password: "",
+        dni: user.dni || "", name: user.name || "", email: user.email || "",
+        roles: user.roles || [], businessId: user.businessId || undefined, password: "",
       });
     } else if (!isEditing && initialDataForCreation) {
       form.reset({
-        dni: initialDataForCreation.dni,
-        name: initialDataForCreation.name || "",
+        dni: initialDataForCreation.dni, name: initialDataForCreation.name || "",
         email: initialDataForCreation.email || "",
         roles: initialDataForCreation.existingPlatformUserRoles || (isBusinessAdminView ? ['staff'] : []),
-        businessId: initialDataForCreation.existingPlatformUser?.businessId || undefined,
+        businessId: initialDataForCreation.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
         password: initialDataForCreation.dni,
       });
     }
-  }, [user, initialDataForCreation, isEditing, form, isBusinessAdminView]);
+  }, [user, initialDataForCreation, isEditing, form, isBusinessAdminView, userProfile?.businessId]);
 
   React.useEffect(() => {
     if (!showBusinessIdField && form.getValues('businessId')) {
-      form.setValue('businessId', undefined, { shouldValidate: true });
+      if(isBusinessAdminView && userProfile?.businessId) {
+          form.setValue('businessId', userProfile.businessId, { shouldValidate: true });
+      } else if (isSuperAdminView) {
+          form.setValue('businessId', undefined, { shouldValidate: true });
+      }
     }
-  }, [showBusinessIdField, form]);
+  }, [showBusinessIdField, form, isBusinessAdminView, userProfile?.businessId, isSuperAdminView]);
 
   const handleSubmit = async (values: PlatformUserFormValues) => {
     if (!isEditing && (!values.password || values.password.length < 6)) {
         form.setError("password", { type: "manual", message: "La contraseña es requerida y debe tener al menos 6 caracteres." });
         return;
     }
+    const rolesNeedBusinessId = values.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+    const finalBusinessId = rolesNeedBusinessId 
+        ? (isSuperAdminView ? values.businessId : userProfile?.businessId)
+        : undefined;
+
     const dataToSubmit: PlatformUserFormData = { 
       uid: user?.uid,
       dni: values.dni, name: values.name, email: values.email, roles: values.roles,
-      businessId: showBusinessIdField ? values.businessId : undefined,
+      businessId: finalBusinessId,
       password: values.password,
     };
     await onSubmit(dataToSubmit, isEditing);
@@ -154,7 +150,7 @@ export function PlatformUserForm({
 
   const availableRoles = isSuperAdminView 
     ? ALL_PLATFORM_USER_ROLES 
-    : ['staff', 'host']; // Business admin can only create staff or hosts
+    : ['staff', 'host'];
 
   return (
     <Form {...form}>
@@ -202,7 +198,7 @@ export function PlatformUserForm({
           <FormDescription className="text-xs">Selecciona uno o más roles para el usuario.</FormDescription>
           <FormMessage />
         </FormItem>
-        {(showBusinessIdField && isSuperAdminView) && (
+        {(showBusinessIdField) && (
           <FormField control={form.control} name="businessId" render={({ field }) => (
               <FormItem><FormLabel>Negocio Asociado <span className="text-destructive">*</span></FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmitting}>
