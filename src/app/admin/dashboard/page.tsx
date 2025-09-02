@@ -165,7 +165,7 @@ export default function AdminDashboardPage() {
                 itemStyle={{ color: 'hsl(var(--foreground))' }}
               />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Bar dataKey="promotionsCreated" fill="hsl(var(--secondary))" name="Promos Creadas" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="promotionsCreated" fill="hsl(var(--secondary-foreground))" name="Promos Creadas" radius={[4, 4, 0, 0]} />
               <Bar dataKey="qrCodesGenerated" fill="hsl(var(--primary))" name="Códigos Creados" radius={[4, 4, 0, 0]} />
               <Bar dataKey="qrCodesUtilized" fill="hsl(var(--accent))" name="Códigos Canjeados" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -186,3 +186,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
