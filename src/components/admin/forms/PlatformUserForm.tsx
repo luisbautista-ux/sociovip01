@@ -91,6 +91,8 @@ export function PlatformUserForm({
   const isSuperAdminView = userProfile?.roles.includes('superadmin') ?? false;
   const isBusinessAdminView = (userProfile?.roles.includes('business_admin') || userProfile?.roles.includes('staff')) ?? false;
 
+  const [isBusinessPopoverOpen, setIsBusinessPopoverOpen] = React.useState(false);
+
   const isEditing = !!user;
 
   const form = useForm<PlatformUserFormValues>({
@@ -237,7 +239,7 @@ export function PlatformUserForm({
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Negocios Asignados (para Promotor)</FormLabel>
-                  <Popover>
+                  <Popover open={isBusinessPopoverOpen} onOpenChange={setIsBusinessPopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
@@ -298,3 +300,4 @@ export function PlatformUserForm({
     </Form>
   );
 }
+
