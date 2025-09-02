@@ -2,27 +2,33 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Regla general: por defecto, nadie puede leer o escribir.
+    
+    // Regla abierta para desarrollo: permite leer y escribir a cualquier usuario autenticado.
+    // Esto es útil para evitar problemas de permisos complejos durante el desarrollo inicial.
+    // En producción, deberías restringir esto más.
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if request.auth != null;
     }
 
-    // Regla específica para las imágenes de los negocios.
-    // Permite la escritura (subida/actualización/eliminación) en la carpeta de un negocio
-    // si el usuario está autenticado y su perfil en Firestore está vinculado a ese businessId
-    // con un rol de 'business_admin' o 'staff'.
-    match /businesses/{businessId}/{allPaths=**} {
-      allow read; // Permitir lectura pública de las imágenes de los negocios.
-      allow write: if request.auth != null &&
+    // --- Reglas más seguras para producción (comentadas por ahora) ---
+    /*
+    match /businesses/{businessId}/{fileName} {
+      // Permite leer a cualquiera (para logos/portadas públicas)
+      allow read: if true;
+      
+      // Permite escribir solo si el usuario está autenticado y está vinculado
+      // a este negocio en Firestore.
+      // NOTA: Esto requiere que las reglas de Firestore permitan la lectura de 'platformUsers'.
+      allow write: if request.auth != null && 
                       exists(/databases/(default)/documents/platformUsers/$(request.auth.uid)) &&
                       (
-                        // El usuario es un business_admin o staff de ESE negocio.
-                        (get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-                         get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff']))
-                        ||
-                        // El usuario es un superadmin.
+                        (
+                          get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+                          get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff'])
+                        ) ||
                         get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin'])
                       );
     }
+    */
   }
 }

@@ -14,7 +14,7 @@ import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, type DocumentData } from "firebase/firestore";
 import type { Business } from "@/lib/types";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
-import { getDownloadURL, ref, uploadBytes, deleteObject } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 
 export default function BusinessSettingsPage() {
@@ -86,39 +86,20 @@ export default function BusinessSettingsPage() {
 
   const uploadFileAndGetURL = async (file: File, path: string): Promise<string> => {
     const storageRef = ref(storage, path);
-    
-    // Check if a file already exists at the path to delete it first
-    try {
-        await getDownloadURL(storageRef);
-        // If the above doesn't throw, a file exists. Delete it.
-        await deleteObject(storageRef);
-    } catch (error: any) {
-        if (error.code === 'storage/object-not-found') {
-            // This is the expected case if no file exists. Continue silently.
-        } else {
-            // Re-throw other errors (like permission issues on getDownloadURL)
-            console.error("Error checking for existing file, it might be a permissions issue:", error);
-            // Propagate a user-friendly error message
-            throw new Error(`Error de permisos al acceder al almacenamiento: ${error.message}`);
-        }
-    }
-    
-    // Now, upload the new file
     try {
         const snapshot = await uploadBytes(storageRef, file);
         return await getDownloadURL(snapshot.ref);
     } catch (error: any) {
         console.error("Error uploading file or getting URL:", error);
-        // Provide a more specific error message based on the Firebase Storage error code
-        let userMessage = "No se pudo subir el archivo.";
+        let userMessage = "No se pudo subir el archivo. Verifica la consola para más detalles.";
         if (error.code === 'storage/unauthorized') {
-            userMessage = "No tienes permiso para subir archivos. Revisa las Reglas de Storage en Firebase.";
+            userMessage = "No tienes permiso para subir archivos. Revisa las Reglas de Storage en Firebase y asegúrate de estar autenticado.";
         } else if (error.code === 'storage/canceled') {
             userMessage = "La subida del archivo fue cancelada.";
         }
         throw new Error(userMessage);
     }
-};
+  };
 
 
   const handleSaveChangesBranding = async () => {
@@ -338,4 +319,3 @@ export default function BusinessSettingsPage() {
     </div>
   );
 }
-
