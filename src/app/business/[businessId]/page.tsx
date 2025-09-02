@@ -1597,4 +1597,3 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
-
