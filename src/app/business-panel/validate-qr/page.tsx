@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -44,8 +45,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure, isScannerActive }:
 
   const startScanner = useCallback(async () => {
     const qrReaderElement = document.getElementById(QR_READER_ELEMENT_ID);
-    if (!qrReaderElement) {
-        console.error("QR reader element not found.");
+    if (!qrReaderElement || (scannerRef.current && scannerRef.current.isScanning)) {
         return;
     }
 
@@ -180,10 +180,10 @@ export default function BusinessValidateQrPage() {
     toast({ title: "QR Escaneado", description: `Verificando código...` });
   }, [findCodeInEntities, toast]);
   
-  const handleScanFailure = (errorMessage: string, error: Html5QrcodeError) => {
+  const handleScanFailure = useCallback((errorMessage: string, error: Html5QrcodeError) => {
     // This can be noisy, so we'll just log it to the console for debugging
     // console.warn(`QR Code no detectado, error: ${errorMessage}`);
-  };
+  }, []);
 
 
   const handleValidateAndRedeem = async () => {
