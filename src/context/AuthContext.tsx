@@ -15,6 +15,7 @@ import type { AuthError } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import type { PlatformUser, PlatformUserRole } from "@/lib/types"; 
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import Cookies from "js-cookie";
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -90,7 +91,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      await fetchUserProfile(user);
+      if (user) {
+        const token = await user.getIdToken();
+        Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
+        await fetchUserProfile(user);
+      } else {
+        Cookies.remove('idToken');
+        setUserProfile(null);
+        setLoadingProfile(false);
+      }
       setLoadingAuth(false);
     });
     return () => unsubscribe();
@@ -99,13 +108,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      // After successful login, update the lastLogin field
+      
       if (userCredential.user) {
-        const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
-        await updateDoc(userDocRef, {
-          lastLogin: serverTimestamp()
-        });
+        // Llamar a la API para actualizar lastLogin en el backend
+        await fetch('/api/user/update-last-login', { method: 'POST' });
       }
+      
       return userCredential;
     } catch (error) {
       return error as AuthError;
@@ -122,7 +130,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           email: userCredential.user.email || "",
           name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
           roles: [role], 
-          dni: "", // El DNI se debe añadir desde un panel de admin
+          dni: "",
         };
         await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
       }
