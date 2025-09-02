@@ -896,25 +896,25 @@ export default function BusinessEventsPage() {
   /* ========================
      Switch: activar/inactivar
   ======================== */
-  const handleToggleEventStatus = useCallback(async (event: BusinessManagedEntity) => {
+  const handleToggleEventStatus = useCallback(async (eventId: string, newStatus: boolean) => {
     if (isSubmitting) return;
 
-    const newStatus = !event.isActive;
     setIsSubmitting(true);
-
     try {
-      await updateDoc(doc(db, "businessEntities", event.id!), { isActive: newStatus });
+      await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
       toast({
         title: "Estado Actualizado",
-        description: `El estado del evento "${event.name}" ha sido cambiado a ${newStatus ? "Activo" : "Inactivo"}.`,
+        description: `El estado del evento ha sido cambiado a ${newStatus ? "Activo" : "Inactivo"}.`,
       });
-      setEvents(prev => prev.map(e => e.id === event.id ? { ...e, isActive: newStatus } : e));
+      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, isActive: newStatus } : e));
     } catch (error: any) {
       toast({
         title: "Error al Actualizar",
         description: `No se pudo cambiar el estado. ${error.message}`,
         variant: "destructive",
       });
+      // Revert optimistic UI update on error
+      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, isActive: !newStatus } : e));
     } finally {
       setIsSubmitting(false);
     }
@@ -1392,7 +1392,7 @@ export default function BusinessEventsPage() {
                               <Switch
                                 id={`status-switch-event-${event.id}`}
                                 checked={event.isActive} 
-                                onCheckedChange={() => handleToggleEventStatus(event)}
+                                onCheckedChange={(value) => handleToggleEventStatus(event.id!, value)}
                                 aria-label={`Estado del evento ${event.name}`}
                                 disabled={isSubmitting}
                               />
