@@ -91,8 +91,6 @@ export function PlatformUserForm({
   const isSuperAdminView = userProfile?.roles.includes('superadmin') ?? false;
   const isBusinessAdminView = (userProfile?.roles.includes('business_admin') || userProfile?.roles.includes('staff')) ?? false;
 
-  const [isBusinessPopoverOpen, setIsBusinessPopoverOpen] = React.useState(false);
-
   const isEditing = !!user;
 
   const form = useForm<PlatformUserFormValues>({
@@ -161,7 +159,7 @@ export function PlatformUserForm({
       uid: user?.uid,
       dni: values.dni, name: values.name, email: values.email, roles: values.roles,
       businessId: showSingleBusinessField ? values.businessId : undefined,
-      businessIds: showMultiBusinessField ? values.businessIds : undefined,
+      businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,
     };
     await onSubmit(dataToSubmit, isEditing);
@@ -239,7 +237,7 @@ export function PlatformUserForm({
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Negocios Asignados (para Promotor)</FormLabel>
-                  <Popover open={isBusinessPopoverOpen} onOpenChange={setIsBusinessPopoverOpen}>
+                  <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
@@ -264,13 +262,13 @@ export function PlatformUserForm({
                         <CommandGroup className="max-h-48 overflow-y-auto">
                           {businesses.map((biz) => (
                             <CommandItem
-                              value={biz.name}
+                              value={biz.id} // Use ID as the value for onSelect
                               key={biz.id}
-                              onSelect={() => {
+                              onSelect={(currentValue) => {
                                 const currentIds = field.value || [];
-                                const newIds = currentIds.includes(biz.id)
-                                  ? currentIds.filter((id) => id !== biz.id)
-                                  : [...currentIds, biz.id];
+                                const newIds = currentIds.includes(currentValue)
+                                  ? currentIds.filter((id) => id !== currentValue)
+                                  : [...currentIds, currentValue];
                                 field.onChange(newIds);
                               }}
                             >
@@ -300,4 +298,3 @@ export function PlatformUserForm({
     </Form>
   );
 }
-
