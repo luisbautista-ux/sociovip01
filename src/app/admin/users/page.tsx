@@ -21,7 +21,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
+import { cn, anyToDate } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 
 import { db } from "@/lib/firebase";
@@ -129,9 +129,7 @@ export default function AdminUsersPage() {
           email: data.email,
           roles: rolesArray,
           businessId: data.businessId || null,
-          lastLogin: data.lastLogin instanceof Timestamp 
-            ? data.lastLogin.toDate().toISOString() 
-            : (data.lastLogin ? (typeof data.lastLogin === 'string' ? parseISO(data.lastLogin).toISOString() : new Date(data.lastLogin?.seconds * 1000 || Date.now()).toISOString()) : new Date().toISOString()),
+          lastLogin: data.lastLogin, // Keep original data type
         };
       });
       setPlatformUsers(fetchedUsers);
@@ -165,16 +163,19 @@ export default function AdminUsersPage() {
       return;
     }
     const headers = ["ID Documento", "UID Auth", "DNI/CE", "Nombre", "Email", "Roles", "Negocio Asociado", "Último Acceso"];
-    const rows = filteredUsers.map(user => [
-      user.id,
-      user.uid || "N/A",
-      user.dni,
-      user.name,
-      user.email,
-      user.roles.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ') || "N/A",
-      user.businessId ? (businessNameMap.get(user.businessId) || `ID: ${user.businessId}`) : "N/A",
-      user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"
-    ]);
+    const rows = filteredUsers.map(user => {
+      const lastLoginDate = anyToDate(user.lastLogin);
+      return [
+        user.id,
+        user.uid || "N/A",
+        user.dni,
+        user.name,
+        user.email,
+        user.roles.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ') || "N/A",
+        user.businessId ? (businessNameMap.get(user.businessId) || `ID: ${user.businessId}`) : "N/A",
+        lastLoginDate ? format(lastLoginDate, "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"
+      ];
+    });
     let csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
       + rows.map(e => e.join(",")).join("\n");
@@ -490,7 +491,9 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => (
+                    filteredUsers.map((user) => {
+                      const lastLoginDate = anyToDate(user.lastLogin);
+                      return (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.name}</TableCell>
                         <TableCell>{user.dni}</TableCell>
@@ -503,11 +506,11 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                           ))}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">{user.businessId ? (businessNameMap.get(user.businessId) || "ID no encontrado") : "N/A"}</TableCell>
-                        <TableCell className="hidden xl:table-cell">{user.lastLogin ? format(new Date(user.lastLogin), "P p", { locale: es }) : "N/A"}</TableCell>
+                        <TableCell className="hidden xl:table-cell">{lastLoginDate ? format(lastLoginDate, "P p", { locale: es }) : "N/A"}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => {
-                              handleEditExistingUser();
-                              setExistingPlatformUserToEdit(user);
+                              setEditingUser(user);
+                              setShowCreateEditModal(true);
                           }} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Editar</span>
@@ -542,7 +545,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                           </AlertDialog>
                         </TableCell>
                       </TableRow>
-                    ))
+                    )})
                   ) : (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
@@ -732,3 +735,4 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     </div>
   );
 }
+
