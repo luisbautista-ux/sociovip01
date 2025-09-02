@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
   const { toast } = useToast();
 
   const [availableBusinesses, setAvailableBusinesses] = useState<Business[]>([]);
-  const [isLoadingBusinesses, setIsLoadingBusinesses] = useState(false); // Only load when needed
+  const [businessNameMap, setBusinessNameMap] = useState<Map<string, string>>(new Map());
 
   const [showDniEntryModal, setShowDniEntryModal] = useState(false);
   const [dniForVerification, setDniForVerification] = useState(""); 
@@ -89,43 +89,30 @@ export default function AdminUsersPage() {
     defaultValues: { docType: 'dni', docNumber: "" },
   });
 
-  const fetchBusinessesForForm = useCallback(async () => {
-    // Only fetch if not already loaded
-    if (availableBusinesses.length > 0) {
-      return;
-    }
-    setIsLoadingBusinesses(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, "businesses"));
-      const fetchedBusinesses: Business[] = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          name: data.name,
-          // Only map essential fields needed for the form
-          contactEmail: "", joinDate: "", // Not needed for the form
-        };
-      });
-      setAvailableBusinesses(fetchedBusinesses);
-    } catch (error) {
-      console.error("Failed to fetch businesses for form:", error);
-      toast({
-        title: "Error al Cargar Negocios",
-        description: "No se pudieron obtener los negocios para el formulario de usuarios.",
-        variant: "destructive",
-      });
-      setAvailableBusinesses([]);
-    } finally {
-      setIsLoadingBusinesses(false);
-    }
-  }, [availableBusinesses.length, toast]);
-
-  const fetchPlatformUsers = useCallback(async () => {
+  const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const q = query(collection(db, "platformUsers"));
-      const querySnapshot = await getDocs(q);
-      const fetchedUsers: PlatformUser[] = querySnapshot.docs.map(docSnap => {
+      // Fetch Businesses
+      const businessesQuerySnapshot = await getDocs(collection(db, "businesses"));
+      const fetchedBusinesses: Business[] = [];
+      const nameMap = new Map<string, string>();
+      businessesQuerySnapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const business: Business = {
+          id: docSnap.id,
+          name: data.name,
+          contactEmail: "", 
+          joinDate: "",
+        };
+        fetchedBusinesses.push(business);
+        nameMap.set(docSnap.id, data.name || `ID: ${docSnap.id.substring(0,6)}...`);
+      });
+      setAvailableBusinesses(fetchedBusinesses);
+      setBusinessNameMap(nameMap);
+
+      // Fetch Users
+      const usersQuerySnapshot = await getDocs(collection(db, "platformUsers"));
+      const fetchedUsers: PlatformUser[] = usersQuerySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         let rolesArray: PlatformUserRole[] = [];
         if (data.roles && Array.isArray(data.roles)) {
@@ -148,23 +135,23 @@ export default function AdminUsersPage() {
         };
       });
       setPlatformUsers(fetchedUsers);
+
     } catch (error: any) {
-      console.error("Failed to fetch platform users:", error);
+      console.error("Failed to fetch initial data:", error);
       toast({
-        title: "Error al Cargar Usuarios",
-        description: "No se pudieron obtener los datos de los usuarios de plataforma. Error: " + error.message,
+        title: "Error al Cargar Datos",
+        description: "No se pudieron obtener los datos de usuarios o negocios.",
         variant: "destructive",
       });
-      setPlatformUsers([]);
     } finally {
       setIsLoading(false);
     }
   }, [toast]);
-
+  
   useEffect(() => {
-    fetchPlatformUsers();
-    // Don't fetch businesses here initially. Fetch them only when the modal is opened.
-  }, [fetchPlatformUsers]);
+    fetchInitialData();
+  }, [fetchInitialData]);
+
 
   const filteredUsers = platformUsers.filter(user =>
     (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -177,7 +164,7 @@ export default function AdminUsersPage() {
       toast({ title: "Sin Datos", description: "No hay usuarios para exportar.", variant: "destructive" });
       return;
     }
-    const headers = ["ID Documento", "UID Auth", "DNI/CE", "Nombre", "Email", "Roles", "ID Negocio Asociado", "Último Acceso"];
+    const headers = ["ID Documento", "UID Auth", "DNI/CE", "Nombre", "Email", "Roles", "Negocio Asociado", "Último Acceso"];
     const rows = filteredUsers.map(user => [
       user.id,
       user.uid || "N/A",
@@ -185,7 +172,7 @@ export default function AdminUsersPage() {
       user.name,
       user.email,
       user.roles.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ') || "N/A",
-      user.businessId || "N/A",
+      user.businessId ? (businessNameMap.get(user.businessId) || `ID: ${user.businessId}`) : "N/A",
       user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"
     ]);
     let csvContent = "data:text/csv;charset=utf-8,"
@@ -248,7 +235,6 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
 
 
   const handleOpenCreateUserFlow = () => {
-    fetchBusinessesForForm(); // Pre-fetch businesses when flow starts
     setEditingUser(null);
     setVerifiedDniResult(null); 
     dniEntryForm.reset({ docType: 'dni', docNumber: "" }); 
@@ -333,7 +319,6 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
   const handleEditExistingPlatformUser = () => {
       setShowDniIsPlatformUserAlert(false); 
       if (existingPlatformUserToEdit) {
-          fetchBusinessesForForm(); // Ensure businesses are loaded for edit form
           setEditingUser(existingPlatformUserToEdit);
           setVerifiedDniResult(null); // Clear initial data as we are editing
           setShowCreateEditModal(true); 
@@ -412,7 +397,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
       setShowCreateEditModal(false);
       setEditingUser(null);
       setVerifiedDniResult(null);
-      fetchPlatformUsers();
+      fetchInitialData();
 
     } catch (error: any) {
       console.error("Failed to create/update user:", error);
@@ -436,19 +421,13 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     try {
       await deleteDoc(doc(db, "platformUsers", user.uid)); // Asumimos que user.uid es el ID del documento
       toast({ title: "Perfil de Usuario Eliminado", description: `El perfil del usuario "${user.name}" ha sido eliminado.`, variant: "destructive", duration: 7000 });
-      fetchPlatformUsers();
+      fetchInitialData();
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast({ title: "Error al Eliminar", description: "No se pudo eliminar el perfil del usuario.", variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getBusinessName = (businessId?: string | null): string => {
-    if (!businessId) return "N/A";
-    const business = availableBusinesses.find(b => b.id === businessId);
-    return business?.name || `ID: ${businessId.substring(0, 6)}...`;
   };
   
   const watchedDocType = dniEntryForm.watch('docType');
@@ -523,11 +502,11 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                               </Badge>
                           ))}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell">{getBusinessName(user.businessId)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{user.businessId ? (businessNameMap.get(user.businessId) || "ID no encontrado") : "N/A"}</TableCell>
                         <TableCell className="hidden xl:table-cell">{user.lastLogin ? format(new Date(user.lastLogin), "P p", { locale: es }) : "N/A"}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => {
-                              handleEditExistingPlatformUser();
+                              handleEditExistingUser();
                               setExistingPlatformUserToEdit(user);
                           }} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />
@@ -703,7 +682,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
               }
             </UIDialogDescription>
           </UIDialogHeader>
-          { isLoadingBusinesses ? (
+          { isLoading ? (
               <div className="flex items-center justify-center h-40">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="ml-3 text-muted-foreground">Cargando negocios...</p>
