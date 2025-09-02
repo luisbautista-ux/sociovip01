@@ -5,7 +5,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import type { PlatformUser, PlatformUserRole } from '@/lib/types';
 import { getAuth } from 'firebase-admin/auth';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers'; // Import headers
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
@@ -50,10 +50,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const idToken = cookies().get('idToken')?.value;
-    if (!idToken) {
+    const authorization = headers().get('Authorization'); // Get Authorization header
+    if (!authorization || !authorization.startsWith('Bearer ')) {
         return NextResponse.json({ error: 'No autenticado. Token no proporcionado.' }, { status: 401 });
     }
+    const idToken = authorization.split('Bearer ')[1]; // Extract token
     
     const callerProfile = await getCallerProfile(idToken);
     const callerIsSuperAdmin = callerProfile.roles.includes('superadmin');
@@ -113,8 +114,8 @@ export async function POST(request: Request) {
       errorMessage = 'El correo electrónico ya está en uso por otro usuario.';
     } else if (error.code === 'auth/invalid-password') {
       errorMessage = `La contraseña proporcionada no es válida. ${error.message}`;
-    } else if (error.message === 'Caller profile not found.') {
-        errorMessage = 'No se encontró el perfil del usuario que realiza la solicitud.'
+    } else if (error.message.includes('Caller profile not found') || error.message.includes('No autenticado')) {
+        errorMessage = 'No se pudo verificar tu identidad para realizar esta acción.'
     }
 
     return NextResponse.json(

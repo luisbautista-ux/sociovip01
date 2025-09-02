@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
-import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,9 @@ import { PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn, anyToDate } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/context/AuthContext"; 
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, writeBatch, getDoc, setDoc, DocumentData } from "firebase/firestore";
@@ -63,6 +66,7 @@ interface CheckDniResult {
 
 
 export default function AdminUsersPage() {
+  const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
@@ -351,7 +355,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
           businessIds: data.businessIds,
           dni: data.dni,
         };
-        await updateDoc(userRef, userPayload);
+        await updateDoc(userRef, sanitizeObjectForFirestore(userPayload as DocumentData));
         toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
       } else {
         // --- CREATION LOGIC ---
@@ -369,23 +373,24 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
           }
         };
 
+        const idToken = await currentUser?.getIdToken();
+        if (!idToken) {
+          throw new Error("No autenticado. Token no proporcionado.");
+        }
+
         const response = await fetch('/api/admin/create-user', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}` // Pass token in header
+          },
           body: JSON.stringify(creationPayload),
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-          // Si la respuesta no es OK, muestra el error en un toast y detén la ejecución.
-          toast({
-            title: "Error al Crear Usuario",
-            description: result.error || 'Ocurrió un error desconocido al crear el usuario.',
-            variant: "destructive",
-          });
-          setIsSubmitting(false); // Libera el botón
-          return; // No continúes
+          throw new Error(result.error || 'Ocurrió un error desconocido al crear el usuario.');
         }
 
         toast({
@@ -402,16 +407,12 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     } catch (error: any) {
       console.error("Failed to create/update user:", error);
       toast({ 
-        title: "Error Inesperado", 
-        description: `Ocurrió un error inesperado al procesar la solicitud. Detalles: ${error.message}`, 
+        title: "Error al Crear Usuario", 
+        description: error.message, 
         variant: "destructive"
       });
     } finally {
-      // Este finally se ejecuta independientemente de si hay un error o no.
-      // Se movió setIsSubmitting(false) al bloque de error para evitar que se ejecute prematuramente.
-      if (!isSubmitting) { // Check if it was already set to false
-        setIsSubmitting(false);
-      }
+      setIsSubmitting(false);
     }
   };
 
@@ -747,4 +748,3 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     </div>
   );
 }
-
