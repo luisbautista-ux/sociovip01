@@ -896,37 +896,32 @@ export default function BusinessEventsPage() {
   /* ========================
      Switch: activar/inactivar
   ======================== */
-  const handleToggleEventStatus = useCallback(async (eventId: string, newStatus: boolean) => {
-      const originalEvent = events.find((e) => e.id === eventId);
-      if (!originalEvent) return;
+  const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-      // Optimistic UI update
+    const newStatus = !eventToToggle.isActive;
+    try {
+      await updateDoc(doc(db, "businessEntities", eventToToggle.id), { isActive: newStatus });
+      toast({
+        title: "Estado Actualizado",
+        description: `El evento "${eventToToggle.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`,
+      });
       setEvents((prevEvents) =>
         prevEvents.map((event) =>
-          event.id === eventId ? { ...event, isActive: newStatus } : event
+          event.id === eventToToggle.id ? { ...event, isActive: newStatus } : event
         )
       );
-
-      try {
-        await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
-        toast({
-            title: "Estado Actualizado",
-            description: `El evento "${originalEvent.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`,
-        });
-      } catch (error: any) {
-        // Revert UI on failure
-        setEvents((prevEvents) =>
-            prevEvents.map((event) =>
-                event.id === eventId ? { ...event, isActive: originalEvent.isActive } : event
-            )
-        );
-        toast({
-            title: "Error al Actualizar",
-            description: `No se pudo cambiar el estado. ${error.message}`,
-            variant: "destructive",
-        });
-      }
-  }, [toast, events]);
+    } catch (error: any) {
+      toast({
+        title: "Error al Actualizar",
+        description: `No se pudo cambiar el estado. ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [isSubmitting, toast]);
 
 
   /* ========================
@@ -1401,7 +1396,7 @@ export default function BusinessEventsPage() {
                               <Switch
                                 id={`status-switch-event-${event.id}`}
                                 checked={!!event.isActive}
-                                onCheckedChange={(newStatus) => handleToggleEventStatus(event.id, newStatus)}
+                                onCheckedChange={() => handleToggleEventStatus(event)}
                                 aria-label={`Estado del evento ${event.name}`}
                                 disabled={isSubmitting}
                               />
@@ -2371,7 +2366,7 @@ export default function BusinessEventsPage() {
                 />
 
                 <FormField
-                  control={commissionRuleForm.control}
+                  control={form.control}
                   name="description"
                   render={({ field }) => (
                     <FormItem>
