@@ -190,6 +190,8 @@ export default function BusinessEventsPage() {
   const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const [activeEventStatus, setActiveEventStatus] = useState<Record<string, boolean>>({});
 
   const [showInitialEventModal, setShowInitialEventModal] = useState(false);
   const [showManageEventModal, setShowManageEventModal] = useState(false);
@@ -314,6 +316,15 @@ export default function BusinessEventsPage() {
     },
     [toast]
   );
+  
+  useEffect(() => {
+    const initialStatus: Record<string, boolean> = {};
+    events.forEach((event) => {
+        initialStatus[event.id] = event.isActive;
+    });
+    setActiveEventStatus(initialStatus);
+  }, [events]);
+
 
   const fetchBusinessPromotersForAssignment = useCallback(
     async (businessIdToFetch: string) => {
@@ -896,30 +907,38 @@ export default function BusinessEventsPage() {
   /* ========================
      Switch: activar/inactivar
   ======================== */
-  const handleToggleEventStatus = useCallback(async (eventToToggle: BusinessManagedEntity) => {
+  const handleToggleEventStatus = useCallback(async (eventId: string, newStatus: boolean) => {
     if (isSubmitting) return;
-    setIsSubmitting(true);
 
-    const newStatus = !eventToToggle.isActive;
+    // Update local state immediately for better UX
+    setActiveEventStatus(prev => ({
+        ...prev,
+        [eventId]: newStatus
+    }));
+    
     try {
-      await updateDoc(doc(db, "businessEntities", eventToToggle.id), { isActive: newStatus });
+      await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
       toast({
         title: "Estado Actualizado",
-        description: `El evento "${eventToToggle.name}" ahora está ${newStatus ? "Activo" : "Inactivo"}.`,
+        description: `El estado del evento ha sido cambiado a ${newStatus ? "Activo" : "Inactivo"}.`,
       });
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === eventToToggle.id ? { ...event, isActive: newStatus } : event
+      // Optionally re-fetch to ensure full data sync, or just update local array
+      setEvents(prevEvents =>
+        prevEvents.map(event =>
+          event.id === eventId ? { ...event, isActive: newStatus } : event
         )
       );
     } catch (error: any) {
+      // Revert UI on error
+      setActiveEventStatus(prev => ({
+          ...prev,
+          [eventId]: !newStatus
+      }));
       toast({
         title: "Error al Actualizar",
         description: `No se pudo cambiar el estado. ${error.message}`,
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   }, [isSubmitting, toast]);
 
@@ -1395,26 +1414,26 @@ export default function BusinessEventsPage() {
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
                               <Switch
                                 id={`status-switch-event-${event.id}`}
-                                checked={!!event.isActive}
-                                onCheckedChange={() => handleToggleEventStatus(event)}
+                                checked={activeEventStatus[event.id] ?? false}
+                                onCheckedChange={(value) => handleToggleEventStatus(event.id, value)}
                                 aria-label={`Estado del evento ${event.name}`}
                                 disabled={isSubmitting}
                               />
                               <Label htmlFor={`status-switch-event-${event.id}`} className="sr-only">
-                                {event.isActive ? "Activo" : "Inactivo"}
+                                {activeEventStatus[event.id] ? "Activo" : "Inactivo"}
                               </Label>
                               <Badge
-                                variant={event.isActive ? "default" : "outline"}
+                                variant={activeEventStatus[event.id] ? "default" : "outline"}
                                 className={cn(
-                                  event.isActive && isActivatable
+                                  activeEventStatus[event.id] && isActivatable
                                     ? "bg-green-500 hover:bg-green-600"
-                                    : event.isActive
+                                    : activeEventStatus[event.id]
                                     ? "bg-yellow-500 hover:bg-yellow-600 text-black"
                                     : "bg-red-500 hover:bg-red-600 text-white",
                                   "text-xs"
                                 )}
                               >
-                                {event.isActive
+                                {activeEventStatus[event.id]
                                   ? isActivatable
                                     ? "Vigente"
                                     : "Activo (Fuera de Fecha)"
