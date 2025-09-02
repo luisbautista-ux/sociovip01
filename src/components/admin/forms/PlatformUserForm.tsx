@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -23,10 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { ALL_PLATFORM_USER_ROLES, PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 
 const platformUserFormSchemaBase = z.object({
@@ -219,7 +217,7 @@ export function PlatformUserForm({
           <FormMessage />
         </FormItem>
         
-        {(showSingleBusinessField && !showMultiBusinessField) && (
+        {showSingleBusinessField && !showMultiBusinessField && (
           <FormField control={form.control} name="businessId" render={({ field }) => (
               <FormItem><FormLabel>Negocio Asociado (para Staff/Host) <span className="text-destructive">*</span></FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmitting}>
@@ -234,55 +232,49 @@ export function PlatformUserForm({
             <FormField
               control={form.control}
               name="businessIds"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Negocios Asignados (para Promotor)</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className={cn("w-full justify-between", !field.value?.length && "text-muted-foreground")}
-                          disabled={isSubmitting}
-                        >
-                          <span className="truncate">
-                           {field.value?.length 
-                             ? businesses.filter(b => field.value?.includes(b.id)).map(b => b.name).join(', ')
-                             : "Seleccionar negocios"}
-                          </span>
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-                      <Command>
-                        <CommandInput placeholder="Buscar negocio..." />
-                        <CommandEmpty>No se encontraron negocios.</CommandEmpty>
-                        <CommandGroup className="max-h-48 overflow-y-auto">
-                          {businesses.map((biz) => (
-                            <CommandItem
-                              value={biz.id} // Use ID as the value for onSelect
-                              key={biz.id}
-                              onSelect={(currentValue) => {
-                                const currentIds = field.value || [];
-                                const newIds = currentIds.includes(currentValue)
-                                  ? currentIds.filter((id) => id !== currentValue)
-                                  : [...currentIds, currentValue];
-                                field.onChange(newIds);
-                              }}
+              render={() => (
+                <FormItem>
+                  <div className="mb-4">
+                    <FormLabel className="text-base">Negocios Asignados (para Promotor)</FormLabel>
+                    <FormDescription>
+                      Selecciona uno o más negocios a los que este promotor estará vinculado.
+                    </FormDescription>
+                  </div>
+                  <div className="space-y-2 rounded-md border p-4 max-h-48 overflow-y-auto">
+                    {businesses.map((item) => (
+                      <FormField
+                        key={item.id}
+                        control={form.control}
+                        name="businessIds"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={item.id}
+                              className="flex flex-row items-start space-x-3 space-y-0"
                             >
-                              <Check
-                                className={cn("mr-2 h-4 w-4", (field.value || []).includes(biz.id) ? "opacity-100" : "opacity-0")}
-                              />
-                              {biz.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  <FormDescription>Asigna uno o más negocios a este promotor.</FormDescription>
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(item.id)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...(field.value || []), item.id])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (value) => value !== item.id
+                                          )
+                                        )
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {item.name}
+                              </FormLabel>
+                            </FormItem>
+                          )
+                        }}
+                      />
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
