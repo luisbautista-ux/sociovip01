@@ -2,23 +2,33 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle } from "lucide-react";
-import type { AdminDashboardStats, BusinessManagedEntity, GeneratedCode } from "@/lib/types";
+import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle, Briefcase, UserPlus, Sparkles, UserCheck, History } from "lucide-react";
+import type { AdminDashboardStats, BusinessManagedEntity, GeneratedCode, Business, PlatformUser, SocioVipMember, QrClient } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear } from 'date-fns';
+import { format, subMonths, startOfMonth, formatDistanceToNow } from 'date-fns';
 import { es } from "date-fns/locale";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, Timestamp } from "firebase/firestore";
+import { collection, getDocs, Timestamp, query, orderBy, limit } from "firebase/firestore";
 import { anyToDate } from "@/lib/utils";
 
 interface MonthlyStat {
   month: string;
   promotionsCreated: number;
   qrCodesGenerated: number;
-  qrCodesUtilized: number; // Clientes que generaron QR
+  qrCodesUtilized: number; 
+}
+
+type ActivityType = 'new_business' | 'new_platform_user' | 'new_socio_vip' | 'new_qr_client';
+
+interface ActivityItem {
+  id: string;
+  type: ActivityType;
+  timestamp: Date;
+  description: string;
+  icon: React.ElementType;
 }
 
 export default function AdminDashboardPage() {
@@ -29,6 +39,7 @@ export default function AdminDashboardPage() {
     totalQrCodesGenerated: 0,
   });
   const [chartData, setChartData] = useState<MonthlyStat[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -85,12 +96,65 @@ export default function AdminDashboardPage() {
       })).sort((a,b) => new Date(a.month).getTime() - new Date(b.month).getTime());
 
       setChartData(finalChartData);
+      
+      // 3. Fetch recent activities
+      const businessesQuery = query(collection(db, "businesses"), orderBy("joinDate", "desc"), limit(5));
+      const usersQuery = query(collection(db, "platformUsers"), orderBy("lastLogin", "desc"), limit(5));
+      const sociosQuery = query(collection(db, "socioVipMembers"), orderBy("joinDate", "desc"), limit(5));
+      const clientsQuery = query(collection(db, "qrClients"), orderBy("registrationDate", "desc"), limit(5));
+      
+      const [businessesSnap, usersSnap, sociosSnap, clientsSnap] = await Promise.all([
+          getDocs(businessesQuery),
+          getDocs(usersQuery),
+          getDocs(sociosQuery),
+          getDocs(clientsQuery)
+      ]);
+
+      const activities: ActivityItem[] = [];
+
+      businessesSnap.forEach(doc => {
+          const data = doc.data() as Business;
+          activities.push({
+              id: doc.id, type: 'new_business', timestamp: anyToDate(data.joinDate)!,
+              description: `Nuevo negocio registrado: ${data.name}`, icon: Briefcase,
+          });
+      });
+      usersSnap.forEach(doc => {
+          const data = doc.data() as PlatformUser;
+          activities.push({
+              id: doc.id, type: 'new_platform_user', timestamp: anyToDate(data.lastLogin)!,
+              description: `Nuevo usuario de plataforma: ${data.name} (${data.roles.join(', ')})`, icon: UserPlus,
+          });
+      });
+      sociosSnap.forEach(doc => {
+          const data = doc.data() as SocioVipMember;
+          activities.push({
+              id: doc.id, type: 'new_socio_vip', timestamp: anyToDate(data.joinDate)!,
+              description: `Nuevo Socio VIP: ${data.name} ${data.surname}`, icon: Sparkles,
+          });
+      });
+      clientsSnap.forEach(doc => {
+          const data = doc.data() as QrClient;
+           activities.push({
+              id: doc.id, type: 'new_qr_client', timestamp: anyToDate(data.registrationDate)!,
+              description: `Nuevo cliente QR: ${data.name} ${data.surname}`, icon: UserCheck,
+          });
+      });
+      
+      const sortedActivities = activities
+          .filter(a => a.timestamp)
+          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+          .slice(0, 5); // Take the most recent 5 across all types
+          
+      setRecentActivities(sortedActivities);
+
 
     } catch (error: any) {
       console.error("AdminDashboard: Error fetching data:", error);
       setConfigError(`No se pudieron obtener los datos desde el servidor. ${error.message}`);
       setStats({ totalBusinesses: 0, totalPlatformUsers: 0, totalSocioVipMembers: 0, totalQrCodesGenerated: 0 });
       setChartData([]);
+      setRecentActivities([]);
     } finally {
       setIsLoading(false);
     }
@@ -174,16 +238,39 @@ export default function AdminDashboardPage() {
       </Card>
        <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Actividad Reciente del Sistema</CardTitle>
+          <CardTitle className="flex items-center">
+            <History className="h-6 w-6 mr-2 text-primary" />
+            Actividad Reciente del Sistema
+          </CardTitle>
+          <CardDescription>Últimos movimientos en la plataforma.</CardDescription>
         </CardHeader>
-        <CardContent className="min-h-[150px] flex flex-col items-center justify-center text-center">
-           <Info className="h-12 w-12 text-primary/60 mb-3" />
-           <p className="text-muted-foreground">
-            La actividad reciente del sistema se mostrará aquí una vez que se integre el registro de auditoría.
-          </p>
+        <CardContent>
+          {recentActivities.length > 0 ? (
+            <div className="space-y-4">
+              {recentActivities.map(activity => (
+                <div key={activity.id} className="flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                      <activity.icon className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                  <div className="flex-grow">
+                    <p className="text-sm font-medium">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(activity.timestamp, { addSuffix: true, locale: es })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
+              <Info className="h-12 w-12 text-primary/60 mb-3" />
+              <p className="text-muted-foreground">No hay actividad reciente para mostrar.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
-
