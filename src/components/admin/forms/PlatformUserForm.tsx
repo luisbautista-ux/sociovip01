@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info, Loader2 } from "lucide-react";
+import { Info, Loader2, Check, X, ChevronsUpDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
@@ -25,6 +25,9 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { ALL_PLATFORM_USER_ROLES, PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/context/AuthContext";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 const platformUserFormSchemaBase = z.object({
   dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
@@ -32,16 +35,16 @@ const platformUserFormSchemaBase = z.object({
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   roles: z.array(z.enum(ALL_PLATFORM_USER_ROLES)).min(1, { message: "Debes seleccionar al menos un rol."}),
   businessId: z.string().optional(),
+  businessIds: z.array(z.string()).optional(),
 });
 
-// --- FIX: Apply .refine() after .extend() ---
 const platformUserFormSchemaCreate = platformUserFormSchemaBase
   .extend({
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
   })
   .refine(data => {
-    const rolesThatNeedBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-    if (rolesThatNeedBusiness) {
+    const rolesThatNeedSingleBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+    if (rolesThatNeedSingleBusiness) {
       return !!data.businessId && data.businessId.length > 0;
     }
     return true;
@@ -52,8 +55,8 @@ const platformUserFormSchemaCreate = platformUserFormSchemaBase
 
 const platformUserFormSchemaEdit = platformUserFormSchemaBase
   .refine(data => {
-    const rolesThatNeedBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-    if (rolesThatNeedBusiness) {
+    const rolesThatNeedSingleBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+    if (rolesThatNeedSingleBusiness) {
       return !!data.businessId && data.businessId.length > 0;
     }
     return true;
@@ -61,7 +64,6 @@ const platformUserFormSchemaEdit = platformUserFormSchemaBase
     message: "Debes seleccionar un negocio para los roles que lo requieren.",
     path: ["businessId"],
   });
-
 
 type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase> & { password?: string };
 
@@ -99,23 +101,33 @@ export function PlatformUserForm({
       email: initialDataForCreation?.email || user?.email || "",
       roles: initialDataForCreation?.existingPlatformUserRoles || user?.roles || (isBusinessAdminView ? ['staff'] : []),
       businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
-      password: initialDataForCreation?.dni || "", // Default password to DNI
+      businessIds: user?.businessIds || [],
+      password: initialDataForCreation?.dni || "", 
     },
   });
 
   const watchedRoles = form.watch("roles");
   
-  const showBusinessIdField = React.useMemo(() => {
-    if (!isSuperAdminView) return false; // Business admins don't get to choose, it's fixed.
+  const showSingleBusinessField = React.useMemo(() => {
+    if (!isSuperAdminView) return false; 
     if (!watchedRoles || watchedRoles.length === 0) return false;
     return watchedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+  }, [watchedRoles, isSuperAdminView]);
+
+  const showMultiBusinessField = React.useMemo(() => {
+    if (!isSuperAdminView) return false;
+    if (!watchedRoles || watchedRoles.length === 0) return false;
+    return watchedRoles.includes('promoter');
   }, [watchedRoles, isSuperAdminView]);
 
   React.useEffect(() => {
     if (isEditing && user) {
       form.reset({
         dni: user.dni || "", name: user.name || "", email: user.email || "",
-        roles: user.roles || [], businessId: user.businessId || undefined, password: "",
+        roles: user.roles || [], 
+        businessId: user.businessId || undefined, 
+        businessIds: user.businessIds || [],
+        password: "",
       });
     } else if (!isEditing && initialDataForCreation) {
       form.reset({
@@ -123,35 +135,31 @@ export function PlatformUserForm({
         email: initialDataForCreation.email || "",
         roles: initialDataForCreation.existingPlatformUserRoles || (isBusinessAdminView ? ['staff'] : []),
         businessId: initialDataForCreation.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
+        businessIds: initialDataForCreation.existingPlatformUser?.businessIds || [],
         password: initialDataForCreation.dni,
       });
     }
   }, [user, initialDataForCreation, isEditing, form, isBusinessAdminView, userProfile?.businessId]);
 
   React.useEffect(() => {
-    if (!showBusinessIdField && form.getValues('businessId')) {
-      if(isBusinessAdminView && userProfile?.businessId) {
-          form.setValue('businessId', userProfile.businessId, { shouldValidate: true });
-      } else if (isSuperAdminView) {
-          form.setValue('businessId', undefined, { shouldValidate: true });
-      }
+    if (!showSingleBusinessField && !watchedRoles.includes('promoter')) {
+      form.setValue('businessId', undefined, { shouldValidate: true });
     }
-  }, [showBusinessIdField, form, isBusinessAdminView, userProfile?.businessId, isSuperAdminView]);
+    if (!showMultiBusinessField) {
+      form.setValue('businessIds', [], { shouldValidate: true });
+    }
+  }, [showSingleBusinessField, showMultiBusinessField, form, watchedRoles]);
 
   const handleSubmit = async (values: PlatformUserFormValues) => {
     if (!isEditing && (!values.password || values.password.length < 6)) {
         form.setError("password", { type: "manual", message: "La contraseña es requerida y debe tener al menos 6 caracteres." });
         return;
     }
-    const rolesNeedBusinessId = values.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-    const finalBusinessId = rolesNeedBusinessId 
-        ? (isSuperAdminView ? values.businessId : userProfile?.businessId)
-        : undefined;
-
     const dataToSubmit: PlatformUserFormData = { 
       uid: user?.uid,
       dni: values.dni, name: values.name, email: values.email, roles: values.roles,
-      businessId: finalBusinessId,
+      businessId: showSingleBusinessField ? values.businessId : undefined,
+      businessIds: showMultiBusinessField ? values.businessIds : undefined,
       password: values.password,
     };
     await onSubmit(dataToSubmit, isEditing);
@@ -210,9 +218,10 @@ export function PlatformUserForm({
           <FormDescription className="text-xs">Selecciona uno o más roles para el usuario.</FormDescription>
           <FormMessage />
         </FormItem>
-        {(showBusinessIdField) && (
+        
+        {(showSingleBusinessField && !showMultiBusinessField) && (
           <FormField control={form.control} name="businessId" render={({ field }) => (
-              <FormItem><FormLabel>Negocio Asociado <span className="text-destructive">*</span></FormLabel>
+              <FormItem><FormLabel>Negocio Asociado (para Staff/Host) <span className="text-destructive">*</span></FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmitting}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un negocio" /></SelectTrigger></FormControl>
                   <SelectContent>{businesses.length === 0 ? (<FormItem><FormLabel className="p-2 text-sm text-muted-foreground">No hay negocios disponibles.</FormLabel></FormItem>) : (businesses.map(biz => (<SelectItem key={biz.id} value={biz.id}>{biz.name}</SelectItem>)))}</SelectContent>
@@ -220,6 +229,67 @@ export function PlatformUserForm({
               </FormItem>
           )} />
         )}
+        
+        {showMultiBusinessField && (
+            <FormField
+              control={form.control}
+              name="businessIds"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Negocios Asignados (para Promotor)</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn("w-full justify-between", !field.value?.length && "text-muted-foreground")}
+                          disabled={isSubmitting}
+                        >
+                          <span className="truncate">
+                           {field.value?.length 
+                             ? `${field.value.length} negocio(s) seleccionado(s)`
+                             : "Seleccionar negocios"}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar negocio..." />
+                        <CommandEmpty>No se encontraron negocios.</CommandEmpty>
+                        <CommandGroup className="max-h-48 overflow-y-auto">
+                          {businesses.map((biz) => (
+                            <CommandItem
+                              value={biz.name}
+                              key={biz.id}
+                              onSelect={() => {
+                                const currentIds = field.value || [];
+                                const newIds = currentIds.includes(biz.id)
+                                  ? currentIds.filter((id) => id !== biz.id)
+                                  : [...currentIds, biz.id];
+                                field.onChange(newIds);
+                              }}
+                            >
+                              <Check
+                                className={cn("mr-2 h-4 w-4", (field.value || []).includes(biz.id) ? "opacity-100" : "opacity-0")}
+                              />
+                              {biz.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormDescription>Asigna uno o más negocios a este promotor.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        )}
+
+
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
           <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isEditing ? "Guardar Cambios" : "Crear Usuario"}</Button>

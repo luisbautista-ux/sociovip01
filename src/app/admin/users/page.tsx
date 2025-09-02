@@ -129,6 +129,7 @@ export default function AdminUsersPage() {
           email: data.email,
           roles: rolesArray,
           businessId: data.businessId || null,
+          businessIds: data.businessIds || [],
           lastLogin: data.lastLogin, // Keep original data type
         };
       });
@@ -332,10 +333,6 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
-    const finalBusinessId = (data.roles.includes('superadmin') || data.roles.includes('promoter') || !ROLES_REQUIRING_BUSINESS_ID.some(r => data.roles.includes(r as PlatformUserRole)))
-      ? null
-      : data.businessId;
-
     try {
       if (isEditing && editingUser) {
         const userRef = doc(db, "platformUsers", editingUser.uid);
@@ -350,7 +347,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         const userPayload: Partial<Omit<PlatformUser, 'id' | 'lastLogin'>> = {
           name: data.name,
           roles: data.roles,
-          businessId: finalBusinessId,
+          businessId: data.businessId,
+          businessIds: data.businessIds,
           dni: data.dni,
         };
         await updateDoc(userRef, userPayload);
@@ -366,7 +364,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             name: data.name,
             email: data.email,
             roles: data.roles,
-            businessId: finalBusinessId,
+            businessId: data.businessId,
+            businessIds: data.businessIds,
           }
         };
 
@@ -493,6 +492,19 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                   {filteredUsers.length > 0 ? (
                     filteredUsers.map((user) => {
                       const lastLoginDate = anyToDate(user.lastLogin);
+                      const getBusinessDisplay = () => {
+                        if (user.roles.includes('promoter')) {
+                           if (user.businessIds && user.businessIds.length > 0) {
+                            return "Múltiples";
+                           }
+                           return "N/A";
+                        }
+                        if (user.businessId) {
+                          return businessNameMap.get(user.businessId) || `ID: ${user.businessId.substring(0, 6)}...`;
+                        }
+                        return "N/A";
+                      };
+
                       return (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.name}</TableCell>
@@ -500,12 +512,12 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                         <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                         <TableCell>
                           {user.roles && user.roles.map(role => (
-                              <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
+                              <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
                                   {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
                               </Badge>
                           ))}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell">{user.businessId ? (businessNameMap.get(user.businessId) || "ID no encontrado") : "N/A"}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{getBusinessDisplay()}</TableCell>
                         <TableCell className="hidden xl:table-cell">{lastLoginDate ? format(lastLoginDate, "P p", { locale: es }) : "N/A"}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => {

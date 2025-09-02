@@ -17,6 +17,7 @@ const CreateUserSchema = z.object({
     email: z.string().email(),
     roles: z.array(z.string()),
     businessId: z.string().nullable().optional(),
+    businessIds: z.array(z.string()).nullable().optional(),
   }),
 });
 
@@ -93,6 +94,7 @@ export async function POST(request: Request) {
       email: firestoreData.email,
       roles: firestoreData.roles as PlatformUserRole[],
       businessId: firestoreData.businessId,
+      businessIds: firestoreData.businessIds || [],
       lastLogin: FieldValue.serverTimestamp() as any, // Use admin SDK FieldValue
     };
     

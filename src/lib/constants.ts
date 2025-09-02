@@ -46,6 +46,7 @@ export const PLATFORM_USER_ROLE_TRANSLATIONS: Record<PlatformUserRole | 'QrClien
   SocioVipMember: "Socio VIP",
 };
 
+// Roles que requieren un (y solo un) businessId
 export const ROLES_REQUIRING_BUSINESS_ID: PlatformUserRole[] = ['business_admin', 'staff', 'host'];
 
 export const BUSINESS_TYPES = [

@@ -72,6 +72,7 @@ export interface PlatformUser {
   email: string;
   roles: PlatformUserRole[];
   businessId?: string | null; 
+  businessIds?: string[]; // Para promotores con multiples negocios
   lastLogin: Timestamp | string; 
   phone?: string; // Added for consistency with other user-like types
 }
@@ -284,6 +285,7 @@ export interface PlatformUserFormData {
   email: string;
   roles: PlatformUserRole[]; 
   businessId?: string | null;
+  businessIds?: string[];
   password?: string;
 }
 
