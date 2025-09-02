@@ -2,22 +2,33 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide, CheckCircle, TicketCheck, ScanSearch } from "lucide-react";
+import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide, CheckCircle, TicketCheck, ScanSearch, History } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import type { BusinessManagedEntity } from "@/lib/types";
-import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { parseISO, isFuture } from "date-fns";
+import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useToast } from "@/hooks/use-toast";
+
+interface RecentActivity {
+  id: string;
+  type: 'redeemed' | 'used';
+  date: string; // ISO string
+  entityName: string;
+  clientName: string;
+  codeValue: string;
+}
 
 interface BusinessDashboardStats {
   activeEntities: number;
   totalCodesCreated: number;
-  totalCodesRedeemed: number; // Claimed by customer (redeemed or used)
-  totalCodesUsed: number; // Scanned at the door (used)
+  totalCodesRedeemed: number; 
+  totalCodesUsed: number;
+  recentActivities: RecentActivity[];
 }
 
 export default function BusinessDashboardPage() {
@@ -27,6 +38,7 @@ export default function BusinessDashboardPage() {
     totalCodesCreated: 0,
     totalCodesRedeemed: 0,
     totalCodesUsed: 0,
+    recentActivities: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -50,17 +62,13 @@ export default function BusinessDashboardPage() {
         if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
         else if (typeof data.startDate === 'string') startDateStr = data.startDate;
         else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
-        else { 
-          startDateStr = nowISO;
-        }
+        else startDateStr = nowISO;
 
         let endDateStr: string;
         if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
         else if (typeof data.endDate === 'string') endDateStr = data.endDate;
         else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
-        else { 
-          endDateStr = nowISO;
-        }
+        else endDateStr = nowISO;
         
         entities.push({
           id: docSnap.id,
@@ -76,8 +84,9 @@ export default function BusinessDashboardPage() {
 
       let activeEntitiesCount = 0;
       let totalCodesCreatedCount = 0; 
-      let totalCodesRedeemedCount = 0; // status 'redeemed' or 'used'
-      let totalCodesUsedCount = 0; // status 'used'
+      let totalCodesRedeemedCount = 0;
+      let totalCodesUsedCount = 0;
+      const allActivities: RecentActivity[] = [];
       
       entities.forEach(entity => {
         if (isEntityCurrentlyActivatable(entity)) {
@@ -93,19 +102,52 @@ export default function BusinessDashboardPage() {
               if (code.status === 'used') {
                 totalCodesUsedCount++;
               }
+
+              // Collect recent activities
+              if (code.status === 'redeemed' && code.redemptionDate && code.redeemedByInfo) {
+                const redemptionDate = anyToDate(code.redemptionDate);
+                if (redemptionDate) {
+                  allActivities.push({
+                    id: `${code.id}-redeemed`,
+                    type: 'redeemed',
+                    date: redemptionDate.toISOString(),
+                    entityName: entity.name,
+                    clientName: code.redeemedByInfo.name,
+                    codeValue: code.value
+                  });
+                }
+              }
+              if (code.status === 'used' && code.usedDate && code.redeemedByInfo) {
+                const usedDate = anyToDate(code.usedDate);
+                 if (usedDate) {
+                    allActivities.push({
+                      id: `${code.id}-used`,
+                      type: 'used',
+                      date: usedDate.toISOString(),
+                      entityName: entity.name,
+                      clientName: code.redeemedByInfo.name,
+                      codeValue: code.value
+                    });
+                 }
+              }
             });
         }
       });
       
+      const sortedActivities = allActivities
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5); // Get latest 5
+
       setStats({
         activeEntities: activeEntitiesCount,
         totalCodesCreated: totalCodesCreatedCount,
         totalCodesRedeemed: totalCodesRedeemedCount,
         totalCodesUsed: totalCodesUsedCount,
+        recentActivities: sortedActivities,
       });
 
     } catch (error: any) {
-      setStats({ activeEntities: 0, totalCodesCreated: 0, totalCodesRedeemed: 0, totalCodesUsed: 0 });
+      setStats({ activeEntities: 0, totalCodesCreated: 0, totalCodesRedeemed: 0, totalCodesUsed: 0, recentActivities: [] });
       toast({
         title: "Error al Cargar Estadísticas del Negocio",
         description: `No se pudieron obtener las estadísticas. Error: ${error.message}. Asegúrate de que tu perfil de Firestore ('platformUsers') tenga 'businessId' y roles correctos ('business_admin', 'staff') y que las reglas de Firestore permitan el acceso.`,
@@ -127,7 +169,7 @@ export default function BusinessDashboardPage() {
       setIsLoading(true);
       fetchBusinessStats(businessId);
     } else {
-      setStats({ activeEntities: 0, totalCodesCreated: 0, totalCodesRedeemed: 0, totalCodesUsed: 0 });
+      setStats({ activeEntities: 0, totalCodesCreated: 0, totalCodesRedeemed: 0, totalCodesUsed: 0, recentActivities: [] });
       setIsLoading(false); 
       if (userProfile && (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff'))) {
         toast({
@@ -175,13 +217,46 @@ export default function BusinessDashboardPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Actividad Reciente de tu Negocio</CardTitle>
+          <CardTitle className="flex items-center"><History className="h-6 w-6 mr-2 text-primary" />Actividad Reciente de tu Negocio</CardTitle>
+          <CardDescription>Las últimas 5 interacciones de clientes con tus promociones y eventos.</CardDescription>
         </CardHeader>
-        <CardContent className="min-h-[150px] flex flex-col items-center justify-center text-center">
-          <Info className="h-12 w-12 text-primary/60 mb-3" />
-           <p className="text-muted-foreground">
-            La actividad reciente de tu negocio se mostrará aquí una vez que se integre el sistema de registro de eventos del backend.
-          </p>
+        <CardContent>
+          {stats.recentActivities.length > 0 ? (
+            <div className="space-y-4">
+              {stats.recentActivities.map(activity => (
+                <div key={activity.id} className="flex items-center space-x-4">
+                  <div className="flex-shrink-0">
+                    {activity.type === 'redeemed' ? (
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <QrCodeLucide className="h-5 w-5 text-blue-600" />
+                      </div>
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-grow">
+                    <p className="text-sm font-medium">
+                      <span className="font-semibold">{activity.clientName}</span>{' '}
+                      {activity.type === 'redeemed' ? 'generó un QR para' : 'utilizó su QR para'}
+                      <span className="font-semibold text-primary"> "{activity.entityName}"</span>.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(activity.date), { addSuffix: true, locale: es })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
+                <Info className="h-12 w-12 text-primary/60 mb-3" />
+                <p className="text-muted-foreground">
+                    Aún no hay actividad reciente para mostrar.
+                </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
