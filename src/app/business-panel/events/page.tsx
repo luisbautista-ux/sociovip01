@@ -2518,7 +2518,7 @@ export default function BusinessEventsPage() {
               }
             }
           }}
-          isPromoterView={false}
+          isPromoterView={false} 
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
         />
