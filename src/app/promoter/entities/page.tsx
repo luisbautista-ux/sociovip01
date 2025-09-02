@@ -57,108 +57,79 @@ export default function PromoterEntitiesPage() {
     );
     return {
       created: promoterCodes.length,
-      used: promoterCodes.filter(c => c.status === 'redeemed').length,
+      used: promoterCodes.filter(c => c.status === 'redeemed' || c.status === 'used').length,
     };
   }, [userProfile]);
-
+  
   const fetchAssignedEntities = useCallback(async () => {
-    if (!userProfile || !(userProfile.uid || userProfile.name)) {
-      console.warn("Promoter Entities Page: No userProfile UID or Name, cannot fetch entities.");
+    if (!userProfile || !userProfile.businessIds || userProfile.businessIds.length === 0) {
+      console.warn("Promoter Entities Page: No businessIds found in profile, cannot fetch entities.");
       setEntities([]);
-      setBusinessesMap(new Map());
       setIsLoading(false);
       return;
     }
     
     setIsLoading(true);
-    console.log(`Promoter Entities Page: Fetching entities for promoter UID: ${userProfile.uid}, Name: ${userProfile.name}`);
-    
+    console.log(`Promoter Entities Page: Fetching entities for businesses:`, userProfile.businessIds);
+
     try {
-      const entitiesQuery = query(collection(db, "businessEntities"));
+      const assignedBusinessIds = userProfile.businessIds;
+      const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", assignedBusinessIds));
+      const businessesSnapshot = await getDocs(businessesQuery);
+      const businessesDataMap = new Map<string, Business>();
+      businessesSnapshot.forEach(doc => {
+          businessesDataMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
+      });
+      setBusinessesMap(businessesDataMap);
+
+      const entitiesQuery = query(
+        collection(db, "businessEntities"),
+        where("businessId", "in", assignedBusinessIds),
+        where("isActive", "==", true)
+      );
       const entitiesSnap = await getDocs(entitiesQuery);
-      console.log("Promoter Entities Page: Fetched all businessEntities snapshot size:", entitiesSnap.size);
       
-      const promoterAssignedEntitiesRaw: BusinessManagedEntity[] = [];
+      const promoterAssignedEntities: PromoterEntityView[] = [];
+
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data();
-        const isAssignedToThisPromoter = (data.assignedPromoters as any[])?.some(
-          (ap: any) => (userProfile.uid && ap.promoterProfileId === userProfile.uid) || 
-                       (!userProfile.uid && userProfile.name && ap.promoterName === userProfile.name)
-        );
+        const nowISO = new Date().toISOString();
+        let startDateStr: string;
+        if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
+        else if (typeof data.startDate === 'string') startDateStr = data.startDate;
+        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
+        else startDateStr = nowISO;
+
+        let endDateStr: string;
+        if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
+        else if (typeof data.endDate === 'string') endDateStr = data.endDate;
+        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
+        else endDateStr = nowISO;
         
-        if (isAssignedToThisPromoter) {
-            const nowISO = new Date().toISOString();
-            let startDateStr: string;
-            if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
-            else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-            else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
-            else startDateStr = nowISO; 
+        const entity: BusinessManagedEntity = {
+          id: docSnap.id,
+          ...data,
+          startDate: startDateStr,
+          endDate: endDateStr,
+        } as BusinessManagedEntity;
 
-            let endDateStr: string;
-            if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
-            else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-            else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
-            else endDateStr = nowISO;
-            
-            let createdAtStr: string | undefined;
-            if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
-            else if (typeof data.createdAt === 'string') createdAtStr = data.createdAt;
-            else if (data.createdAt instanceof Date) createdAtStr = data.createdAt.toISOString();
-            else createdAtStr = undefined;
-
-            promoterAssignedEntitiesRaw.push({
-              id: docSnap.id,
-              businessId: data.businessId || "N/A",
-              type: data.type as "promotion" | "event",
-              name: data.name || "Entidad sin nombre",
-              description: data.description || "",
-              termsAndConditions: data.termsAndConditions || "",
-              startDate: startDateStr,
-              endDate: endDateStr,
-              usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : Number(data.usageLimit),
-              maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
-              isActive: data.isActive === undefined ? true : data.isActive,
-              imageUrl: data.imageUrl || "",
-              aiHint: data.aiHint || "",
-              generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore(gc as GeneratedCode)) : [],
-              ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes.map(tt => sanitizeObjectForFirestore(tt as any)) : [],
-              eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes.map(eb => sanitizeObjectForFirestore(eb as any)) : [],
-              assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters.map(ap => sanitizeObjectForFirestore(ap as any)) : [],
-              createdAt: createdAtStr,
-            });
-        }
-      });
-      
-      const businessIdsToFetch = new Set(promoterAssignedEntitiesRaw.map(e => e.businessId).filter(id => id && id !== "N/A"));
-      const businessesDataMap = new Map<string, Business>();
-
-      if (businessIdsToFetch.size > 0) {
-        const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", Array.from(businessIdsToFetch)));
-        const businessesSnapshot = await getDocs(businessesQuery);
-        businessesSnapshot.forEach(doc => {
-            businessesDataMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
-        });
-      }
-      setBusinessesMap(businessesDataMap);
-      
-      const entitiesWithDetails: PromoterEntityView[] = promoterAssignedEntitiesRaw
-        .filter(entity => isEntityCurrentlyActivatable(entity)) // Show only activatable entities
-        .map(entity => {
+        if (isEntityCurrentlyActivatable(entity)) {
           const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
-          return {
+          promoterAssignedEntities.push({
             ...entity,
             businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
             promoterCodesCreated: promoterCodeStats.created,
             promoterCodesUsed: promoterCodeStats.used,
-          };
-        });
+          });
+        }
+      });
 
-      setEntities(entitiesWithDetails.sort((a,b) => {
+      setEntities(promoterAssignedEntities.sort((a, b) => {
         const aDate = a.createdAt ? new Date(a.createdAt).getTime() : (a.startDate ? new Date(a.startDate).getTime() : 0);
         const bDate = b.createdAt ? new Date(b.createdAt).getTime() : (b.startDate ? new Date(b.startDate).getTime() : 0);
         return bDate - aDate;
       }));
-      console.log("Promoter Entities Page: Fetched and filtered entities assigned to promoter:", entitiesWithDetails.length);
+      console.log("Promoter Entities Page: Fetched and filtered entities:", promoterAssignedEntities.length);
 
     } catch (error: any) {
       console.error("Promoter Entities Page: Error fetching assigned entities:", error.code, error.message, error);
@@ -167,24 +138,14 @@ export default function PromoterEntitiesPage() {
       setBusinessesMap(new Map());
     } finally {
       setIsLoading(false);
-      console.log("Promoter Entities Page: fetchAssignedEntities finished, isLoading set to false.");
     }
   }, [userProfile, toast, getPromoterCodeStats]);
 
   useEffect(() => {
-    console.log("Promoter Entities Page: useEffect for fetching data. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "userProfile:", userProfile ? userProfile.uid : "null");
-    if (loadingAuth || loadingProfile) {
-      return; 
-    }
-
-    if (userProfile && (userProfile.uid || userProfile.name)) {
-      console.log("Promoter Entities Page: User profile loaded, calling fetchAssignedEntities.");
+    if (!loadingAuth && !loadingProfile && userProfile) {
       fetchAssignedEntities();
-    } else {
-      console.log("Promoter Entities Page: No valid user profile (or missing necessary identifiers), clearing entities and setting isLoading to false.");
-      setEntities([]);
-      setBusinessesMap(new Map());
-      setIsLoading(false);
+    } else if (!loadingAuth && !loadingProfile) {
+      setIsLoading(false); 
     }
   }, [userProfile, loadingAuth, loadingProfile, fetchAssignedEntities]);
 
@@ -468,7 +429,7 @@ export default function PromoterEntitiesPage() {
                    <hr className="my-2"/>
                    <p className="text-xs text-muted-foreground">Estadísticas generales de la entidad:</p>
                    <p className="text-xs"><strong>Total Códigos Creados (Entidad):</strong> ({(selectedEntityForStats.generatedCodes || []).length})</p>
-                   <p className="text-xs"><strong>Total Códigos Usados (Entidad):</strong> ({(selectedEntityForStats.generatedCodes || []).filter(c => c.status === 'redeemed').length})</p>
+                   <p className="text-xs"><strong>Total Códigos Usados (Entidad):</strong> ({(selectedEntityForStats.generatedCodes || []).filter(c => c.status === 'redeemed' || c.status === 'used').length})</p>
                 </div>
                 <ShadcnDialogFooter>
                     <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedEntityForStats(null);}}>Cerrar</Button>
@@ -479,4 +440,3 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
-

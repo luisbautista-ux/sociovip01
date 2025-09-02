@@ -26,79 +26,68 @@ export default function PromoterDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAssignedEntitiesForPromoter = useCallback(async () => {
-    if (!userProfile || !(userProfile.uid || userProfile.name)) {
-      console.warn("Promoter Dashboard: No userProfile UID or Name, cannot fetch entities for stats.");
+    if (!userProfile?.businessIds || userProfile.businessIds.length === 0) {
+      console.warn("Promoter Dashboard: No assigned businessIds, cannot fetch entities.");
       setAssignedEntities([]);
       setIsLoading(false);
       return;
     }
     
     setIsLoading(true);
-    const promoterIdentifierField = userProfile.uid ? "promoterProfileId" : "promoterName";
-    const promoterIdentifierValue = userProfile.uid || userProfile.name;
-
-    console.log(`Promoter Dashboard: Fetching entities where ${promoterIdentifierField} is assigned to:`, promoterIdentifierValue);
+    console.log(`Promoter Dashboard: Fetching entities for businesses:`, userProfile.businessIds);
     
     try {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
-        where("isActive", "==", true),
-        // Firestore no permite filtrar por un elemento dentro de un array de objetos directamente
-        // where("assignedPromoters", "array-contains", { promoterProfileId: promoterIdentifierValue }) // Esto no funciona así
+        where("businessId", "in", userProfile.businessIds),
+        where("isActive", "==", true)
       );
       const entitiesSnap = await getDocs(entitiesQuery);
       const allActiveEntities: BusinessManagedEntity[] = [];
       
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data();
-        const isAssignedToThisPromoter = (data.assignedPromoters as any[])?.some(
-          (ap: any) => (userProfile.uid && ap.promoterProfileId === userProfile.uid) || 
-                       (!userProfile.uid && ap.promoterName === userProfile.name)
-        );
+        const nowISO = new Date().toISOString();
+        let startDateStr: string;
+        if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
+        else if (typeof data.startDate === 'string') startDateStr = data.startDate;
+        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
+        else startDateStr = nowISO;
 
-        if (isAssignedToThisPromoter) {
-            const nowISO = new Date().toISOString();
-            let startDateStr: string;
-            if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
-            else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-            else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
-            else startDateStr = nowISO;
+        let endDateStr: string;
+        if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
+        else if (typeof data.endDate === 'string') endDateStr = data.endDate;
+        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
+        else endDateStr = nowISO;
+        
+        let createdAtStr: string | undefined;
+        if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
+        else if (typeof data.createdAt === 'string') createdAtStr = data.createdAt;
+        else if (data.createdAt instanceof Date) createdAtStr = data.createdAt.toISOString();
+        else createdAtStr = undefined;
 
-            let endDateStr: string;
-            if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
-            else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-            else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
-            else endDateStr = nowISO;
-            
-            let createdAtStr: string | undefined;
-            if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
-            else if (typeof data.createdAt === 'string') createdAtStr = data.createdAt;
-            else if (data.createdAt instanceof Date) createdAtStr = data.createdAt.toISOString();
-            else createdAtStr = undefined;
-
-            const entity: BusinessManagedEntity = {
-              id: docSnap.id,
-              businessId: data.businessId || "N/A",
-              type: data.type as "promotion" | "event",
-              name: data.name || "Entidad sin nombre",
-              description: data.description || "",
-              startDate: startDateStr,
-              endDate: endDateStr,
-              usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : Number(data.usageLimit),
-              maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
-              isActive: data.isActive === undefined ? true : data.isActive,
-              imageUrl: data.imageUrl || "",
-              aiHint: data.aiHint || "",
-              termsAndConditions: data.termsAndConditions || "",
-              generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
-              ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes : [],
-              eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes : [],
-              assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
-              createdAt: createdAtStr,
-            };
-            if (isEntityCurrentlyActivatable(entity)) {
-              allActiveEntities.push(entity);
-            }
+        const entity: BusinessManagedEntity = {
+          id: docSnap.id,
+          businessId: data.businessId || "N/A",
+          type: data.type as "promotion" | "event",
+          name: data.name || "Entidad sin nombre",
+          description: data.description || "",
+          startDate: startDateStr,
+          endDate: endDateStr,
+          usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : Number(data.usageLimit),
+          maxAttendance: data.maxAttendance === undefined || data.maxAttendance === null ? 0 : Number(data.maxAttendance),
+          isActive: data.isActive === undefined ? true : data.isActive,
+          imageUrl: data.imageUrl || "",
+          aiHint: data.aiHint || "",
+          termsAndConditions: data.termsAndConditions || "",
+          generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes : [],
+          ticketTypes: Array.isArray(data.ticketTypes) ? data.ticketTypes : [],
+          eventBoxes: Array.isArray(data.eventBoxes) ? data.eventBoxes : [],
+          assignedPromoters: Array.isArray(data.assignedPromoters) ? data.assignedPromoters : [],
+          createdAt: createdAtStr,
+        };
+        if (isEntityCurrentlyActivatable(entity)) {
+          allActiveEntities.push(entity);
         }
       });
       setAssignedEntities(allActiveEntities);
@@ -122,23 +111,28 @@ export default function PromoterDashboardPage() {
   const promoterStats = useMemo((): PromoterDashboardStats => {
     const uniqueBusinessIds = new Set(assignedEntities.map(entity => entity.businessId));
     let codesGeneratedByPromoter = 0;
-    let codesRedeemedByPromoter = 0;
+    let codesRedeemedByPromoter = 0; // "Usados" para el promotor significa que el cliente generó su QR
 
     assignedEntities.forEach(entity => {
+      // El promotor ahora puede generar códigos para cualquier entidad de un negocio asignado.
+      // Filtramos los códigos generados por este promotor.
       const promoterCodes = (entity.generatedCodes || []).filter(c => 
         (userProfile?.uid && c.generatedByUid === userProfile.uid) || 
-        (!userProfile?.uid && c.generatedByName === userProfile.name)
+        (!userProfile?.uid && userProfile?.name && c.generatedByName === userProfile.name)
       );
       codesGeneratedByPromoter += promoterCodes.length;
-      codesRedeemedByPromoter += promoterCodes.filter(c => c.status === 'redeemed').length;
+      codesRedeemedByPromoter += promoterCodes.filter(c => c.status === 'redeemed' || c.status === 'used').length;
     });
 
     return {
-      totalBusinessesAssigned: uniqueBusinessIds.size,
+      totalBusinessesAssigned: userProfile?.businessIds?.length || 0,
       totalCodesGeneratedByPromoter: codesGeneratedByPromoter,
-      qrGeneratedWithPromoterCodes: 0, // Este se actualizará con lógica de backend. Por ahora, 0.
-      totalCodesRedeemedByPromoter: codesRedeemedByPromoter,
-      // totalCommissionEarned: codesRedeemedByPromoter * 0.50, // Ejemplo, ocultado por ahora
+      qrGeneratedWithPromoterCodes: codesRedeemedByPromoter, // Renombrado para claridad
+      totalCodesRedeemedByPromoter: assignedEntities.reduce((acc, entity) => {
+        return acc + (entity.generatedCodes || []).filter(c =>
+          ((userProfile?.uid && c.generatedByUid === userProfile.uid) || (!userProfile?.uid && userProfile?.name && c.generatedByName === userProfile.name)) && c.status === 'used'
+        ).length;
+      }, 0),
     };
   }, [assignedEntities, userProfile]);
 
@@ -157,12 +151,11 @@ export default function PromoterDashboardPage() {
         <BarChart2 className="h-8 w-8 mr-2" /> Dashboard del Promotor
       </h1>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"> {/* Cambiado a lg:grid-cols-4 para acomodar 4 tarjetas */}
-        <StatCard title="Negocios Asignados (Activos)" value={promoterStats.totalBusinessesAssigned} icon={Building} />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Negocios Asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
         <StatCard title="Códigos Creados por Ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
         <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} />
         <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesRedeemedByPromoter} icon={CheckCircle} />
-        {/* <StatCard title="Comisión Estimada" value={`S/ ${promoterStats.totalCommissionEarned.toFixed(2)}`} icon={DollarSign} /> */}
       </div>
 
       <Card className="shadow-lg">
