@@ -318,11 +318,13 @@ export default function BusinessEventsPage() {
   );
   
   useEffect(() => {
-    const initialStatus: Record<string, boolean> = {};
-    events.forEach((event) => {
-        initialStatus[event.id] = event.isActive;
+    const initial: Record<string, boolean> = {};
+    events.forEach((ev) => {
+        if(ev.id) {
+            initial[ev.id] = ev.isActive;
+        }
     });
-    setActiveEventStatus(initialStatus);
+    setActiveEventStatus(initial);
   }, [events]);
 
 
@@ -1411,26 +1413,26 @@ export default function BusinessEventsPage() {
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
                               <Switch
                                 id={`status-switch-event-${event.id}`}
-                                checked={activeEventStatus[event.id] ?? false}
-                                onCheckedChange={(value) => handleToggleEventStatus(event.id, value)}
+                                checked={activeEventStatus[event.id!] ?? false}
+                                onCheckedChange={(value) => handleToggleEventStatus(event.id!, value)}
                                 aria-label={`Estado del evento ${event.name}`}
                                 disabled={isSubmitting}
                               />
                               <Label htmlFor={`status-switch-event-${event.id}`} className="sr-only">
-                                {activeEventStatus[event.id] ? "Activo" : "Inactivo"}
+                                {activeEventStatus[event.id!] ? "Activo" : "Inactivo"}
                               </Label>
                               <Badge
-                                variant={activeEventStatus[event.id] ? "default" : "outline"}
+                                variant={activeEventStatus[event.id!] ? "default" : "outline"}
                                 className={cn(
-                                  activeEventStatus[event.id] && isActivatable
+                                  activeEventStatus[event.id!] && isActivatable
                                     ? "bg-green-500 hover:bg-green-600"
-                                    : activeEventStatus[event.id]
+                                    : activeEventStatus[event.id!]
                                     ? "bg-yellow-500 hover:bg-yellow-600 text-black"
                                     : "bg-red-500 hover:bg-red-600 text-white",
                                   "text-xs"
                                 )}
                               >
-                                {activeEventStatus[event.id]
+                                {activeEventStatus[event.id!]
                                   ? isActivatable
                                     ? "Vigente"
                                     : "Activo (Fuera de Fecha)"
