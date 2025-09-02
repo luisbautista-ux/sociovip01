@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -43,9 +44,12 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure, isScannerActive }:
   }, []);
 
   const startScanner = useCallback(async () => {
-    const qrReaderElement = document.getElementById(QR_READER_ELEMENT_ID);
-    if (!qrReaderElement || (scannerRef.current && scannerRef.current.isScanning)) {
+    if (typeof window === 'undefined' || !document.getElementById(QR_READER_ELEMENT_ID)) {
         return;
+    }
+    // Prevent re-initializing if already scanning
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      return;
     }
 
     const newScannerInstance = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
@@ -109,6 +113,7 @@ export default function HostValidateQrPage() {
   const [isScannerActive, setIsScannerActive] = useState(false);
   
   const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
+  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
 
   const fetchActiveEntities = useCallback(async () => {
     if (!currentBusinessId) return;
@@ -173,11 +178,16 @@ export default function HostValidateQrPage() {
   }, [currentBusinessId, toast]);
 
   const handleScanSuccess = useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
+    // Prevent processing the same code multiple times in a row
+    if (decodedText === lastScannedCode) {
+      return;
+    }
+    
     setIsScannerActive(false);
-    setScannedCodeId(decodedText);
+    setLastScannedCode(decodedText);
     findCodeInEntities(decodedText);
     toast({ title: "QR Escaneado", description: `Verificando código...` });
-  }, [findCodeInEntities, toast]);
+  }, [findCodeInEntities, toast, lastScannedCode]);
   
   const handleScanFailure = useCallback((errorMessage: string, error: Html5QrcodeError) => {
     // This can be noisy, so we'll just log it to the console for debugging
@@ -242,6 +252,11 @@ export default function HostValidateQrPage() {
     const redeemedCount = event.generatedCodes?.filter(c => c.status === 'used').length || 0;
     return `Asistencia: ${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
   };
+  
+  const handleActivateScanner = () => {
+    setLastScannedCode(null); // Reset last scanned code to allow re-scanning
+    setIsScannerActive(true);
+  }
 
   return (
     <div className="space-y-6">
@@ -249,7 +264,7 @@ export default function HostValidateQrPage() {
         <h1 className="text-3xl font-bold text-primary flex items-center">
           <QrCodeIcon className="h-8 w-8 mr-2" /> Validación de Códigos QR
         </h1>
-        <Button onClick={() => setIsScannerActive(prev => !prev)} variant={isScannerActive ? "destructive" : "default"} className="w-full sm:w-auto">
+        <Button onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} variant={isScannerActive ? "destructive" : "default"} className="w-full sm:w-auto">
           <Camera className="mr-2 h-5 w-5" /> {isScannerActive ? "Detener Escáner" : "Activar Escáner"}
         </Button>
       </div>
@@ -294,7 +309,7 @@ export default function HostValidateQrPage() {
                         "text-blue-800": foundCode.status === 'used',
                         "text-red-800": !isCodeCurrentlyRedeemableByHost() && foundCode.status !== 'used'
                       })}>
-                    {foundCode.status === 'used' ? `Este código ya fue utilizado`
+                    {foundCode.status === 'used' ? `Este QR ya fue utilizado`
                      : isCodeCurrentlyRedeemableByHost() ? "Disponible para Canje" 
                      : `Estado: ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCode.status] || foundCode.status}`}
                   </AlertTitle>
@@ -378,3 +393,4 @@ export default function HostValidateQrPage() {
     </div>
   );
 }
+
