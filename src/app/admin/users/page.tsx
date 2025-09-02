@@ -21,7 +21,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn, anyToDate } from "@/lib/utils";
+import { cn, anyToDate, sanitizeObjectForFirestore } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext"; 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
