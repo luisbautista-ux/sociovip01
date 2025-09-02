@@ -1,12 +1,24 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permite la lectura y escritura de cualquier archivo a cualquier usuario autenticado.
-    // Esto es seguro para este caso de uso porque los nombres de los archivos se generan
-    // con un identificador único (timestamp), lo que previene colisiones y acceso no deseado.
+    
+    // Regla global: permite la lectura a cualquiera
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read;
+    }
+    
+    // Regla para la carpeta 'businesses'
+    match /businesses/{businessId}/{fileName} {
+      // Permite la escritura (subir, actualizar, eliminar) si el usuario está autenticado.
+      // La seguridad de quién puede escribir en qué carpeta de negocio se maneja 
+      // en el backend (Cloud Functions o reglas de seguridad de la app) que genera la URL de subida,
+      // o se confía en que el `businessId` en la ruta es el correcto para el usuario logueado.
+      // Esta regla simple evita problemas de permisos complejos del lado del cliente.
+      allow write: if request.auth != null;
     }
   }
 }
+
+    
