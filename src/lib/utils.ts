@@ -25,10 +25,10 @@ export function anyToDate(value: any): Date | null {
     return isNaN(d.getTime()) ? null : d;
   }
   
-  // Firestore-like object from server-side rendering { _seconds, _nanoseconds }
-  if (typeof value._seconds === 'number' || typeof value.seconds === 'number') {
-    const seconds = value._seconds ?? value.seconds;
-    const nanoseconds = value._nanoseconds ?? value.nanoseconds ?? 0;
+  // Firestore-like object from server-side rendering { _seconds, _nanoseconds } or { seconds, nanoseconds }
+  if (typeof value.seconds === 'number' || typeof value._seconds === 'number') {
+    const seconds = value.seconds ?? value._seconds;
+    const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
     const ms = seconds * 1000 + Math.floor(nanoseconds / 1e6);
     const d = new Date(ms);
     return isNaN(d.getTime()) ? null : d;
@@ -37,8 +37,8 @@ export function anyToDate(value: any): Date | null {
   // ISO string or other string parsable by Date constructor
   if (typeof value === 'string') {
     const parsed = new Date(value);
-    // Check if parsing resulted in a valid date
-    if (!isNaN(parsed.getTime())) {
+    // Check if parsing resulted in a valid date and is not a nonsensical year like 0001
+    if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1900) {
       return parsed;
     }
   }
