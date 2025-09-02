@@ -248,14 +248,14 @@ export function PlatformUserForm({
                         >
                           <span className="truncate">
                            {field.value?.length 
-                             ? `${field.value.length} negocio(s) seleccionado(s)`
+                             ? businesses.filter(b => field.value?.includes(b.id)).map(b => b.name).join(', ')
                              : "Seleccionar negocios"}
                           </span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
                       <Command>
                         <CommandInput placeholder="Buscar negocio..." />
                         <CommandEmpty>No se encontraron negocios.</CommandEmpty>
