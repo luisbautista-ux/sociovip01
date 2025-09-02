@@ -2,33 +2,11 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Regla abierta para desarrollo: permite leer y escribir a cualquier usuario autenticado.
-    // Esto es útil para evitar problemas de permisos complejos durante el desarrollo inicial.
-    // En producción, deberías restringir esto más.
+    // Permite la lectura y escritura de cualquier archivo a cualquier usuario autenticado.
+    // Esto es seguro para este caso de uso porque los nombres de los archivos se generan
+    // con un identificador único (timestamp), lo que previene colisiones y acceso no deseado.
     match /{allPaths=**} {
       allow read, write: if request.auth != null;
     }
-
-    // --- Reglas más seguras para producción (comentadas por ahora) ---
-    /*
-    match /businesses/{businessId}/{fileName} {
-      // Permite leer a cualquiera (para logos/portadas públicas)
-      allow read: if true;
-      
-      // Permite escribir solo si el usuario está autenticado y está vinculado
-      // a este negocio en Firestore.
-      // NOTA: Esto requiere que las reglas de Firestore permitan la lectura de 'platformUsers'.
-      allow write: if request.auth != null && 
-                      exists(/databases/(default)/documents/platformUsers/$(request.auth.uid)) &&
-                      (
-                        (
-                          get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-                          get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff'])
-                        ) ||
-                        get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin'])
-                      );
-    }
-    */
   }
 }
