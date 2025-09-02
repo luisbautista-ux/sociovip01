@@ -48,7 +48,7 @@ const navItems = [
   { href: "/business-panel/staff", label: "Mi Personal", icon: Users },
   { href: "/business-panel/analytics", label: "Analíticas", icon: BarChart3 },
   { href: "/business-panel/settings", label: "Configuración", icon: Settings },
-  { href: "/business-panel/validate-qr", label: "Validar QR", icon: QrCode }, 
+  { href: "/host/validate", label: "Validar QR", icon: QrCode }, 
 ];
 
 export function BusinessSidebar() {

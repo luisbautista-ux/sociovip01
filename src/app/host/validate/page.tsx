@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -35,53 +34,55 @@ interface QrScannerProps {
 
 const QrScanner = React.memo(({ onScanSuccess, onScanFailure, isScannerActive }: QrScannerProps) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const onScanSuccessRef = useRef(onScanSuccess);
+  const onScanFailureRef = useRef(onScanFailure);
   const { toast } = useToast();
 
-  const stopScanner = useCallback(() => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      scannerRef.current.stop().catch(err => console.error("Failed to stop scanner.", err));
-    }
-  }, []);
+  useEffect(() => {
+    onScanSuccessRef.current = onScanSuccess;
+    onScanFailureRef.current = onScanFailure;
+  }, [onScanSuccess, onScanFailure]);
 
   const startScanner = useCallback(async () => {
-    if (typeof window === 'undefined' || !document.getElementById(QR_READER_ELEMENT_ID)) {
-        return;
-    }
-    // Prevent re-initializing if already scanning
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      return;
-    }
-
-    const newScannerInstance = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
-    scannerRef.current = newScannerInstance;
-
-    try {
-      await newScannerInstance.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-        onScanSuccess,
-        onScanFailure
-      );
-    } catch (err: any) {
-      console.error("Primary scanner start failed:", err);
-      let message = "No se pudo iniciar el escáner de QR.";
-      if (err.name === "NotAllowedError") {
-        message = "Permiso de cámara denegado. Por favor, habilita el acceso a la cámara en tu navegador.";
+      if (typeof window === 'undefined' || !document.getElementById(QR_READER_ELEMENT_ID)) {
+          return;
       }
-      toast({ title: "Error de Escáner", description: message, variant: "destructive" });
-    }
-  }, [onScanSuccess, onScanFailure, toast]);
+      if (scannerRef.current && scannerRef.current.isScanning) {
+          console.log("Scanner is already running.");
+          return;
+      }
+      const newScannerInstance = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
+      scannerRef.current = newScannerInstance;
+      try {
+          await newScannerInstance.start(
+              { facingMode: "environment" },
+              { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+              onScanSuccessRef.current,
+              onScanFailureRef.current
+          );
+      } catch (err: any) {
+          console.error("Scanner start failed:", err);
+          let message = "No se pudo iniciar el escáner.";
+          if (err.name === "NotAllowedError") {
+              message = "Permiso de cámara denegado. Por favor, habilita el acceso en tu navegador.";
+          }
+          toast({ title: "Error de Escáner", description: message, variant: "destructive" });
+      }
+  }, [toast]);
+  
+  const stopScanner = useCallback(() => {
+      if (scannerRef.current && scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(err => console.error("Failed to stop scanner.", err));
+      }
+  }, []);
+
 
   useEffect(() => {
-    if (isScannerActive) {
-      startScanner();
-    } else {
-      stopScanner();
-    }
-    
-    return () => {
-      stopScanner();
-    };
+      if (isScannerActive) {
+          startScanner();
+      } else {
+          stopScanner();
+      }
   }, [isScannerActive, startScanner, stopScanner]);
 
   return (
@@ -113,7 +114,7 @@ export default function HostValidateQrPage() {
   const [isScannerActive, setIsScannerActive] = useState(false);
   
   const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
-  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const lastProcessedCode = useRef<string | null>(null);
 
   const fetchActiveEntities = useCallback(async () => {
     if (!currentBusinessId) return;
@@ -178,19 +179,16 @@ export default function HostValidateQrPage() {
   }, [currentBusinessId, toast]);
 
   const handleScanSuccess = useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
-    // Prevent processing the same code multiple times in a row
-    if (decodedText === lastScannedCode) {
-      return;
+    if (decodedText === lastProcessedCode.current) {
+      return; 
     }
-    
-    setIsScannerActive(false);
-    setLastScannedCode(decodedText);
-    findCodeInEntities(decodedText);
+    lastProcessedCode.current = decodedText;
+    setIsScannerActive(false); 
     toast({ title: "QR Escaneado", description: `Verificando código...` });
-  }, [findCodeInEntities, toast, lastScannedCode]);
+    findCodeInEntities(decodedText);
+  }, [findCodeInEntities, toast]);
   
   const handleScanFailure = useCallback((errorMessage: string, error: Html5QrcodeError) => {
-    // This can be noisy, so we'll just log it to the console for debugging
     // console.warn(`QR Code no detectado, error: ${errorMessage}`);
   }, []);
 
@@ -254,7 +252,7 @@ export default function HostValidateQrPage() {
   };
   
   const handleActivateScanner = () => {
-    setLastScannedCode(null); // Reset last scanned code to allow re-scanning
+    lastProcessedCode.current = null; // Reset last scanned code to allow re-scanning
     setIsScannerActive(true);
   }
 
@@ -393,4 +391,3 @@ export default function HostValidateQrPage() {
     </div>
   );
 }
-
