@@ -3,24 +3,23 @@
 
 import { StatCard } from "@/components/admin/StatCard";
 import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle } from "lucide-react";
-import type { AdminDashboardStats } from "@/lib/types";
+import type { AdminDashboardStats, BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { format, subMonths } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, getMonth, getYear } from 'date-fns';
 import { es } from "date-fns/locale";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, Timestamp } from "firebase/firestore";
+import { anyToDate } from "@/lib/utils";
 
-// Mock Data for chart (will remain mock for now)
-const mockMonthlyPromotionData = Array.from({ length: 6 }, (_, i) => {
-  const monthDate = subMonths(new Date(), 5 - i);
-  return {
-    month: format(monthDate, "MMM yy", { locale: es }),
-    promotionsCreated: Math.floor(Math.random() * 15) + 5,
-    qrCodesGenerated: Math.floor(Math.random() * 200) + 50,
-    qrCodesUtilized: Math.floor(Math.random() * 100) + 20,
-  };
-});
+interface MonthlyStat {
+  month: string;
+  promotionsCreated: number;
+  qrCodesGenerated: number;
+  qrCodesUtilized: number; // Clientes que generaron QR
+}
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminDashboardStats>({
@@ -29,49 +28,77 @@ export default function AdminDashboardPage() {
     totalSocioVipMembers: 0,
     totalQrCodesGenerated: 0,
   });
+  const [chartData, setChartData] = useState<MonthlyStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchAdminStats = useCallback(async () => {
+  const fetchAdminData = useCallback(async () => {
     setIsLoading(true);
     setConfigError(null);
     try {
-      // Llama a la nueva API Route para obtener las estadísticas
-      const response = await fetch('/api/admin-stats');
-      const data = await response.json();
+      // 1. Fetch aggregate stats from the API route
+      const statsResponse = await fetch('/api/admin-stats');
+      const statsData = await statsResponse.json();
 
-      if (!response.ok) {
-        // En lugar de lanzar un error que rompe la página, lo guardamos en el estado.
-        setConfigError(data.error || 'Error en el servidor al obtener estadísticas.');
-        // Resetear stats a 0 en caso de error
-        setStats({
-          totalBusinesses: 0,
-          totalPlatformUsers: 0,
-          totalSocioVipMembers: 0,
-          totalQrCodesGenerated: 0,
-        });
+      if (!statsResponse.ok) {
+        setConfigError(statsData.error || 'Error en el servidor al obtener estadísticas.');
+        setStats({ totalBusinesses: 0, totalPlatformUsers: 0, totalSocioVipMembers: 0, totalQrCodesGenerated: 0 });
       } else {
-        setStats(data);
+        setStats(statsData);
       }
+
+      // 2. Fetch all entities for chart calculation
+      const entitiesSnap = await getDocs(collection(db, "businessEntities"));
+      const allEntities = entitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessManagedEntity));
       
-    } catch (error: any) {
-      console.error("AdminDashboard: Error calling API route:", error);
-      setConfigError(`No se pudieron obtener las estadísticas desde el servidor. ${error.message}`);
-      setStats({
-        totalBusinesses: 0,
-        totalPlatformUsers: 0,
-        totalSocioVipMembers: 0,
-        totalQrCodesGenerated: 0,
+      const monthlyStats: { [key: string]: Omit<MonthlyStat, 'month'> } = {};
+      const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
+
+      // Initialize last 6 months
+      for (let i = 0; i < 6; i++) {
+        const monthDate = startOfMonth(subMonths(new Date(), 5 - i));
+        const monthKey = format(monthDate, "yyyy-MM");
+        monthlyStats[monthKey] = { promotionsCreated: 0, qrCodesGenerated: 0, qrCodesUtilized: 0 };
+      }
+
+      allEntities.forEach(entity => {
+        const createdAt = anyToDate(entity.createdAt);
+        if (!createdAt || createdAt < sixMonthsAgo) return;
+
+        const monthKey = format(createdAt, "yyyy-MM");
+
+        if (monthlyStats[monthKey]) {
+          if (entity.type === 'promotion' || entity.type === 'event') {
+            monthlyStats[monthKey].promotionsCreated += 1;
+          }
+          if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
+            monthlyStats[monthKey].qrCodesGenerated += entity.generatedCodes.length;
+            monthlyStats[monthKey].qrCodesUtilized += entity.generatedCodes.filter(c => c.status === 'redeemed' || c.status === 'used').length;
+          }
+        }
       });
+      
+      const finalChartData = Object.keys(monthlyStats).map(key => ({
+        month: format(new Date(key + '-02'), "MMM yy", { locale: es }), // Use day 02 to avoid timezone issues
+        ...monthlyStats[key]
+      })).sort((a,b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
+      setChartData(finalChartData);
+
+    } catch (error: any) {
+      console.error("AdminDashboard: Error fetching data:", error);
+      setConfigError(`No se pudieron obtener los datos desde el servidor. ${error.message}`);
+      setStats({ totalBusinesses: 0, totalPlatformUsers: 0, totalSocioVipMembers: 0, totalQrCodesGenerated: 0 });
+      setChartData([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchAdminStats();
-  }, [fetchAdminStats]);
+    fetchAdminData();
+  }, [fetchAdminData]);
 
   if (isLoading) {
     return (
@@ -120,11 +147,11 @@ export default function AdminDashboardPage() {
             <BarChart3 className="h-6 w-6 mr-2 text-primary" />
             Actividad de Promociones (Últimos 6 Meses)
           </CardTitle>
-          <CardDescription>Creación de promociones, códigos creados y códigos canjeados. (Datos de ejemplo para el gráfico)</CardDescription>
+          <CardDescription>Creación de promociones, códigos creados y códigos canjeados por clientes.</CardDescription>
         </CardHeader>
         <CardContent className="h-[350px] p-2">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={mockMonthlyPromotionData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
@@ -138,9 +165,9 @@ export default function AdminDashboardPage() {
                 itemStyle={{ color: 'hsl(var(--foreground))' }}
               />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Bar dataKey="promotionsCreated" fill="hsl(var(--chart-1))" name="Promos Creadas" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="qrCodesGenerated" fill="hsl(var(--chart-2))" name="Códigos Creados" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="qrCodesUtilized" fill="hsl(var(--chart-3))" name="Códigos Canjeados" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="promotionsCreated" fill="hsl(var(--secondary))" name="Promos Creadas" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="qrCodesGenerated" fill="hsl(var(--primary))" name="Códigos Creados" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="qrCodesUtilized" fill="hsl(var(--accent))" name="Códigos Canjeados" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
