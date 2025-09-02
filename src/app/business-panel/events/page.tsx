@@ -910,7 +910,6 @@ export default function BusinessEventsPage() {
   const handleToggleEventStatus = useCallback(async (eventId: string, newStatus: boolean) => {
     if (isSubmitting) return;
 
-    // Update local state immediately for better UX
     setActiveEventStatus(prev => ({
         ...prev,
         [eventId]: newStatus
@@ -922,14 +921,12 @@ export default function BusinessEventsPage() {
         title: "Estado Actualizado",
         description: `El estado del evento ha sido cambiado a ${newStatus ? "Activo" : "Inactivo"}.`,
       });
-      // Optionally re-fetch to ensure full data sync, or just update local array
       setEvents(prevEvents =>
         prevEvents.map(event =>
           event.id === eventId ? { ...event, isActive: newStatus } : event
         )
       );
     } catch (error: any) {
-      // Revert UI on error
       setActiveEventStatus(prev => ({
           ...prev,
           [eventId]: !newStatus
