@@ -440,41 +440,35 @@ export default function BusinessPromotionsPage() {
     }
   };
 
-  const handleTogglePromotionStatus = useCallback(async (promotionToToggle: BusinessManagedEntity) => {
-    if (isSubmitting) return;
-    if (!currentBusinessId || !promotionToToggle.id) {
-        toast({ title: "Error", description: "ID de promoción o negocio no disponible.", variant: "destructive" });
-        return;
+  const handleTogglePromotionStatus = async (promotionToToggle: BusinessManagedEntity) => {
+    if (isSubmitting || !currentBusinessId || !promotionToToggle.id) {
+      toast({ title: "Error", description: "Datos insuficientes para cambiar el estado.", variant: "destructive" });
+      return;
     }
-    
-    const newStatus = !promotionToToggle.isActive;
-    const promotionName = promotionToToggle.name;
-        
-    setIsSubmitting(true); 
-    console.log(`Promotions Page: Toggling status for ${promotionName} (ID: ${promotionToToggle.id}) to ${newStatus}`);
 
+    setIsSubmitting(true);
+    const newStatus = !promotionToToggle.isActive;
+    
     try {
       await updateDoc(doc(db, "businessEntities", promotionToToggle.id), { isActive: newStatus });
+      
+      setPromotions(prev => 
+        prev.map(p => 
+          p.id === promotionToToggle.id ? { ...p, isActive: newStatus } : p
+        )
+      );
+
       toast({
         title: "Estado Actualizado",
-        description: `La promoción "${promotionName}" ahora está ${newStatus ? "Activa" : "Inactiva"}.`
+        description: `La promoción "${promotionToToggle.name}" ahora está ${newStatus ? "Activa" : "Inactiva"}.`
       });
-      
-      setPromotions(prev => prev.map(p => p.id === promotionToToggle.id ? {...p, isActive: newStatus} : p));
-      if (editingPromotion && editingPromotion.id === promotionToToggle.id) { 
-          setEditingPromotion(prev => prev ? {...prev, isActive: newStatus} : null);
-      }
     } catch (error: any) {
-      console.error("Promotions Page: Error updating promotion status:", error.code, error.message, error);
-      toast({
-        title: "Error al Actualizar Estado",
-        description: `No se pudo cambiar el estado de la promoción. ${error.message}`,
-        variant: "destructive"
-      });
+      console.error("Promotions Page: Error toggling status:", error);
+      toast({ title: "Error", description: "No se pudo actualizar el estado de la promoción.", variant: "destructive" });
     } finally {
-        setIsSubmitting(false); 
+      setIsSubmitting(false);
     }
-  }, [currentBusinessId, toast, isSubmitting, editingPromotion]); 
+  };
 
   const openCreateCodesDialog = (promotion: BusinessManagedEntity) => {
     if (!isEntityCurrentlyActivatable(promotion)) {
