@@ -1,12 +1,17 @@
+
 // src/app/api/user/update-last-login/route.ts
 import { NextResponse } from 'next/server';
 import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 
 // Helper function to verify the token and get the UID
-async function getUidFromToken(idToken: string): Promise<string> {
+async function getUidFromToken(authorizationHeader: string): Promise<string> {
+  if (!authorizationHeader.startsWith('Bearer ')) {
+    throw new Error('Invalid authorization header format.');
+  }
+  const idToken = authorizationHeader.split('Bearer ')[1];
   const decodedToken = await getAuth().verifyIdToken(idToken);
   return decodedToken.uid;
 }
@@ -16,14 +21,14 @@ export async function POST(request: Request) {
     await initializeAdminApp();
     const adminDb = admin.firestore();
     
-    // Obtener el idToken de las cookies del lado del servidor
-    const idToken = cookies().get('idToken')?.value;
+    // Obtener el idToken de la cabecera de autorización
+    const authorization = headers().get('Authorization');
 
-    if (!idToken) {
+    if (!authorization) {
       return NextResponse.json({ error: 'Token de autenticación no proporcionado.' }, { status: 401 });
     }
 
-    const uid = await getUidFromToken(idToken);
+    const uid = await getUidFromToken(authorization);
     
     if (!uid) {
        return NextResponse.json({ error: 'UID de usuario no válido.' }, { status: 400 });
@@ -44,7 +49,7 @@ export async function POST(request: Request) {
     let errorMessage = 'Ocurrió un error interno al actualizar la hora de acceso.';
     if (error.code === 'auth/id-token-expired') {
       errorMessage = 'El token de sesión ha expirado. Por favor, inicia sesión de nuevo.';
-    } else if (error.code === 'auth/argument-error') {
+    } else if (error.code === 'auth/argument-error' || error.message.includes('Invalid authorization header')) {
        errorMessage = 'Token de sesión inválido.';
     }
 

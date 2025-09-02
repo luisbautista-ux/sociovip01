@@ -14,7 +14,7 @@ import {
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
 import type { PlatformUser, PlatformUserRole } from "@/lib/types"; 
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import Cookies from "js-cookie";
 
 interface AuthContextType {
@@ -110,8 +110,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       
       if (userCredential.user) {
-        // Llamar a la API para actualizar lastLogin en el backend
-        await fetch('/api/user/update-last-login', { method: 'POST' });
+        const token = await userCredential.user.getIdToken();
+        Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
+        await fetch('/api/user/update-last-login', { 
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
       }
       
       return userCredential;
