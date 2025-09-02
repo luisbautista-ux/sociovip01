@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle, Briefcase, UserPlus, Sparkles, UserCheck, History } from "lucide-react";
+import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle, Briefcase, UserPlus, Sparkles, UserCheck, History, LogIn } from "lucide-react";
 import type { AdminDashboardStats, BusinessManagedEntity, GeneratedCode, Business, PlatformUser, SocioVipMember, QrClient } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
@@ -21,7 +21,7 @@ interface MonthlyStat {
   qrCodesUtilized: number; 
 }
 
-type ActivityType = 'new_business' | 'new_platform_user' | 'new_socio_vip' | 'new_qr_client';
+type ActivityType = 'new_business' | 'user_login' | 'new_socio_vip' | 'new_qr_client';
 
 interface ActivityItem {
   id: string;
@@ -121,10 +121,13 @@ export default function AdminDashboardPage() {
       });
       usersSnap.forEach(doc => {
           const data = doc.data() as PlatformUser;
-          activities.push({
-              id: doc.id, type: 'new_platform_user', timestamp: anyToDate(data.lastLogin)!,
-              description: `Nuevo usuario de plataforma: ${data.name} (${data.roles.join(', ')})`, icon: UserPlus,
-          });
+          // Solo añadir si hay un lastLogin válido
+          if (data.lastLogin) {
+            activities.push({
+                id: doc.id, type: 'user_login', timestamp: anyToDate(data.lastLogin)!,
+                description: `Último acceso al sistema: ${data.name} (${(data.roles || []).join(', ')})`, icon: LogIn,
+            });
+          }
       });
       sociosSnap.forEach(doc => {
           const data = doc.data() as SocioVipMember;
