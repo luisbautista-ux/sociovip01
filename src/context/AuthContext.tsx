@@ -14,7 +14,7 @@ import {
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
 import type { PlatformUser, PlatformUserRole } from "@/lib/types"; 
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -98,7 +98,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
-      return await signInWithEmailAndPassword(auth, email, pass);
+      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      // After successful login, update the lastLogin field
+      if (userCredential.user) {
+        const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
+        await updateDoc(userDocRef, {
+          lastLogin: serverTimestamp()
+        });
+      }
+      return userCredential;
     } catch (error) {
       return error as AuthError;
     }
