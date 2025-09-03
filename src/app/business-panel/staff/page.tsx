@@ -228,9 +228,19 @@ export default function BusinessStaffPage() {
         await updateDoc(userRef, userPayload);
         toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
       } else {
+        if (!data.email || !data.password) {
+          throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
+        }
         const creationPayload = {
-          email: data.email, password: data.password, displayName: data.name,
-          firestoreData: { dni: data.dni, name: data.name, email: data.email, roles: finalRoles }
+          email: data.email,
+          password: data.password,
+          displayName: data.name,
+          firestoreData: {
+            dni: data.dni,
+            name: data.name,
+            email: data.email,
+            roles: finalRoles
+          }
         };
 
         const response = await fetch('/api/business-panel/create-staff', {
@@ -403,4 +413,3 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
-
