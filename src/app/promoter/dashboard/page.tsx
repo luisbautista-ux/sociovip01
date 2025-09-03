@@ -75,7 +75,16 @@ export default function PromoterDashboardPage() {
       const performanceMap = new Map<string, Omit<BusinessPerformance, 'businessName' | 'businessId'>>();
 
       allEntities.forEach(entity => {
-        const promoterCodes = (entity.generatedCodes || []).filter(c => c.generatedByUid === userProfile.uid);
+        // CORRECCIÓN: Un promotor es identificado por su UID si lo tiene, o por su nombre.
+        // Esto asegura que se capturen los códigos sin importar cómo se creó el promotor.
+        const promoterIdentifierUid = userProfile.uid;
+        const promoterIdentifierName = userProfile.name;
+        
+        const promoterCodes = (entity.generatedCodes || []).filter(c => 
+          (promoterIdentifierUid && c.generatedByUid === promoterIdentifierUid) ||
+          (!c.generatedByUid && promoterIdentifierName && c.generatedByName === promoterIdentifierName)
+        );
+
         if (promoterCodes.length === 0) return;
 
         totalCodesGenerated += promoterCodes.length;
