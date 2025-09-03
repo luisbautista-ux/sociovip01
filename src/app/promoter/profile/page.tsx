@@ -14,12 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Loader2, UserCircle } from "lucide-react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const profileFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   dni: z.string().optional(),
   email: z.string().email(),
   phone: z.string().regex(/^9\d{8}$/, "El celular debe empezar con 9 y tener 9 dígitos.").optional().or(z.literal("")),
+  photoURL: z.string().url({ message: "Por favor, ingresa una URL válida." }).optional().or(z.literal("")),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -36,6 +38,7 @@ export default function PromoterProfilePage() {
       dni: "",
       email: "",
       phone: "",
+      photoURL: "",
     },
   });
 
@@ -46,6 +49,7 @@ export default function PromoterProfilePage() {
         dni: userProfile.dni || "",
         email: userProfile.email || "",
         phone: userProfile.phone || "",
+        photoURL: userProfile.photoURL || "",
       });
     }
   }, [userProfile, form]);
@@ -60,7 +64,8 @@ export default function PromoterProfilePage() {
       const userDocRef = doc(db, "platformUsers", currentUser.uid);
       await updateDoc(userDocRef, {
         name: values.name,
-        phone: values.phone || null, // Guardar null si está vacío
+        phone: values.phone || null,
+        photoURL: values.photoURL || null,
       });
       toast({
         title: "Perfil Actualizado",
@@ -113,6 +118,27 @@ export default function PromoterProfilePage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleUpdateProfile)} className="space-y-6">
+              <div className="flex justify-center mb-6">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={form.watch('photoURL') || userProfile?.photoURL || undefined} alt={userProfile.name} />
+                  <AvatarFallback className="text-3xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
+                </Avatar>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="photoURL"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>URL de Foto de Perfil</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://ejemplo.com/tu-foto.jpg" {...field} value={field.value || ""} disabled={isSubmitting} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="name"
@@ -147,7 +173,7 @@ export default function PromoterProfilePage() {
                     <FormItem>
                       <FormLabel>Número de Teléfono</FormLabel>
                       <FormControl>
-                        <Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} />
+                        <Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

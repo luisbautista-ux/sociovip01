@@ -8,10 +8,10 @@ import { SocioVipLogo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import React, { useEffect, useState } from "react"; // Added useState
+import React, { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet"; // Added SheetClose
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
@@ -31,14 +32,17 @@ const navItems = [
   { href: "/promoter/profile", label: "Mi Perfil", icon: UserCircle },
 ];
 
-function PromoterSidebarNavContent({ closeSheet, promoterName }: { closeSheet?: () => void; promoterName?: string }) {
+function PromoterSidebarNavContent({ closeSheet, promoterName, promoterPhotoUrl }: { closeSheet?: () => void; promoterName?: string, promoterPhotoUrl?: string | null }) {
   const pathname = usePathname();
   const { logout } = useAuth();
 
   return (
     <>
-      <div className="p-4 border-b border-border flex items-center space-x-2">
-        <UserCircle className="h-8 w-8 text-primary" />
+      <div className="p-4 border-b border-border flex items-center space-x-3">
+        <Avatar>
+            <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterName || 'Promotor'} />
+            <AvatarFallback>{promoterName ? promoterName.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
+        </Avatar>
         <div>
           <h1 className="text-md font-semibold text-primary">Panel Promotor</h1>
           {promoterName && <p className="text-xs text-muted-foreground">{promoterName}</p>}
@@ -88,10 +92,10 @@ function PromoterSidebarNavContent({ closeSheet, promoterName }: { closeSheet?: 
   );
 }
 
-function PromoterSidebar({ promoterName }: { promoterName?: string }) {
+function PromoterSidebar({ promoterName, promoterPhotoUrl }: { promoterName?: string; promoterPhotoUrl?: string | null }) {
   return (
-    <aside className="w-60 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
-      <PromoterSidebarNavContent promoterName={promoterName} />
+    <aside className="w-64 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
+      <PromoterSidebarNavContent promoterName={promoterName} promoterPhotoUrl={promoterPhotoUrl} />
     </aside>
   );
 }
@@ -180,11 +184,12 @@ export default function PromoterLayout({
   }
   
   const promoterDisplayName = userProfile?.name || currentUser?.email || "Promotor";
+  const promoterPhotoUrl = userProfile?.photoURL;
 
   return (
     <div className="flex min-h-screen bg-muted/40">
       <div className="hidden md:flex">
-        <PromoterSidebar promoterName={promoterDisplayName} />
+        <PromoterSidebar promoterName={promoterDisplayName} promoterPhotoUrl={promoterPhotoUrl}/>
       </div>
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
@@ -196,13 +201,13 @@ export default function PromoterLayout({
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col"> {/* Increased width for SheetContent */}
-                <PromoterSidebarNavContent promoterName={promoterDisplayName} closeSheet={() => setIsSheetOpen(false)} />
+              <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
+                <PromoterSidebarNavContent promoterName={promoterDisplayName} promoterPhotoUrl={promoterPhotoUrl} closeSheet={() => setIsSheetOpen(false)} />
               </SheetContent>
             </Sheet>
           </div>
           <div className="flex items-center gap-2">
-            <SocioVipLogo className="h-7 w-7 text-primary md:hidden" /> {/* Hide on md and up as it's in sidebar */}
+            <SocioVipLogo className="h-7 w-7 text-primary md:hidden" />
             <h1 className="text-xl font-semibold text-primary hidden md:block">Panel Promotor</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">

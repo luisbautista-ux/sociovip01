@@ -1,3 +1,4 @@
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -74,7 +75,8 @@ export interface PlatformUser {
   businessId?: string | null; 
   businessIds?: string[]; // Para promotores con multiples negocios
   lastLogin: Timestamp | string; 
-  phone?: string; // Added for consistency with other user-like types
+  phone?: string;
+  photoURL?: string;
 }
 
 export interface SocioVipMember {
@@ -287,6 +289,7 @@ export interface PlatformUserFormData {
   businessId?: string | null;
   businessIds?: string[];
   password?: string;
+  photoURL?: string;
 }
 
 export interface SocioVipMemberFormData {
