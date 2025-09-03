@@ -91,28 +91,34 @@ export default function PromoterDashboardPage() {
             totalQrGenerated++;
             businessPerf!.qrGenerated++;
             if (code.redemptionDate && code.redeemedByInfo) {
-              allActivities.push({
-                id: `${code.id}-redeemed`,
-                type: 'redeemed',
-                date: anyToDate(code.redemptionDate)!,
-                entityName: entity.name,
-                clientName: code.redeemedByInfo.name,
-                codeValue: code.value
-              });
+              const redemptionDate = anyToDate(code.redemptionDate);
+              if (redemptionDate) {
+                allActivities.push({
+                  id: `${code.id}-redeemed`,
+                  type: 'redeemed',
+                  date: redemptionDate,
+                  entityName: entity.name,
+                  clientName: code.redeemedByInfo.name,
+                  codeValue: code.value
+                });
+              }
             }
           }
           if (code.status === 'used') {
             totalQrUsed++;
             businessPerf!.qrUsed++;
             if (code.usedDate && code.redeemedByInfo) {
-              allActivities.push({
-                id: `${code.id}-used`,
-                type: 'used',
-                date: anyToDate(code.usedDate)!,
-                entityName: entity.name,
-                clientName: code.redeemedByInfo.name,
-                codeValue: code.value
-              });
+              const usedDate = anyToDate(code.usedDate);
+              if(usedDate) {
+                allActivities.push({
+                  id: `${code.id}-used`,
+                  type: 'used',
+                  date: usedDate,
+                  entityName: entity.name,
+                  clientName: code.redeemedByInfo.name,
+                  codeValue: code.value
+                });
+              }
             }
           }
         });
