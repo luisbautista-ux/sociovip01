@@ -33,12 +33,11 @@ const platformUserFormSchemaBase = z.object({
   roles: z.array(z.enum(ALL_PLATFORM_USER_ROLES)).min(1, { message: "Debes seleccionar al menos un rol."}),
   businessId: z.string().optional(),
   businessIds: z.array(z.string()).optional(),
+  password: z.string().optional(), // Make password optional in base
 });
 
-const platformUserFormSchemaCreate = platformUserFormSchemaBase
-  .extend({
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
-  })
+
+const platformUserFormSchema = platformUserFormSchemaBase
   .refine(data => {
     const rolesThatNeedSingleBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
     if (rolesThatNeedSingleBusiness) {
@@ -50,25 +49,13 @@ const platformUserFormSchemaCreate = platformUserFormSchemaBase
     path: ["businessId"],
   });
 
-const platformUserFormSchemaEdit = platformUserFormSchemaBase
-  .refine(data => {
-    const rolesThatNeedSingleBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-    if (rolesThatNeedSingleBusiness) {
-      return !!data.businessId && data.businessId.length > 0;
-    }
-    return true;
-  }, {
-    message: "Debes seleccionar un negocio para los roles que lo requieren.",
-    path: ["businessId"],
-  });
-
-type PlatformUserFormValues = z.infer<typeof platformUserFormSchemaBase> & { password?: string };
+type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
 
 interface PlatformUserFormProps {
   user?: PlatformUser; 
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>; 
+  onSubmit: (data: PlatformUserFormData) => Promise<void>; 
   onCancel: () => void;
   isSubmitting?: boolean;
   disableSubmitOverride?: boolean; 
@@ -91,7 +78,18 @@ export function PlatformUserForm({
   const isEditing = !!user;
 
   const form = useForm<PlatformUserFormValues>({
-    resolver: zodResolver(isEditing ? platformUserFormSchemaEdit : platformUserFormSchemaCreate),
+    resolver: zodResolver(
+      // Conditionally require password only on creation
+      platformUserFormSchema.refine(data => {
+          if (!isEditing) {
+            return !!data.password && data.password.length >= 6;
+          }
+          return true;
+      }, {
+        message: "La contraseña es requerida y debe tener al menos 6 caracteres.",
+        path: ["password"],
+      })
+    ),
     defaultValues: {
       dni: initialDataForCreation?.dni || user?.dni || "",
       name: initialDataForCreation?.name || user?.name || "",
@@ -148,10 +146,6 @@ export function PlatformUserForm({
   }, [showSingleBusinessField, showMultiBusinessField, form, watchedRoles]);
 
   const handleSubmit = (values: PlatformUserFormValues) => {
-    if (!isEditing && (!values.password || values.password.length < 6)) {
-        form.setError("password", { type: "manual", message: "La contraseña es requerida y debe tener al menos 6 caracteres." });
-        return;
-    }
     const dataToSubmit: PlatformUserFormData = { 
       uid: user?.uid,
       dni: values.dni, name: values.name, email: values.email, roles: values.roles,
@@ -159,7 +153,7 @@ export function PlatformUserForm({
       businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,
     };
-    onSubmit(dataToSubmit, isEditing);
+    onSubmit(dataToSubmit);
   };
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);
@@ -283,7 +277,10 @@ export function PlatformUserForm({
 
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
-          <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isEditing ? "Guardar Cambios" : "Crear Usuario"}</Button>
+          <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? "Guardar Cambios" : "Crear Usuario"}
+          </Button>
         </DialogFooter>
       </form>
     </Form>

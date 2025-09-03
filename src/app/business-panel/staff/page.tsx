@@ -204,13 +204,14 @@ export default function BusinessStaffPage() {
       setExistingPlatformUserToEdit(null);
   };
   
-  const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
-    if (isSubmitting || !currentBusinessId) {
+  const handleCreateOrEditUser = async (data: PlatformUserFormData) => {
+    if (isSubmitting || !currentBusinessId || !currentUser) {
         toast({ title: "Error", description: "Operación no permitida o negocio no identificado.", variant: "destructive" });
         return;
     }
     setIsSubmitting(true);
 
+    const isEditing = !!data.uid;
     const rolesAllowed: PlatformUserRole[] = ['staff', 'host'];
     const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
     if (finalRoles.length === 0) {
@@ -220,13 +221,8 @@ export default function BusinessStaffPage() {
     }
 
     try {
-        const idToken = await currentUser?.getIdToken();
-        if (!idToken) {
-            throw new Error("No se pudo obtener el token de autenticación del usuario actual.");
-        }
-
-        if (isEditing && editingUser) {
-            const userRef = doc(db, "platformUsers", editingUser.uid);
+        if (isEditing) {
+            const userRef = doc(db, "platformUsers", data.uid!);
             const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
             await updateDoc(userRef, userPayload);
             toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
@@ -234,6 +230,7 @@ export default function BusinessStaffPage() {
             if (!data.email || !data.password) {
                 throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
             }
+            const idToken = await currentUser.getIdToken();
             const creationPayload = {
                 email: data.email,
                 password: data.password,
@@ -248,10 +245,7 @@ export default function BusinessStaffPage() {
 
             const response = await fetch('/api/business-panel/create-staff', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
                 body: JSON.stringify(creationPayload)
             });
             const result = await response.json();
