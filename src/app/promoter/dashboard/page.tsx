@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building, CheckCircle, QrCode, ScanLine, DollarSign, BarChart2, Info, Gift, History, CheckCheck } from "lucide-react"; 
 import { StatCard } from "@/components/admin/StatCard";
-import type { BusinessManagedEntity, Business } from "@/lib/types";
+import type { BusinessManagedEntity, Business, BusinessPromoterLink } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { db } from "@/lib/firebase";
@@ -22,13 +22,14 @@ interface PromoterDashboardStats {
   totalCodesUsedByPromoter: number;
 }
 
-interface RecentActivity {
-  id: string;
-  type: 'redeemed' | 'used';
-  date: Date;
-  entityName: string;
-  clientName: string;
-  codeValue: string;
+type ActivityItemType = 'new_assignment' | 'code_redeemed' | 'code_used';
+
+interface ActivityItem {
+    id: string;
+    type: ActivityItemType;
+    date: Date;
+    description: React.ReactNode;
+    icon: React.ElementType;
 }
 
 interface BusinessPerformance {
@@ -42,7 +43,7 @@ interface BusinessPerformance {
 export default function PromoterDashboardPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
   const [businessPerformance, setBusinessPerformance] = useState<BusinessPerformance[]>([]);
   const [promoterStats, setPromoterStats] = useState<PromoterDashboardStats>({
     totalBusinessesAssigned: 0,
@@ -52,108 +53,135 @@ export default function PromoterDashboardPage() {
   });
 
   const fetchDataForDashboard = useCallback(async () => {
-    if (!userProfile?.businessIds || userProfile.businessIds.length === 0) {
-      setIsLoading(false);
-      return;
+    if (!userProfile?.uid) {
+        setIsLoading(false);
+        return;
     }
     
     setIsLoading(true);
     try {
-      const businessIds = userProfile.businessIds;
-      const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
-      const businessesSnap = await getDocs(businessesQuery);
-      const businessesMap = new Map(businessesSnap.docs.map(doc => [doc.id, doc.data() as Business]));
-
-      const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "in", businessIds));
-      const entitiesSnap = await getDocs(entitiesQuery);
-      const allEntities = entitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessManagedEntity);
-
-      const allActivities: RecentActivity[] = [];
-      let totalCodesGenerated = 0;
-      let totalQrGenerated = 0;
-      let totalQrUsed = 0;
-      const performanceMap = new Map<string, Omit<BusinessPerformance, 'businessName' | 'businessId'>>();
-
-      allEntities.forEach(entity => {
-        // CORRECCIÓN: Un promotor es identificado por su UID si lo tiene, o por su nombre.
-        // Esto asegura que se capturen los códigos sin importar cómo se creó el promotor.
-        const promoterIdentifierUid = userProfile.uid;
-        const promoterIdentifierName = userProfile.name;
+        const promoterUid = userProfile.uid;
         
-        const promoterCodes = (entity.generatedCodes || []).filter(c => 
-          (promoterIdentifierUid && c.generatedByUid === promoterIdentifierUid) ||
-          (!c.generatedByUid && promoterIdentifierName && c.generatedByName === promoterIdentifierName)
-        );
+        // 1. Fetch business links for this promoter to get assignment dates
+        const linksQuery = query(collection(db, "businessPromoterLinks"), where("platformUserUid", "==", promoterUid));
+        const linksSnap = await getDocs(linksQuery);
+        const promoterLinks = linksSnap.docs.map(doc => ({id: doc.id, ...doc.data()}) as BusinessPromoterLink);
+        const businessIds = promoterLinks.map(link => link.businessId);
 
-        if (promoterCodes.length === 0) return;
-
-        totalCodesGenerated += promoterCodes.length;
-        
-        let businessPerf = performanceMap.get(entity.businessId);
-        if (!businessPerf) {
-          businessPerf = { codesCreated: 0, qrGenerated: 0, qrUsed: 0 };
+        if (businessIds.length === 0) {
+            setIsLoading(false);
+            return;
         }
-        businessPerf.codesCreated += promoterCodes.length;
+
+        // 2. Fetch details for the assigned businesses
+        const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
+        const businessesSnap = await getDocs(businessesQuery);
+        const businessesMap = new Map(businessesSnap.docs.map(doc => [doc.id, doc.data() as Business]));
+
+        // 3. Create "New Assignment" activities
+        const allActivities: ActivityItem[] = promoterLinks.map(link => {
+            const businessName = businessesMap.get(link.businessId)?.name || 'Negocio Desconocido';
+            return {
+                id: `assignment-${link.id}`,
+                type: 'new_assignment',
+                date: anyToDate(link.joinDate)!,
+                icon: Building,
+                description: (
+                    <>
+                        Fuiste asignado al negocio <span className="font-semibold text-primary">{businessName}</span>.
+                    </>
+                )
+            };
+        });
+
+        // 4. Fetch entities and process code-related activities
+        const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "in", businessIds));
+        const entitiesSnap = await getDocs(entitiesQuery);
+        const allEntities = entitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessManagedEntity);
         
-        promoterCodes.forEach(code => {
-          if (code.status === 'redeemed' || code.status === 'used') {
-            totalQrGenerated++;
-            businessPerf!.qrGenerated++;
-            if (code.redemptionDate && code.redeemedByInfo) {
-              const redemptionDate = anyToDate(code.redemptionDate);
-              if (redemptionDate) {
-                allActivities.push({
-                  id: `${code.id}-redeemed`,
-                  type: 'redeemed',
-                  date: redemptionDate,
-                  entityName: entity.name,
-                  clientName: code.redeemedByInfo.name,
-                  codeValue: code.value
-                });
-              }
+        let totalCodesGenerated = 0;
+        let totalQrGenerated = 0;
+        let totalQrUsed = 0;
+        const performanceMap = new Map<string, Omit<BusinessPerformance, 'businessName' | 'businessId'>>();
+
+        allEntities.forEach(entity => {
+            const promoterCodes = (entity.generatedCodes || []).filter(c => c.generatedByUid === promoterUid);
+            if (promoterCodes.length === 0) return;
+
+            totalCodesGenerated += promoterCodes.length;
+            
+            let businessPerf = performanceMap.get(entity.businessId);
+            if (!businessPerf) {
+                businessPerf = { codesCreated: 0, qrGenerated: 0, qrUsed: 0 };
             }
-          }
-          if (code.status === 'used') {
-            totalQrUsed++;
-            businessPerf!.qrUsed++;
-            if (code.usedDate && code.redeemedByInfo) {
-              const usedDate = anyToDate(code.usedDate);
-              if(usedDate) {
-                allActivities.push({
-                  id: `${code.id}-used`,
-                  type: 'used',
-                  date: usedDate,
-                  entityName: entity.name,
-                  clientName: code.redeemedByInfo.name,
-                  codeValue: code.value
-                });
-              }
-            }
-          }
+            businessPerf.codesCreated += promoterCodes.length;
+
+            promoterCodes.forEach(code => {
+                if (code.status === 'redeemed' || code.status === 'used') {
+                    totalQrGenerated++;
+                    businessPerf!.qrGenerated++;
+                    const redemptionDate = anyToDate(code.redemptionDate);
+                    if (redemptionDate) {
+                        allActivities.push({
+                            id: `${code.id}-redeemed`,
+                            type: 'code_redeemed',
+                            date: redemptionDate,
+                            icon: ScanLine,
+                            description: (
+                                <>
+                                    <span className="font-semibold">{code.redeemedByInfo?.name || 'Un cliente'}</span> generó un QR para <span className="font-semibold text-primary">"{entity.name}"</span>.
+                                </>
+                            ),
+                        });
+                    }
+                }
+                if (code.status === 'used') {
+                    totalQrUsed++;
+                    businessPerf!.qrUsed++;
+                    const usedDate = anyToDate(code.usedDate);
+                    if (usedDate) {
+                        allActivities.push({
+                            id: `${code.id}-used`,
+                            type: 'code_used',
+                            date: usedDate,
+                            icon: CheckCheck,
+                            description: (
+                                <>
+                                    <span className="font-semibold">{code.redeemedByInfo?.name || 'Un cliente'}</span> utilizó su QR para <span className="font-semibold text-primary">"{entity.name}"</span>.
+                                </>
+                            ),
+                        });
+                    }
+                }
+            });
+
+            performanceMap.set(entity.businessId, businessPerf);
         });
 
-        performanceMap.set(entity.businessId, businessPerf);
-      });
-      
-      const sortedActivities = allActivities.sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
-      setRecentActivities(sortedActivities);
+        // 5. Sort all activities chronologically and set state
+        const sortedActivities = allActivities
+            .filter(a => a.date) // Ensure activity has a valid date
+            .sort((a, b) => b.date.getTime() - a.date.getTime())
+            .slice(0, 5);
+        setRecentActivities(sortedActivities);
 
-      const performanceData: BusinessPerformance[] = [];
-      performanceMap.forEach((perf, bizId) => {
-        performanceData.push({
-          businessId: bizId,
-          businessName: businessesMap.get(bizId)?.name || 'Negocio Desconocido',
-          ...perf
+        // 6. Set performance and general stats
+        const performanceData: BusinessPerformance[] = [];
+        performanceMap.forEach((perf, bizId) => {
+            performanceData.push({
+                businessId: bizId,
+                businessName: businessesMap.get(bizId)?.name || 'Negocio Desconocido',
+                ...perf
+            });
         });
-      });
-      setBusinessPerformance(performanceData);
+        setBusinessPerformance(performanceData);
 
-      setPromoterStats({
-        totalBusinessesAssigned: businessIds.length,
-        totalCodesGeneratedByPromoter: totalCodesGenerated,
-        qrGeneratedWithPromoterCodes: totalQrGenerated,
-        totalCodesUsedByPromoter: totalQrUsed,
-      });
+        setPromoterStats({
+            totalBusinessesAssigned: businessIds.length,
+            totalCodesGeneratedByPromoter: totalCodesGenerated,
+            qrGeneratedWithPromoterCodes: totalQrGenerated,
+            totalCodesUsedByPromoter: totalQrUsed,
+        });
 
     } catch (error) {
       console.error("Promoter Dashboard: Error fetching data:", error);
@@ -195,7 +223,7 @@ export default function PromoterDashboardPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Actividad Reciente</CardTitle>
-          <CardDescription>Últimas 5 acciones relacionadas con tus códigos.</CardDescription>
+          <CardDescription>Últimos vínculos y actividad de tus códigos en la plataforma.</CardDescription>
         </CardHeader>
         <CardContent>
           {recentActivities.length > 0 ? (
@@ -203,20 +231,20 @@ export default function PromoterDashboardPage() {
               {recentActivities.map(activity => (
                 <div key={activity.id} className="flex items-center space-x-4">
                   <div className="flex-shrink-0">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${activity.type === 'redeemed' ? 'bg-blue-100' : 'bg-green-100'}`}>
-                      {activity.type === 'redeemed' ? (
-                        <ScanLine className="h-5 w-5 text-blue-600" />
-                      ) : (
-                        <CheckCheck className="h-5 w-5 text-green-600" />
-                      )}
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        activity.type === 'new_assignment' ? 'bg-purple-100' :
+                        activity.type === 'code_redeemed' ? 'bg-blue-100' : 
+                        'bg-green-100'
+                    }`}>
+                      <activity.icon className={`h-5 w-5 ${
+                          activity.type === 'new_assignment' ? 'text-purple-600' :
+                          activity.type === 'code_redeemed' ? 'text-blue-600' : 
+                          'text-green-600'
+                      }`} />
                     </div>
                   </div>
                   <div className="flex-grow">
-                    <p className="text-sm font-medium">
-                      <span className="font-semibold">{activity.clientName}</span>{' '}
-                      {activity.type === 'redeemed' ? 'generó un QR para' : 'utilizó su QR para'}
-                      <span className="font-semibold text-primary"> "{activity.entityName}"</span>.
-                    </p>
+                    <p className="text-sm font-medium">{activity.description}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatDistanceToNow(activity.date, { addSuffix: true, locale: es })}
                     </p>
