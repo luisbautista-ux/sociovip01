@@ -86,7 +86,6 @@ export default function BusinessSettingsPage() {
     fetchBusinessData();
   }, [fetchBusinessData]);
 
-  // Refactored upload logic into a dedicated function
   const uploadFileAndGetURL = async (file: File, type: 'logo' | 'cover'): Promise<string | null> => {
     if (!userProfile?.businessId) {
       toast({ title: "Error de autenticación", description: "ID de negocio no encontrado.", variant: "destructive"});
@@ -358,3 +357,5 @@ export default function BusinessSettingsPage() {
     </div>
   );
 }
+
+    
