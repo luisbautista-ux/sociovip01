@@ -28,6 +28,7 @@ const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
   { href: "/promoter/entities", label: "Promociones y Eventos", icon: Gift },
   { href: "/promoter/commissions", label: "Mis Comisiones", icon: DollarSign },
+  { href: "/promoter/profile", label: "Mi Perfil", icon: UserCircle },
 ];
 
 function PromoterSidebarNavContent({ closeSheet, promoterName }: { closeSheet?: () => void; promoterName?: string }) {
