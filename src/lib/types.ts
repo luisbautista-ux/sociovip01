@@ -343,6 +343,7 @@ export interface BusinessPromoterFormData {
   promoterEmail: string;
   promoterPhone?: string;
   commissionRate?: string; 
+  password?: string;
 }
  
 export interface SpecificCodeFormValues { // Para el input de código de 9 dígitos en la página pública del negocio

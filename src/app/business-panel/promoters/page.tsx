@@ -17,7 +17,7 @@ import { BusinessPromoterForm } from "@/components/business/forms/BusinessPromot
 import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -60,7 +60,7 @@ interface CheckDniForPromoterResult {
 
 
 export default function BusinessPromotersPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, currentUser } = useAuth();
   const currentBusinessId = userProfile?.businessId;
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -88,16 +88,10 @@ export default function BusinessPromotersPage() {
 
   const fetchPromoterLinks = useCallback(async () => {
     if (!currentBusinessId) {
-      console.warn("Promoters Page: No currentBusinessId or userProfile available. Skipping fetch.");
       setPromoterLinks([]);
       setIsLoading(false);
-      if (userProfile === null) {
-        toast({ title: "Error de Negocio", description: "ID de negocio no disponible en tu perfil.", variant: "destructive", duration: 7000 });
-      }
       return;
     }
-    console.log('Promoters Page: UserProfile for query:', userProfile);
-    console.log('Promoters Page: Querying promoter links with businessId:', currentBusinessId);
     setIsLoading(true);
     try {
       const q = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
@@ -119,11 +113,10 @@ export default function BusinessPromotersPage() {
         };
       });
       setPromoterLinks(fetchedLinks.sort((a,b) => (a.promoterName || "").localeCompare(b.promoterName || "")));
-      console.log("Promoters Page: Fetched links successfully:", fetchedLinks.length);
     } catch (error: any) {
-       console.error("Promoters Page: Failed to fetch promoter links:", error.code, error.message, error);
+      console.error("Promoters Page: Failed to fetch promoter links:", error);
       toast({
-        title: "Error al Cargar Promotores Vinculados",
+        title: "Error al Cargar Promotores",
         description: `No se pudieron obtener los promotores. ${error.message}`,
         variant: "destructive",
       });
@@ -131,7 +124,7 @@ export default function BusinessPromotersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentBusinessId, userProfile, toast]);
+  }, [currentBusinessId, toast]);
 
   useEffect(() => {
     if (currentBusinessId) {
@@ -152,14 +145,12 @@ export default function BusinessPromotersPage() {
   const checkDniForPromoterAndLink = async (dni: string, businessIdToCheck: string): Promise<InitialDataForPromoterLink> => {
     let result: InitialDataForPromoterLink = { dni };
 
-    // 1. Check if DNI is already linked to this specific business
     const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", businessIdToCheck), where("promoterDni", "==", dni));
     const linksSnapshot = await getDocs(linksQuery);
     if (!linksSnapshot.empty) {
       result.existingLink = { id: linksSnapshot.docs[0].id, ...linksSnapshot.docs[0].data() } as BusinessPromoterLink;
     }
 
-    // 2. Check if DNI exists as a PlatformUser with role 'promoter'
     const platformUserQuery = query(collection(db, "platformUsers"), where("dni", "==", dni), where("roles", "array-contains", "promoter"));
     const platformUserSnapshot = await getDocs(platformUserQuery);
     if (!platformUserSnapshot.empty) {
@@ -234,7 +225,13 @@ export default function BusinessPromotersPage() {
     const checkResult = await checkDniForPromoterAndLink(docNumberCleaned, currentBusinessId);
     
     if (fetchedNameFromApi) {
-        checkResult.qrClientData = { ...checkResult.qrClientData, name: fetchedNameFromApi } as QrClient;
+        if(checkResult.qrClientData) {
+            checkResult.qrClientData.name = fetchedNameFromApi.split(' ').slice(2).join(' ');
+            checkResult.qrClientData.surname = fetchedNameFromApi.split(' ').slice(0,2).join(' ');
+        } else if (checkResult.socioVipData) {
+            checkResult.socioVipData.name = fetchedNameFromApi.split(' ').slice(2).join(' ');
+            checkResult.socioVipData.surname = fetchedNameFromApi.split(' ').slice(0,2).join(' ');
+        }
     }
     
     setIsSubmitting(false);
@@ -261,8 +258,8 @@ export default function BusinessPromotersPage() {
   };
 
   const handleAddOrEditPromoterLink = async (data: BusinessPromoterFormData) => {
-    if (!currentBusinessId) {
-        toast({ title: "Error de Negocio", description: "ID de negocio no disponible.", variant: "destructive" });
+    if (!currentBusinessId || !currentUser) {
+        toast({ title: "Error de Sesión", description: "No se puede completar la operación.", variant: "destructive" });
         return;
     }
     setIsSubmitting(true);
@@ -271,27 +268,58 @@ export default function BusinessPromotersPage() {
         const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
         const updatePayload: Partial<BusinessPromoterLink> = {
             commissionRate: data.commissionRate,
-            promoterName: editingPromoterLink.isPlatformUser ? editingPromoterLink.promoterName : data.promoterName,
-            promoterEmail: editingPromoterLink.isPlatformUser ? editingPromoterLink.promoterEmail : data.promoterEmail,
-            promoterPhone: editingPromoterLink.isPlatformUser ? editingPromoterLink.promoterPhone : data.promoterPhone,
         };
         await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload));
-        toast({ title: "Vínculo de Promotor Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
-      } else if (verifiedPromoterDniResult) { 
-        const newLinkPayloadRaw: Omit<BusinessPromoterLink, 'id' | 'joinDate'> & { joinDate: any } = {
+        toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
+      } else if (verifiedPromoterDniResult?.existingPlatformUserPromoter) {
+        // Link existing platform user
+        const batch = writeBatch(db);
+        const userRef = doc(db, "platformUsers", verifiedPromoterDniResult.existingPlatformUserPromoter.uid);
+        const newBusinessIds = [...(verifiedPromoterDniResult.existingPlatformUserPromoter.businessIds || []), currentBusinessId];
+        batch.update(userRef, { businessIds: newBusinessIds });
+        
+        const linkPayload = {
             businessId: currentBusinessId,
             promoterDni: verifiedPromoterDniResult.dni,
-            promoterName: data.promoterName, 
-            promoterEmail: data.promoterEmail,
-            promoterPhone: data.promoterPhone,
+            promoterName: verifiedPromoterDniResult.existingPlatformUserPromoter.name,
+            promoterEmail: verifiedPromoterDniResult.existingPlatformUserPromoter.email,
+            promoterPhone: verifiedPromoterDniResult.existingPlatformUserPromoter.phone || "",
             commissionRate: data.commissionRate,
             isActive: true,
-            isPlatformUser: !!verifiedPromoterDniResult.existingPlatformUserPromoter,
-            platformUserUid: verifiedPromoterDniResult.existingPlatformUserPromoter?.uid,
+            isPlatformUser: true,
+            platformUserUid: verifiedPromoterDniResult.existingPlatformUserPromoter.uid,
             joinDate: serverTimestamp(),
         };
-        await addDoc(collection(db, "businessPromoterLinks"), sanitizeObjectForFirestore(newLinkPayloadRaw));
+        const linkDocRef = doc(collection(db, "businessPromoterLinks"));
+        batch.set(linkDocRef, sanitizeObjectForFirestore(linkPayload));
+        await batch.commit();
         toast({ title: "Promotor Vinculado", description: `${data.promoterName} ha sido vinculado a tu negocio.` });
+
+      } else if(verifiedPromoterDniResult) { 
+        // Create new platform user
+        if(!data.password) {
+            toast({ title: "Error de Validación", description: `La contraseña es requerida para un nuevo promotor.`, variant: "destructive"});
+            setIsSubmitting(false);
+            return;
+        }
+        const idToken = await currentUser.getIdToken();
+        const creationPayload = {
+          email: data.promoterEmail, password: data.password, displayName: data.promoterName,
+          firestoreData: {
+            dni: verifiedPromoterDniResult.dni, name: data.promoterName, email: data.promoterEmail,
+            phone: data.promoterPhone, commissionRate: data.commissionRate
+          }
+        };
+
+        const response = await fetch('/api/business-panel/create-promoter', {
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, 
+          body: JSON.stringify(creationPayload)
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Error al crear promotor.');
+        toast({ title: "Promotor Creado y Vinculado", description: `Se creó el usuario para ${data.promoterName}.` });
       }
       
       setShowAddEditModal(false);
@@ -299,8 +327,8 @@ export default function BusinessPromotersPage() {
       setVerifiedPromoterDniResult(null);
       fetchPromoterLinks();
     } catch (error: any) {
-      console.error("Promoters Page: Failed to add/edit promoter link:", error.code, error.message, error);
-      toast({ title: "Error al Guardar", description: `No se pudo procesar la solicitud del promotor. ${error.message}`, variant: "destructive"});
+      console.error("Promoters Page: Failed to add/edit promoter link:", error);
+      toast({ title: "Error al Guardar", description: `No se pudo procesar la solicitud. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
@@ -310,11 +338,27 @@ export default function BusinessPromotersPage() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await deleteDoc(doc(db, "businessPromoterLinks", link.id));
+      const batch = writeBatch(db);
+      // Remove link
+      const linkRef = doc(db, "businessPromoterLinks", link.id);
+      batch.delete(linkRef);
+
+      // If user is a platform user, remove this businessId from their profile
+      if (link.isPlatformUser && link.platformUserUid && currentBusinessId) {
+        const userRef = doc(db, "platformUsers", link.platformUserUid);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as PlatformUser;
+          const updatedBusinessIds = (userData.businessIds || []).filter(id => id !== currentBusinessId);
+          batch.update(userRef, { businessIds: updatedBusinessIds });
+        }
+      }
+      await batch.commit();
+      
       toast({ title: "Promotor Desvinculado", description: `${link.promoterName || 'El promotor'} ha sido desvinculado.`, variant: "destructive" });
       fetchPromoterLinks();
     } catch (error: any) {
-       console.error("Promoters Page: Failed to delete promoter link:", error.code, error.message, error);
+       console.error("Promoters Page: Failed to delete promoter link:", error);
       toast({ title: "Error al Desvincular", description: `No se pudo desvincular el promotor. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false);
@@ -331,7 +375,7 @@ export default function BusinessPromotersPage() {
       toast({ title: `Estado Actualizado`, description: `El promotor ${link.promoterName} ahora está ${newStatus ? 'activo' : 'inactivo'}.` });
       fetchPromoterLinks(); 
     } catch (error: any) {
-      console.error("Promoters Page: Failed to toggle promoter link status:", error.code, error.message, error);
+      console.error("Promoters Page: Failed to toggle promoter link status:", error);
       toast({ title: "Error al Actualizar Estado", description: `No se pudo cambiar el estado del promotor. ${error.message}`, variant: "destructive"});
     } finally {
         setIsSubmitting(false);
@@ -579,12 +623,12 @@ export default function BusinessPromotersPage() {
             <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
              <UIDialogDescription>
                 {editingPromoterLink 
-                  ? `Actualiza la tasa de comisión para ${editingPromoterLink.promoterName}. Los datos del promotor (si es Usuario de Plataforma) no se cambian aquí.`
+                  ? `Actualiza la tasa de comisión para ${editingPromoterLink.promoterName}.`
                   : (verifiedPromoterDniResult?.existingPlatformUserPromoter 
-                      ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos de contacto se usarán. Define la comisión."
+                      ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos se usarán. Define la comisión y vincúlalo."
                       : (verifiedPromoterDniResult?.qrClientData || verifiedPromoterDniResult?.socioVipData 
-                          ? "Este DNI fue encontrado como Cliente. Algunos datos han sido pre-rellenados. Completa la información para este vínculo de promotor."
-                          : "Ingresa los detalles para este nuevo promotor y su comisión para tu negocio."
+                          ? "Este DNI fue encontrado como Cliente. Completa los datos para crear su cuenta de promotor y vincularlo."
+                          : "Ingresa los detalles para crear un nuevo usuario promotor y vincularlo a tu negocio."
                         )
                     )
                 }
@@ -626,4 +670,3 @@ export default function BusinessPromotersPage() {
     </div>
   );
 }
-

@@ -16,12 +16,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import type { BusinessPromoterFormData, BusinessPromoterLink, InitialDataForPromoterLink, QrClient, SocioVipMember, PlatformUser } from "@/lib/types";
+import type { BusinessPromoterFormData, BusinessPromoterLink, InitialDataForPromoterLink } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, Loader2 } from "lucide-react";
 
-const promoterFormSchema = z.object({
+const promoterFormSchemaBase = z.object({
   promoterDni: z.string(), 
   promoterName: z.string().min(3, "Nombre del promotor es requerido."),
   promoterEmail: z.string().email("Email del promotor inválido."),
@@ -32,7 +32,11 @@ const promoterFormSchema = z.object({
   commissionRate: z.string().optional(),
 });
 
-type PromoterFormValues = z.infer<typeof promoterFormSchema>;
+const promoterFormSchemaCreate = promoterFormSchemaBase.extend({
+  password: z.string().optional(),
+});
+
+type PromoterFormValues = z.infer<typeof promoterFormSchemaCreate>;
 
 interface BusinessPromoterFormProps {
   promoterLinkToEdit?: BusinessPromoterLink; 
@@ -51,19 +55,25 @@ export function BusinessPromoterForm({
 }: BusinessPromoterFormProps) {
   
   const isEditingLink = !!promoterLinkToEdit;
-  // Check if we are creating a new link based on an existing PlatformUser who is a promoter
   const isPrePopulatedFromPlatformUser = !!initialData?.existingPlatformUserPromoter;
-  // Check if we are creating a new link based on an existing QrClient or SocioVipMember (but not a PlatformUser promoter)
   const isPrePopulatedFromOtherSource = !!(initialData && (initialData.qrClientData || initialData.socioVipData) && !isPrePopulatedFromPlatformUser);
+  const needsPassword = !isEditingLink && !isPrePopulatedFromPlatformUser;
 
   const form = useForm<PromoterFormValues>({
-    resolver: zodResolver(promoterFormSchema),
+    resolver: zodResolver(
+      needsPassword
+        ? promoterFormSchemaCreate.extend({
+            password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres."),
+          })
+        : promoterFormSchemaCreate
+    ),
     defaultValues: {
-      promoterDni: promoterLinkToEdit?.promoterDni || initialData?.dni || "",
-      promoterName: promoterLinkToEdit?.promoterName || initialData?.existingPlatformUserPromoter?.name || initialData?.qrClientData?.name || initialData?.socioVipData?.name || "",
-      promoterEmail: promoterLinkToEdit?.promoterEmail || initialData?.existingPlatformUserPromoter?.email || initialData?.socioVipData?.email || "",
-      promoterPhone: promoterLinkToEdit?.promoterPhone || initialData?.existingPlatformUserPromoter?.phone || initialData?.qrClientData?.phone || initialData?.socioVipData?.phone || "",
-      commissionRate: promoterLinkToEdit?.commissionRate || "",
+      promoterDni: "",
+      promoterName: "",
+      promoterEmail: "",
+      promoterPhone: "",
+      commissionRate: "",
+      password: "",
     },
   });
 
@@ -74,6 +84,7 @@ export function BusinessPromoterForm({
         promoterEmail: "",
         promoterPhone: "",
         commissionRate: promoterLinkToEdit?.commissionRate || "",
+        password: initialData?.dni || ""
     };
 
     if (isEditingLink && promoterLinkToEdit) {
@@ -81,24 +92,19 @@ export function BusinessPromoterForm({
         defaultVals.promoterEmail = promoterLinkToEdit.promoterEmail || "";
         defaultVals.promoterPhone = promoterLinkToEdit.promoterPhone || "";
     } else if (initialData) {
-        defaultVals.promoterDni = initialData.dni;
         const platformUser = initialData.existingPlatformUserPromoter;
         const qrClient = initialData.qrClientData;
         const socioVip = initialData.socioVipData;
-
+        
         if (platformUser) {
             defaultVals.promoterName = platformUser.name || "";
             defaultVals.promoterEmail = platformUser.email || "";
-            // PlatformUser type doesn't explicitly have 'phone', assuming it might be added or part of a more generic profile
             defaultVals.promoterPhone = (platformUser as any).phone || ""; 
-        } else if (qrClient) {
-            defaultVals.promoterName = `${qrClient.name || ''} ${qrClient.surname || ''}`.trim();
-            defaultVals.promoterEmail = ""; // QrClient doesn't have email
-            defaultVals.promoterPhone = qrClient.phone || "";
-        } else if (socioVip) {
-            defaultVals.promoterName = `${socioVip.name || ''} ${socioVip.surname || ''}`.trim();
-            defaultVals.promoterEmail = socioVip.email || "";
-            defaultVals.promoterPhone = socioVip.phone || "";
+        } else {
+             const name = qrClient ? `${qrClient.name || ''} ${qrClient.surname || ''}`.trim() : (socioVip ? `${socioVip.name || ''} ${socioVip.surname || ''}`.trim() : "");
+             defaultVals.promoterName = name;
+             defaultVals.promoterEmail = socioVip?.email || "";
+             defaultVals.promoterPhone = qrClient?.phone || socioVip?.phone || "";
         }
     }
     form.reset(defaultVals);
@@ -106,47 +112,32 @@ export function BusinessPromoterForm({
 
 
   const handleSubmit = (values: PromoterFormValues) => {
-    onSubmit({
-        promoterName: values.promoterName,
-        promoterEmail: values.promoterEmail,
-        promoterPhone: values.promoterPhone,
-        commissionRate: values.commissionRate,
-    });
+    onSubmit(values);
   };
   
-  const disableContactFields = (isPrePopulatedFromPlatformUser && !isEditingLink) || (isEditingLink && !!promoterLinkToEdit?.isPlatformUser);
+  const disableContactFields = isPrePopulatedFromPlatformUser;
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-        {disableContactFields && !isEditingLink && ( // Only show this alert when creating a new link for an existing Platform User
+        {isPrePopulatedFromPlatformUser && !isEditingLink && (
              <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <AlertTitle className="text-blue-700 dark:text-blue-300">Vinculando Promotor de Plataforma Existente</AlertTitle>
+                <AlertTitle className="text-blue-700 dark:text-blue-300">Vinculando Promotor Existente</AlertTitle>
                 <AlertDescription className="text-blue-600 dark:text-blue-400">
-                    Los datos de contacto (Nombre, Email, Teléfono) se toman del perfil global del promotor y no son editables aquí. Solo define la comisión para este vínculo con tu negocio.
+                    Este promotor ya tiene una cuenta en la plataforma. Sus datos están pre-rellenados. Solo define la comisión para este vínculo.
                 </AlertDescription>
             </Alert>
         )}
-        {isPrePopulatedFromOtherSource && !isEditingLink && ( // If pre-populating from QrClient or SocioVip
+        {isPrePopulatedFromOtherSource && !isEditingLink && (
              <Alert variant="default" className="bg-sky-50 border-sky-200 dark:bg-sky-900/30 dark:border-sky-700">
                 <Info className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                <AlertTitle className="text-sky-700 dark:text-sky-300">DNI Encontrado como Cliente</AlertTitle>
+                <AlertTitle className="text-sky-700 dark:text-sky-300">Creando Cuenta de Promotor</AlertTitle>
                 <AlertDescription className="text-sky-600 dark:text-sky-400">
-                    Este DNI pertenece a un Cliente QR o Socio VIP. Algunos datos han sido pre-rellenados. Por favor, completa o confirma la información para vincularlo como promotor a tu negocio. Los datos de contacto editados aquí serán para este vínculo específico.
+                    Se creará una nueva cuenta de acceso para este promotor. Por favor, completa o confirma sus datos.
                 </AlertDescription>
             </Alert>
         )}
-         {isEditingLink && promoterLinkToEdit?.isPlatformUser && (
-             <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
-                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <AlertTitle className="text-blue-700 dark:text-blue-300">Editando Vínculo con Promotor de Plataforma</AlertTitle>
-                <AlertDescription className="text-blue-600 dark:text-blue-400">
-                    Los datos de contacto (Nombre, Email, Teléfono) pertenecen al perfil global del promotor y no son editables aquí. Solo puedes modificar la tasa de comisión.
-                </AlertDescription>
-            </Alert>
-        )}
-
 
         <FormField
           control={form.control}
@@ -155,8 +146,6 @@ export function BusinessPromoterForm({
             <FormItem>
               <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input placeholder="Verificado en paso anterior" {...field} disabled={true} className="disabled:bg-muted/50 disabled:text-muted-foreground/80" /></FormControl>
-              <FormDescription className="text-xs">El DNI/CE ha sido verificado y no se puede cambiar aquí.</FormDescription>
-              <FormMessage />
             </FormItem>
           )}
         />
@@ -206,13 +195,29 @@ export function BusinessPromoterForm({
             </FormItem>
           )}
         />
+
+        {needsPassword && (
+           <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contraseña Inicial para el Promotor <span className="text-destructive">*</span></FormLabel>
+                  <FormControl><Input type="text" placeholder="Mínimo 6 caracteres" {...field} disabled={isSubmitting} /></FormControl>
+                  <FormDescription className="text-xs">Por defecto, es el DNI del promotor. Puedes cambiarla.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        )}
+
         <FormField
           control={form.control}
           name="commissionRate"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Tasa de Comisión para este Negocio (Ej: 10% o S/5 por código)</FormLabel>
-              <FormControl><Input placeholder="Definir comisión para este negocio" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Definir comisión para este negocio" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -223,7 +228,7 @@ export function BusinessPromoterForm({
           </Button>
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {promoterLinkToEdit ? "Guardar Cambios de Vínculo" : "Vincular Promotor"}
+            {isEditingLink ? "Guardar Cambios" : "Crear y Vincular Promotor"}
           </Button>
         </DialogFooter>
       </form>
