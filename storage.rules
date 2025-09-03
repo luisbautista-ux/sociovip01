@@ -1,19 +1,22 @@
-
 rules_version = '2';
 
-// Reglas para el servicio de Firebase Storage
 service firebase.storage {
-  // Coincide con cualquier bucket en tu proyecto
   match /b/{bucket}/o {
-
-    // Regla global más simple:
-    // Permite la lectura a cualquier usuario (para imágenes públicas)
-    // Permite la escritura (subir, actualizar, borrar) SOLO a usuarios autenticados.
-    // La seguridad de quién sube a qué carpeta se maneja en el código del cliente
-    // (que obtiene el businessId del perfil del usuario) y con nombres de archivo únicos
-    // para prevenir sobrescrituras no deseadas.
+    // Regla global: permite la lectura pública de todos los archivos.
+    // Esto es útil para que las imágenes de perfil, logos, etc., se puedan mostrar
+    // en la aplicación sin necesidad de que el usuario esté autenticado.
     match /{allPaths=**} {
       allow read: if true;
+    }
+
+    // Regla para la escritura en la carpeta de negocios.
+    // Permite que cualquier usuario autenticado pueda escribir (subir/actualizar)
+    // archivos en cualquier subcarpeta dentro de 'businesses'.
+    // La seguridad se maneja en el lado del cliente (código de la app),
+    // que solo permite a un usuario subir archivos a la carpeta de su
+    // propio negocio (usando su businessId). Los nombres de archivo únicos
+    // previenen que un usuario sobrescriba los archivos de otro.
+    match /businesses/{businessId}/{allPaths=**} {
       allow write: if request.auth != null;
     }
   }

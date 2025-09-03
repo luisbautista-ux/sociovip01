@@ -86,45 +86,56 @@ export default function BusinessSettingsPage() {
     fetchBusinessData();
   }, [fetchBusinessData]);
 
-  const handleFileUpload = async (file: File | null, type: 'logo' | 'cover') => {
-    if (!file || !userProfile?.businessId) {
-        toast({ title: "Error", description: "No se ha seleccionado ningún archivo o falta el ID del negocio.", variant: "destructive" });
-        return;
+  // Refactored upload logic into a dedicated function
+  const uploadFileAndGetURL = async (file: File, type: 'logo' | 'cover'): Promise<string | null> => {
+    if (!userProfile?.businessId) {
+      toast({ title: "Error de autenticación", description: "ID de negocio no encontrado.", variant: "destructive"});
+      return null;
     }
-
-    const uploaderStateSetter = type === 'logo' ? setIsUploadingLogo : setIsUploadingCover;
-    uploaderStateSetter(true);
-    
+    const filePath = `businesses/${userProfile.businessId}/${type}-${Date.now()}-${file.name}`;
+    const storageRef = ref(storage, filePath);
     try {
-        const filePath = `businesses/${userProfile.businessId}/${type}-${Date.now()}-${file.name}`;
-        const storageRef = ref(storage, filePath);
-        
-        await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(storageRef);
-
-        const fieldToUpdate = type === 'logo' ? { logoUrl: downloadURL } : { publicCoverImageUrl: downloadURL };
-        
-        const businessDocRef = doc(db, "businesses", userProfile.businessId);
-        await updateDoc(businessDocRef, fieldToUpdate);
-
-        toast({ title: `¡Éxito!`, description: `La imagen de ${type === 'logo' ? 'logo' : 'portada'} ha sido actualizada.` });
-
-        if (type === 'logo') {
-            setLogoUrl(downloadURL);
-            setLogoFile(null);
-        } else {
-            setCoverUrl(downloadURL);
-            setCoverFile(null);
-        }
-
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+      return downloadURL;
     } catch (error: any) {
         console.error(`Error uploading ${type}:`, error);
-        toast({ title: "Error de Subida", description: `No se pudo subir la imagen. ${error.message}`, variant: "destructive" });
-    } finally {
-        uploaderStateSetter(false);
+        let errorMessage = "No se pudo subir la imagen.";
+        if (error.code === 'storage/unauthorized') {
+            errorMessage = "No tienes permiso para subir archivos. Revisa las reglas de Storage.";
+        } else if (error.code === 'storage/retry-limit-exceeded') {
+            errorMessage = "Se superó el límite de reintentos. Revisa tu conexión a internet o las reglas de Firebase Storage.";
+        }
+        toast({ title: "Error de Subida", description: errorMessage, variant: "destructive" });
+        return null;
     }
   };
 
+  const handleLogoUpload = async () => {
+    if (!logoFile) return;
+    setIsUploadingLogo(true);
+    const newUrl = await uploadFileAndGetURL(logoFile, 'logo');
+    if (newUrl) {
+      await updateDoc(doc(db, "businesses", userProfile!.businessId!), { logoUrl: newUrl });
+      setLogoUrl(newUrl);
+      setLogoFile(null);
+      toast({ title: "Éxito", description: "Logo actualizado correctamente." });
+    }
+    setIsUploadingLogo(false);
+  };
+
+  const handleCoverUpload = async () => {
+    if (!coverFile) return;
+    setIsUploadingCover(true);
+    const newUrl = await uploadFileAndGetURL(coverFile, 'cover');
+    if (newUrl) {
+      await updateDoc(doc(db, "businesses", userProfile!.businessId!), { publicCoverImageUrl: newUrl });
+      setCoverUrl(newUrl);
+      setCoverFile(null);
+      toast({ title: "Éxito", description: "Imagen de portada actualizada." });
+    }
+    setIsUploadingCover(false);
+  };
   
   const handleSaveBrandingText = async () => {
     if (!userProfile?.businessId) {
@@ -271,7 +282,7 @@ export default function BusinessSettingsPage() {
                       <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={isUploadingLogo || isUploadingCover}>
                         {logoUrl ? 'Cambiar Logo' : 'Seleccionar Logo'}
                       </Button>
-                      <Button size="sm" onClick={() => handleFileUpload(logoFile, 'logo')} disabled={!logoFile || isUploadingLogo || isUploadingCover}>
+                      <Button size="sm" onClick={handleLogoUpload} disabled={!logoFile || isUploadingLogo || isUploadingCover}>
                           {isUploadingLogo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                           Subir Logo
                       </Button>
@@ -297,7 +308,7 @@ export default function BusinessSettingsPage() {
                         <Button variant="outline" size="sm" onClick={() => coverInputRef.current?.click()} disabled={isUploadingLogo || isUploadingCover}>
                           {coverUrl ? 'Cambiar Portada' : 'Seleccionar Portada'}
                         </Button>
-                        <Button size="sm" onClick={() => handleFileUpload(coverFile, 'cover')} disabled={!coverFile || isUploadingLogo || isUploadingCover}>
+                        <Button size="sm" onClick={handleCoverUpload} disabled={!coverFile || isUploadingLogo || isUploadingCover}>
                             {isUploadingCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                             Subir Portada
                         </Button>
