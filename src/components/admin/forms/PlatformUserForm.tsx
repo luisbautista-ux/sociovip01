@@ -33,23 +33,8 @@ const platformUserFormSchemaBase = z.object({
   roles: z.array(z.enum(ALL_PLATFORM_USER_ROLES)).min(1, { message: "Debes seleccionar al menos un rol."}),
   businessId: z.string().optional(),
   businessIds: z.array(z.string()).optional(),
-  password: z.string().optional(), // Make password optional in base
+  password: z.string().optional(),
 });
-
-
-const platformUserFormSchema = platformUserFormSchemaBase
-  .refine(data => {
-    const rolesThatNeedSingleBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-    if (rolesThatNeedSingleBusiness) {
-      return !!data.businessId && data.businessId.length > 0;
-    }
-    return true;
-  }, {
-    message: "Debes seleccionar un negocio para los roles que lo requieren.",
-    path: ["businessId"],
-  });
-
-type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
 
 interface PlatformUserFormProps {
   user?: PlatformUser; 
@@ -77,19 +62,31 @@ export function PlatformUserForm({
 
   const isEditing = !!user;
 
+  const platformUserFormSchema = platformUserFormSchemaBase
+    .refine(data => {
+      if (!isEditing) {
+        return !!data.password && data.password.length >= 6;
+      }
+      return true;
+    }, {
+      message: "La contraseña es requerida y debe tener al menos 6 caracteres.",
+      path: ["password"],
+    })
+    .refine(data => {
+      const rolesThatNeedSingleBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+      if (rolesThatNeedSingleBusiness) {
+        return !!data.businessId && data.businessId.length > 0;
+      }
+      return true;
+    }, {
+      message: "Debes seleccionar un negocio para los roles que lo requieren.",
+      path: ["businessId"],
+    });
+
+  type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
+
   const form = useForm<PlatformUserFormValues>({
-    resolver: zodResolver(
-      // Conditionally require password only on creation
-      platformUserFormSchema.refine(data => {
-          if (!isEditing) {
-            return !!data.password && data.password.length >= 6;
-          }
-          return true;
-      }, {
-        message: "La contraseña es requerida y debe tener al menos 6 caracteres.",
-        path: ["password"],
-      })
-    ),
+    resolver: zodResolver(platformUserFormSchema),
     defaultValues: {
       dni: initialDataForCreation?.dni || user?.dni || "",
       name: initialDataForCreation?.name || user?.name || "",

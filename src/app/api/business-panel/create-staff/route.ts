@@ -95,7 +95,7 @@ export async function POST(request: Request) {
       emailVerified: true, 
     });
     
-    const userProfilePayload: Omit<PlatformUser, 'id'> = {
+    const userProfilePayload: Omit<PlatformUser, 'id' | 'businessIds'> = {
       uid: userRecord.uid,
       dni: firestoreData.dni,
       name: firestoreData.name,

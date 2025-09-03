@@ -212,17 +212,12 @@ export default function BusinessStaffPage() {
     setIsSubmitting(true);
 
     const isEditing = !!data.uid;
-    const rolesAllowed: PlatformUserRole[] = ['staff', 'host'];
-    const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
-    if (finalRoles.length === 0) {
-        toast({ title: "Rol no válido", description: "Solo puedes asignar los roles 'Staff' o 'Anfitrión'.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-    }
 
     try {
         if (isEditing) {
             const userRef = doc(db, "platformUsers", data.uid!);
+            const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host'];
+            const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
             const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
             await updateDoc(userRef, userPayload);
             toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
@@ -230,6 +225,12 @@ export default function BusinessStaffPage() {
             if (!data.email || !data.password) {
                 throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
             }
+            const rolesAllowed: PlatformUserRole[] = ['staff', 'host'];
+            const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
+            if (finalRoles.length === 0) {
+              throw new Error("Rol no válido. Solo puedes asignar 'Staff' o 'Anfitrión'.")
+            }
+            
             const idToken = await currentUser.getIdToken();
             const creationPayload = {
                 email: data.email,
@@ -258,7 +259,7 @@ export default function BusinessStaffPage() {
         setShowCreateEditModal(false);
         setEditingUser(null);
         setVerifiedDniResult(null);
-        fetchStaffMembers();
+        await fetchStaffMembers();
 
     } catch (error: any) {
         console.error("Error creating/editing staff user:", error);
@@ -398,7 +399,7 @@ export default function BusinessStaffPage() {
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
             businesses={[]} // Business is fixed to current, not selectable
             onSubmit={handleCreateOrEditUser}
-            onCancel={() => setShowCreateEditModal(false)}
+            onCancel={() => {setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}
           />
         </UIDialogContent>
