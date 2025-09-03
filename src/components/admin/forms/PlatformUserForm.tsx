@@ -147,7 +147,7 @@ export function PlatformUserForm({
     }
   }, [showSingleBusinessField, showMultiBusinessField, form, watchedRoles]);
 
-  const handleSubmit = async (values: PlatformUserFormValues) => {
+  const handleSubmit = (values: PlatformUserFormValues) => {
     if (!isEditing && (!values.password || values.password.length < 6)) {
         form.setError("password", { type: "manual", message: "La contraseña es requerida y debe tener al menos 6 caracteres." });
         return;
@@ -159,7 +159,7 @@ export function PlatformUserForm({
       businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,
     };
-    await onSubmit(dataToSubmit, isEditing);
+    onSubmit(dataToSubmit, isEditing);
   };
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);

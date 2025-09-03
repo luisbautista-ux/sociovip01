@@ -205,7 +205,10 @@ export default function BusinessStaffPage() {
   };
   
   const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
-    if (isSubmitting || !currentBusinessId) return;
+    if (isSubmitting || !currentBusinessId) {
+        toast({ title: "Error", description: "Operación no permitida o negocio no identificado.", variant: "destructive" });
+        return;
+    }
     setIsSubmitting(true);
 
     const rolesAllowed: PlatformUserRole[] = ['staff', 'host'];
@@ -217,54 +220,57 @@ export default function BusinessStaffPage() {
     }
 
     try {
-      const idToken = await currentUser?.getIdToken();
-      if (!idToken) {
-          throw new Error("No se pudo obtener el token de autenticación del usuario actual.");
-      }
-
-      if (isEditing && editingUser) {
-        const userRef = doc(db, "platformUsers", editingUser.uid);
-        const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
-        await updateDoc(userRef, userPayload);
-        toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
-      } else {
-        if (!data.email || !data.password) {
-          throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
+        const idToken = await currentUser?.getIdToken();
+        if (!idToken) {
+            throw new Error("No se pudo obtener el token de autenticación del usuario actual.");
         }
-        const creationPayload = {
-          email: data.email,
-          password: data.password,
-          displayName: data.name,
-          firestoreData: {
-            dni: data.dni,
-            name: data.name,
-            email: data.email,
-            roles: finalRoles
-          }
-        };
 
-        const response = await fetch('/api/business-panel/create-staff', {
-          method: 'POST', 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`,
-          }, 
-          body: JSON.stringify(creationPayload)
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error || 'Ocurrió un error desconocido.');
+        if (isEditing && editingUser) {
+            const userRef = doc(db, "platformUsers", editingUser.uid);
+            const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
+            await updateDoc(userRef, userPayload);
+            toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+        } else {
+            if (!data.email || !data.password) {
+                throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
+            }
+            const creationPayload = {
+                email: data.email,
+                password: data.password,
+                displayName: data.name,
+                firestoreData: {
+                    dni: data.dni,
+                    name: data.name,
+                    email: data.email,
+                    roles: finalRoles
+                }
+            };
+
+            const response = await fetch('/api/business-panel/create-staff', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify(creationPayload)
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Ocurrió un error desconocido al crear el usuario.');
+            }
+            toast({ title: "Personal Creado Exitosamente", description: `Se creó el usuario "${data.name}".` });
         }
-        toast({ title: "Personal Creado Exitosamente", description: `Se creó el usuario "${data.name}".` });
-      }
-      setShowCreateEditModal(false);
-      setEditingUser(null);
-      setVerifiedDniResult(null);
-      fetchStaffMembers();
+        
+        setShowCreateEditModal(false);
+        setEditingUser(null);
+        setVerifiedDniResult(null);
+        fetchStaffMembers();
+
     } catch (error: any) {
-      toast({ title: "Error al Guardar", description: `Ocurrió un error. ${error.message}`, variant: "destructive" });
+        console.error("Error creating/editing staff user:", error);
+        toast({ title: "Error al Guardar", description: `Ocurrió un error. ${error.message}`, variant: "destructive" });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   };
 
