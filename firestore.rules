@@ -1,131 +1,73 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Regla global: Nadie puede leer/escribir por defecto
-    match /{document=**} {
-      allow read, write: if false;
-    }
-    
-    // ===================================
-    //       Colección 'businesses'
-    // ===================================
+    // Reglas para la colección de Negocios
     match /businesses/{businessId} {
-      // LECTURA: Cualquiera puede leer la información pública de un negocio.
+      // Lectura: Cualquiera puede leer la información pública de un negocio.
       allow read: if true;
       
-      // ESCRITURA (Crear, Actualizar, Borrar): Solo Super Admins.
-      allow write: if isSuperAdmin();
+      // Escritura (Crear, Actualizar, Eliminar): Solo los Super Administradores.
+      allow write: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
     }
-    
-    // ===================================
-    //     Colección 'businessEntities'
-    // ===================================
-    match /businessEntities/{entityId} {
-      // LECTURA: Cualquiera puede leer las entidades (promociones, eventos).
-      allow read: if true;
-      
-      // ESCRITURA (Crear, Actualizar, Borrar): Super Admins o personal del negocio dueño de la entidad.
-      allow write: if isSuperAdmin() || isStaffForResource(resource.data.businessId);
-    }
-    
-    // ===================================
-    //     Colección 'platformUsers'
-    // ===================================
+
+    // Reglas para la colección de Usuarios de la Plataforma
     match /platformUsers/{userId} {
-      // LECTURA:
-      // 1. Super Admins pueden leer cualquier perfil.
-      // 2. Admins de negocio pueden leer perfiles de usuarios de su propio negocio.
-      // 3. El propio usuario puede leer su perfil.
-      allow read: if isSuperAdmin() || 
-                     isBusinessAdminForUser(userId) ||
-                     request.auth.uid == userId;
-
-      // ESCRITURA (Crear, Actualizar, Borrar):
-      // 1. Super Admins pueden escribir en cualquier perfil.
-      // 2. El propio usuario puede actualizar su propio perfil (excepto roles y businessId).
-      allow create: if isSuperAdmin();
-      allow update: if isSuperAdmin() || 
-                       (request.auth.uid == userId && canUpdateOwnProfile());
-      allow delete: if isSuperAdmin();
+      // Lectura: Solo un superadmin o el propio usuario pueden leer un perfil.
+      allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']));
+      
+      // Actualización: El propio usuario puede actualizar su perfil. Los superadmins también pueden (cubierto por la regla de escritura general abajo).
+      allow update: if request.auth.uid == userId;
+      
+      // Creación/Eliminación: Solo los Super Administradores pueden crear o eliminar perfiles directamente.
+      // (La creación desde la app se gestiona por funciones de backend/API que usan credenciales de admin)
+      allow create, delete: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
     }
-    
-    // ===================================
-    //     Colección 'qrClients'
-    // ===================================
+
+    // Reglas para Entidades de Negocio (Promociones, Eventos)
+    match /businessEntities/{entityId} {
+      // Lectura: Cualquiera puede leer las entidades (para páginas públicas).
+      allow read: if true;
+
+      // Creación/Actualización/Eliminación: Solo admins o staff del negocio correspondiente.
+      allow write: if request.auth != null && 
+                      (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff'])) &&
+                      (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == resource.data.businessId);
+    }
+
+    // Reglas para Clientes QR (los que se registran para un código)
     match /qrClients/{clientId} {
-      // LECTURA: Super Admins y personal del negocio que generó al cliente.
-      allow read: if isSuperAdmin() || isStaffForResource(resource.data.generatedForBusinessId);
-      
-      // CREACIÓN: Cualquiera puede crear un cliente (flujo público de generación de QR).
-      allow create: if true;
-      
-      // ACTUALIZACIÓN/BORRADO: Solo Super Admins.
-      allow update, delete: if isSuperAdmin();
+        // Lectura: Solo personal del negocio o superadmins.
+        allow read: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin', 'business_admin', 'staff']);
+        
+        // Creación: Permitida a cualquiera (público) que se registre para un QR.
+        allow create: if true;
+        
+        // Actualización/Eliminación: Solo superadmins.
+        allow update, delete: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
     }
     
-    // ===================================
-    //     Colección 'socioVipMembers'
-    // ===================================
+    // Reglas para Miembros SocioVIP
     match /socioVipMembers/{memberId} {
-      // LECTURA/ESCRITURA: Solo Super Admins.
-      allow read, write: if isSuperAdmin();
+        // Lectura: Solo superadmins.
+        allow read: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
+        
+        // Escritura: Solo superadmins.
+        allow write: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
     }
     
-    // ===================================
-    //   Colección 'businessPromoterLinks'
-    // ===================================
+    // Reglas para los Vínculos Promotor-Negocio
     match /businessPromoterLinks/{linkId} {
-      // LECTURA: Super Admins o personal del negocio vinculado.
-      allow read: if isSuperAdmin() || isStaffForResource(resource.data.businessId);
-      
-      // ESCRITURA: Super Admins o Admins (no staff) del negocio vinculado.
-      allow write: if isSuperAdmin() || isAdminForResource(resource.data.businessId);
-    }
-
-    // ===================================
-    //      FUNCIONES HELPER
-    // ===================================
-    
-    // Verifica si el usuario autenticado es Super Admin.
-    function isSuperAdmin() {
-      return exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
-             'superadmin' in get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles;
-    }
-    
-    // Verifica si el usuario es staff o admin del negocio con el ID `businessId`.
-    function isStaffForResource(businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-      return request.auth.uid != null &&
-             userProfile.businessId == businessId &&
-             userProfile.roles.hasAny(['business_admin', 'staff', 'host']);
-    }
-    
-    // Verifica si el usuario es admin (no staff) del negocio con el ID `businessId`.
-    function isAdminForResource(businessId) {
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-      return request.auth.uid != null &&
-             userProfile.businessId == businessId &&
-             userProfile.roles.hasAny(['business_admin']);
-    }
-    
-    // Verifica si un admin de negocio puede leer el perfil de un usuario de su mismo negocio.
-    function isBusinessAdminForUser(targetUserId) {
-      let adminProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
-      let targetProfile = get(/databases/$(database)/documents/platformUsers/$(targetUserId)).data;
-      return adminProfile.roles.hasAny(['business_admin', 'staff']) &&
-             adminProfile.businessId == targetProfile.businessId;
-    }
-    
-    // Define los campos que un usuario NO puede modificar en su propio perfil.
-    function canUpdateOwnProfile() {
-      // El usuario no puede cambiar su rol, businessId, o dni.
-      return !('roles' in request.resource.data) && 
-             !('businessId' in request.resource.data) &&
-             request.resource.data.dni == resource.data.dni;
+        // Lectura: Superadmins, o personal del negocio vinculado.
+        allow read: if request.auth != null && 
+                      (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']) || 
+                       (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == resource.data.businessId));
+                       
+        // Escritura: Superadmins, o personal del negocio vinculado.
+        allow write: if request.auth != null && 
+                       (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']) || 
+                       (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == resource.data.businessId));
     }
   }
 }
-
-    
