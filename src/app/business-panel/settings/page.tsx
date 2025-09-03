@@ -42,7 +42,9 @@ export default function BusinessSettingsPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   
-  const [isSavingBranding, setIsSavingBranding] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isSavingBrandingText, setIsSavingBrandingText] = useState(false);
   const [isSavingInfo, setIsSavingInfo] = useState(false);
 
   const fetchBusinessData = useCallback(async () => {
@@ -84,72 +86,68 @@ export default function BusinessSettingsPage() {
     fetchBusinessData();
   }, [fetchBusinessData]);
 
-  const uploadFileAndGetURL = async (file: File, path: string): Promise<string> => {
-    const storageRef = ref(storage, path);
+  const handleFileUpload = async (file: File | null, type: 'logo' | 'cover') => {
+    if (!file || !userProfile?.businessId) {
+        toast({ title: "Error", description: "No se ha seleccionado ningún archivo o falta el ID del negocio.", variant: "destructive" });
+        return;
+    }
+
+    const uploaderStateSetter = type === 'logo' ? setIsUploadingLogo : setIsUploadingCover;
+    uploaderStateSetter(true);
+    
     try {
-        const snapshot = await uploadBytes(storageRef, file);
-        return await getDownloadURL(snapshot.ref);
-    } catch (error: any) {
-        console.error("Error uploading file or getting URL:", error);
-        let userMessage = "No se pudo subir el archivo. Verifica la consola para más detalles.";
-        if (error.code === 'storage/unauthorized') {
-            userMessage = "No tienes permiso para subir archivos. Revisa las Reglas de Storage en Firebase y asegúrate de estar autenticado.";
-        } else if (error.code === 'storage/canceled') {
-            userMessage = "La subida del archivo fue cancelada.";
+        const filePath = `businesses/${userProfile.businessId}/${type}-${Date.now()}-${file.name}`;
+        const storageRef = ref(storage, filePath);
+        
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        const fieldToUpdate = type === 'logo' ? { logoUrl: downloadURL } : { publicCoverImageUrl: downloadURL };
+        
+        const businessDocRef = doc(db, "businesses", userProfile.businessId);
+        await updateDoc(businessDocRef, fieldToUpdate);
+
+        toast({ title: `¡Éxito!`, description: `La imagen de ${type === 'logo' ? 'logo' : 'portada'} ha sido actualizada.` });
+
+        if (type === 'logo') {
+            setLogoUrl(downloadURL);
+            setLogoFile(null);
+        } else {
+            setCoverUrl(downloadURL);
+            setCoverFile(null);
         }
-        throw new Error(userMessage);
+
+    } catch (error: any) {
+        console.error(`Error uploading ${type}:`, error);
+        toast({ title: "Error de Subida", description: `No se pudo subir la imagen. ${error.message}`, variant: "destructive" });
+    } finally {
+        uploaderStateSetter(false);
     }
   };
 
-
-  const handleSaveChangesBranding = async () => {
+  
+  const handleSaveBrandingText = async () => {
     if (!userProfile?.businessId) {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       return;
     }
     
-    setIsSavingBranding(true);
+    setIsSavingBrandingText(true);
     
-    let finalLogoUrl = logoUrl;
-    let finalCoverUrl = coverUrl;
-
     try {
-        if (logoFile) {
-            const logoPath = `businesses/${userProfile.businessId}/logo-${Date.now()}`;
-            finalLogoUrl = await uploadFileAndGetURL(logoFile, logoPath);
-        }
-        if (coverFile) {
-            const coverPath = `businesses/${userProfile.businessId}/cover-${Date.now()}`;
-            finalCoverUrl = await uploadFileAndGetURL(coverFile, coverPath);
-        }
-
         const updateData: Partial<Business> = {
             slogan,
             primaryColor,
             secondaryColor,
-            logoUrl: finalLogoUrl,
-            publicCoverImageUrl: finalCoverUrl
         };
-
         const businessDocRef = doc(db, "businesses", userProfile.businessId);
         await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
-        
-        toast({
-            title: "Branding Guardado",
-            description: "Los cambios de branding se han guardado correctamente.",
-        });
-        
-        // Update local state after successful save
-        setLogoUrl(finalLogoUrl);
-        setCoverUrl(finalCoverUrl);
-        setLogoFile(null);
-        setCoverFile(null);
-
+        toast({ title: "Branding Guardado", description: "El slogan y los colores se han guardado." });
     } catch (error: any) {
-        console.error("Error saving branding:", error);
-        toast({ title: "Error al Guardar", description: error.message || "No se pudieron guardar los cambios de branding.", variant: "destructive"});
+        console.error("Error saving text branding:", error);
+        toast({ title: "Error al Guardar", description: `No se pudieron guardar los cambios. ${error.message}`, variant: "destructive"});
     } finally {
-        setIsSavingBranding(false);
+        setIsSavingBrandingText(false);
     }
   };
   
@@ -254,47 +252,77 @@ export default function BusinessSettingsPage() {
           <CardDescription>Define la identidad visual de tu negocio en la plataforma.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="space-y-2">
                 <Label htmlFor="logo" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Logo del Negocio</Label>
                 <div className="flex items-center gap-4">
-                    {logoUrl && !logoFile && <NextImage src={logoUrl} alt="Logo actual" width={64} height={64} className="rounded-md border p-1" />}
-                    {logoFile && <NextImage src={URL.createObjectURL(logoFile)} alt="Previsualización Logo" width={64} height={64} className="rounded-md border p-1" />}
-                    <Button variant="outline" onClick={() => logoInputRef.current?.click()} disabled={isSavingBranding}>
-                      <UploadCloud className="mr-2 h-4 w-4" /> {logoUrl ? 'Cambiar Logo' : 'Subir Logo'}
-                    </Button>
+                    <div className="w-16 h-16 flex-shrink-0">
+                      {logoFile ? (
+                        <NextImage src={URL.createObjectURL(logoFile)} alt="Previsualización Logo" width={64} height={64} className="rounded-md border p-1 object-contain" />
+                      ) : logoUrl ? (
+                        <NextImage src={logoUrl} alt="Logo actual" width={64} height={64} className="rounded-md border p-1 object-contain" />
+                      ) : (
+                        <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
+                            <ImageIconLucide/>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={isUploadingLogo || isUploadingCover}>
+                        {logoUrl ? 'Cambiar Logo' : 'Seleccionar Logo'}
+                      </Button>
+                      <Button size="sm" onClick={() => handleFileUpload(logoFile, 'logo')} disabled={!logoFile || isUploadingLogo || isUploadingCover}>
+                          {isUploadingLogo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                          Subir Logo
+                      </Button>
+                    </div>
                     <Input ref={logoInputRef} type="file" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cover" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Imagen de Portada</Label>
                 <div className="flex items-center gap-4">
-                    {coverUrl && !coverFile && <NextImage src={coverUrl} alt="Portada actual" width={100} height={56} className="rounded-md border p-1 object-cover" />}
-                    {coverFile && <NextImage src={URL.createObjectURL(coverFile)} alt="Previsualización Portada" width={100} height={56} className="rounded-md border p-1 object-cover" />}
-                    <Button variant="outline" onClick={() => coverInputRef.current?.click()} disabled={isSavingBranding}>
-                      <UploadCloud className="mr-2 h-4 w-4" /> {coverUrl ? 'Cambiar Portada' : 'Subir Portada'}
-                    </Button>
+                   <div className="w-24 h-14 flex-shrink-0">
+                      {coverFile ? (
+                        <NextImage src={URL.createObjectURL(coverFile)} alt="Previsualización Portada" width={100} height={56} className="rounded-md border p-1 object-cover" />
+                      ) : coverUrl ? (
+                         <NextImage src={coverUrl} alt="Portada actual" width={100} height={56} className="rounded-md border p-1 object-cover" />
+                      ) : (
+                         <div className="w-24 h-14 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
+                            <ImageIconLucide/>
+                        </div>
+                      )}
+                    </div>
+                     <div className="flex flex-col gap-2">
+                        <Button variant="outline" size="sm" onClick={() => coverInputRef.current?.click()} disabled={isUploadingLogo || isUploadingCover}>
+                          {coverUrl ? 'Cambiar Portada' : 'Seleccionar Portada'}
+                        </Button>
+                        <Button size="sm" onClick={() => handleFileUpload(coverFile, 'cover')} disabled={!coverFile || isUploadingLogo || isUploadingCover}>
+                            {isUploadingCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                            Subir Portada
+                        </Button>
+                     </div>
                     <Input ref={coverInputRef} type="file" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
                 </div>
               </div>
             </div>
           <div>
             <Label htmlFor="slogan" className="flex items-center"><Type className="h-4 w-4 mr-1 text-muted-foreground"/> Slogan del Negocio</Label>
-            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSavingBranding || isLoadingData} />
+            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSavingBrandingText || isLoadingData} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="primaryColor">Color Primario</Label>
-              <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingBranding || isLoadingData}/>
+              <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingBrandingText || isLoadingData}/>
             </div>
             <div>
               <Label htmlFor="secondaryColor">Color Secundario</Label>
-              <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingBranding || isLoadingData}/>
+              <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingBrandingText || isLoadingData}/>
             </div>
           </div>
-          <Button onClick={handleSaveChangesBranding} className="bg-primary hover:bg-primary/90" disabled={isSavingBranding || isLoadingData}>
-            {isSavingBranding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar Cambios de Branding
+          <Button onClick={handleSaveBrandingText} className="bg-primary hover:bg-primary/90" disabled={isSavingBrandingText || isLoadingData}>
+            {isSavingBrandingText && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar Slogan y Colores
           </Button>
         </CardContent>
       </Card>
