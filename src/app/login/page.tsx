@@ -54,21 +54,33 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    // This effect redirects the user if they are already logged in and have a profile.
-    if (!loadingAuth && !loadingProfile && currentUser && userProfile) {
-      router.push("/auth/dispatcher");
+    if (!loadingAuth && !loadingProfile) {
+      if (currentUser && userProfile) {
+        router.push("/auth/dispatcher");
+      } else if (currentUser && !userProfile) {
+        // This case handles a logged-in user with no profile. 
+        // AuthContext logout logic will eventually kick in, but this provides immediate feedback.
+        toast({
+          title: "Error de Perfil",
+          description: "Tu cuenta de autenticación existe pero no se encontró un perfil asociado. Cerrando sesión.",
+          variant: "destructive",
+          duration: 7000,
+        });
+      }
     }
-  }, [currentUser, userProfile, loadingAuth, loadingProfile, router]);
+  }, [currentUser, userProfile, loadingAuth, loadingProfile, router, toast]);
 
   const handleLogin = async (values: LoginFormValues) => {
     setIsSubmitting(true);
     try {
       const result = await login(values.email, values.password);
-      if ("user" in result) {
-        // Don't push here. Let the useEffect handle redirection after profile loads.
-        toast({ title: "Inicio de Sesión Exitoso", description: "Verificando perfil..." });
-      } else {
-        const errorCode = (result as AuthError).code;
+      
+      // The login function in AuthContext now handles the logic.
+      // If successful, the useEffect above will redirect.
+      // If it fails (e.g., no profile), the login function itself will show a toast.
+      
+      if ("code" in result) { // AuthError
+        const errorCode = result.code;
         let errorMessage = "Ocurrió un error al iniciar sesión.";
         if (
           errorCode === "auth/user-not-found" ||
@@ -78,9 +90,15 @@ export default function LoginPage() {
           errorMessage = "Email o contraseña incorrectos.";
         } else if (errorCode === "auth/invalid-email") {
           errorMessage = "El formato del email no es válido.";
+        } else if (result.message.includes('No se encontró perfil')) {
+           errorMessage = result.message;
         }
+        
         toast({ title: "Error de Inicio de Sesión", description: errorMessage, variant: "destructive" });
-        setIsSubmitting(false); // Only set submitting to false on error
+        setIsSubmitting(false); // Only stop submitting on a clear failure.
+      } else {
+         toast({ title: "Inicio de Sesión Exitoso", description: "Verificando perfil y redirigiendo..." });
+         // Keep isSubmitting=true to prevent user interaction during redirection.
       }
     } catch (err) {
       console.error("Unexpected login error", err);
@@ -91,27 +109,28 @@ export default function LoginPage() {
       });
       setIsSubmitting(false);
     }
-    // Don't set isSubmitting to false on success, to keep UI disabled during redirection.
   };
 
-  // If already logged in, show a loading state until redirection happens.
-  if (currentUser && !loadingProfile) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/40">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-muted-foreground">Sesión iniciada. Redirigiendo a tu panel...</p>
-      </div>
-    );
-  }
-  
-  if (loadingAuth || loadingProfile) {
+  // If auth state is still loading, show a generic loader.
+  if (loadingAuth) {
     return (
        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/40">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="mt-4 text-lg text-muted-foreground">Cargando...</p>
       </div>
-    )
+    );
   }
+  
+  // If we are logged in but waiting for profile, show a more specific message
+  if (currentUser && loadingProfile) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-muted/40">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Sesión iniciada. Verificando tu perfil...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="relative min-h-screen bg-[#f4eef7]">

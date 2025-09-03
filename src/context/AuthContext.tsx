@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import type { PlatformUser, PlatformUserRole } from "@/lib/types"; 
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import Cookies from "js-cookie";
+import { toast } from "@/hooks/use-toast";
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -49,14 +50,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   const router = useRouter(); 
 
-  const fetchUserProfile = useCallback(async (user: FirebaseUser | null) => {
+  const fetchUserProfile = useCallback(async (user: FirebaseUser): Promise<PlatformUser | null> => {
     setLoadingProfile(true);
-    if (!user) {
-      setUserProfile(null);
-      setLoadingProfile(false);
-      return;
-    }
-    
     try {
       const userDocRef = doc(db, "platformUsers", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -77,54 +72,96 @@ export function AuthProvider({ children }: AuthProviderProps) {
             roles: rolesArray, 
         } as PlatformUser;
         setUserProfile(profileData);
+        return profileData;
       } else {
+        console.error(`AuthContext: No profile found in Firestore for UID ${user.uid}. User needs to be logged out.`);
         setUserProfile(null);
+        return null;
       }
     } catch (error) {
       console.error("AuthContext: Error fetching user profile:", error);
       setUserProfile(null);
+      return null;
     } finally {
       setLoadingProfile(false);
     }
   }, []);
 
+  const logout = useCallback(async () => {
+    try {
+      await signOut(auth);
+      // Clear local state immediately
+      setCurrentUser(null);
+      setUserProfile(null);
+      Cookies.remove('idToken');
+      // Redirect to login page
+      router.push("/login"); 
+    } catch (error) {
+      console.error("AuthContext: Logout error:", error);
+    }
+  }, [router]);
+
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
+      setLoadingAuth(true); // Ensure loading is true at the start of a change
       if (user) {
+        setCurrentUser(user);
         const token = await user.getIdToken();
         Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
-        await fetchUserProfile(user);
+        
+        const profile = await fetchUserProfile(user);
+        if (!profile) {
+          // If no profile exists for an authenticated user, log them out.
+          toast({
+            title: "Error de Perfil",
+            description: "Tu cuenta existe, pero no se encontró un perfil de datos válido. Se ha cerrado la sesión.",
+            variant: "destructive",
+            duration: 8000
+          });
+          await logout();
+        }
       } else {
-        Cookies.remove('idToken');
+        // No user is signed in
+        setCurrentUser(null);
         setUserProfile(null);
-        setLoadingProfile(false);
+        Cookies.remove('idToken');
+        setLoadingProfile(false); // No profile to load
       }
       setLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile, logout]);
 
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
+      const user = userCredential.user;
       
-      if (userCredential.user) {
-        const token = await userCredential.user.getIdToken();
-        Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
-        await fetch('/api/user/update-last-login', { 
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+      // Post-login profile check
+      const profile = await fetchUserProfile(user);
+      if (!profile) {
+        // If profile doesn't exist, sign out the user immediately and return an error
+        await logout();
+        return {
+          code: 'auth/user-profile-not-found',
+          message: 'No se encontró perfil para este usuario. Sesión terminada.'
+        } as AuthError;
       }
+      
+      // Update last login timestamp
+      const token = await user.getIdToken();
+      Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
+      await fetch('/api/user/update-last-login', { 
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+      });
       
       return userCredential;
     } catch (error) {
       return error as AuthError;
     }
-  }, []);
+  }, [fetchUserProfile, logout]);
 
   const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'promoter'): Promise<UserCredential | AuthError> => {
     try {
@@ -145,15 +182,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return error as AuthError;
     }
   }, []);
-
-  const logout = useCallback(async () => {
-    try {
-      await signOut(auth);
-      router.push("/login"); 
-    } catch (error) {
-      console.error("AuthContext: Logout error:", error);
-    }
-  }, [router]);
 
   const value = useMemo(() => ({
     currentUser,
