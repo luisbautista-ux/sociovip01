@@ -1,12 +1,10 @@
 
 import {NextResponse} from 'next/server';
 import {ai} from '@/ai/genkit';
-import {assertNonProd} from 'genkit/debug';
 import {defineFlow} from 'genkit';
 import {z} from 'genkit';
 import {GenerateTilingInput, GenerateTilingOutput} from '@/ai/flows/generate-tiling';
 
-assertNonProd();
 
 // This is the definition of the generateTilingFlow from src/ai/flows/generate-tiling.ts
 // It's duplicated here because the original file seems to export the flow already defined.

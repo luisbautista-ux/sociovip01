@@ -1,48 +1,65 @@
 "use client";
 
 import * as React from "react";
-import * as SwitchPrimitives from "@radix-ui/react-switch";
 import { cn } from "@/lib/utils";
 
-type RootProps = React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>;
-
-type SwitchProps = Omit<
-  RootProps,
-  "checked" | "defaultChecked" | "onCheckedChange"
-> & {
-  checked?: boolean; // Controlado desde afuera
-  defaultChecked?: boolean; // Inicial, solo si no usas `checked`
+export interface SwitchProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {
   onCheckedChange?: (checked: boolean) => void;
-};
+}
 
-const SwitchBase = React.forwardRef<
-  React.ElementRef<typeof SwitchPrimitives.Root>,
-  SwitchProps
->(({ checked, defaultChecked, onCheckedChange, className, ...rest }, ref) => {
-  // Detecta si es controlado o no
-  const isControlled = checked !== undefined;
+const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
+  ({ className, checked, defaultChecked, onCheckedChange, ...props }, ref) => {
+    const id = React.useId();
+    const [internalChecked, setInternalChecked] = React.useState(
+      defaultChecked || false
+    );
+    
+    // Determina si es controlado
+    const isControlled = checked !== undefined;
+    const currentChecked = isControlled ? checked : internalChecked;
+    
+    const handleCheckedChange = (newChecked: boolean) => {
+      if (!isControlled) {
+        setInternalChecked(newChecked);
+      }
+      
+      // Usar setTimeout para evitar bucles en Firebase Studio
+      setTimeout(() => {
+        onCheckedChange?.(newChecked);
+      }, 10);
+    };
+    
+    return (
+      <div className="flex items-center">
+        <input
+          type="checkbox"
+          id={id}
+          className={cn("sr-only")}
+          checked={currentChecked}
+          onChange={(e) => handleCheckedChange(e.target.checked)}
+          ref={ref as any}
+          {...props}
+        />
+        <label
+          htmlFor={id}
+          className={cn(
+            "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
+            currentChecked ? "bg-primary" : "bg-input",
+            className
+          )}
+        >
+          <span
+            className={cn(
+              "pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform",
+              currentChecked ? "translate-x-5" : "translate-x-0"
+            )}
+          />
+        </label>
+      </div>
+    );
+  }
+);
 
-  return (
-    <SwitchPrimitives.Root
-      ref={ref}
-      {...(isControlled
-        ? { checked, onCheckedChange } // Controlado → usa `checked`
-        : { defaultChecked, onCheckedChange } // No controlado → usa `defaultChecked`
-      )}
-      className={cn(
-        "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
-        className
-      )}
-      {...rest}
-    >
-      <SwitchPrimitives.Thumb
-        className="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
-      />
-    </SwitchPrimitives.Root>
-  );
-});
-
-SwitchBase.displayName = "Switch";
-
-// ✅ React.memo para evitar renders innecesarios
-export const Switch = React.memo(SwitchBase);
+Switch.displayName = "Switch";
+export { Switch };
