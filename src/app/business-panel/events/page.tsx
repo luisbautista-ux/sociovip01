@@ -1,3 +1,4 @@
+
 "use client";
 import * as React from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -206,23 +207,17 @@ export default function BusinessEventsPage() {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
   
-/* ========================
-   Manejo del estado del Switch (CORREGIDO)
-======================== */
-const [pendingStatusChange, setPendingStatusChange] = useState<{
-  eventId: string;
-  newStatus: boolean;
-} | null>(null);
 
-useEffect(() => {
-  if (!pendingStatusChange) return;
-  
-  const { eventId, newStatus } = pendingStatusChange;
-  let isMounted = true;
-  
-  const updateStatus = async () => {
-    if (!isMounted) return;
+  const handleToggleEventStatus = useCallback(async (eventId: string, currentStatus: boolean) => {
+    if (isSubmitting) return;
+
+    const newStatus = !currentStatus;
     
+    // Optimistic UI update
+    setEvents(prev => prev.map(e => 
+      e.id === eventId ? { ...e, isActive: newStatus } : e
+    ));
+
     setIsSubmitting(true);
     try {
       await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
@@ -237,41 +232,15 @@ useEffect(() => {
         description: `No se pudo cambiar el estado. ${error.message}`,
         variant: "destructive",
       });
-      // Revertir en caso de error
-      if (isMounted) {
-        setEvents(prev => prev.map(e => 
-          e.id === eventId ? { ...e, isActive: !newStatus } : e
-        ));
-      }
+      // Revert UI on error
+      setEvents(prev => prev.map(e => 
+        e.id === eventId ? { ...e, isActive: currentStatus } : e
+      ));
     } finally {
-      if (isMounted) {
-        setIsSubmitting(false);
-        setPendingStatusChange(null);
-      }
+      setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, toast]);
 
-  // ✅ USAMOS setTimeout EN LUGAR DE requestAnimationFrame
-  setTimeout(updateStatus, 0);
-  
-  return () => {
-    isMounted = false;
-  };
-}, [pendingStatusChange, toast]);
-
-const handleToggleEventStatus = useCallback((eventId: string, newStatus: boolean) => {
-  if (isSubmitting) return;
-  
-  // ✅ PRIMERO ACTUALIZA LOCALMENTE
-  setEvents(prev => prev.map(e => 
-    e.id === eventId ? { ...e, isActive: newStatus } : e
-  ));
-  
-  // ✅ LUEGO PROGRAMA LA ACTUALIZACIÓN A FIRESTORE
-  setTimeout(() => {
-    setPendingStatusChange({ eventId, newStatus });
-  }, 0);
-}, [isSubmitting]);
 
   /* ========================
      Forms
@@ -1363,8 +1332,8 @@ const handleToggleEventStatus = useCallback((eventId: string, newStatus: boolean
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
                               <Switch
                                 id={`status-switch-event-${event.id}`}
-                                checked={event.isActive} 
-                                onCheckedChange={(value) => handleToggleEventStatus(event.id!, value)}
+                                checked={event.isActive}
+                                onCheckedChange={() => handleToggleEventStatus(event.id!, event.isActive)}
                                 aria-label={`Estado del evento ${event.name}`}
                                 disabled={isSubmitting}
                               />
