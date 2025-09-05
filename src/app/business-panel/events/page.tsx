@@ -123,6 +123,7 @@ import {
 } from "@/components/ui/form";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as ShadcnCalendar } from "@/components/ui/calendar";
+import { StatusSwitch } from "@/components/business/StatusSwitch";
 
 /* ========================
    Validaciones (zod)
@@ -207,21 +208,19 @@ export default function BusinessEventsPage() {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
   
-
-  const handleToggleEventStatus = useCallback(async (eventId: string, currentStatus: boolean) => {
-    if (isSubmitting || !currentBusinessId) return;
-
-    const newStatus = !currentStatus;
-    
-    setIsSubmitting(true);
+  const handleToggleEventStatus = async (eventId: string, newStatus: boolean) => {
     try {
       await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
       toast({
         title: "Estado Actualizado",
         description: `El estado del evento ha sido cambiado a ${newStatus ? "Activo" : "Inactivo"}.`,
       });
-      // Re-fetch data to ensure UI is consistent with backend
-      await fetchBusinessEvents(currentBusinessId);
+      // Optimistic update on the local state
+      setEvents(prevEvents =>
+        prevEvents.map(event =>
+          event.id === eventId ? { ...event, isActive: newStatus } : event
+        )
+      );
     } catch (error: any) {
       console.error("Error updating event status:", error);
       toast({
@@ -229,10 +228,10 @@ export default function BusinessEventsPage() {
         description: `No se pudo cambiar el estado. ${error.message}`,
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
+      // Revert optimistic update on error if needed by re-fetching
+      // fetchBusinessEvents(currentBusinessId!);
     }
-  }, [isSubmitting, toast, currentBusinessId]);
+  };
 
 
   /* ========================
@@ -1324,12 +1323,10 @@ export default function BusinessEventsPage() {
                           <TableCell className="font-medium align-top py-3">
                             <div className="font-semibold text-base">{event.name}</div>
                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
-                              <Switch
-                                id={`status-switch-event-${event.id}`}
-                                checked={event.isActive}
-                                onCheckedChange={() => handleToggleEventStatus(event.id!, event.isActive)}
-                                aria-label={`Estado del evento ${event.name}`}
-                                disabled={isSubmitting}
+                              <StatusSwitch
+                                eventId={event.id!}
+                                initialStatus={event.isActive}
+                                onStatusChange={handleToggleEventStatus}
                               />
                               <Label htmlFor={`status-switch-event-${event.id}`} className="sr-only">
                                 {event.isActive ? "Activo" : "Inactivo"}
