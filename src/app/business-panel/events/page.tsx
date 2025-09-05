@@ -2432,3 +2432,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
