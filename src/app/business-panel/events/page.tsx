@@ -441,9 +441,13 @@ export default function BusinessEventsPage() {
     eventToManage: BusinessManagedEntity | null,
     duplicate = false
   ) => {
-    // ✅ RESETEAMOS TODOS LOS MODALES PRIMERO
-    setShowInitialEventModal(false);
-    setShowManageEventModal(false);
+    // RESET ALL MODAL STATES FIRST to prevent loops
+    setShowTicketFormInEventModal(false);
+    setEditingTicketInEventModal(null);
+    setShowBoxFormInEventModal(false);
+    setEditingBoxInEventModal(null);
+    setShowCommissionRuleForm(false);
+    setEditingCommissionRule(null);
     
     setIsSubmitting(false);
     setIsDuplicatingEvent(duplicate);
@@ -479,8 +483,7 @@ export default function BusinessEventsPage() {
         createdAt: undefined,
       };
       setEditingEvent(newEventForDuplication);
-      // ✅ USAR setTimeout PARA ASEGURAR QUE EL MODAL SE ABRE CORRECTAMENTE
-      setTimeout(() => setShowManageEventModal(true), 50);
+      setShowManageEventModal(true);
     } else if (eventToManage) {
       setEditingEvent({
         ...eventToManage,
@@ -488,8 +491,7 @@ export default function BusinessEventsPage() {
         endDate: anyToDate(eventToManage.endDate)!.toISOString(),
         maxAttendance: calculateMaxAttendance(eventToManage.ticketTypes),
       });
-      // ✅ USAR setTimeout PARA ASEGURAR QUE EL MODAL SE ABRE CORRECTAMENTE
-      setTimeout(() => setShowManageEventModal(true), 50);
+      setShowManageEventModal(true);
     } else {
       initialEventForm.reset({
         name: "",
@@ -503,8 +505,7 @@ export default function BusinessEventsPage() {
         }),
       });
       setEditingEvent(null);
-      // ✅ USAR setTimeout PARA ASEGURAR QUE EL MODAL SE ABRE CORRECTAMENTE
-      setTimeout(() => setShowInitialEventModal(true), 50);
+      setShowInitialEventModal(true);
     }
   };
   
@@ -1480,20 +1481,7 @@ export default function BusinessEventsPage() {
         </CardContent>
       </Card>
       {/* ======= Modal: Crear evento básico ======= */}
-      // En el modal de showInitialEventModal
-      <Dialog
-        open={showInitialEventModal}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            setTimeout(() => {
-              initialEventForm.reset();
-              setShowInitialEventModal(false);
-            }, 50);
-          } else {
-             setShowInitialEventModal(true);
-          }
-        }}
-      >
+      <Dialog open={showInitialEventModal} onOpenChange={setShowInitialEventModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Paso 1: Crear Evento Básico</DialogTitle>
@@ -1634,27 +1622,22 @@ export default function BusinessEventsPage() {
         </DialogContent>
       </Dialog>
       {/* ======= Modal: Gestionar evento (tabs) ======= */}
-      // En el modal de showManageEventModal
       <Dialog
         open={showManageEventModal}
         onOpenChange={(isOpen) => {
           if (!isOpen) {
-            setTimeout(() => {
-              setEditingEvent(null);
-              setIsDuplicatingEvent(false);
-              setShowTicketFormInEventModal(false);
-              setEditingTicketInEventModal(null);
-              setShowBoxFormInEventModal(false);
-              setEditingBoxInEventModal(null);
-              setShowCommissionRuleForm(false);
-              setEditingCommissionRule(null);
-              setCurrentPromoterAssignmentForRules(null);
-              setSelectedPromoterForAssignment("");
-              setShowManageEventModal(false);
-            }, 50);
-          } else {
-            setShowManageEventModal(true);
+            setEditingEvent(null);
+            setIsDuplicatingEvent(false);
+            setShowTicketFormInEventModal(false);
+            setEditingTicketInEventModal(null);
+            setShowBoxFormInEventModal(false);
+            setEditingBoxInEventModal(null);
+            setShowCommissionRuleForm(false);
+            setEditingCommissionRule(null);
+            setCurrentPromoterAssignmentForRules(null);
+            setSelectedPromoterForAssignment("");
           }
+          setShowManageEventModal(isOpen);
         }}
       >
         <DialogContent className="sm:max-w-4xl max-h-[90vh]">
