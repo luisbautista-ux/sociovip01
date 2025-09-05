@@ -209,15 +209,10 @@ export default function BusinessEventsPage() {
   
 
   const handleToggleEventStatus = useCallback(async (eventId: string, currentStatus: boolean) => {
-    if (isSubmitting) return;
+    if (isSubmitting || !currentBusinessId) return;
 
     const newStatus = !currentStatus;
     
-    // Optimistic UI update
-    setEvents(prev => prev.map(e => 
-      e.id === eventId ? { ...e, isActive: newStatus } : e
-    ));
-
     setIsSubmitting(true);
     try {
       await updateDoc(doc(db, "businessEntities", eventId), { isActive: newStatus });
@@ -225,6 +220,8 @@ export default function BusinessEventsPage() {
         title: "Estado Actualizado",
         description: `El estado del evento ha sido cambiado a ${newStatus ? "Activo" : "Inactivo"}.`,
       });
+      // Re-fetch data to ensure UI is consistent with backend
+      await fetchBusinessEvents(currentBusinessId);
     } catch (error: any) {
       console.error("Error updating event status:", error);
       toast({
@@ -232,14 +229,10 @@ export default function BusinessEventsPage() {
         description: `No se pudo cambiar el estado. ${error.message}`,
         variant: "destructive",
       });
-      // Revert UI on error
-      setEvents(prev => prev.map(e => 
-        e.id === eventId ? { ...e, isActive: currentStatus } : e
-      ));
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, toast]);
+  }, [isSubmitting, toast, currentBusinessId]);
 
 
   /* ========================
@@ -2432,4 +2425,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
