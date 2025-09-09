@@ -89,7 +89,6 @@ export default function BusinessStaffPage() {
       const fetchedStaff: PlatformUser[] = [];
       querySnapshot.forEach(docSnap => {
         const data = docSnap.data() as Omit<PlatformUser, 'id'>;
-        // Solo incluir usuarios con roles relevantes para el panel de negocio
         if (data.roles.includes('staff') || data.roles.includes('host') || data.roles.includes('business_admin') || data.roles.includes('lector_qr')) {
              fetchedStaff.push({ id: docSnap.id, uid: docSnap.id, ...data });
         }
@@ -233,7 +232,6 @@ export default function BusinessStaffPage() {
         await updateDoc(userRef, userPayload);
         toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
       } else {
-        // Handle user creation logic
         if (!data.email || !data.password) {
           throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
         }
@@ -413,7 +411,7 @@ export default function BusinessStaffPage() {
           <PlatformUserForm 
             user={editingUser || undefined}
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
-            businesses={[]} // Business is fixed to current, not selectable
+            businesses={[]}
             onSubmit={handleCreateOrEditUser}
             onCancel={() => {setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}

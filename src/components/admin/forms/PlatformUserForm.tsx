@@ -144,7 +144,7 @@ export function PlatformUserForm({
 
   const handleSubmit = (values: PlatformUserFormValues) => {
     const dataToSubmit: PlatformUserFormData = { 
-      uid: user?.uid, // Will be undefined for new users
+      uid: user?.uid,
       dni: values.dni, 
       name: values.name, 
       email: values.email, 
@@ -182,8 +182,8 @@ export function PlatformUserForm({
             <FormItem><FormLabel>Nombre Completo <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="email" render={({ field }) => (
-            <FormItem><FormLabel>Email (para inicio de sesión) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || (isEditing && !!user?.email)} className={ (isSubmitting || (isEditing && !!user?.email)) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}/></FormControl>
-              {isEditing && !!user?.email && <FormDescription className="text-xs">El email no se puede cambiar para usuarios existentes.</FormDescription>}
+            <FormItem><FormLabel>Email (para inicio de sesión) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || isEditing} className={ (isSubmitting || isEditing) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}/></FormControl>
+              {isEditing && <FormDescription className="text-xs">El email no se puede cambiar para usuarios existentes.</FormDescription>}
               <FormMessage />
             </FormItem>
         )} />
