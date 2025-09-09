@@ -51,7 +51,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter(); 
 
   const fetchUserProfile = useCallback(async (user: FirebaseUser): Promise<PlatformUser | null> => {
-    setLoadingProfile(true);
     try {
       const userDocRef = doc(db, "platformUsers", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -71,19 +70,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
             ...profileDataFromDb,
             roles: rolesArray, 
         } as PlatformUser;
-        setUserProfile(profileData);
         return profileData;
       } else {
         console.error(`AuthContext: No profile found in Firestore for UID ${user.uid}. User needs to be logged out.`);
-        setUserProfile(null);
         return null;
       }
     } catch (error) {
       console.error("AuthContext: Error fetching user profile:", error);
-      setUserProfile(null);
       return null;
-    } finally {
-      setLoadingProfile(false);
     }
   }, []);
 
@@ -104,15 +98,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoadingAuth(true); // Ensure loading is true at the start of a change
+      setLoadingAuth(true);
+      setLoadingProfile(true); 
+      
       if (user) {
         setCurrentUser(user);
         const token = await user.getIdToken();
         Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
         
         const profile = await fetchUserProfile(user);
-        if (!profile) {
-          // If no profile exists for an authenticated user, log them out.
+        if (profile) {
+            setUserProfile(profile);
+            setLoadingProfile(false);
+        } else {
           toast({
             title: "Error de Perfil",
             description: "Tu cuenta existe, pero no se encontró un perfil de datos válido. Se ha cerrado la sesión.",
@@ -120,13 +118,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
             duration: 8000
           });
           await logout();
+          setUserProfile(null);
+          setLoadingProfile(false);
         }
       } else {
-        // No user is signed in
         setCurrentUser(null);
         setUserProfile(null);
         Cookies.remove('idToken');
-        setLoadingProfile(false); // No profile to load
+        setLoadingProfile(false);
       }
       setLoadingAuth(false);
     });
@@ -138,10 +137,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       const user = userCredential.user;
       
-      // Post-login profile check
       const profile = await fetchUserProfile(user);
       if (!profile) {
-        // If profile doesn't exist, sign out the user immediately and return an error
         await logout();
         return {
           code: 'auth/user-profile-not-found',
@@ -149,7 +146,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } as AuthError;
       }
       
-      // Update last login timestamp
       const token = await user.getIdToken();
       Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
       await fetch('/api/user/update-last-login', { 
@@ -168,14 +164,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       if (userCredential.user) {
         const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
-        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId'> = {
+        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
           uid: userCredential.user.uid,
           email: userCredential.user.email || "",
           name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
           roles: [role], 
           dni: "",
         };
-        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null });
+        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
       }
       return userCredential;
     } catch (error) {
