@@ -40,7 +40,7 @@ interface PlatformUserFormProps {
   user?: PlatformUser; 
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData) => Promise<void>; 
+  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>; 
   onCancel: () => void;
   isSubmitting?: boolean;
   disableSubmitOverride?: boolean; 
@@ -153,14 +153,13 @@ export function PlatformUserForm({
       businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,
     };
-    onSubmit(dataToSubmit);
+    onSubmit(dataToSubmit, isEditing);
   };
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);
   const isPrePopulatedFromOtherSource = !isEditing && initialDataForCreation?.preExistingUserType && initialDataForCreation.preExistingUserType !== 'PlatformUser';
-  // Critical Fix: Email should ONLY be disabled if editing an existing user.
-  // When creating (even from pre-populated data), the admin should be able to confirm or change it.
-  const shouldDisableEmail = isEditing;
+  // Email should only be disabled when editing an existing user.
+  const shouldDisableEmail = isEditing && !!user?.email;
 
   const availableRoles = isSuperAdminView 
     ? ALL_PLATFORM_USER_ROLES 

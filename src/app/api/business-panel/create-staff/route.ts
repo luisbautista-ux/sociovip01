@@ -27,7 +27,9 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const uid = decodedToken.uid;
     const adminDb = admin.firestore();
-    const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
+    const userDocRef = adminDb.collection('platformUsers').doc(uid);
+    const userDoc = await userDocRef.get();
+    
     if (!userDoc.exists) {
         throw new Error('Caller profile not found.');
     }
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
   let adminDb;
   
   try {
-    const adminApp = await initializeAdminApp();
+    await initializeAdminApp();
     adminAuth = admin.auth();
     adminDb = admin.firestore();
   } catch (error: any) {
