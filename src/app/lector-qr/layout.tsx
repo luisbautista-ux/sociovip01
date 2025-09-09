@@ -23,6 +23,7 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
+import NextImage from "next/image";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -67,9 +68,10 @@ export default function LectorQrLayout({
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
   const [businessDisplayName, setBusinessDisplayName] = useState("SocioVIP Lector QR");
+  const [businessLogoUrl, setBusinessLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const applyBusinessColorsAndName = async () => {
+    const applyBusinessStyles = async () => {
       if (userProfile?.businessId) {
         try {
           const businessDocRef = doc(db, "businesses", userProfile.businessId);
@@ -77,6 +79,8 @@ export default function LectorQrLayout({
           if (businessSnap.exists()) {
             const businessData = businessSnap.data() as Business;
             setBusinessDisplayName(businessData.name || `Negocio ID: ...`);
+            setBusinessLogoUrl(businessData.logoUrl || null);
+
             const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0');
             const secondaryHsl = hexToHsl(businessData.secondaryColor || '#8E5EA2');
             if (primaryHsl) document.documentElement.style.setProperty('--primary', primaryHsl);
@@ -88,7 +92,7 @@ export default function LectorQrLayout({
       }
     };
     if (!loadingProfile && userProfile) {
-      applyBusinessColorsAndName();
+      applyBusinessStyles();
     }
     return () => {
         document.documentElement.style.removeProperty('--primary');
@@ -147,7 +151,17 @@ export default function LectorQrLayout({
     <div className="flex flex-col min-h-screen bg-muted/40">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
         <div className="flex items-center gap-2">
-          <SocioVipLogo className="h-7 w-7 text-primary" />
+          {businessLogoUrl ? (
+            <NextImage
+              src={businessLogoUrl}
+              alt={`${businessDisplayName} Logo`}
+              width={28}
+              height={28}
+              className="h-7 w-7 object-contain rounded-full"
+            />
+          ) : (
+            <SocioVipLogo className="h-7 w-7" />
+          )}
           <h1 className="text-xl font-semibold text-primary">{businessDisplayName}</h1>
         </div>
         <div className="ml-auto flex items-center gap-3">
