@@ -3,7 +3,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
 import NextImage from "next/image";
 import {
   LayoutDashboard,
@@ -18,6 +17,7 @@ import {
   Contact,
   LogOut,
   QrCode,
+  PanelLeft,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,17 @@ import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
+import {
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger
+} from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 const navItems = [
   { href: "/business-panel/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -90,48 +101,58 @@ export function BusinessSidebar() {
   const businessDisplay = currentBusinessName || "Panel Negocio";
 
   return (
-    <aside className="w-64 h-full bg-card text-card-foreground border-r border-border flex flex-col">
-      <div className="p-4 border-b border-border flex items-center space-x-2">
-        {currentLogoUrl ? (
-          <NextImage src={currentLogoUrl} alt={`${businessDisplay} Logo`} width={32} height={32} className="h-8 w-8 object-contain rounded-sm" data-ai-hint="logo"/>
-        ) : (
-          <Building className="h-8 w-8 text-primary" />
-        )}
-        <h1 className="text-lg font-semibold text-primary leading-tight">{businessDisplay}</h1>
-      </div>
-      <nav className="flex-grow p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
-              pathname.startsWith(item.href)
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground"
+    <>
+      <SidebarHeader className="border-b">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 overflow-hidden">
+            {currentLogoUrl ? (
+              <NextImage src={currentLogoUrl} alt={`${businessDisplay} Logo`} width={32} height={32} className="size-8 object-contain rounded-sm" data-ai-hint="logo"/>
+            ) : (
+              <Building className="size-8 text-primary" />
             )}
-          >
-            <item.icon className="h-5 w-5" />
-            <span>{item.label}</span>
-          </Link>
-        ))}
-      </nav>
-      <div className="p-4 border-t border-border space-y-2">
-        {userProfile && (
-          <div className="mb-2">
+            <h1 className="text-lg font-semibold text-primary leading-tight truncate">{businessDisplay}</h1>
+          </div>
+          <SidebarTrigger>
+            <PanelLeft className="h-5 w-5"/>
+          </SidebarTrigger>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarMenu>
+          {navItems.map((item) => (
+            <SidebarMenuItem key={item.href}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link href={item.href}>
+                    <SidebarMenuButton isActive={pathname.startsWith(item.href)}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" align="center" className="group-data-[state=expanded]/sidebar-wrapper:hidden">
+                    {item.label}
+                </TooltipContent>
+              </Tooltip>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarContent>
+      <SidebarFooter className="border-t">
+        <div className="mb-2">
             <p className="text-xs text-muted-foreground">Usuario:</p>
             <p className="text-sm font-medium text-foreground truncate" title={displayName}>
               {displayName}
             </p>
             <p className="text-xs text-muted-foreground">
-              Rol: {userProfile.roles.map(r => r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())).join(', ')}
+              Rol: {userProfile?.roles.map(r => r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())).join(', ')}
             </p>
-          </div>
-        )}
+        </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
+            <Button variant="outline" className="w-full justify-start text-left">
+              <LogOut className="mr-2 h-4 w-4" /> 
+              <span className="truncate group-data-[collapsible=icon]:group-hover:opacity-100 group-data-[collapsible=icon]:opacity-0 transition-opacity duration-200">Cerrar Sesión</span>
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
@@ -149,10 +170,10 @@ export function BusinessSidebar() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        <p className="text-xs text-muted-foreground text-center mt-2 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:group-hover:opacity-100 transition-opacity duration-200">
           © {new Date().getFullYear()} SocioVIP
         </p>
-      </div>
-    </aside>
+      </SidebarFooter>
+    </>
   );
 }

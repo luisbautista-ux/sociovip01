@@ -5,14 +5,19 @@ import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { Loader2, Menu } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { SocioVipLogo } from "@/components/icons";
+import { 
+  SidebarProvider, 
+  Sidebar, 
+  SidebarTrigger, 
+  SidebarInset,
+  SidebarHeader
+} from "@/components/ui/sidebar";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -192,31 +197,21 @@ export default function BusinessPanelLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/40">
-        <div className="hidden md:flex">
-             <BusinessSidebar />
+    <SidebarProvider>
+      <Sidebar collapsible="icon" className="group/sidebar">
+        <BusinessSidebar />
+      </Sidebar>
+      <SidebarInset>
+        <div className="flex flex-col min-h-screen">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
+            <SidebarTrigger className="md:hidden" />
+            <h1 className="text-xl font-semibold md:hidden">Panel de Negocio</h1>
+          </header>
+          <main className="flex-1 p-4 sm:p-6 overflow-auto">
+            {children}
+          </main>
         </div>
-        <div className="flex flex-col flex-1">
-            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2 md:hidden">
-                 <Sheet>
-                    <SheetTrigger asChild>
-                        <Button size="icon" variant="outline" className="sm:hidden">
-                            <Menu className="h-5 w-5" />
-                            <span className="sr-only">Toggle Menu</span>
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="sm:max-w-xs p-0 w-64 bg-card flex flex-col">
-                        <BusinessSidebar />
-                    </SheetContent>
-                </Sheet>
-                 <div className="flex items-center gap-2">
-                    <SocioVipLogo className="h-7 w-7 text-primary" />
-                 </div>
-            </header>
-            <main className="flex-1 p-4 sm:p-6 overflow-auto">
-                {children}
-            </main>
-        </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
