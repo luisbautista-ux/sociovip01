@@ -19,7 +19,7 @@ const CreateStaffSchema = z.object({
   }),
 });
 
-async function getCallerProfile(authorizationHeader: string) {
+async function getCallerProfile(authorizationHeader: string): Promise<PlatformUser> {
     if (!authorizationHeader.startsWith('Bearer ')) {
         throw new Error('Invalid authorization header format.');
     }

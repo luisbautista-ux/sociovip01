@@ -144,7 +144,7 @@ export function PlatformUserForm({
 
   const handleSubmit = (values: PlatformUserFormValues) => {
     const dataToSubmit: PlatformUserFormData = { 
-      uid: user?.uid,
+      uid: user?.uid || undefined, // Send undefined for creation
       dni: values.dni, 
       name: values.name, 
       email: values.email, 
@@ -158,6 +158,9 @@ export function PlatformUserForm({
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);
   const isPrePopulatedFromOtherSource = !isEditing && initialDataForCreation?.preExistingUserType && initialDataForCreation.preExistingUserType !== 'PlatformUser';
+  // Correction: Email field should only be disabled if we are editing an existing user.
+  // It should NOT be disabled on creation, even if the data is pre-populated.
+  const shouldDisableEmail = isEditing && !!user?.email;
 
   const availableRoles = isSuperAdminView 
     ? ALL_PLATFORM_USER_ROLES 
@@ -182,7 +185,7 @@ export function PlatformUserForm({
             <FormItem><FormLabel>Nombre Completo <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="email" render={({ field }) => (
-            <FormItem><FormLabel>Email (para inicio de sesión) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || isEditing} className={ (isSubmitting || isEditing) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}/></FormControl>
+            <FormItem><FormLabel>Email (para inicio de sesión) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: juan.perez@ejemplo.com" {...field} disabled={isSubmitting || shouldDisableEmail} className={ (isSubmitting || shouldDisableEmail) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}/></FormControl>
               {isEditing && <FormDescription className="text-xs">El email no se puede cambiar para usuarios existentes.</FormDescription>}
               <FormMessage />
             </FormItem>
