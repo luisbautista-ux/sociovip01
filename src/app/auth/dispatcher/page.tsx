@@ -20,7 +20,6 @@ export default function AuthDispatcherPage() {
 
     if (!currentUser) {
       // No hay usuario autenticado, redirigir a login.
-      // Esto puede ocurrir si se accede a esta página directamente sin estar logueado.
       console.log("AuthDispatcher: No currentUser, redirecting to /login");
       router.replace("/login");
       return;
@@ -45,17 +44,13 @@ export default function AuthDispatcherPage() {
       if (userProfile.roles.includes('superadmin')) {
         console.log("AuthDispatcher: Redirecting superadmin to /admin/dashboard");
         router.replace("/admin/dashboard");
-      } else if (userProfile.roles.includes('business_admin')) {
-        console.log("AuthDispatcher: Redirecting business_admin to /business-panel/dashboard");
-        router.replace("/business-panel/dashboard");
-      } else if (userProfile.roles.includes('staff')) {
-        console.log("AuthDispatcher: Redirecting staff to /business-panel/dashboard");
+      } else if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
+        console.log("AuthDispatcher: Redirecting business_admin/staff to /business-panel/dashboard");
         router.replace("/business-panel/dashboard");
       } else if (userProfile.roles.includes('promoter')) {
         console.log("AuthDispatcher: Redirecting promoter to /promoter/dashboard");
         router.replace("/promoter/dashboard");
       } else if (userProfile.roles.includes('host') || userProfile.roles.includes('lector_qr')) {
-        // --- CORRECTED LOGIC --- Both host and lector_qr redirect to the same place.
         console.log("AuthDispatcher: Redirecting host/lector_qr to /lector-qr/validate");
         router.replace("/lector-qr/validate");
       } else {

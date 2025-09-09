@@ -391,5 +391,3 @@ export default function BusinessPanelValidateQrPage() {
     </div>
   );
 }
-
-    
