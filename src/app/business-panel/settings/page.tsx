@@ -44,7 +44,8 @@ export default function BusinessSettingsPage() {
   
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [isSavingBrandingText, setIsSavingBrandingText] = useState(false);
+  const [isSavingSlogan, setIsSavingSlogan] = useState(false);
+  const [isSavingColors, setIsSavingColors] = useState(false);
   const [isSavingInfo, setIsSavingInfo] = useState(false);
 
   const fetchBusinessData = useCallback(async () => {
@@ -136,28 +137,39 @@ export default function BusinessSettingsPage() {
     setIsUploadingCover(false);
   };
   
-  const handleSaveBrandingText = async () => {
+  const handleSaveSlogan = async () => {
     if (!userProfile?.businessId) {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       return;
     }
-    
-    setIsSavingBrandingText(true);
-    
+    setIsSavingSlogan(true);
     try {
-        const updateData: Partial<Business> = {
-            slogan,
-            primaryColor,
-            secondaryColor,
-        };
         const businessDocRef = doc(db, "businesses", userProfile.businessId);
-        await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
-        toast({ title: "Branding Guardado", description: "El slogan y los colores se han guardado." });
+        await updateDoc(businessDocRef, { slogan });
+        toast({ title: "Slogan Guardado", description: "El slogan se ha guardado." });
     } catch (error: any) {
-        console.error("Error saving text branding:", error);
-        toast({ title: "Error al Guardar", description: `No se pudieron guardar los cambios. ${error.message}`, variant: "destructive"});
+        console.error("Error saving slogan:", error);
+        toast({ title: "Error al Guardar", description: `No se pudo guardar el slogan. ${error.message}`, variant: "destructive"});
     } finally {
-        setIsSavingBrandingText(false);
+        setIsSavingSlogan(false);
+    }
+  };
+
+  const handleSaveColors = async () => {
+    if (!userProfile?.businessId) {
+      toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
+      return;
+    }
+    setIsSavingColors(true);
+    try {
+        const businessDocRef = doc(db, "businesses", userProfile.businessId);
+        await updateDoc(businessDocRef, { primaryColor, secondaryColor });
+        toast({ title: "Colores Guardados", description: "Los colores de la marca se han guardado." });
+    } catch (error: any) {
+        console.error("Error saving colors:", error);
+        toast({ title: "Error al Guardar", description: `No se pudieron guardar los colores. ${error.message}`, variant: "destructive"});
+    } finally {
+        setIsSavingColors(false);
     }
   };
   
@@ -316,24 +328,30 @@ export default function BusinessSettingsPage() {
                 </div>
               </div>
             </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="slogan" className="flex items-center"><Type className="h-4 w-4 mr-1 text-muted-foreground"/> Slogan del Negocio</Label>
-            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSavingBrandingText || isLoadingData} />
+            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSavingSlogan || isLoadingData} />
+            <Button onClick={handleSaveSlogan} size="sm" className="bg-primary hover:bg-primary/90 mt-2" disabled={isSavingSlogan || isLoadingData}>
+              {isSavingSlogan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar Slogan
+            </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="primaryColor">Color Primario</Label>
-              <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingBrandingText || isLoadingData}/>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="primaryColor">Color Primario</Label>
+                  <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingColors || isLoadingData}/>
+                </div>
+                <div>
+                  <Label htmlFor="secondaryColor">Color Secundario</Label>
+                  <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingColors || isLoadingData}/>
+                </div>
             </div>
-            <div>
-              <Label htmlFor="secondaryColor">Color Secundario</Label>
-              <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingBrandingText || isLoadingData}/>
-            </div>
+             <Button onClick={handleSaveColors} size="sm" className="bg-primary hover:bg-primary/90" disabled={isSavingColors || isLoadingData}>
+              {isSavingColors && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar Colores
+            </Button>
           </div>
-          <Button onClick={handleSaveBrandingText} className="bg-primary hover:bg-primary/90" disabled={isSavingBrandingText || isLoadingData}>
-            {isSavingBrandingText && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar Slogan y Colores
-          </Button>
         </CardContent>
       </Card>
 
@@ -357,5 +375,3 @@ export default function BusinessSettingsPage() {
     </div>
   );
 }
-
-    
