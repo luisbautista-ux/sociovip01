@@ -145,7 +145,10 @@ export function PlatformUserForm({
   const handleSubmit = (values: PlatformUserFormValues) => {
     const dataToSubmit: PlatformUserFormData = { 
       uid: user?.uid, // Will be undefined for new users
-      dni: values.dni, name: values.name, email: values.email, roles: values.roles,
+      dni: values.dni, 
+      name: values.name, 
+      email: values.email, 
+      roles: values.roles,
       businessId: showSingleBusinessField ? values.businessId : (isBusinessAdminView ? userProfile?.businessId : undefined),
       businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,

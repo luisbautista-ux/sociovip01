@@ -213,71 +213,73 @@ export default function BusinessStaffPage() {
   
   const handleCreateOrEditUser = async (data: PlatformUserFormData) => {
     if (isSubmitting || !currentBusinessId || !currentUser) {
-        toast({ title: "Error", description: "Operación no permitida o negocio no identificado.", variant: "destructive" });
-        return;
+      toast({ title: "Error", description: "Operación no permitida o negocio no identificado.", variant: "destructive" });
+      return;
     }
     setIsSubmitting(true);
 
-    const isEditing = !!data.uid;
+    const isEditing = !!data.uid && data.uid.length > 0;
 
     try {
-        if (isEditing) {
-            const userRef = doc(db, "platformUsers", data.uid!);
-            const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
-            const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
-            if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
-                toast({title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive"});
-                setIsSubmitting(false);
-                return;
-            }
-            const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
-            await updateDoc(userRef, userPayload);
-            toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
-        } else {
-            if (!data.email || !data.password) {
-                throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
-            }
-            const rolesAllowed: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
-            const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
-            if (finalRoles.length === 0) {
-              throw new Error("Rol no válido. Solo puedes asignar 'Staff', 'Anfitrión' o 'Lector QR'.")
-            }
-            
-            const idToken = await currentUser.getIdToken();
-            const creationPayload = {
-                email: data.email,
-                password: data.password,
-                displayName: data.name,
-                firestoreData: {
-                    dni: data.dni,
-                    name: data.name,
-                    email: data.email,
-                    roles: finalRoles
-                }
-            };
-
-            const response = await fetch('/api/business-panel/create-staff', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                body: JSON.stringify(creationPayload)
-            });
-            const result = await response.json();
-            if (!response.ok) {
-                throw new Error(result.error || 'Ocurrió un error desconocido al crear el usuario.');
-            }
-            toast({ title: "Personal Creado Exitosamente", description: `Se creó el usuario "${data.name}".` });
+      if (isEditing) {
+        // Handle user update logic
+        const userRef = doc(db, "platformUsers", data.uid!);
+        const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
+        const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
+        if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
+          toast({ title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive" });
+          setIsSubmitting(false);
+          return;
+        }
+        const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
+        await updateDoc(userRef, userPayload);
+        toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+      } else {
+        // Handle user creation logic
+        if (!data.email || !data.password) {
+          throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
+        }
+        const rolesAllowed: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
+        const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
+        if (finalRoles.length === 0) {
+          throw new Error("Rol no válido. Solo puedes asignar 'Staff', 'Anfitrión' o 'Lector QR'.")
         }
         
-        setShowCreateEditModal(false);
-        setEditingUser(null);
-        setVerifiedDniResult(null);
-        await fetchStaffMembers();
+        const idToken = await currentUser.getIdToken();
+        const creationPayload = {
+          email: data.email,
+          password: data.password,
+          displayName: data.name,
+          firestoreData: {
+            dni: data.dni,
+            name: data.name,
+            email: data.email,
+            roles: finalRoles
+          }
+        };
+
+        const response = await fetch('/api/business-panel/create-staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+          body: JSON.stringify(creationPayload)
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Ocurrió un error desconocido al crear el usuario.');
+        }
+        toast({ title: "Personal Creado Exitosamente", description: `Se creó el usuario "${data.name}".` });
+      }
+      
+      setShowCreateEditModal(false);
+      setEditingUser(null);
+      setVerifiedDniResult(null);
+      await fetchStaffMembers();
 
     } catch (error: any) {
-        console.error("Error creating/editing staff user:", error);
-        toast({ title: "Error al Guardar", description: `Ocurrió un error. ${error.message}`, variant: "destructive" });
+      console.error("Error creating/editing staff user:", error);
+      toast({ title: "Error al Guardar", description: `Ocurrió un error. ${error.message}`, variant: "destructive" });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
