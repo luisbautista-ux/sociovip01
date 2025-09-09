@@ -40,7 +40,7 @@ interface PlatformUserFormProps {
   user?: PlatformUser; 
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
-  onSubmit: (data: PlatformUserFormData) => Promise<void>; 
+  onSubmit: (data: PlatformUserFormData, isEditing: boolean) => Promise<void>; 
   onCancel: () => void;
   isSubmitting?: boolean;
   disableSubmitOverride?: boolean; 
@@ -153,7 +153,7 @@ export function PlatformUserForm({
       businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,
     };
-    onSubmit(dataToSubmit);
+    onSubmit(dataToSubmit, isEditing);
   };
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);

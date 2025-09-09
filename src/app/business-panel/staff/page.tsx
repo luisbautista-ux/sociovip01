@@ -211,19 +211,17 @@ export default function BusinessStaffPage() {
       setExistingPlatformUserToEdit(null);
   };
   
-  const handleCreateOrEditUser = async (data: PlatformUserFormData) => {
+  const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
     if (isSubmitting || !currentBusinessId || !currentUser) {
       toast({ title: "Error", description: "Operación no permitida o negocio no identificado.", variant: "destructive" });
       return;
     }
     setIsSubmitting(true);
 
-    const isEditing = !!data.uid && data.uid.length > 0;
-
     try {
       if (isEditing) {
-        // Handle user update logic
-        const userRef = doc(db, "platformUsers", data.uid!);
+        if (!data.uid) throw new Error("Falta el UID del usuario para editar.");
+        const userRef = doc(db, "platformUsers", data.uid);
         const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
         const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
         if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
