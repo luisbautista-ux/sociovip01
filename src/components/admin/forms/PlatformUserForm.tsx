@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -75,6 +74,10 @@ export function PlatformUserForm({
     .refine(data => {
       const rolesThatNeedSingleBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
       if (rolesThatNeedSingleBusiness) {
+        // Para business admin, businessId se establece automáticamente, así que no debe ser requerido en el formulario
+        if (isBusinessAdminView) {
+          return true;
+        }
         return !!data.businessId && data.businessId.length > 0;
       }
       return true;
@@ -101,10 +104,9 @@ export function PlatformUserForm({
   const watchedRoles = form.watch("roles");
   
   const showSingleBusinessField = React.useMemo(() => {
-    if (!isSuperAdminView) return false; 
     if (!watchedRoles || watchedRoles.length === 0) return false;
     return watchedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
-  }, [watchedRoles, isSuperAdminView]);
+  }, [watchedRoles]);
 
   const showMultiBusinessField = React.useMemo(() => {
     if (!isSuperAdminView) return false;
@@ -143,13 +145,31 @@ export function PlatformUserForm({
   }, [showSingleBusinessField, showMultiBusinessField, form, watchedRoles]);
 
   const handleSubmit = (values: PlatformUserFormValues) => {
+    // Aseguramos que businessId esté correctamente establecido
+    let businessIdToSubmit = values.businessId;
+    
+    // Si es business admin y no hay businessId en los valores, usar el businessId del usuario actual
+    if (isBusinessAdminView && !businessIdToSubmit) {
+      businessIdToSubmit = userProfile?.businessId || "";
+    }
+    
+    // Validación manual para businessId si es necesario
+    const rolesThatNeedSingleBusiness = values.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
+    if (rolesThatNeedSingleBusiness && !businessIdToSubmit) {
+      form.setError("businessId", {
+        type: "manual",
+        message: "Debes tener un negocio asociado para crear usuarios con estos roles."
+      });
+      return;
+    }
+    
     const dataToSubmit: PlatformUserFormData = { 
-      uid: user?.uid, // uid is present for editing, undefined for creation
+      uid: user?.uid,
       dni: values.dni, 
       name: values.name, 
       email: values.email, 
       roles: values.roles,
-      businessId: showSingleBusinessField ? values.businessId : (isBusinessAdminView ? userProfile?.businessId : undefined),
+      businessId: businessIdToSubmit,
       businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,
     };
@@ -212,16 +232,13 @@ export function PlatformUserForm({
           <FormMessage />
         </FormItem>
         
-        {showSingleBusinessField && !showMultiBusinessField && (
-          <FormField control={form.control} name="businessId" render={({ field }) => (
-              <FormItem><FormLabel>Negocio Asociado (para Staff/Host/Lector QR) <span className="text-destructive">*</span></FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmitting}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un negocio" /></SelectTrigger></FormControl>
-                  <SelectContent>{businesses.length === 0 ? (<FormItem><FormLabel className="p-2 text-sm text-muted-foreground">No hay negocios disponibles.</FormLabel></FormItem>) : (businesses.map(biz => (<SelectItem key={biz.id} value={biz.id}>{biz.name}</SelectItem>)))}</SelectContent>
-                </Select><FormMessage />
-              </FormItem>
-          )} />
-        )}
+        {isBusinessAdminView && !showSingleBusinessField && (
+  <input 
+    type="hidden" 
+    {...form.register("businessId")} 
+    value={userProfile?.businessId || ""} 
+  />
+)}
         
         {showMultiBusinessField && (
             <FormField
@@ -275,7 +292,14 @@ export function PlatformUserForm({
               )}
             />
         )}
-
+        
+        {isBusinessAdminView && !showSingleBusinessField && (
+          <input 
+            type="hidden" 
+            {...form.register("businessId")} 
+            value={userProfile?.businessId || ""} 
+          />
+        )}
 
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>

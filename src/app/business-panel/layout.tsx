@@ -4,13 +4,27 @@
 import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Loader2, Menu } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarTrigger,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+} from "@/components/ui/sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { SocioVipLogo } from "@/components/icons";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -65,13 +79,13 @@ export default function BusinessPanelLayout({
           if (businessSnap.exists()) {
             const businessData = businessSnap.data() as Business;
             const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0'); // Fallback to default purple
-            const secondaryHsl = hexToHsl(businessData.secondaryColor || '#8E5EA2'); // Fallback to default darker purple
+            const accentHsl = hexToHsl(businessData.secondaryColor || '#8E5EA2'); // Fallback to default darker purple
             
             if (primaryHsl) {
               document.documentElement.style.setProperty('--primary', primaryHsl);
             }
-            if (secondaryHsl) {
-              document.documentElement.style.setProperty('--accent', secondaryHsl); // Using secondary as accent
+            if (accentHsl) {
+              document.documentElement.style.setProperty('--accent', accentHsl); 
             }
           }
         } catch (error) {
@@ -190,11 +204,29 @@ export default function BusinessPanelLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <BusinessSidebar />
-      <main className="flex-1 p-6 overflow-auto">
-        {children}
-      </main>
-    </div>
+    <SidebarProvider>
+        <BusinessSidebar />
+        <div className="flex flex-col flex-1">
+            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2 md:hidden">
+                 <Sheet>
+                    <SheetTrigger asChild>
+                        <Button size="icon" variant="outline" className="sm:hidden">
+                            <Menu className="h-5 w-5" />
+                            <span className="sr-only">Toggle Menu</span>
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="sm:max-w-xs p-0 w-64 bg-card flex flex-col">
+                        <BusinessSidebar />
+                    </SheetContent>
+                </Sheet>
+                 <div className="flex items-center gap-2">
+                    <SocioVipLogo className="h-7 w-7 text-primary" />
+                 </div>
+            </header>
+            <main className="flex-1 p-4 sm:p-6 overflow-auto">
+                {children}
+            </main>
+        </div>
+    </SidebarProvider>
   );
 }

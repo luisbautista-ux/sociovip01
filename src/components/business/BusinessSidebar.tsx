@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import NextImage from "next/image"; // Import NextImage
+import NextImage from "next/image";
 import {
   LayoutDashboard,
   Ticket,
@@ -19,9 +19,8 @@ import {
   LogOut,
   QrCode,
 } from "lucide-react";
-// SocioVipLogo is not used here, Building icon or Business Logo is used.
-import { useAuth } from "@/context/AuthContext"; 
-import { Button } from "@/components/ui/button"; 
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"; 
+} from "@/components/ui/alert-dialog";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -48,12 +47,12 @@ const navItems = [
   { href: "/business-panel/staff", label: "Mi Personal", icon: Users },
   { href: "/business-panel/analytics", label: "Analíticas", icon: BarChart3 },
   { href: "/business-panel/settings", label: "Configuración", icon: Settings },
-  { href: "/business-panel/validate-qr", label: "Validar QR", icon: QrCode }, 
+  { href: "/business-panel/validate-qr", label: "Validar QR", icon: QrCode },
 ];
 
 export function BusinessSidebar() {
   const pathname = usePathname();
-  const { currentUser, userProfile, logout } = useAuth(); 
+  const { currentUser, userProfile, logout } = useAuth();
   
   const [currentBusinessName, setCurrentBusinessName] = useState<string | null>(null);
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
@@ -69,43 +68,36 @@ export function BusinessSidebar() {
             setCurrentBusinessName(businessData.name);
             setCurrentLogoUrl(businessData.logoUrl || null);
           } else {
-            console.warn(`Business details not found for ID: ${userProfile.businessId}`);
-            setCurrentBusinessName("Panel Negocio"); // Fallback
+            setCurrentBusinessName("Panel Negocio");
             setCurrentLogoUrl(null);
           }
         } catch (error) {
-          console.error("Error fetching business details for sidebar:", error);
-          setCurrentBusinessName("Panel Negocio"); // Fallback
+          setCurrentBusinessName("Panel Negocio");
           setCurrentLogoUrl(null);
         }
       } else {
-        setCurrentBusinessName("Panel Negocio"); // Default if no businessId
+        setCurrentBusinessName("Panel Negocio");
         setCurrentLogoUrl(null);
       }
     };
 
-    if (userProfile) { // Only fetch if userProfile is available
+    if (userProfile) {
       fetchBusinessDetails();
     }
   }, [userProfile]);
 
-
   const displayName = userProfile?.name || currentUser?.email || "Usuario";
-  const businessDisplay = currentBusinessName || (userProfile?.businessId ? `Negocio ID: ${userProfile.businessId.substring(0,6)}...` : "Panel Negocio");
-
+  const businessDisplay = currentBusinessName || "Panel Negocio";
 
   return (
-    <aside className="w-64 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
+    <aside className="w-64 h-full bg-card text-card-foreground border-r border-border flex flex-col">
       <div className="p-4 border-b border-border flex items-center space-x-2">
         {currentLogoUrl ? (
           <NextImage src={currentLogoUrl} alt={`${businessDisplay} Logo`} width={32} height={32} className="h-8 w-8 object-contain rounded-sm" data-ai-hint="logo"/>
         ) : (
           <Building className="h-8 w-8 text-primary" />
         )}
-        <div>
-          <h1 className="text-lg font-semibold text-primary leading-tight">{businessDisplay}</h1>
-          {userProfile?.businessId && !currentBusinessName && <p className="text-xs text-muted-foreground">ID: {userProfile.businessId.substring(0,6)}...</p>}
-        </div>
+        <h1 className="text-lg font-semibold text-primary leading-tight">{businessDisplay}</h1>
       </div>
       <nav className="flex-grow p-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
@@ -132,7 +124,7 @@ export function BusinessSidebar() {
               {displayName}
             </p>
             <p className="text-xs text-muted-foreground">
-              Rol: {userProfile.roles.map(r => r.replace('_', ' ')).join(', ')}
+              Rol: {userProfile.roles.map(r => r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())).join(', ')}
             </p>
           </div>
         )}
