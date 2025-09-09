@@ -5,19 +5,13 @@ import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Menu } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
-import { 
-  SidebarProvider, 
-  Sidebar, 
-  SidebarTrigger, 
-  SidebarInset,
-  SidebarHeader
-} from "@/components/ui/sidebar";
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -61,6 +55,7 @@ export default function BusinessPanelLayout({
 }) {
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // --- START: Dynamic Color Loading ---
   useEffect(() => {
@@ -197,21 +192,44 @@ export default function BusinessPanelLayout({
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon" className="group/sidebar">
+    <div className="flex min-h-screen bg-muted/40">
+      <div className="hidden md:flex">
         <BusinessSidebar />
-      </Sidebar>
-      <SidebarInset>
-        <div className="flex flex-col min-h-screen">
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
-            <SidebarTrigger className="md:hidden" />
-            <h1 className="text-xl font-semibold md:hidden">Panel de Negocio</h1>
-          </header>
-          <main className="flex-1 p-4 sm:p-6 overflow-auto">
-            {children}
-          </main>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+      <div className="flex flex-col flex-1">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
+          <div className="md:hidden">
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+              <SheetTrigger asChild>
+                <Button size="icon" variant="outline">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
+                {/* Re-render the sidebar content inside the sheet, passing a close function */}
+                <div className="p-4 border-b border-border">
+                  <h1 className="text-xl font-semibold text-primary">Panel Negocio</h1>
+                </div>
+                <nav className="flex-grow p-4 space-y-2">
+                   <Link href="/business-panel/dashboard" onClick={() => setIsSheetOpen(false)} className="flex items-center space-x-2 text-muted-foreground hover:text-foreground">Dashboard</Link>
+                   <Link href="/business-panel/promotions" onClick={() => setIsSheetOpen(false)} className="flex items-center space-x-2 text-muted-foreground hover:text-foreground">Promociones</Link>
+                   {/* Add all other links here */}
+                </nav>
+                 <div className="p-4 border-t border-border mt-auto">
+                    <Button onClick={() => { logout(); setIsSheetOpen(false); }} variant="outline" className="w-full">Cerrar Sesión</Button>
+                 </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+          <div className="flex-grow">
+            {/* You can add a breadcrumb or page title here if needed */}
+          </div>
+        </header>
+        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }
