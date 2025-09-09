@@ -4,10 +4,48 @@
 import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type { Business } from "@/lib/types";
+
+// Helper function to convert hex to HSL string
+function hexToHsl(hex: string): string | null {
+  if (!hex || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex)) {
+    return null;
+  }
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  h = Math.round(h * 360);
+  s = Math.round(s * 100);
+  l = Math.round(l * 100);
+  return `${h} ${s}% ${l}%`;
+}
+
 
 export default function BusinessPanelLayout({
   children,
@@ -16,6 +54,44 @@ export default function BusinessPanelLayout({
 }) {
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
+
+  // --- START: Dynamic Color Loading ---
+  useEffect(() => {
+    const applyBusinessColors = async () => {
+      if (userProfile?.businessId) {
+        try {
+          const businessDocRef = doc(db, "businesses", userProfile.businessId);
+          const businessSnap = await getDoc(businessDocRef);
+          if (businessSnap.exists()) {
+            const businessData = businessSnap.data() as Business;
+            const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0'); // Fallback to default purple
+            const secondaryHsl = hexToHsl(businessData.secondaryColor || '#8E5EA2'); // Fallback to default darker purple
+            
+            if (primaryHsl) {
+              document.documentElement.style.setProperty('--primary', primaryHsl);
+            }
+            if (secondaryHsl) {
+              document.documentElement.style.setProperty('--accent', secondaryHsl); // Using secondary as accent
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load and apply business colors:", error);
+        }
+      }
+    };
+
+    if (!loadingProfile && userProfile) {
+      applyBusinessColors();
+    }
+    
+    // Cleanup function to reset colors when unmounting or user changes
+    return () => {
+        document.documentElement.style.removeProperty('--primary');
+        document.documentElement.style.removeProperty('--accent');
+    };
+  }, [userProfile, loadingProfile]);
+  // --- END: Dynamic Color Loading ---
+
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
