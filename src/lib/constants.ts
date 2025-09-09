@@ -34,7 +34,7 @@ export const MESES_DEL_ANO_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
-export const ALL_PLATFORM_USER_ROLES: PlatformUserRole[] = ['superadmin', 'business_admin', 'staff', 'promoter', 'host'];
+export const ALL_PLATFORM_USER_ROLES: PlatformUserRole[] = ['superadmin', 'business_admin', 'staff', 'promoter', 'host', 'lector_qr'];
 
 export const PLATFORM_USER_ROLE_TRANSLATIONS: Record<PlatformUserRole | 'QrClient' | 'SocioVipMember', string> = {
   superadmin: "Super Admin",
@@ -42,12 +42,13 @@ export const PLATFORM_USER_ROLE_TRANSLATIONS: Record<PlatformUserRole | 'QrClien
   staff: "Staff Negocio",
   promoter: "Promotor",
   host: "Anfitrión",
+  lector_qr: "Lector QR",
   QrClient: "Cliente QR",
   SocioVipMember: "Socio VIP",
 };
 
 // Roles que requieren un (y solo un) businessId
-export const ROLES_REQUIRING_BUSINESS_ID: PlatformUserRole[] = ['business_admin', 'staff', 'host'];
+export const ROLES_REQUIRING_BUSINESS_ID: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
 
 export const BUSINESS_TYPES = [
   "Restaurante",

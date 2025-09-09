@@ -57,6 +57,9 @@ export default function AuthDispatcherPage() {
       } else if (userProfile.roles.includes('host')) {
         console.log("AuthDispatcher: Redirecting host to /host/validate");
         router.replace("/host/validate");
+      } else if (userProfile.roles.includes('lector_qr')) {
+        console.log("AuthDispatcher: Redirecting lector_qr to /lector-qr/validate");
+        router.replace("/lector-qr/validate");
       } else {
         // Rol no reconocido o sin roles asignados que tengan un dashboard específico.
         console.warn("AuthDispatcher: User has roles but none match a specific dashboard. Roles:", userProfile.roles, "Redirecting to /");

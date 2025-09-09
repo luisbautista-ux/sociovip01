@@ -84,9 +84,16 @@ export default function BusinessStaffPage() {
     }
     setIsLoading(true);
     try {
-      const staffQuery = query(collection(db, "platformUsers"), where("businessId", "==", currentBusinessId), where("roles", "array-contains-any", ["staff", "host", "business_admin"]));
+      const staffQuery = query(collection(db, "platformUsers"), where("businessId", "==", currentBusinessId));
       const querySnapshot = await getDocs(staffQuery);
-      const fetchedStaff: PlatformUser[] = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, uid: docSnap.id, ...docSnap.data() } as PlatformUser));
+      const fetchedStaff: PlatformUser[] = [];
+      querySnapshot.forEach(docSnap => {
+        const data = docSnap.data() as Omit<PlatformUser, 'id'>;
+        // Solo incluir usuarios con roles relevantes para el panel de negocio
+        if (data.roles.includes('staff') || data.roles.includes('host') || data.roles.includes('business_admin') || data.roles.includes('lector_qr')) {
+             fetchedStaff.push({ id: docSnap.id, uid: docSnap.id, ...data });
+        }
+      });
       setStaffMembers(fetchedStaff);
     } catch (error: any) {
       toast({ title: "Error al Cargar Personal", description: `No se pudieron obtener los datos. ${error.message}`, variant: "destructive" });
@@ -210,13 +217,13 @@ export default function BusinessStaffPage() {
         return;
     }
     setIsSubmitting(true);
-
+    
     const isEditing = !!data.uid;
 
     try {
         if (isEditing) {
             const userRef = doc(db, "platformUsers", data.uid!);
-            const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host'];
+            const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
             const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
             const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
             await updateDoc(userRef, userPayload);
@@ -225,10 +232,10 @@ export default function BusinessStaffPage() {
             if (!data.email || !data.password) {
                 throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
             }
-            const rolesAllowed: PlatformUserRole[] = ['staff', 'host'];
+            const rolesAllowed: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
             const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
             if (finalRoles.length === 0) {
-              throw new Error("Rol no válido. Solo puedes asignar 'Staff' o 'Anfitrión'.")
+              throw new Error("Rol no válido. Solo puedes asignar 'Staff', 'Anfitrión' o 'Lector QR'.")
             }
             
             const idToken = await currentUser.getIdToken();
@@ -297,7 +304,7 @@ export default function BusinessStaffPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Mi Personal</CardTitle>
-          <CardDescription>Administra los usuarios staff y anfitriones de tu negocio.</CardDescription>
+          <CardDescription>Administra los usuarios staff, anfitriones y lectores QR de tu negocio.</CardDescription>
           <div className="relative mt-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input

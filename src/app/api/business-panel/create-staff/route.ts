@@ -72,11 +72,11 @@ export async function POST(request: Request) {
     
     const { email, password, displayName, firestoreData } = validation.data;
     
-    const allowedRoles: PlatformUserRole[] = ['staff', 'host'];
+    const allowedRoles: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
     const finalRoles = firestoreData.roles.filter(role => allowedRoles.includes(role as PlatformUserRole)) as PlatformUserRole[];
     
     if (finalRoles.length === 0) {
-        return NextResponse.json({ error: 'Rol no permitido. Un admin de negocio solo puede crear Staff o Anfitriones.' }, { status: 403 });
+        return NextResponse.json({ error: 'Rol no permitido. Un admin de negocio solo puede crear Staff, Anfitriones o Lectores QR.' }, { status: 403 });
     }
     
     try {

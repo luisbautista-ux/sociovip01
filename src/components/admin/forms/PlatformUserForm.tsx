@@ -146,7 +146,7 @@ export function PlatformUserForm({
     const dataToSubmit: PlatformUserFormData = { 
       uid: user?.uid,
       dni: values.dni, name: values.name, email: values.email, roles: values.roles,
-      businessId: showSingleBusinessField ? values.businessId : undefined,
+      businessId: showSingleBusinessField ? values.businessId : (isBusinessAdminView ? userProfile?.businessId : undefined),
       businessIds: showMultiBusinessField ? values.businessIds : [],
       password: values.password,
     };
@@ -158,7 +158,7 @@ export function PlatformUserForm({
 
   const availableRoles = isSuperAdminView 
     ? ALL_PLATFORM_USER_ROLES 
-    : ['staff', 'host'];
+    : ['staff', 'host', 'lector_qr'];
 
   return (
     <Form {...form}>
@@ -209,7 +209,7 @@ export function PlatformUserForm({
         
         {showSingleBusinessField && !showMultiBusinessField && (
           <FormField control={form.control} name="businessId" render={({ field }) => (
-              <FormItem><FormLabel>Negocio Asociado (para Staff/Host) <span className="text-destructive">*</span></FormLabel>
+              <FormItem><FormLabel>Negocio Asociado (para Staff/Host/Lector QR) <span className="text-destructive">*</span></FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || ""} disabled={isSubmitting}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Selecciona un negocio" /></SelectTrigger></FormControl>
                   <SelectContent>{businesses.length === 0 ? (<FormItem><FormLabel className="p-2 text-sm text-muted-foreground">No hay negocios disponibles.</FormLabel></FormItem>) : (businesses.map(biz => (<SelectItem key={biz.id} value={biz.id}>{biz.name}</SelectItem>)))}</SelectContent>
