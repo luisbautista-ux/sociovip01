@@ -11,18 +11,6 @@ import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarTrigger,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarInset,
-} from "@/components/ui/sidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SocioVipLogo } from "@/components/icons";
 
@@ -204,8 +192,10 @@ export default function BusinessPanelLayout({
   }
 
   return (
-    <SidebarProvider>
-        <BusinessSidebar />
+    <div className="flex min-h-screen bg-muted/40">
+        <div className="hidden md:flex">
+             <BusinessSidebar />
+        </div>
         <div className="flex flex-col flex-1">
             <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2 md:hidden">
                  <Sheet>
@@ -227,6 +217,6 @@ export default function BusinessPanelLayout({
                 {children}
             </main>
         </div>
-    </SidebarProvider>
+    </div>
   );
 }
