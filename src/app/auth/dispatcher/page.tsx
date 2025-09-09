@@ -54,11 +54,9 @@ export default function AuthDispatcherPage() {
       } else if (userProfile.roles.includes('promoter')) {
         console.log("AuthDispatcher: Redirecting promoter to /promoter/dashboard");
         router.replace("/promoter/dashboard");
-      } else if (userProfile.roles.includes('host')) {
-        console.log("AuthDispatcher: Redirecting host to /host/validate");
-        router.replace("/host/validate");
-      } else if (userProfile.roles.includes('lector_qr')) {
-        console.log("AuthDispatcher: Redirecting lector_qr to /lector-qr/validate");
+      } else if (userProfile.roles.includes('host') || userProfile.roles.includes('lector_qr')) {
+        // --- CORRECTED LOGIC --- Both host and lector_qr redirect to the same place.
+        console.log("AuthDispatcher: Redirecting host/lector_qr to /lector-qr/validate");
         router.replace("/lector-qr/validate");
       } else {
         // Rol no reconocido o sin roles asignados que tengan un dashboard específico.
