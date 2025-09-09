@@ -5,13 +5,14 @@ import { BusinessSidebar } from "@/components/business/BusinessSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { Loader2, Menu } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -190,6 +191,19 @@ export default function BusinessPanelLayout({
       </div>
     );
   }
+  
+  const navLinks = [
+    { href: "/business-panel/dashboard", label: "Dashboard" },
+    { href: "/business-panel/promotions", label: "Promociones" },
+    { href: "/business-panel/events", label: "Eventos" },
+    { href: "/business-panel/clients", label: "Mis Clientes" },
+    { href: "/business-panel/surveys", label: "Encuestas" },
+    { href: "/business-panel/promoters", label: "Mis Promotores" },
+    { href: "/business-panel/staff", label: "Mi Personal" },
+    { href: "/business-panel/analytics", label: "Analíticas" },
+    { href: "/business-panel/settings", label: "Configuración" },
+    { href: "/business-panel/validate-qr", label: "Validar QR" },
+  ];
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -207,14 +221,20 @@ export default function BusinessPanelLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
-                {/* Re-render the sidebar content inside the sheet, passing a close function */}
                 <div className="p-4 border-b border-border">
                   <h1 className="text-xl font-semibold text-primary">Panel Negocio</h1>
                 </div>
                 <nav className="flex-grow p-4 space-y-2">
-                   <Link href="/business-panel/dashboard" onClick={() => setIsSheetOpen(false)} className="flex items-center space-x-2 text-muted-foreground hover:text-foreground">Dashboard</Link>
-                   <Link href="/business-panel/promotions" onClick={() => setIsSheetOpen(false)} className="flex items-center space-x-2 text-muted-foreground hover:text-foreground">Promociones</Link>
-                   {/* Add all other links here */}
+                  {navLinks.map(link => (
+                    <Link 
+                      key={link.href}
+                      href={link.href} 
+                      onClick={() => setIsSheetOpen(false)} 
+                      className="flex items-center space-x-2 text-muted-foreground hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
                 </nav>
                  <div className="p-4 border-t border-border mt-auto">
                     <Button onClick={() => { logout(); setIsSheetOpen(false); }} variant="outline" className="w-full">Cerrar Sesión</Button>
@@ -223,7 +243,6 @@ export default function BusinessPanelLayout({
             </Sheet>
           </div>
           <div className="flex-grow">
-            {/* You can add a breadcrumb or page title here if needed */}
           </div>
         </header>
         <main className="flex-1 p-4 sm:p-6 overflow-auto">
