@@ -101,7 +101,7 @@ export async function POST(request: Request) {
       name: firestoreData.name,
       email: firestoreData.email,
       roles: finalRoles,
-      businessId: callerProfile.businessId,
+      businessId: callerProfile.businessId, // Correctly assign the businessId of the creator
       lastLogin: FieldValue.serverTimestamp() as any,
     };
     

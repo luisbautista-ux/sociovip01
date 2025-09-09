@@ -217,7 +217,7 @@ export default function BusinessStaffPage() {
         return;
     }
     setIsSubmitting(true);
-    
+
     const isEditing = !!data.uid;
 
     try {
@@ -225,6 +225,11 @@ export default function BusinessStaffPage() {
             const userRef = doc(db, "platformUsers", data.uid!);
             const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
             const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
+            if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
+                toast({title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive"});
+                setIsSubmitting(false);
+                return;
+            }
             const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
             await updateDoc(userRef, userPayload);
             toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
@@ -278,6 +283,10 @@ export default function BusinessStaffPage() {
 
   const handleDeleteUser = async (user: PlatformUser) => {
     if (isSubmitting) return;
+    if (user.uid === userProfile?.uid) {
+        toast({ title: "Acción no permitida", description: "No puedes eliminar tu propio perfil de usuario.", variant: "destructive" });
+        return;
+    }
     setIsSubmitting(true);
     try {
       await deleteDoc(doc(db, "platformUsers", user.uid));
@@ -351,7 +360,7 @@ export default function BusinessStaffPage() {
                         <Edit className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
                           <ShadcnAlertDialogFooter>
