@@ -6,13 +6,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Menu } from "lucide-react";
+import { Loader2, Menu, Building } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import NextImage from "next/image";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -57,18 +58,26 @@ export default function BusinessPanelLayout({
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  
+  const [currentBusinessName, setCurrentBusinessName] = useState<string | null>(null);
+  const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
 
-  // --- START: Dynamic Color Loading ---
   useEffect(() => {
-    const applyBusinessColors = async () => {
+    const applyBusinessColorsAndName = async () => {
       if (userProfile?.businessId) {
         try {
           const businessDocRef = doc(db, "businesses", userProfile.businessId);
           const businessSnap = await getDoc(businessDocRef);
           if (businessSnap.exists()) {
             const businessData = businessSnap.data() as Business;
-            const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0'); // Fallback to default purple
-            const accentHsl = hexToHsl(businessData.secondaryColor || '#8E5EA2'); // Fallback to default darker purple
+            
+            // Set name and logo for display
+            setCurrentBusinessName(businessData.name || null);
+            setCurrentLogoUrl(businessData.logoUrl || null);
+            
+            // Set colors for theme
+            const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0');
+            const accentHsl = hexToHsl(businessData.secondaryColor || '#8E5EA2');
             
             if (primaryHsl) {
               document.documentElement.style.setProperty('--primary', primaryHsl);
@@ -78,22 +87,25 @@ export default function BusinessPanelLayout({
             }
           }
         } catch (error) {
-          console.error("Failed to load and apply business colors:", error);
+          console.error("Failed to load and apply business details:", error);
+          setCurrentBusinessName("Panel Negocio");
+          setCurrentLogoUrl(null);
         }
+      } else {
+        setCurrentBusinessName("Panel Negocio");
+        setCurrentLogoUrl(null);
       }
     };
 
     if (!loadingProfile && userProfile) {
-      applyBusinessColors();
+      applyBusinessColorsAndName();
     }
     
-    // Cleanup function to reset colors when unmounting or user changes
     return () => {
         document.documentElement.style.removeProperty('--primary');
         document.documentElement.style.removeProperty('--accent');
     };
   }, [userProfile, loadingProfile]);
-  // --- END: Dynamic Color Loading ---
 
 
   useEffect(() => {
@@ -102,7 +114,7 @@ export default function BusinessPanelLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth) {
+  if (loadingAuth || loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -119,15 +131,6 @@ export default function BusinessPanelLayout({
     );
   }
   
-  if (loadingProfile) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando perfil de usuario...</p>
-      </div>
-    );
-  }
-
   if (!userProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -170,7 +173,6 @@ export default function BusinessPanelLayout({
     );
   }
   
-  // Check if businessId is associated if role requires it
   const requiresBusinessId = userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff');
   if (requiresBusinessId && !userProfile.businessId) {
     return (
@@ -221,8 +223,13 @@ export default function BusinessPanelLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
-                <div className="p-4 border-b border-border">
-                  <h1 className="text-xl font-semibold text-primary">Panel Negocio</h1>
+                <div className="p-4 border-b border-border flex items-center space-x-2">
+                   {currentLogoUrl ? (
+                    <NextImage src={currentLogoUrl} alt={`${currentBusinessName || 'Negocio'} Logo`} width={28} height={28} className="h-7 w-7 object-contain rounded-sm" />
+                   ) : (
+                    <Building className="h-7 w-7 text-primary" />
+                   )}
+                  <h1 className="text-lg font-semibold text-primary">{currentBusinessName || 'Panel Negocio'}</h1>
                 </div>
                 <nav className="flex-grow p-4 space-y-2">
                   {navLinks.map(link => (
