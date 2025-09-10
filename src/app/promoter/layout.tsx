@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DialogTitle } from "@/components/ui/dialog";
 
 const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
@@ -202,6 +203,7 @@ export default function PromoterLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
+                <DialogTitle className="sr-only">Menú de Navegación del Panel de Promotor</DialogTitle>
                 <PromoterSidebarNavContent promoterName={promoterDisplayName} promoterPhotoUrl={promoterPhotoUrl} closeSheet={() => setIsSheetOpen(false)} />
               </SheetContent>
             </Sheet>
@@ -242,7 +244,7 @@ export default function PromoterLayout({
           {children}
         </main>
         <footer className="py-4 px-6 border-t text-center text-xs text-muted-foreground bg-background sm:bg-transparent">
-          <p>&copy; {new Date().getFullYear()} SocioVIP Promotor Panel</p>
+          <p>© {new Date().getFullYear()} SocioVIP Promotor Panel</p>
         </footer>
       </div>
     </div>
