@@ -44,13 +44,12 @@ const batchBoxFormSchema = z.object({
 type BatchBoxFormValues = z.infer<typeof batchBoxFormSchema>;
 
 interface CreateBatchBoxesDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   onSubmit: (data: BatchBoxFormData) => void;
-  isSubmitting?: boolean; // Added for consistency
+  onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-export function CreateBatchBoxesDialog({ open, onOpenChange, onSubmit, isSubmitting = false }: CreateBatchBoxesDialogProps) {
+export function CreateBatchBoxesDialog({ onSubmit, onCancel, isSubmitting = false }: CreateBatchBoxesDialogProps) {
   const form = useForm<BatchBoxFormValues>({
     resolver: zodResolver(batchBoxFormSchema),
     defaultValues: {
@@ -66,21 +65,9 @@ export function CreateBatchBoxesDialog({ open, onOpenChange, onSubmit, isSubmitt
 
   const handleSubmit = (values: BatchBoxFormValues) => {
     onSubmit(values);
-    // form.reset(); // Resetting here might not be desired if dialog closes or if there's an error
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      if (!isOpen) form.reset(); // Reset form when dialog closes
-      onOpenChange(isOpen);
-    }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Crear Boxes en Lote</DialogTitle>
-          <DialogDescription>
-            Define un prefijo y un rango numérico para crear múltiples boxes con configuraciones similares.
-          </DialogDescription>
-        </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
             <FormField
@@ -174,7 +161,7 @@ export function CreateBatchBoxesDialog({ open, onOpenChange, onSubmit, isSubmitt
               )}
             />
             <DialogFooter className="pt-6">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
@@ -184,7 +171,5 @@ export function CreateBatchBoxesDialog({ open, onOpenChange, onSubmit, isSubmitt
             </DialogFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
   );
 }
