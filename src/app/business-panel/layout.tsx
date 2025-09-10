@@ -14,6 +14,7 @@ import { db } from "@/lib/firebase";
 import type { Business } from "@/lib/types";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import NextImage from "next/image";
+import { DialogTitle } from "@/components/ui/dialog";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -223,6 +224,7 @@ export default function BusinessPanelLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
+                <DialogTitle className="sr-only">Menú de Navegación del Panel de Negocio</DialogTitle>
                 <div className="p-4 border-b border-border flex items-center space-x-2">
                    {currentLogoUrl ? (
                     <NextImage src={currentLogoUrl} alt={`${currentBusinessName || 'Negocio'} Logo`} width={28} height={28} className="h-7 w-7 object-contain rounded-sm" />
