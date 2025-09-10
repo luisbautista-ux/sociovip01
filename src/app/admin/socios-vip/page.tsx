@@ -566,13 +566,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         </CardContent>
       </Card>
 
-      <UIDialog open={showDniEntryModal} onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            dniEntryForm.reset({ docType: 'dni', docNumber: "" });
-            setDniForSocioVerification("");
-          }
-          setShowDniEntryModal(isOpen);
-      }}>
+      <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader>
             <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
@@ -672,13 +666,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         </UIDialogContent>
       </UIDialog>
 
-       <UIDialog open={showCreateEditModal} onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setEditingMember(null);
-          setVerifiedSocioDniResult(null);
-        }
-        setShowCreateEditModal(isOpen);
-      }}>
+       <UIDialog open={showCreateEditModal} onOpenChange={setShowCreateEditModal}>
         <UIDialogContent className="sm:max-w-2xl">
           <UIDialogHeader>
             <UIDialogTitle>

@@ -571,16 +571,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         </CardContent>
       </Card>
       
-      <UIDialog open={showDniEntryModal} onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            dniEntryForm.reset({ docType: 'dni', docNumber: "" });
-            setDniForVerification(""); 
-            setVerifiedDniResult(null);
-            setExistingPlatformUserToEdit(null);
-            setExistingPlatformUserRoles([]);
-          }
-          setShowDniEntryModal(isOpen);
-      }}>
+      <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader>
             <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
@@ -676,13 +667,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         </UIDialogContent>
       </UIDialog>
 
-       <UIDialog open={showCreateEditModal} onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setEditingUser(null);
-          setVerifiedDniResult(null); 
-        }
-        setShowCreateEditModal(isOpen);
-      }}>
+       <UIDialog open={showCreateEditModal} onOpenChange={setShowCreateEditModal}>
         <UIDialogContent className="sm:max-w-lg">
           <UIDialogHeader>
             <UIDialogTitle>

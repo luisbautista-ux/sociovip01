@@ -509,13 +509,7 @@ export default function BusinessPromotersPage() {
         </Card>
       )}
       
-      <UIDialog open={showDniEntryModal} onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            dniEntryForm.reset({ docType: 'dni', docNumber: "" });
-            setDniForPromoterVerification("");
-          }
-          setShowDniEntryModal(isOpen);
-      }}>
+      <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader>
             <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
@@ -611,13 +605,7 @@ export default function BusinessPromotersPage() {
         </UIDialogContent>
       </UIDialog>
 
-      <UIDialog open={showAddEditModal} onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setEditingPromoterLink(null); 
-          setVerifiedPromoterDniResult(null);
-        }
-        setShowAddEditModal(isOpen);
-      }}>
+      <UIDialog open={showAddEditModal} onOpenChange={setShowAddEditModal}>
         <UIDialogContent className="sm:max-w-lg">
           <UIDialogHeader>
             <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
@@ -644,10 +632,7 @@ export default function BusinessPromotersPage() {
         </UIDialogContent>
       </UIDialog>
 
-       <AlertDialog open={showAlreadyLinkedAlert} onOpenChange={(isOpen) => {
-           if(!isOpen) setPromoterLinkToEditFromAlert(null);
-           setShowAlreadyLinkedAlert(isOpen);
-        }}>
+       <AlertDialog open={showAlreadyLinkedAlert} onOpenChange={setShowAlreadyLinkedAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <UIAlertDialogTitle className="flex items-center">
