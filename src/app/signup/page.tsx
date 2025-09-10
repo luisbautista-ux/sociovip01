@@ -32,16 +32,12 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import type { AuthError } from "firebase/auth";
 import { SocioVipLogo } from "@/components/icons";
-import { Checkbox } from "@/components/ui/checkbox";
 
 const signupFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
   confirmPassword: z.string(),
-  acceptTerms: z.boolean().refine(val => val === true, {
-    message: "Debes aceptar el tratamiento de tus datos personales.",
-  }),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden.",
   path: ["confirmPassword"],
@@ -62,7 +58,6 @@ export default function SignupPage() {
       email: "",
       password: "",
       confirmPassword: "",
-      acceptTerms: false,
     },
   });
 
@@ -202,27 +197,6 @@ export default function SignupPage() {
                       />
                     </FormControl>
                     <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="acceptTerms"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 pt-2">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={isSubmitting}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>
-                        Acepto el tratamiento de mis datos personales
-                      </FormLabel>
-                      <FormMessage />
-                    </div>
                   </FormItem>
                 )}
               />

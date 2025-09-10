@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import Switch from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
 import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
@@ -50,7 +50,7 @@ export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
-  onFormChange: (data: EventDetailsFormValues) => void; 
+  onFormChange?: (data: EventDetailsFormValues) => void; // ✅ AGREGA EL SIGNO ?
 }
 
 export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }: BusinessEventFormProps) => {
@@ -69,9 +69,12 @@ export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }:
   });
 
   const watchedValues = form.watch();
-  React.useEffect(() => {
+React.useEffect(() => {
+  // ✅ VERIFICAR SI onFormChange ES UNA FUNCIÓN ANTES DE LLAMARLA
+  if (typeof onFormChange === 'function') {
     onFormChange(watchedValues);
-  }, [watchedValues, onFormChange]);
+  }
+}, [watchedValues, onFormChange]);
   
   React.useEffect(() => {
     if (event) {

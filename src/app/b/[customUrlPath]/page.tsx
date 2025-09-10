@@ -87,7 +87,6 @@ import {
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
 
 // --- Helpers robustos para códigos ---
 const normalizeCode = (v: unknown) =>
@@ -153,9 +152,6 @@ const newQrClientSchema = z.object({
     .string()
     .min(7, "DNI/CE debe tener al menos 7 caracteres.")
     .max(15, "DNI/CE no debe exceder 15 caracteres."),
-  acceptTerms: z.boolean().refine(val => val === true, {
-    message: "Debes aceptar el tratamiento de tus datos personales.",
-  }),
 });
 
 export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
@@ -201,7 +197,7 @@ export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
 
   const newQrClientForm = useForm<NewQrClientFormData>({
     resolver: zodResolver(newQrClientSchema),
-    defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "", acceptTerms: false },
+    defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
 
   const fetchBusinessDataByCustomUrl = useCallback(async () => {
@@ -502,7 +498,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 phone: "", 
                 dob: undefined, 
                 dni: docNumberCleaned,
-                acceptTerms: false
             });
             setCurrentStepInModal("newUserForm");
         }
@@ -1543,27 +1538,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={newQrClientForm.control}
-                  name="acceptTerms"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={isLoadingQrFlow}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>
-                          Acepto el tratamiento de mis datos personales
-                        </FormLabel>
-                        <FormMessage />
-                      </div>
                     </FormItem>
                   )}
                 />

@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -9,9 +8,15 @@ interface StatusSwitchProps {
   eventId: string;
   initialStatus: boolean;
   onStatusChange: (eventId: string, newStatus: boolean) => Promise<void>;
+  isSubmitting: boolean; // ✅ AÑADIR ESTA LÍNEA
 }
 
-export function StatusSwitch({ eventId, initialStatus, onStatusChange }: StatusSwitchProps) {
+export function StatusSwitch({ 
+  eventId, 
+  initialStatus, 
+  onStatusChange,
+  isSubmitting // ✅ AÑADIR ESTA LÍNEA
+}: StatusSwitchProps) {
   const [isUpdating, setIsUpdating] = React.useState(false);
   // We manage the checked state internally to provide immediate feedback,
   // but it's initialized from the outside.
@@ -40,7 +45,7 @@ export function StatusSwitch({ eventId, initialStatus, onStatusChange }: StatusS
         id={`status-switch-event-${eventId}`}
         checked={isChecked}
         onCheckedChange={handleCheckedChange}
-        disabled={isUpdating}
+        disabled={isSubmitting || isUpdating} // ✅ USAR LA PROPIEDAD RECIBIDA
         className={isUpdating ? "opacity-50" : ""}
       />
     </div>

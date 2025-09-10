@@ -34,9 +34,6 @@ const platformUserFormSchemaBase = z.object({
   businessId: z.string().optional(),
   businessIds: z.array(z.string()).optional(),
   password: z.string().optional(),
-  acceptTerms: z.boolean().refine(val => val === true, {
-    message: "El usuario debe aceptar el tratamiento de datos.",
-  }),
 });
 
 interface PlatformUserFormProps {
@@ -102,7 +99,6 @@ export function PlatformUserForm({
       businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
       businessIds: user?.businessIds || [],
       password: initialDataForCreation?.dni || "",
-      acceptTerms: isEditing, // True if editing, false for new users
     },
   });
 
@@ -127,7 +123,6 @@ export function PlatformUserForm({
         businessId: user.businessId || undefined, 
         businessIds: user.businessIds || [],
         password: "",
-        acceptTerms: true,
       });
     } else if (!isEditing && initialDataForCreation) {
       form.reset({
@@ -137,7 +132,6 @@ export function PlatformUserForm({
         businessId: initialDataForCreation.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
         businessIds: initialDataForCreation.existingPlatformUser?.businessIds || [],
         password: initialDataForCreation.dni,
-        acceptTerms: false,
       });
     }
   }, [user, initialDataForCreation, isEditing, form, isBusinessAdminView, userProfile?.businessId]);
@@ -302,30 +296,6 @@ export function PlatformUserForm({
             {...form.register("businessId")} 
             value={userProfile?.businessId || ""} 
           />
-        )}
-
-        {!isEditing && (
-            <FormField
-                control={form.control}
-                name="acceptTerms"
-                render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                    <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={isSubmitting}
-                    />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                    <FormLabel>
-                        Acepto el tratamiento de mis datos personales
-                    </FormLabel>
-                    <FormMessage />
-                    </div>
-                </FormItem>
-                )}
-            />
         )}
 
         <DialogFooter className="pt-6">
