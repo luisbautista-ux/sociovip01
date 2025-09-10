@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect } from "react";
@@ -28,6 +29,7 @@ import { es } from "date-fns/locale";
 import type { SocioVipMember, SocioVipMemberFormData, InitialDataForSocioVipCreation } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 const socioVipMemberFormSchema = z.object({
@@ -42,6 +44,9 @@ const socioVipMemberFormSchema = z.object({
   preferences: z.string().optional(), // Will be comma-separated string from textarea
   loyaltyPoints: z.coerce.number().min(0, "Los puntos no pueden ser negativos.").default(0),
   membershipStatus: z.enum(['active', 'inactive', 'pending_payment', 'cancelled'], { required_error: "Debes seleccionar un estado."}),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "El socio debe aceptar el tratamiento de sus datos personales.",
+  }),
 });
 
 type SocioVipMemberFormValues = z.infer<typeof socioVipMemberFormSchema>;
@@ -79,6 +84,7 @@ export function SocioVipMemberForm({
       preferences: "", 
       loyaltyPoints: 0,
       membershipStatus: 'active', 
+      acceptTerms: isEditing,
     },
   });
 
@@ -96,6 +102,7 @@ export function SocioVipMemberForm({
         preferences: member.preferences?.join(', ') || "",
         loyaltyPoints: member.loyaltyPoints || 0,
         membershipStatus: member.membershipStatus || 'active',
+        acceptTerms: true,
       });
     } else if (!isEditing && initialData) {
       form.reset({
@@ -110,11 +117,12 @@ export function SocioVipMemberForm({
         preferences: "",
         loyaltyPoints: 0,
         membershipStatus: 'active', 
+        acceptTerms: false,
       });
     } else if (!isEditing && !initialData) { 
         form.reset({
             dni: "", name: "", surname: "", phone: "", dob: undefined, email: "",
-            address: "", profession: "", preferences: "", loyaltyPoints: 0, membershipStatus: 'active'
+            address: "", profession: "", preferences: "", loyaltyPoints: 0, membershipStatus: 'active', acceptTerms: false,
         });
     }
   }, [member, initialData, isEditing, form]);
@@ -310,6 +318,31 @@ export function SocioVipMemberForm({
             )}
           />
         </div>
+
+        {!isEditing && (
+            <FormField
+                control={form.control}
+                name="acceptTerms"
+                render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                    <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isSubmitting}
+                    />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                    <FormLabel>
+                        Acepto el tratamiento de mis datos personales
+                    </FormLabel>
+                    <FormMessage />
+                    </div>
+                </FormItem>
+                )}
+            />
+        )}
+        
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar

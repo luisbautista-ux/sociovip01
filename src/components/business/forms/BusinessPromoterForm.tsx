@@ -20,6 +20,7 @@ import type { BusinessPromoterFormData, BusinessPromoterLink, InitialDataForProm
 import { DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const promoterFormSchemaBase = z.object({
   promoterDni: z.string(), 
@@ -34,6 +35,9 @@ const promoterFormSchemaBase = z.object({
 
 const promoterFormSchemaCreate = promoterFormSchemaBase.extend({
   password: z.string().optional(),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "El promotor debe aceptar el tratamiento de datos.",
+  }),
 });
 
 type PromoterFormValues = z.infer<typeof promoterFormSchemaCreate>;
@@ -74,6 +78,7 @@ export function BusinessPromoterForm({
       promoterPhone: "",
       commissionRate: "",
       password: "",
+      acceptTerms: isEditingLink,
     },
   });
 
@@ -84,7 +89,8 @@ export function BusinessPromoterForm({
         promoterEmail: "",
         promoterPhone: "",
         commissionRate: promoterLinkToEdit?.commissionRate || "",
-        password: initialData?.dni || ""
+        password: initialData?.dni || "",
+        acceptTerms: isEditingLink
     };
 
     if (isEditingLink && promoterLinkToEdit) {
@@ -222,6 +228,31 @@ export function BusinessPromoterForm({
             </FormItem>
           )}
         />
+
+        {!isEditingLink && (
+            <FormField
+                control={form.control}
+                name="acceptTerms"
+                render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                    <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isSubmitting}
+                    />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                    <FormLabel>
+                        Acepto el tratamiento de mis datos personales
+                    </FormLabel>
+                    <FormMessage />
+                    </div>
+                </FormItem>
+                )}
+            />
+        )}
+
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar

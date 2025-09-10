@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -33,6 +34,9 @@ const platformUserFormSchemaBase = z.object({
   businessId: z.string().optional(),
   businessIds: z.array(z.string()).optional(),
   password: z.string().optional(),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "El usuario debe aceptar el tratamiento de datos.",
+  }),
 });
 
 interface PlatformUserFormProps {
@@ -97,7 +101,8 @@ export function PlatformUserForm({
       roles: initialDataForCreation?.existingPlatformUserRoles || user?.roles || (isBusinessAdminView ? ['staff'] : []),
       businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
       businessIds: user?.businessIds || [],
-      password: initialDataForCreation?.dni || "", 
+      password: initialDataForCreation?.dni || "",
+      acceptTerms: isEditing, // True if editing, false for new users
     },
   });
 
@@ -122,6 +127,7 @@ export function PlatformUserForm({
         businessId: user.businessId || undefined, 
         businessIds: user.businessIds || [],
         password: "",
+        acceptTerms: true,
       });
     } else if (!isEditing && initialDataForCreation) {
       form.reset({
@@ -131,6 +137,7 @@ export function PlatformUserForm({
         businessId: initialDataForCreation.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
         businessIds: initialDataForCreation.existingPlatformUser?.businessIds || [],
         password: initialDataForCreation.dni,
+        acceptTerms: false,
       });
     }
   }, [user, initialDataForCreation, isEditing, form, isBusinessAdminView, userProfile?.businessId]);
@@ -145,15 +152,12 @@ export function PlatformUserForm({
   }, [showSingleBusinessField, showMultiBusinessField, form, watchedRoles]);
 
   const handleSubmit = (values: PlatformUserFormValues) => {
-    // Aseguramos que businessId esté correctamente establecido
     let businessIdToSubmit = values.businessId;
     
-    // Si es business admin y no hay businessId en los valores, usar el businessId del usuario actual
     if (isBusinessAdminView && !businessIdToSubmit) {
       businessIdToSubmit = userProfile?.businessId || "";
     }
     
-    // Validación manual para businessId si es necesario
     const rolesThatNeedSingleBusiness = values.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role));
     if (rolesThatNeedSingleBusiness && !businessIdToSubmit) {
       form.setError("businessId", {
@@ -178,7 +182,6 @@ export function PlatformUserForm({
 
   const shouldDisableDni = isEditing || (!isEditing && !!initialDataForCreation?.dni);
   const isPrePopulatedFromOtherSource = !isEditing && initialDataForCreation?.preExistingUserType && initialDataForCreation.preExistingUserType !== 'PlatformUser';
-  // Email should only be disabled when editing an existing user.
   const shouldDisableEmail = isEditing && !!user?.email;
 
   const availableRoles = isSuperAdminView 
@@ -233,12 +236,12 @@ export function PlatformUserForm({
         </FormItem>
         
         {isBusinessAdminView && !showSingleBusinessField && (
-  <input 
-    type="hidden" 
-    {...form.register("businessId")} 
-    value={userProfile?.businessId || ""} 
-  />
-)}
+          <input 
+            type="hidden" 
+            {...form.register("businessId")} 
+            value={userProfile?.businessId || ""} 
+          />
+        )}
         
         {showMultiBusinessField && (
             <FormField
@@ -299,6 +302,30 @@ export function PlatformUserForm({
             {...form.register("businessId")} 
             value={userProfile?.businessId || ""} 
           />
+        )}
+
+        {!isEditing && (
+            <FormField
+                control={form.control}
+                name="acceptTerms"
+                render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                    <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isSubmitting}
+                    />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                    <FormLabel>
+                        Acepto el tratamiento de mis datos personales
+                    </FormLabel>
+                    <FormMessage />
+                    </div>
+                </FormItem>
+                )}
+            />
         )}
 
         <DialogFooter className="pt-6">

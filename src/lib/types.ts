@@ -1,3 +1,4 @@
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -303,6 +304,7 @@ export interface SocioVipMemberFormData {
   preferences?: string;
   loyaltyPoints: number;
   membershipStatus: SocioVipMember['membershipStatus'];
+  acceptTerms: boolean;
 }
 
 export interface NewQrClientFormData { 
@@ -311,6 +313,7 @@ export interface NewQrClientFormData {
   surname: string;
   phone: string;
   dob: Date;
+  acceptTerms: boolean;
 }
 
 export interface BusinessPromotionFormData {
@@ -343,6 +346,7 @@ export interface BusinessPromoterFormData {
   promoterPhone?: string;
   commissionRate?: string; 
   password?: string;
+  acceptTerms: boolean;
 }
  
 export interface SpecificCodeFormValues { // Para el input de código de 9 dígitos en la página pública del negocio
