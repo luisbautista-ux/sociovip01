@@ -6,8 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDescription, AlertDialogFooter as UIFooter, AlertDialogHeader, AlertDialogTitle as UITitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { PlusCircle, Edit, Trash2, Calendar, Loader2, Info, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -20,10 +19,7 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-// We will create these new components for the tabs
-// import { ManageTicketsTab } from '@/components/business/event-tabs/ManageTicketsTab';
-// import { ManageBoxesTab } from '@/components/business/event-tabs/ManageBoxesTab';
-// import { ManageEventPromotersTab } from '@/components/business/event-tabs/ManageEventPromotersTab';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
 export default function BusinessEventsPage() {
@@ -116,10 +112,13 @@ export default function BusinessEventsPage() {
     }
   };
   
-  // Placeholder for advanced save logic
-  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity) => {
+  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null) => {
       if(!currentBusinessId) {
           toast({title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive"});
+          return;
+      }
+       if(!eventDataToSave) {
+          toast({title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive"});
           return;
       }
       setIsSubmitting(true);
@@ -127,7 +126,7 @@ export default function BusinessEventsPage() {
       const payload = {
         ...eventDataToSave,
         businessId: currentBusinessId,
-        type: 'event',
+        type: 'event' as 'event',
         startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
         endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
       };
@@ -152,26 +151,15 @@ export default function BusinessEventsPage() {
       }
   };
 
-  const handleDetailsChange = (values: EventDetailsFormValues) => {
-    if (editingEvent) {
-        setEditingEvent(prev => ({ ...prev!, ...values }));
-    }
-  };
-
   const ManageEventDialog = () => {
     const [activeTab, setActiveTab] = useState("details");
-    
-    // This local state will hold the draft of the event being edited.
-    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(
-        editingEvent ? { ...editingEvent } : null
-    );
+    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
 
     useEffect(() => {
-        // Initialize local state when dialog opens or editingEvent changes
+      if (isManageEventDialogOpen) {
         if (editingEvent) {
             setLocalEventState({ ...editingEvent });
         } else {
-            // Default new event structure
             const now = new Date();
             const endDate = new Date(now);
             endDate.setDate(now.getDate() + 7);
@@ -190,7 +178,10 @@ export default function BusinessEventsPage() {
                 assignedPromoters: []
             });
         }
-    }, [editingEvent]);
+      } else {
+        setLocalEventState(null);
+      }
+    }, [isManageEventDialogOpen, editingEvent]);
 
     const handleLocalDetailsChange = (values: EventDetailsFormValues) => {
         setLocalEventState(prev => prev ? { ...prev, ...values } : null);
@@ -297,8 +288,8 @@ export default function BusinessEventsPage() {
                        <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><UITitle>¿Confirmar eliminación?</UITitle><UIDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDescription></AlertDialogHeader>
-                            <UIFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></UIFooter>
+                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                     </TableCell>
@@ -309,7 +300,7 @@ export default function BusinessEventsPage() {
           </CardContent>
         </Card>
       )}
-      <ManageEventDialog />
+      {isManageEventDialogOpen && <ManageEventDialog />}
     </div>
   );
 }
