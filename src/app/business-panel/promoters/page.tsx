@@ -4,7 +4,7 @@
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
   import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
   import { Button } from "@/components/ui/button";
-  import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog"; 
+  import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
   import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info } from "lucide-react";
   import type { BusinessPromoterLink, PromoterProfile, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember } from "@/lib/types";
   import { format, parseISO } from "date-fns";
@@ -12,18 +12,20 @@
   import React, { useState, useEffect, useCallback } from "react";
   import { Input } from "@/components/ui/input";
   import { useToast } from "@/hooks/use-toast";
-  import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+  import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
  
   import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
   import { useAuth } from "@/context/AuthContext";
   import { db } from "@/lib/firebase";
   import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch, getDoc } from "firebase/firestore";
-  import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook } from "@/components/ui/form";
+  import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook, FormDescription } from "@/components/ui/form";
   import { zodResolver } from "@hookform/resolvers/zod";
   import { useForm } from "react-hook-form";
   import { z } from "zod";
   import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
   import { Label } from "@/components/ui/label";
+  import { Alert, AlertTitle } from "@/components/ui/alert";
+
 
   const DniEntrySchema = z.object({
     docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
@@ -127,18 +129,18 @@ function BusinessPromoterForm({
              <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="text-blue-700 dark:text-blue-300">Vinculando Promotor Existente</AlertTitle>
-                <AlertDescription className="text-blue-600 dark:text-blue-400">
+                <AlertDialogDescription>
                     Este promotor ya tiene una cuenta en la plataforma. Sus datos están pre-rellenados. Solo define la comisión para este vínculo.
-                </AlertDescription>
+                </AlertDialogDescription>
             </Alert>
         )}
         {isPrePopulatedFromOtherSource && !isEditingLink && (
              <Alert variant="default" className="bg-sky-50 border-sky-200 dark:bg-sky-900/30 dark:border-sky-700">
                 <Info className="h-4 w-4 text-sky-600 dark:text-sky-400" />
                 <AlertTitle className="text-sky-700 dark:text-sky-300">Creando Cuenta de Promotor</AlertTitle>
-                <AlertDescription className="text-sky-600 dark:text-sky-400">
+                <AlertDialogDescription>
                     Se creará una nueva cuenta de acceso para este promotor. Por favor, completa o confirma sus datos.
-                </AlertDescription>
+                </AlertDialogDescription>
             </Alert>
         )}
 
@@ -159,7 +161,7 @@ function BusinessPromoterForm({
             <FormItem>
               <FormLabel>Nombre del Promotor <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting || disableContactFields} className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""} /></FormControl>
-              <FormMessage />
+              <FormMessageHook />
             </FormItem>
           )}
         />
@@ -170,7 +172,7 @@ function BusinessPromoterForm({
             <FormItem>
               <FormLabel>Email del Promotor <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input type="email" placeholder="Ej: juan.promotor@example.com" {...field} disabled={isSubmitting || disableContactFields} className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""} /></FormControl>
-              <FormMessage />
+              <FormMessageHook />
             </FormItem>
           )}
         />
@@ -194,7 +196,7 @@ function BusinessPromoterForm({
                   className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""}
                 />
               </FormControl>
-              <FormMessage />
+              <FormMessageHook />
             </FormItem>
           )}
         />
@@ -208,7 +210,7 @@ function BusinessPromoterForm({
                   <FormLabel>Contraseña Inicial para el Promotor <span className="text-destructive">*</span></FormLabel>
                   <FormControl><Input type="text" placeholder="Mínimo 6 caracteres" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
                   <FormDescription className="text-xs">Por defecto, es el DNI del promotor. Puedes cambiarla.</FormDescription>
-                  <FormMessage />
+                  <FormMessageHook />
                 </FormItem>
               )}
             />
@@ -221,7 +223,7 @@ function BusinessPromoterForm({
             <FormItem>
               <FormLabel>Tasa de Comisión para este Negocio (Ej: 10% o S/5 por código)</FormLabel>
               <FormControl><Input placeholder="Definir comisión para este negocio" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
+              <FormMessageHook />
             </FormItem>
           )}
         />
@@ -665,7 +667,7 @@ function BusinessPromoterForm({
                                     No se eliminará su perfil global (si lo tiene).
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
-                                <AlertDialogFooter>
+                                <ShadcnAlertDialogFooter>
                                   <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => handleDeletePromoterLink(link)}
@@ -675,7 +677,7 @@ function BusinessPromoterForm({
                                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                     Desvincular
                                   </AlertDialogAction>
-                                </AlertDialogFooter>
+                                </ShadcnAlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
                           </TableCell>
@@ -776,14 +778,14 @@ function BusinessPromoterForm({
                     </FormItem>
                   )}
                 />
-                <UIDialogFooter className="pt-2">
+                <DialogFooter className="pt-2">
                   <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>
                     Cancelar
                   </Button>
                   <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                   </Button>
-                </UIDialogFooter>
+                </DialogFooter>
               </form>
             </Form>
           </UIDialogContent>
@@ -838,15 +840,16 @@ function BusinessPromoterForm({
                 ¿Desea editar la información de este vínculo (ej. tasa de comisión)?
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <ShadcnAlertDialogFooter>
               <AlertDialogCancel onClick={() => { setShowAlreadyLinkedAlert(false); setPromoterLinkToEditFromAlert(null); }}>No, Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={handleEditLinkFromAlert} className="bg-primary hover:bg-primary/90">
                   Sí, Editar Vínculo
               </AlertDialogAction>
-            </AlertDialogFooter>
+            </ShadcnAlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </div>
     );
   }
 
+    
