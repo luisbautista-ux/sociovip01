@@ -177,14 +177,13 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
               <FormControl>
                 <Input
                   type="number"
-                  placeholder="100"
+                  placeholder="100 (0 o vacío para ilimitado)"
                   className="no-spinner"
                   {...field}
-                  value={field.value === undefined || field.value === null ? '' : String(field.value)}
+                  value={field.value ?? ""} // Use ?? to handle null and undefined
                   onChange={e => {
                     const value = e.target.value;
-                    const numberValue = parseInt(value, 10);
-                    field.onChange(value === "" ? undefined : (isNaN(numberValue) ? undefined : numberValue));
+                    field.onChange(value === "" ? undefined : Number(value));
                   }}
                   disabled={isSubmitting}
                 />
