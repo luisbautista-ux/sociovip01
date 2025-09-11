@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
+import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
 import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, ChevronsUpDown, Check } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
@@ -29,6 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Alert, AlertTitle } from "@/components/ui/alert";
+import { DialogFooter } from "@/components/ui/dialog";
 
 
 const DniEntrySchema = z.object({
@@ -247,7 +248,6 @@ function PlatformUserForm({
     </Form>
   );
 }
-
 
 export default function BusinessStaffPage() {
   const { userProfile, currentUser } = useAuth();
@@ -628,3 +628,5 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
+    
