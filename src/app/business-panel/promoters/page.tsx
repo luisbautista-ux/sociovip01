@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -265,14 +266,11 @@ function BusinessPromoterForm({
     const { toast } = useToast();
     
     // State for modal visibility control
-    const [showDniEntryModal, setShowDniEntryModal] = useState(false);
-    const [showPromoterFormModal, setShowPromoterFormModal] = useState(false);
+    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
+    const [showAlreadyLinkedAlert, setShowAlreadyLinkedAlert] = useState(false);
     
     const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
-    
-    // State for alerts and confirmations
-    const [showAlreadyLinkedAlert, setShowAlreadyLinkedAlert] = useState(false);
     const [promoterLinkToEditFromAlert, setPromoterLinkToEditFromAlert] = useState<BusinessPromoterLink | null>(null);
 
 
@@ -370,12 +368,17 @@ function BusinessPromoterForm({
       }
       return result;
     };
+    
+    const closeModal = () => {
+        setModalStep('closed');
+        setEditingPromoterLink(null);
+        setVerifiedPromoterDniResult(null);
+    }
 
     const handleOpenAddPromoterFlow = () => {
-      setEditingPromoterLink(null);
-      setVerifiedPromoterDniResult(null);
+      closeModal();
       dniEntryForm.reset({ docType: 'dni', docNumber: "" });
-      setShowDniEntryModal(true);
+      setModalStep('dni_entry');
     };
 
     const handlePromoterDniVerificationSubmit = async (values: DniEntryValues) => {
@@ -430,12 +433,11 @@ function BusinessPromoterForm({
 
       if (checkResult.existingLink) {
           setPromoterLinkToEditFromAlert(checkResult.existingLink);
-          setShowDniEntryModal(false);
+          setModalStep('closed');
           setShowAlreadyLinkedAlert(true);
       } else {
           setVerifiedPromoterDniResult(checkResult); 
-          setShowDniEntryModal(false);
-          setShowPromoterFormModal(true);
+          setModalStep('promoter_form');
       }
     };
     
@@ -443,7 +445,7 @@ function BusinessPromoterForm({
       if (promoterLinkToEditFromAlert) {
           setEditingPromoterLink(promoterLinkToEditFromAlert);
           setVerifiedPromoterDniResult(null); 
-          setShowPromoterFormModal(true);
+          setModalStep('promoter_form');
       }
       setShowAlreadyLinkedAlert(false);
       setPromoterLinkToEditFromAlert(null);
@@ -514,10 +516,7 @@ function BusinessPromoterForm({
           toast({ title: "Promotor Creado y Vinculado", description: `Se creó el usuario para ${data.promoterName}.` });
         }
         
-        setShowDniEntryModal(false);
-        setShowPromoterFormModal(false);
-        setEditingPromoterLink(null);
-        setVerifiedPromoterDniResult(null);
+        closeModal();
         fetchPromoterLinks();
       } catch (error: any) {
         console.error("Promoters Page: Failed to add/edit promoter link:", error);
@@ -655,7 +654,7 @@ function BusinessPromoterForm({
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">{link.joinDate ? format(parseISO(link.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setShowPromoterFormModal(true); }} disabled={isSubmitting}>
+                            <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Editar</span>
                             </Button>
@@ -702,58 +701,61 @@ function BusinessPromoterForm({
           </Card>
         )}
         
-        <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
-            <UIDialogContent className="sm:max-w-md">
-                <UIDialogHeader>
-                    <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
-                    <UIDialogDescription>
-                    Ingresa el documento del promotor para verificar si ya existe o está vinculado.
-                    </UIDialogDescription>
-                </UIDialogHeader>
-                <Form {...dniEntryForm}>
-                    <form onSubmit={dniEntryForm.handleSubmit(handlePromoterDniVerificationSubmit)} className="space-y-4 py-2">
-                        <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
-                        <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
-                                    <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-promoter" className="sr-only" /></FormControl>DNI</Label></FormItem>
-                                    <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-promoter" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
-                        </RadioGroup></FormControl><FormMessageHook /></FormItem>
-                        )} />
-                        <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} {...field} maxLength={watchedDocType === 'dni' ? 8 : 20} onChange={(e) => { const numericValue = e.target.value.replace(/[^0-9]/g, ''); field.onChange(numericValue); }} autoFocus disabled={isSubmitting} /></FormControl><FormMessageHook /></FormItem>
-                        )} />
-                        <DialogFooter className="pt-2">
-                        <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>Cancelar</Button>
-                        <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </UIDialogContent>
-        </UIDialog>
-        
-        <UIDialog open={showPromoterFormModal} onOpenChange={setShowPromoterFormModal}>
+        <UIDialog open={modalStep !== 'closed'} onOpenChange={(isOpen) => !isOpen && closeModal()}>
             <UIDialogContent className="sm:max-w-lg">
-                 <UIDialogHeader>
-                  <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
-                  <UIDialogDescription>
-                      {editingPromoterLink 
-                        ? `Actualiza la tasa de comisión para ${editingPromoterLink.promoterName}.`
-                        : (verifiedPromoterDniResult?.existingPlatformUserPromoter 
-                            ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos se usarán. Define la comisión y vincúlalo."
-                            : (verifiedPromoterDniResult?.qrClientData || verifiedPromoterDniResult?.socioVipData 
-                                ? "Este DNI fue encontrado como Cliente. Completa los datos para crear su cuenta de promotor y vincularlo."
-                                : "Ingresa los detalles para crear un nuevo usuario promotor y vincularlo a tu negocio."
-                              )
-                          )
-                      }
-                  </UIDialogDescription>
-                </UIDialogHeader>
-                <BusinessPromoterForm
-                  promoterLinkToEdit={editingPromoterLink || undefined}
-                  initialData={verifiedPromoterDniResult || undefined}
-                  onSubmit={handleAddOrEditPromoterLink}
-                  onCancel={() => setShowPromoterFormModal(false)}
-                  isSubmitting={isSubmitting}
-                />
+                {modalStep === 'dni_entry' && (
+                    <>
+                        <UIDialogHeader>
+                            <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
+                            <UIDialogDescription>
+                            Ingresa el documento del promotor para verificar si ya existe o está vinculado.
+                            </UIDialogDescription>
+                        </UIDialogHeader>
+                        <Form {...dniEntryForm}>
+                            <form onSubmit={dniEntryForm.handleSubmit(handlePromoterDniVerificationSubmit)} className="space-y-4 py-2">
+                                <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
+                                <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
+                                            <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-promoter" className="sr-only" /></FormControl>DNI</Label></FormItem>
+                                            <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-promoter" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
+                                </RadioGroup></FormControl><FormMessageHook /></FormItem>
+                                )} />
+                                <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
+                                <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} {...field} maxLength={watchedDocType === 'dni' ? 8 : 20} onChange={(e) => { const numericValue = e.target.value.replace(/[^0-9]/g, ''); field.onChange(numericValue); }} autoFocus disabled={isSubmitting} /></FormControl><FormMessageHook /></FormItem>
+                                )} />
+                                <DialogFooter className="pt-2">
+                                <Button type="button" variant="outline" onClick={closeModal} disabled={isSubmitting}>Cancelar</Button>
+                                <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button>
+                                </DialogFooter>
+                            </form>
+                        </Form>
+                    </>
+                )}
+                {modalStep === 'promoter_form' && (
+                    <>
+                        <UIDialogHeader>
+                            <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
+                            <UIDialogDescription>
+                                {editingPromoterLink 
+                                    ? `Actualiza la tasa de comisión para ${editingPromoterLink.promoterName}.`
+                                    : (verifiedPromoterDniResult?.existingPlatformUserPromoter 
+                                        ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos se usarán. Define la comisión y vincúlalo."
+                                        : (verifiedPromoterDniResult?.qrClientData || verifiedPromoterDniResult?.socioVipData 
+                                            ? "Este DNI fue encontrado como Cliente. Completa los datos para crear su cuenta de promotor y vincularlo."
+                                            : "Ingresa los detalles para crear un nuevo usuario promotor y vincularlo a tu negocio."
+                                        )
+                                    )
+                                }
+                            </UIDialogDescription>
+                        </UIDialogHeader>
+                        <BusinessPromoterForm
+                            promoterLinkToEdit={editingPromoterLink || undefined}
+                            initialData={verifiedPromoterDniResult || undefined}
+                            onSubmit={handleAddOrEditPromoterLink}
+                            onCancel={closeModal}
+                            isSubmitting={isSubmitting}
+                        />
+                    </>
+                )}
             </UIDialogContent>
         </UIDialog>
 
