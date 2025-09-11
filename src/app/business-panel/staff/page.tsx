@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
+import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
 import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, ChevronsUpDown, Check } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
@@ -236,13 +236,13 @@ function PlatformUserForm({
              )}/>
         )}
         
-        <DialogFooter className="pt-6">
+        <ShadcnAlertDialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableSubmitOverride}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEditing ? "Guardar Cambios" : "Crear Usuario"}
           </Button>
-        </DialogFooter>
+        </ShadcnAlertDialogFooter>
       </form>
     </Form>
   );
@@ -593,7 +593,7 @@ export default function BusinessStaffPage() {
                   <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
                     <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <DialogFooter><Button type="button" variant="outline" onClick={() => setModalStep('closed')} disabled={isSubmitting}>Cancelar</Button><Button type="submit" variant="gradient" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button></DialogFooter>
+                  <ShadcnAlertDialogFooter><Button type="button" variant="outline" onClick={() => setModalStep('closed')} disabled={isSubmitting}>Cancelar</Button><Button type="submit" variant="gradient" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button></ShadcnAlertDialogFooter>
                 </form>
               </Form>
             </>
@@ -616,7 +616,7 @@ export default function BusinessStaffPage() {
           )}
         </UIDialogContent>
       </UIDialog>
-
+      
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
