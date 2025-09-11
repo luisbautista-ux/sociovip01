@@ -181,16 +181,10 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
                   className="no-spinner"
                   {...field}
                   value={field.value === undefined || field.value === null ? '' : String(field.value)}
-                   onChange={e => {
-                    const val = e.target.value;
-                    if (val === "") {
-                      field.onChange(undefined);
-                    } else {
-                      const num = parseInt(val, 10);
-                      if (!isNaN(num)) {
-                        field.onChange(num);
-                      }
-                    }
+                  onChange={e => {
+                    const value = e.target.value;
+                    const numberValue = parseInt(value, 10);
+                    field.onChange(value === "" ? undefined : (isNaN(numberValue) ? undefined : numberValue));
                   }}
                   disabled={isSubmitting}
                 />
