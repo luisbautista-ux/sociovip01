@@ -12,7 +12,6 @@ import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
- 
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +28,8 @@ import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "fi
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+
 
 const DniEntrySchema = z.object({
   docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
@@ -127,6 +128,19 @@ function PlatformUserForm({
       businessIds: user?.businessIds || [],
     },
   });
+
+  useEffect(() => {
+    form.reset({
+      uid: user?.uid || undefined,
+      name: user?.name || initialDataForCreation?.name || "",
+      dni: user?.dni || initialDataForCreation?.dni || "",
+      email: user?.email || initialDataForCreation?.email || "",
+      password: "",
+      roles: user?.roles || [],
+      businessId: user?.businessId || null,
+      businessIds: user?.businessIds || [],
+    });
+  }, [user, initialDataForCreation, form]);
 
   const selectedRoles = form.watch("roles", user?.roles || []);
   const showBusinessIdSelector = isSuperAdminView && selectedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
@@ -258,12 +272,11 @@ export default function BusinessStaffPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // State for modal visibility control
+  const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'user_form'>('closed');
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
-  const [showDniEntryModal, setShowDniEntryModal] = useState(false);
-  const [dniForVerification, setDniForVerification] = useState(""); 
   const [verifiedDniResult, setVerifiedDniResult] = useState<InitialDataForPlatformUserCreation | null>(null);
-  const [showCreateEditModal, setShowCreateEditModal] = useState(false); 
-  
+
   const [showDniIsPlatformUserAlert, setShowDniIsPlatformUserAlert] = useState(false);
   const [existingPlatformUserToEdit, setExistingPlatformUserToEdit] = useState<PlatformUser | null>(null);
 
@@ -342,14 +355,13 @@ export default function BusinessStaffPage() {
     dniEntryForm.reset({ docType: 'dni', docNumber: "" });
     setExistingPlatformUserToEdit(null);
     setShowDniIsPlatformUserAlert(false);
-    setShowDniEntryModal(true); 
+    setModalStep('dni_entry'); 
   };
   
   const handleDniVerificationSubmit = async (values: DniEntryValues) => {
     if (isSubmitting) return;
     const docNumberCleaned = values.docNumber.trim();
     setIsSubmitting(true);
-    setDniForVerification(docNumberCleaned);
     
     let fetchedNameFromApi: string | undefined = undefined;
     if (values.docType === 'dni') {
@@ -369,7 +381,6 @@ export default function BusinessStaffPage() {
     
     const result = await checkDniExists(docNumberCleaned);
     
-    setShowDniEntryModal(false);
     setIsSubmitting(false);
     
     let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
@@ -381,6 +392,7 @@ export default function BusinessStaffPage() {
         if (result.userType === 'PlatformUser' && result.platformUserData) {
             setExistingPlatformUserToEdit(result.platformUserData);
             initialData.existingPlatformUser = result.platformUserData;
+            setModalStep('closed');
             setShowDniIsPlatformUserAlert(true); 
             return;
         } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
@@ -394,13 +406,13 @@ export default function BusinessStaffPage() {
     }
     
     setVerifiedDniResult(initialData);
-    setShowCreateEditModal(true); 
+    setModalStep('user_form');
   };
   
   const handleEditExistingUser = () => {
       if (existingPlatformUserToEdit) {
           setEditingUser(existingPlatformUserToEdit);
-          setShowCreateEditModal(true); 
+          setModalStep('user_form'); 
       }
       setShowDniIsPlatformUserAlert(false);
   };
@@ -465,7 +477,7 @@ export default function BusinessStaffPage() {
         toast({ title: "Personal Creado Exitosamente", description: `Se creó el usuario "${data.name}".` });
       }
       
-      setShowCreateEditModal(false);
+      setModalStep('closed');
       setEditingUser(null);
       setVerifiedDniResult(null);
       await fetchStaffMembers();
@@ -553,7 +565,7 @@ export default function BusinessStaffPage() {
                       ))}
                     </TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => { setEditingUser(staff); setShowCreateEditModal(true); }} disabled={isSubmitting}>
+                      <Button variant="ghost" size="icon" onClick={() => { setEditingUser(staff); setModalStep('user_form'); }} disabled={isSubmitting}>
                         <Edit className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
@@ -575,58 +587,58 @@ export default function BusinessStaffPage() {
         </CardContent>
       </Card>
       
-      <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
-        <UIDialogContent className="sm:max-w-md">
-          <UIDialogHeader><UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle><UIDialogDescription>Ingresa el documento para verificar si la persona ya existe en la plataforma.</UIDialogDescription></UIDialogHeader>
-          <Form {...dniEntryForm}>
-            <form onSubmit={dniEntryForm.handleSubmit(handleDniVerificationSubmit)} className="space-y-4 py-2">
-              <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
-                  <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
-                            <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI</Label></FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-staff" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
-                  </RadioGroup></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <DialogFooter><Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" variant="gradient" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button></DialogFooter>
-            </form>
-          </Form>
-        </UIDialogContent>
-      </UIDialog>
-
-      <UIDialog open={showCreateEditModal} onOpenChange={(open) => {
-          if (!open) {
-              setEditingUser(null);
-              setVerifiedDniResult(null);
-          }
-          setShowCreateEditModal(open);
-      }}>
+      <UIDialog open={modalStep !== 'closed'} onOpenChange={(open) => !open && setModalStep('closed')}>
         <UIDialogContent className="sm:max-w-lg">
-          <UIDialogHeader>
-            <UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
-            <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los detalles para crear el usuario."}</UIDialogDescription>
-          </UIDialogHeader>
-          <PlatformUserForm 
-            user={editingUser || undefined}
-            initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
-            businesses={[]}
-            onSubmit={(data) => handleCreateOrEditUser(data, !!editingUser)}
-            onCancel={() => {setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
-            isSubmitting={isSubmitting}
-          />
+          {modalStep === 'dni_entry' && (
+            <>
+              <UIDialogHeader>
+                <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
+                <UIDialogDescription>Ingresa el documento para verificar si la persona ya existe en la plataforma.</UIDialogDescription>
+              </UIDialogHeader>
+              <Form {...dniEntryForm}>
+                <form onSubmit={dniEntryForm.handleSubmit(handleDniVerificationSubmit)} className="space-y-4 py-2">
+                  <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
+                    <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
+                      <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI</Label></FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-staff" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
+                    </RadioGroup></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
+                    <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <DialogFooter><Button type="button" variant="outline" onClick={() => setModalStep('closed')} disabled={isSubmitting}>Cancelar</Button><Button type="submit" variant="gradient" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button></DialogFooter>
+                </form>
+              </Form>
+            </>
+          )}
+          {modalStep === 'user_form' && (
+            <>
+              <UIDialogHeader>
+                <UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
+                <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los detalles para crear el usuario."}</UIDialogDescription>
+              </UIDialogHeader>
+              <PlatformUserForm 
+                user={editingUser || undefined}
+                initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
+                businesses={[]}
+                onSubmit={(data) => handleCreateOrEditUser(data, !!editingUser)}
+                onCancel={() => {setModalStep('closed'); setEditingUser(null); setVerifiedDniResult(null);}}
+                isSubmitting={isSubmitting}
+              />
+            </>
+          )}
         </UIDialogContent>
       </UIDialog>
 
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
-          <AlertDialogHeader><UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Usuario ya Existente</UIAlertDialogTitle><AlertDialogDescription>El documento <span className="font-semibold">{dniForVerification}</span> ya está registrado para <span className="font-semibold">{existingPlatformUserToEdit?.name}</span>. Si no está en tu lista de personal, puede estar asignado a otro negocio. Contacta al Super Admin si necesitas reasignarlo. No puedes crear un duplicado.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader>
+            <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Usuario ya Existente</UIAlertDialogTitle>
+            <AlertDialogDescription>El documento <span className="font-semibold">{existingPlatformUserToEdit?.dni}</span> ya está registrado para <span className="font-semibold">{existingPlatformUserToEdit?.name}</span>. Si no está en tu lista de personal, puede estar asignado a otro negocio. Contacta al Super Admin si necesitas reasignarlo. No puedes crear un duplicado.</AlertDialogDescription>
+          </AlertDialogHeader>
           <ShadcnAlertDialogFooter><AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Entendido</AlertDialogCancel></ShadcnAlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
-
-
-    

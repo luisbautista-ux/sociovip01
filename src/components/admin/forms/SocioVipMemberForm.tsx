@@ -68,19 +68,7 @@ export function SocioVipMemberForm({
 
   const form = useForm<SocioVipMemberFormValues>({
     resolver: zodResolver(socioVipMemberFormSchema),
-    defaultValues: {
-      name: "",
-      surname: "",
-      dni: "",
-      phone: "",
-      dob: undefined,
-      email: "",
-      address: "",     
-      profession: "",  
-      preferences: "", 
-      loyaltyPoints: 0,
-      membershipStatus: 'active', 
-    },
+    defaultValues: {},
   });
 
   useEffect(() => {

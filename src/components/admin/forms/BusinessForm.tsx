@@ -84,28 +84,9 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
 
   const form = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
-    defaultValues: {
-      name: business?.name || "",
-      contactEmail: business?.contactEmail || "",
-      ruc: business?.ruc || "",
-      razonSocial: business?.razonSocial || "",
-      department: business?.department || "",
-      province: business?.province || "",
-      district: business?.district || "",
-      address: business?.address || "",
-      managerName: business?.managerName || "",
-      managerDni: business?.managerDni || "",
-      businessType: business?.businessType || undefined,
-      logoUrl: business?.logoUrl || "",
-      publicCoverImageUrl: business?.publicCoverImageUrl || "",
-      slogan: business?.slogan || "",
-      publicContactEmail: business?.publicContactEmail || "",
-      publicPhone: business?.publicPhone || "",
-      publicAddress: business?.publicAddress || "",
-      customUrlPath: business?.customUrlPath || "",
-    },
+    defaultValues: {},
   });
-
+  
   useEffect(() => {
     const defaultVals = {
       name: business?.name || "",
@@ -127,36 +108,27 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       publicAddress: business?.publicAddress || "",
       customUrlPath: business?.customUrlPath || "",
     };
-    form.reset(defaultVals); 
-    setSelectedDepartment(defaultVals.department);
+    form.reset(defaultVals);
     
-    if (defaultVals.department && PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]) {
-      const currentProvinces = Object.keys(PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS]);
-      setProvinces(currentProvinces);
-      setSelectedProvince(defaultVals.province); 
+    // Manual state updates for dependent dropdowns
+    setSelectedDepartment(defaultVals.department);
+    if (defaultVals.department) {
+      const initialProvinces = Object.keys(PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS] || {});
+      setProvinces(initialProvinces);
+      setSelectedProvince(defaultVals.province);
       
-      if (currentProvinces.includes(defaultVals.province)) {
-        const departmentKey = defaultVals.department as keyof typeof PERU_LOCATIONS;
-        const provinceKey = defaultVals.province as keyof typeof PERU_LOCATIONS[typeof departmentKey];
+      if (defaultVals.province) {
         // @ts-ignore
-        const districtsForProvince = PERU_LOCATIONS[departmentKey][provinceKey] || [];
-        setDistricts(districtsForProvince);
-        if (!districtsForProvince.includes(defaultVals.district)) {
-          form.setValue("district", ""); 
-        }
+        const initialDistricts = PERU_LOCATIONS[defaultVals.department]?.[defaultVals.province] || [];
+        setDistricts(initialDistricts);
       } else {
-        form.setValue("province", ""); 
-        form.setValue("district", "");
-        setSelectedProvince("");
         setDistricts([]);
       }
     } else {
       setProvinces([]);
-      setSelectedProvince("");
       setDistricts([]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [business, form]); 
+  }, [business, form]);
 
 
   useEffect(() => {
@@ -177,7 +149,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       setDistricts([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDepartment, form]); 
+  }, [selectedDepartment]); 
 
   useEffect(() => {
     if (selectedDepartment && selectedProvince && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]]) {
@@ -194,7 +166,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       form.setValue("district", "");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvince, selectedDepartment, form]); 
+  }, [selectedProvince, selectedDepartment]); 
 
 
   const processSubmit = async (values: BusinessFormValues) => {

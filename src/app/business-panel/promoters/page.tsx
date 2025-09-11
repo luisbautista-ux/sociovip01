@@ -115,6 +115,17 @@ function BusinessPromoterForm({
         password: initialData?.dni || "",
     },
   });
+  
+  useEffect(() => {
+    form.reset({
+      promoterDni: initialData?.dni || promoterLinkToEdit?.promoterDni || "",
+      promoterName: promoterLinkToEdit?.promoterName || initialData?.existingPlatformUserPromoter?.name || `${initialData?.qrClientData?.name || initialData?.socioVipData?.name || ''} ${initialData?.qrClientData?.surname || initialData?.socioVipData?.surname || ''}`.trim() || "",
+      promoterEmail: promoterLinkToEdit?.promoterEmail || initialData?.existingPlatformUserPromoter?.email || initialData?.socioVipData?.email || "",
+      promoterPhone: promoterLinkToEdit?.promoterPhone || (initialData?.existingPlatformUserPromoter as any)?.phone || initialData?.qrClientData?.phone?.toString() || initialData?.socioVipData?.phone?.toString() || "",
+      commissionRate: promoterLinkToEdit?.commissionRate || "",
+      password: initialData?.dni || "",
+    });
+  }, [promoterLinkToEdit, initialData, form]);
 
   const handleSubmit = (values: PromoterFormValues) => {
     onSubmit(values);
@@ -252,14 +263,13 @@ function BusinessPromoterForm({
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
-
-    const [showDniEntryModal, setShowDniEntryModal] = useState(false);
-    const [dniForPromoterVerification, setDniForPromoterVerification] = useState("");
+    
+    // State for modal visibility control
+    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
+    const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     
-    const [showAddEditModal, setShowAddEditModal] = useState(false);
-    const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
-
+    // State for alerts and confirmations
     const [showAlreadyLinkedAlert, setShowAlreadyLinkedAlert] = useState(false);
     const [promoterLinkToEditFromAlert, setPromoterLinkToEditFromAlert] = useState<BusinessPromoterLink | null>(null);
 
@@ -311,13 +321,13 @@ function BusinessPromoterForm({
     }, [currentBusinessId, toast]);
 
     useEffect(() => {
-  if (!currentBusinessId) {
-    setIsLoading(false);
-    setPromoterLinks([]);
-    return;
-  }
-  fetchPromoterLinks();
-}, [currentBusinessId, fetchPromoterLinks]);
+      if (!currentBusinessId) {
+        setIsLoading(false);
+        setPromoterLinks([]);
+        return;
+      }
+      fetchPromoterLinks();
+    }, [currentBusinessId, fetchPromoterLinks]);
 
 
     const filteredPromoters = promoterLinks.filter(link =>
@@ -363,9 +373,7 @@ function BusinessPromoterForm({
       setEditingPromoterLink(null);
       setVerifiedPromoterDniResult(null);
       dniEntryForm.reset({ docType: 'dni', docNumber: "" });
-      setPromoterLinkToEditFromAlert(null); 
-      setShowAlreadyLinkedAlert(false); 
-      setShowDniEntryModal(true);
+      setModalStep('dni_entry');
     };
 
     const handlePromoterDniVerificationSubmit = async (values: DniEntryValues) => {
@@ -376,14 +384,9 @@ function BusinessPromoterForm({
       if (isSubmitting) return;
       
       const docNumberCleaned = values.docNumber.trim();
-      if (!docNumberCleaned) {
-          toast({ title: "Número de Documento Requerido", description: "Por favor, ingresa un número válido.", variant: "destructive"});
-          return;
-      }
       
       setIsSubmitting(true);
-      setDniForPromoterVerification(docNumberCleaned);
-
+      
       let fetchedNameFromApi: string | undefined = undefined;
 
       if (values.docType === 'dni') {
@@ -422,14 +425,14 @@ function BusinessPromoterForm({
       }
       
       setIsSubmitting(false);
-      setShowDniEntryModal(false);
 
       if (checkResult.existingLink) {
           setPromoterLinkToEditFromAlert(checkResult.existingLink);
+          setModalStep('closed');
           setShowAlreadyLinkedAlert(true);
       } else {
           setVerifiedPromoterDniResult(checkResult); 
-          setShowAddEditModal(true);
+          setModalStep('promoter_form');
       }
     };
     
@@ -437,7 +440,7 @@ function BusinessPromoterForm({
       if (promoterLinkToEditFromAlert) {
           setEditingPromoterLink(promoterLinkToEditFromAlert);
           setVerifiedPromoterDniResult(null); 
-          setShowAddEditModal(true);
+          setModalStep('promoter_form');
       }
       setShowAlreadyLinkedAlert(false);
       setPromoterLinkToEditFromAlert(null);
@@ -508,7 +511,7 @@ function BusinessPromoterForm({
           toast({ title: "Promotor Creado y Vinculado", description: `Se creó el usuario para ${data.promoterName}.` });
         }
         
-        setShowAddEditModal(false);
+        setModalStep('closed');
         setEditingPromoterLink(null);
         setVerifiedPromoterDniResult(null);
         fetchPromoterLinks();
@@ -648,7 +651,7 @@ function BusinessPromoterForm({
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">{link.joinDate ? format(parseISO(link.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setShowAddEditModal(true); }} disabled={isSubmitting}>
+                            <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Editar</span>
                             </Button>
@@ -695,136 +698,61 @@ function BusinessPromoterForm({
           </Card>
         )}
         
-        <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
+        <UIDialog open={modalStep !== 'closed'} onOpenChange={(isOpen) => !isOpen && setModalStep('closed')}>
           <UIDialogContent className="sm:max-w-md">
-            <UIDialogHeader>
-              <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
-              <UIDialogDescription>
-                Ingresa el documento del promotor para verificar si ya existe o está vinculado.
-              </UIDialogDescription>
-            </UIDialogHeader>
-            <Form {...dniEntryForm}>
-              <form onSubmit={dniEntryForm.handleSubmit(handlePromoterDniVerificationSubmit)} className="space-y-4 py-2">
-                <FormField
-                  control={dniEntryForm.control}
-                  name="docType"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <FormLabel>Tipo de Documento</FormLabel>
-                      <FormControl>
-                          <RadioGroup
-                              onValueChange={(value) => {
-                                  field.onChange(value);
-                                  dniEntryForm.setValue('docNumber', '');
-                                  dniEntryForm.clearErrors('docNumber');
-                              }}
-                              defaultValue={field.value}
-                              className="grid grid-cols-2 gap-2"
-                          >
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                  <Label
-                                      htmlFor="docType-dni-promoter"
-                                      className={cn(
-                                          "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                                          field.value === 'dni' && "bg-primary text-primary-foreground border-primary"
-                                      )}
-                                  >
-                                      <FormControl>
-                                          <RadioGroupItem value="dni" id="docType-dni-promoter" className="sr-only" />
-                                      </FormControl>
-                                      DNI
-                                  </Label>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-3 space-y-0">
-                                  <Label
-                                      htmlFor="docType-ce-promoter"
-                                      className={cn(
-                                          "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                                          field.value === 'ce' && "bg-primary text-primary-foreground border-primary"
-                                      )}
-                                  >
-                                      <FormControl>
-                                          <RadioGroupItem value="ce" id="docType-ce-promoter" className="sr-only" />
-                                      </FormControl>
-                                      Carnet de Extranjería
-                                  </Label>
-                              </FormItem>
-                          </RadioGroup>
-                      </FormControl>
-                      <FormMessageHook />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={dniEntryForm.control}
-                  name="docNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
-                          {...field} 
-                          maxLength={watchedDocType === 'dni' ? 8 : 20}
-                          onChange={(e) => {
-                              const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                              field.onChange(numericValue);
-                          }}
-                          autoFocus 
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessageHook />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter className="pt-2">
-                  <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </UIDialogContent>
-        </UIDialog>
-
-        <UIDialog open={showAddEditModal} onOpenChange={(open) => {
-            if (!open) {
-                setEditingPromoterLink(null);
-                setVerifiedPromoterDniResult(null);
-            }
-            setShowAddEditModal(open);
-        }}>
-          <UIDialogContent className="sm:max-w-lg">
-            <UIDialogHeader>
-              <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
-              <UIDialogDescription>
-                  {editingPromoterLink 
-                    ? `Actualiza la tasa de comisión para ${editingPromoterLink.promoterName}.`
-                    : (verifiedPromoterDniResult?.existingPlatformUserPromoter 
-                        ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos se usarán. Define la comisión y vincúlalo."
-                        : (verifiedPromoterDniResult?.qrClientData || verifiedPromoterDniResult?.socioVipData 
-                            ? "Este DNI fue encontrado como Cliente. Completa los datos para crear su cuenta de promotor y vincularlo."
-                            : "Ingresa los detalles para crear un nuevo usuario promotor y vincularlo a tu negocio."
+            {modalStep === 'dni_entry' && (
+              <>
+                <UIDialogHeader>
+                  <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
+                  <UIDialogDescription>
+                    Ingresa el documento del promotor para verificar si ya existe o está vinculado.
+                  </UIDialogDescription>
+                </UIDialogHeader>
+                <Form {...dniEntryForm}>
+                  <form onSubmit={dniEntryForm.handleSubmit(handlePromoterDniVerificationSubmit)} className="space-y-4 py-2">
+                    <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
+                      <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
+                                <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-promoter" className="sr-only" /></FormControl>DNI</Label></FormItem>
+                                <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-promoter" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
+                      </RadioGroup></FormControl><FormMessageHook /></FormItem>
+                    )} />
+                    <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
+                      <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} {...field} maxLength={watchedDocType === 'dni' ? 8 : 20} onChange={(e) => { const numericValue = e.target.value.replace(/[^0-9]/g, ''); field.onChange(numericValue); }} autoFocus disabled={isSubmitting} /></FormControl><FormMessageHook /></FormItem>
+                    )} />
+                    <DialogFooter className="pt-2">
+                      <Button type="button" variant="outline" onClick={() => setModalStep('closed')} disabled={isSubmitting}>Cancelar</Button>
+                      <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </>
+            )}
+            {modalStep === 'promoter_form' && (
+              <>
+                <UIDialogHeader>
+                  <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
+                  <UIDialogDescription>
+                      {editingPromoterLink 
+                        ? `Actualiza la tasa de comisión para ${editingPromoterLink.promoterName}.`
+                        : (verifiedPromoterDniResult?.existingPlatformUserPromoter 
+                            ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos se usarán. Define la comisión y vincúlalo."
+                            : (verifiedPromoterDniResult?.qrClientData || verifiedPromoterDniResult?.socioVipData 
+                                ? "Este DNI fue encontrado como Cliente. Completa los datos para crear su cuenta de promotor y vincularlo."
+                                : "Ingresa los detalles para crear un nuevo usuario promotor y vincularlo a tu negocio."
+                              )
                           )
-                      )
-                  }
-              </UIDialogDescription>
-            </UIDialogHeader>
-            <BusinessPromoterForm
-                promoterLinkToEdit={editingPromoterLink || undefined}
-                initialData={verifiedPromoterDniResult || undefined}
-                onSubmit={handleAddOrEditPromoterLink}
-                onCancel={() => {
-                  setShowAddEditModal(false);
-                  setEditingPromoterLink(null);
-                  setVerifiedPromoterDniResult(null);
-                }}
-                isSubmitting={isSubmitting}
-              />
+                      }
+                  </UIDialogDescription>
+                </UIDialogHeader>
+                <BusinessPromoterForm
+                  promoterLinkToEdit={editingPromoterLink || undefined}
+                  initialData={verifiedPromoterDniResult || undefined}
+                  onSubmit={handleAddOrEditPromoterLink}
+                  onCancel={() => setModalStep('closed')}
+                  isSubmitting={isSubmitting}
+                />
+              </>
+            )}
           </UIDialogContent>
         </UIDialog>
 
@@ -835,7 +763,7 @@ function BusinessPromoterForm({
                   <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Promotor ya Vinculado
               </UIAlertDialogTitle>
               <AlertDialogDescription>
-                El promotor con DNI/CE <span className="font-semibold">{dniForPromoterVerification}</span> ({promoterLinkToEditFromAlert?.promoterName}) ya está vinculado a tu negocio.
+                El promotor con DNI/CE <span className="font-semibold">{promoterLinkToEditFromAlert?.promoterDni}</span> ({promoterLinkToEditFromAlert?.promoterName}) ya está vinculado a tu negocio.
                 <br/><br/>
                 ¿Desea editar la información de este vínculo (ej. tasa de comisión)?
               </AlertDialogDescription>
