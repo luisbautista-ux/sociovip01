@@ -577,7 +577,7 @@ export default function BusinessStaffPage() {
       
       <UIDialog open={modalStep !== 'closed'} onOpenChange={(open) => !open && setModalStep('closed')}>
         <UIDialogContent className="sm:max-w-lg">
-          {modalStep === 'dni_entry' && (
+          {modalStep === 'dni_entry' ? (
             <>
               <UIDialogHeader>
                 <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
@@ -598,8 +598,7 @@ export default function BusinessStaffPage() {
                 </form>
               </Form>
             </>
-          )}
-          {modalStep === 'user_form' && (
+          ) : modalStep === 'user_form' ? (
             <>
               <UIDialogHeader>
                 <UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
@@ -614,7 +613,7 @@ export default function BusinessStaffPage() {
                 isSubmitting={isSubmitting}
               />
             </>
-          )}
+          ) : null}
         </UIDialogContent>
       </UIDialog>
 

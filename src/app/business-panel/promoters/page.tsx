@@ -700,7 +700,7 @@ function BusinessPromoterForm({
         
         <UIDialog open={modalStep !== 'closed'} onOpenChange={(isOpen) => !isOpen && setModalStep('closed')}>
           <UIDialogContent className="sm:max-w-md">
-            {modalStep === 'dni_entry' && (
+            {modalStep === 'dni_entry' ? (
               <>
                 <UIDialogHeader>
                   <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
@@ -726,8 +726,7 @@ function BusinessPromoterForm({
                   </form>
                 </Form>
               </>
-            )}
-            {modalStep === 'promoter_form' && (
+            ) : modalStep === 'promoter_form' ? (
               <>
                 <UIDialogHeader>
                   <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
@@ -752,7 +751,7 @@ function BusinessPromoterForm({
                   isSubmitting={isSubmitting}
                 />
               </>
-            )}
+            ) : null}
           </UIDialogContent>
         </UIDialog>
 
