@@ -11,7 +11,7 @@ import { collection, query, where, getDocs, Timestamp } from "firebase/firestore
 import type { BusinessManagedEntity } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 
 interface RecentActivity {
@@ -209,7 +209,7 @@ export default function BusinessDashboardPage() {
       <h1 className="text-3xl font-bold text-primary">Dashboard de Mi Negocio</h1>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Promociones/Eventos Activos" value={stats.activeEntities} icon={Ticket} />
+        <StatCard title="Promociones Activas" value={stats.activeEntities} icon={Ticket} />
         <StatCard title="Códigos Creados" value={stats.totalCodesCreated} icon={QrCodeLucide} />
         <StatCard title="Códigos Canjeados (QR Generados)" value={stats.totalCodesRedeemed} icon={TicketCheck} />
         <StatCard title="QR Validados (Asistencia)" value={stats.totalCodesUsed} icon={ScanSearch} />

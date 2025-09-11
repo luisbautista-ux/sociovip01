@@ -245,7 +245,8 @@ export default function BusinessPublicPageById(): React.JSX.Element | null {
         const entitiesQuery = query(
           collection(db, "businessEntities"),
           where("businessId", "==", fetchedBusiness.id),
-          where("isActive", "==", true)
+          where("isActive", "==", true),
+          where("type", "==", "promotion") // Only fetch promotions
         );
         const entitiesSnapshot = await getDocs(entitiesQuery);
 
@@ -1109,7 +1110,6 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
 
   if (!businessDetails) return null;
 
-  const events = activeEntitiesForBusiness.filter((e) => e.type === "event");
   const promotions = activeEntitiesForBusiness.filter((e) => e.type === "promotion");
 
   return (
@@ -1133,46 +1133,6 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
-        {events.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
-              <CalendarDays className="h-8 w-8 mr-3" /> Eventos Próximos
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {events.map((event) => (
-                <Card
-                  key={event.id}
-                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card"
-                >
-                  <div className="relative aspect-[16/9] w-full">
-                    <NextImage
-                      src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
-                      alt={event.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover"
-                      data-ai-hint={event.aiHint || "event party"}
-                    />
-                  </div>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xl">{event.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow space-y-1">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Del {format(parseISO(event.startDate), "dd MMM", { locale: es })} al{" "}
-                      {format(parseISO(event.endDate), "dd MMM, yyyy", { locale: es })}
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex-col items-start p-4 border-t">
-                    <SpecificCodeEntryForm entity={event} />
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
         {promotions.length > 0 && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
@@ -1212,7 +1172,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           </section>
         )}
 
-        {!isLoadingPage && !pageError && events.length === 0 && promotions.length === 0 && pageViewState === "entityList" && (
+        {!isLoadingPage && !pageError && promotions.length === 0 && pageViewState === "entityList" && (
           <Card className="col-span-full">
             <CardHeader className="text-center">
               <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -1220,7 +1180,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             </CardHeader>
             <CardContent className="text-center">
               <CardDescription>
-                Este negocio no tiene eventos o promociones activos en este momento. ¡Vuelve pronto!
+                Este negocio no tiene promociones activos en este momento. ¡Vuelve pronto!
               </CardDescription>
             </CardContent>
           </Card>

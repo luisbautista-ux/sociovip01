@@ -12,7 +12,7 @@ export interface PromotionDetails {
   promoCode: string; // The original 9-digit code
   qrValue: string; // The value embedded in the QR (e.g., the code's unique ID)
   aiHint: string;
-  type: 'promotion' | 'event';
+  type: 'promotion';
   termsAndConditions?: string;
 }
 
@@ -107,7 +107,6 @@ export interface AdminDashboardStats {
 
 export interface BusinessDashboardStats {
   activePromotions: number;
-  upcomingEvents: number;
   totalCodesCreated: number; 
   totalQrUsed: number; 
 }
@@ -125,7 +124,7 @@ export interface RegisteredClient {
   newRegistrations: number;
 }
 
-export type BusinessEntityType = 'promotion' | 'event' | 'survey';
+export type BusinessEntityType = 'promotion' | 'survey';
 
 export interface GeneratedCode { 
   id: string; 
@@ -203,15 +202,11 @@ export interface BusinessManagedEntity {
   startDate: string; 
   endDate: string; 
   usageLimit?: number; 
-  maxAttendance?: number; 
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
-  ticketTypes?: TicketType[];
-  eventBoxes?: EventBox[];
-  assignedPromoters?: EventPromoterAssignment[];
   businessName?: string; 
   businessLogoUrl?: string;
   businessCustomUrlPath?: string | null;
@@ -331,7 +326,6 @@ export interface BusinessEventFormData {
   description: string;
   startDate: Date;
   endDate: Date;
-  // maxAttendance is calculated
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
@@ -358,7 +352,7 @@ export interface PromoterCommissionEntry {
     id: string;
     businessName: string;
     entityName: string;
-    entityType: 'promotion' | 'event';
+    entityType: 'promotion';
     promoterCodesRedeemed: number; 
     commissionRateApplied: string; // Ej: "10%" o "S/ 5.00 por código"
     commissionEarned: number;

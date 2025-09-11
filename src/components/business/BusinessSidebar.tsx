@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/business-panel/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/business-panel/promotions", label: "Promociones", icon: Ticket },
-  { href: "/business-panel/events", label: "Eventos", icon: Calendar },
+  // { href: "/business-panel/events", label: "Eventos", icon: Calendar }, // This line is removed
   { href: "/business-panel/clients", label: "Mis Clientes", icon: Contact },
   { href: "/business-panel/surveys", label: "Encuestas", icon: ClipboardList },
   { href: "/business-panel/promoters", label: "Mis Promotores", icon: UserPlus },

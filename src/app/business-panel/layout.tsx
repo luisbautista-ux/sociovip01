@@ -198,7 +198,7 @@ export default function BusinessPanelLayout({
   const navLinks = [
     { href: "/business-panel/dashboard", label: "Dashboard" },
     { href: "/business-panel/promotions", label: "Promociones" },
-    { href: "/business-panel/events", label: "Eventos" },
+    // { href: "/business-panel/events", label: "Eventos" }, // This line is removed
     { href: "/business-panel/clients", label: "Mis Clientes" },
     { href: "/business-panel/surveys", label: "Encuestas" },
     { href: "/business-panel/promoters", label: "Mis Promotores" },
