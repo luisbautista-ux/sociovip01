@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -26,6 +25,7 @@ import {
   DialogDescription, 
   DialogFooter as ShadcnDialogFooter 
 } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -432,5 +432,3 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
-
-    
