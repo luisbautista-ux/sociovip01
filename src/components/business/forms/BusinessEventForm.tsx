@@ -70,30 +70,22 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
     },
   });
   
+  // Use useEffect to subscribe to form changes and call onFormChange
   React.useEffect(() => {
-    if (event) {
-        form.reset({
-          name: event.name || "",
-          description: event.description || "",
-          termsAndConditions: event.termsAndConditions || "",
-          startDate: anyToDate(event.startDate) ?? new Date(),
-          endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
-          maxAttendance: event.maxAttendance === undefined || event.maxAttendance === null ? undefined : event.maxAttendance,
-          isActive: event.isActive === undefined ? true : event.isActive,
-          imageUrl: event.imageUrl || "",
-          aiHint: event.aiHint || "",
-        });
-    }
-  }, [event, form]);
-
-  const handleSubmit = (values: EventDetailsFormValues) => {
-    onFormChange(values); 
-  };
+    const subscription = form.watch((value) => {
+      // Zod parse to ensure the data is valid before propagating
+      const parsed = eventDetailsFormSchema.safeParse(value);
+      if (parsed.success) {
+        onFormChange(parsed.data);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onFormChange]);
 
 
   return (
     <Form {...form}>
-      <form onBlur={() => onFormChange(form.getValues())} className="space-y-4">
+      <form className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -196,7 +188,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
                 />
               </FormControl>
               <FormDescription className="text-xs">
-                Número total de personas permitidas. Si defines entradas, este valor será informativo.
+                Define el número máximo de asistentes para tu evento.
               </FormDescription>
               <FormMessage />
             </FormItem>
