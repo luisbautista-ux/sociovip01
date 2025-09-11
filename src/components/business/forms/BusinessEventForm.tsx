@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from "react";
@@ -25,6 +26,7 @@ import { cn, anyToDate } from "@/lib/utils";
 import { format, parseISO, startOfDay, isBefore, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity } from "@/lib/types";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -32,6 +34,7 @@ const eventDetailsFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
+  unlimitedAttendance: z.boolean().default(true),
   maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
   isActive: z.boolean().default(true),
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
@@ -44,6 +47,14 @@ const eventDetailsFormSchema = z.object({
 }, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
   path: ["endDate"],
+}).refine(data => {
+    if (!data.unlimitedAttendance && (!data.maxAttendance || data.maxAttendance <= 0)) {
+        return false;
+    }
+    return true;
+}, {
+  message: "Si el aforo no es ilimitado, debes especificar un número mayor a 0.",
+  path: ["maxAttendance"],
 });
 
 export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
@@ -63,6 +74,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
       termsAndConditions: event?.termsAndConditions || "",
       startDate: anyToDate(event?.startDate) ?? new Date(),
       endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+      unlimitedAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null || event.maxAttendance === 0,
       maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
@@ -72,15 +84,25 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
   
   // Use useEffect to subscribe to form changes and call onFormChange
   React.useEffect(() => {
-    const subscription = form.watch((value) => {
+    const subscription = form.watch((value, { name }) => {
       // Zod parse to ensure the data is valid before propagating
-      const parsed = eventDetailsFormSchema.safeParse(value);
+      let formData = {...value};
+      if (name === "unlimitedAttendance") {
+          if (formData.unlimitedAttendance) {
+              formData.maxAttendance = 0;
+              form.setValue("maxAttendance", 0); // Update form state as well
+          }
+      }
+      
+      const parsed = eventDetailsFormSchema.safeParse(formData);
       if (parsed.success) {
         onFormChange(parsed.data);
       }
     });
     return () => subscription.unsubscribe();
   }, [form, onFormChange]);
+  
+  const isUnlimited = form.watch("unlimitedAttendance");
 
 
   return (
@@ -168,33 +190,51 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           />
         </div>
         
-        <FormField
-          control={form.control}
-          name="maxAttendance"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Aforo Máximo</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  placeholder="100 (0 o vacío para ilimitado)"
-                  className="no-spinner"
-                  {...field}
-                  value={field.value ?? ""} // Use ?? to handle null and undefined
-                  onChange={e => {
-                    const value = e.target.value;
-                    field.onChange(value === "" ? undefined : Number(value));
-                  }}
-                  disabled={isSubmitting}
+        <div className="space-y-2">
+            <FormField
+              control={form.control}
+              name="unlimitedAttendance"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormLabel className="font-normal">Aforo Ilimitado</FormLabel>
+                </FormItem>
+              )}
+            />
+             <FormField
+                control={form.control}
+                name="maxAttendance"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel className={cn(isUnlimited && "text-muted-foreground/50")}>Aforo Máximo</FormLabel>
+                    <FormControl>
+                        <Input
+                        type="number"
+                        placeholder="100"
+                        className="no-spinner"
+                        {...field}
+                        value={field.value ?? ""} 
+                        onChange={e => {
+                            const val = e.target.value;
+                            field.onChange(val === "" ? undefined : Number(val));
+                        }}
+                        disabled={isSubmitting || isUnlimited}
+                        />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                        {isUnlimited ? "El aforo es ilimitado. Desmarca la casilla para definir un límite." : "Define el número máximo de asistentes."}
+                    </FormDescription>
+                    <FormMessage />
+                    </FormItem>
+                )}
                 />
-              </FormControl>
-              <FormDescription className="text-xs">
-                Define el número máximo de asistentes para tu evento.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        </div>
 
         <FormField
           control={form.control}
