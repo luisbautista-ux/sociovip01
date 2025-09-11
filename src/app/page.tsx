@@ -12,23 +12,23 @@ import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, Search } from "lucide-react";
+import { Loader2, Building, Tag, Search, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
-interface EnrichedPromotion extends BusinessManagedEntity {
+interface EnrichedEntity extends BusinessManagedEntity {
   businessName?: string;
   businessLogoUrl?: string;
   businessCustomUrlPath?: string | null;
 }
 
 export default function HomePage() {
-  const [allPromotions, setAllPromotions] = useState<EnrichedPromotion[]>([]);
+  const [allEntities, setAllEntities] = useState<EnrichedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  const fetchPromotionsAndBusinesses = useCallback(async () => {
+  const fetchEntitiesAndBusinesses = useCallback(async () => {
     setIsLoading(true);
     try {
       // 1. Fetch all businesses and create a map
@@ -38,18 +38,17 @@ export default function HomePage() {
         businessesMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
       });
 
-      // 2. Fetch all active promotions
-      const promotionsQuery = query(
+      // 2. Fetch all active promotions and events
+      const entitiesQuery = query(
         collection(db, "businessEntities"),
-        where("type", "==", "promotion"),
         where("isActive", "==", true)
       );
-      const promotionsSnap = await getDocs(promotionsQuery);
+      const entitiesSnap = await getDocs(entitiesQuery);
       
-      const enrichedPromotions: EnrichedPromotion[] = [];
-      promotionsSnap.forEach(doc => {
-        const promoData = doc.data() as Omit<BusinessManagedEntity, 'id'> & { startDate: Timestamp | string, endDate: Timestamp | string };
-        const business = businessesMap.get(promoData.businessId);
+      const enrichedEntities: EnrichedEntity[] = [];
+      entitiesSnap.forEach(doc => {
+        const entityData = doc.data() as Omit<BusinessManagedEntity, 'id'> & { startDate: Timestamp | string, endDate: Timestamp | string };
+        const business = businessesMap.get(entityData.businessId);
         
         // Helper to safely convert a Firestore Timestamp or a date string to an ISO string
         const toSafeISOString = (dateValue: Timestamp | string | Date | undefined): string => {
@@ -69,14 +68,14 @@ export default function HomePage() {
 
         const entityForCheck: BusinessManagedEntity = {
           id: doc.id,
-          ...promoData,
-          startDate: toSafeISOString(promoData.startDate),
-          endDate: toSafeISOString(promoData.endDate),
+          ...entityData,
+          startDate: toSafeISOString(entityData.startDate),
+          endDate: toSafeISOString(entityData.endDate),
         };
 
-        // 3. Filter for currently valid promotions
+        // 3. Filter for currently valid entities
         if (isEntityCurrentlyActivatable(entityForCheck) && business) {
-          enrichedPromotions.push({
+          enrichedEntities.push({
             ...entityForCheck,
             businessName: business.name,
             businessLogoUrl: business.logoUrl,
@@ -85,16 +84,16 @@ export default function HomePage() {
         }
       });
       
-      // 4. Sort promotions, e.g., by end date (soonest to expire first)
-      enrichedPromotions.sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+      // 4. Sort entities, e.g., by end date (soonest to expire first)
+      enrichedEntities.sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
       
-      setAllPromotions(enrichedPromotions);
+      setAllEntities(enrichedEntities);
 
     } catch (error: any) {
-      console.error("Error fetching promotions for homepage:", error);
+      console.error("Error fetching entities for homepage:", error);
       toast({
-        title: "Error al Cargar Promociones",
-        description: "No se pudieron obtener las promociones. " + error.message,
+        title: "Error al Cargar Contenido",
+        description: "No se pudieron obtener las promociones y eventos. " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -103,18 +102,18 @@ export default function HomePage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchPromotionsAndBusinesses();
-  }, [fetchPromotionsAndBusinesses]);
+    fetchEntitiesAndBusinesses();
+  }, [fetchEntitiesAndBusinesses]);
 
-  const filteredPromotions = useMemo(() => {
-    if (!searchTerm) return allPromotions;
+  const filteredEntities = useMemo(() => {
+    if (!searchTerm) return allEntities;
     const lowercasedTerm = searchTerm.toLowerCase();
-    return allPromotions.filter(promo => 
-      promo.name.toLowerCase().includes(lowercasedTerm) ||
-      (promo.description && promo.description.toLowerCase().includes(lowercasedTerm)) ||
-      promo.businessName?.toLowerCase().includes(lowercasedTerm)
+    return allEntities.filter(entity => 
+      entity.name.toLowerCase().includes(lowercasedTerm) ||
+      (entity.description && entity.description.toLowerCase().includes(lowercasedTerm)) ||
+      entity.businessName?.toLowerCase().includes(lowercasedTerm)
     );
-  }, [allPromotions, searchTerm]);
+  }, [allEntities, searchTerm]);
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground">
@@ -133,7 +132,7 @@ export default function HomePage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">SocioVIP</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Descubre las mejores promociones cerca de ti
+                Descubre los mejores eventos y promociones
               </p>
             </div>
           </div>
@@ -142,7 +141,7 @@ export default function HomePage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar promoción o negocio..."
+              placeholder="Buscar evento, promoción o negocio..."
               className="pl-8 w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -155,35 +154,37 @@ export default function HomePage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center text-center py-20">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="mt-4 text-lg text-muted-foreground">Cargando promociones...</p>
+            <p className="mt-4 text-lg text-muted-foreground">Cargando...</p>
           </div>
-        ) : filteredPromotions.length > 0 ? (
+        ) : filteredEntities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredPromotions.map((promo) => {
-              const businessUrl = promo.businessCustomUrlPath
-                ? `/b/${promo.businessCustomUrlPath}`
-                : `/business/${promo.businessId}`;
+            {filteredEntities.map((entity) => {
+              const businessUrl = entity.businessCustomUrlPath
+                ? `/b/${entity.businessCustomUrlPath}`
+                : `/business/${entity.businessId}`;
               
+              const isEvent = entity.type === 'event';
+
               return (
-                <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
+                <Card key={entity.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card">
                   <div className="relative aspect-[16/9] w-full">
                     <NextImage
-                      src={promo.imageUrl || "https://placehold.co/600x400.png"}
-                      alt={promo.name}
+                      src={entity.imageUrl || "https://placehold.co/600x400.png"}
+                      alt={entity.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover"
-                      data-ai-hint={promo.aiHint || "discount offer"}
+                      data-ai-hint={entity.aiHint || "discount offer"}
                     />
                   </div>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-xl">{promo.name}</CardTitle>
+                    <CardTitle className="text-xl">{entity.name}</CardTitle>
                     <CardDescription className="text-xs pt-1">
                       <Link href={businessUrl} className="flex items-center text-muted-foreground hover:text-primary transition-colors">
-                        {promo.businessLogoUrl ? (
+                        {entity.businessLogoUrl ? (
                           <NextImage
-                            src={promo.businessLogoUrl}
-                            alt={`${promo.businessName} logo`}
+                            src={entity.businessLogoUrl}
+                            alt={`${entity.businessName} logo`}
                             width={16}
                             height={16}
                             className="h-4 w-4 mr-1.5 rounded-full object-contain"
@@ -192,20 +193,21 @@ export default function HomePage() {
                         ) : (
                           <Building className="h-4 w-4 mr-1.5" />
                         )}
-                        <span>{promo.businessName}</span>
+                        <span>{entity.businessName}</span>
                       </Link>
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-grow space-y-1">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{entity.description}</p>
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t bg-muted/50">
                     <p className="text-xs text-muted-foreground w-full mb-2">
-                      Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
+                      Válido hasta el {format(parseISO(entity.endDate), "dd MMMM, yyyy", { locale: es })}
                     </p>
                     <Link href={businessUrl} passHref className="w-full">
                       <Button className="w-full bg-primary hover:bg-primary/90">
-                        <Tag className="mr-2 h-4 w-4" /> Ver Promoción
+                        {isEvent ? <Calendar className="mr-2 h-4 w-4" /> : <Tag className="mr-2 h-4 w-4" />}
+                         {isEvent ? "Ver Evento" : "Ver Promoción"}
                       </Button>
                     </Link>
                   </CardFooter>
@@ -215,9 +217,9 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="text-center py-20">
-            <p className="text-xl font-semibold">No se encontraron promociones</p>
+            <p className="text-xl font-semibold">No se encontraron resultados</p>
             <p className="text-muted-foreground mt-2">
-              {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas ofertas."}
+              {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas ofertas y eventos."}
             </p>
           </div>
         )}
