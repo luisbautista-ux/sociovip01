@@ -522,56 +522,55 @@ export default function BusinessStaffPage() {
             />
           </div>
         </CardHeader>
-        <CardContent>
-           {isLoading ? (
-             <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg text-muted-foreground">Cargando personal...</p></div>
-           ) : staffMembers.length === 0 && !searchTerm ? (
-             <p className="text-center text-muted-foreground h-24 flex items-center justify-center">No hay personal registrado.</p>
-           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>DNI/CE</TableHead>
-                  <TableHead className="hidden md:table-cell">Email</TableHead>
-                  <TableHead>Roles</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+        
+        {isLoading ? (
+            <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg text-muted-foreground">Cargando personal...</p></div>
+        ) : staffMembers.length === 0 && !searchTerm ? (
+            <CardContent><p className="text-center text-muted-foreground h-24 flex items-center justify-center">No hay personal registrado.</p></CardContent>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>DNI/CE</TableHead>
+                <TableHead className="hidden md:table-cell">Email</TableHead>
+                <TableHead>Roles</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredStaff.map((staff) => (
+                <TableRow key={staff.id}>
+                  <TableCell className="font-medium">{staff.name}</TableCell>
+                  <TableCell>{staff.dni}</TableCell>
+                  <TableCell className="hidden md:table-cell">{staff.email}</TableCell>
+                  <TableCell>
+                    {staff.roles?.map(role => (
+                        <Badge key={role} variant="secondary" className="mr-1 mb-1 text-xs">
+                            {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
+                        </Badge>
+                    ))}
+                  </TableCell>
+                  <TableCell className="text-right space-x-1">
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingUser(staff); setModalStep('user_form'); }} disabled={isSubmitting}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
+                        <ShadcnAlertDialogFooter>
+                          <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
+                        </ShadcnAlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStaff.map((staff) => (
-                  <TableRow key={staff.id}>
-                    <TableCell className="font-medium">{staff.name}</TableCell>
-                    <TableCell>{staff.dni}</TableCell>
-                    <TableCell className="hidden md:table-cell">{staff.email}</TableCell>
-                    <TableCell>
-                      {staff.roles?.map(role => (
-                          <Badge key={role} variant="secondary" className="mr-1 mb-1 text-xs">
-                              {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
-                          </Badge>
-                      ))}
-                    </TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => { setEditingUser(staff); setModalStep('user_form'); }} disabled={isSubmitting}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
-                          <ShadcnAlertDialogFooter>
-                            <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
-                          </ShadcnAlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
       
       <UIDialog open={modalStep !== 'closed'} onOpenChange={(open) => !open && setModalStep('closed')}>
