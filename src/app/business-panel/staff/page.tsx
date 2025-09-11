@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
+import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 
 const DniEntrySchema = z.object({
   docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
@@ -141,11 +142,6 @@ export default function BusinessStaffPage() {
   
   const handleOpenCreateUserFlow = () => {
     setEditingUser(null);
-    setVerifiedDniResult(null); 
-    dniEntryForm.reset({ docType: 'dni', docNumber: "" }); 
-    setShowDniIsPlatformUserAlert(false); 
-    setExistingPlatformUserToEdit(null);
-    setDniForVerification(""); 
     setShowDniEntryModal(true); 
   };
   
@@ -183,8 +179,8 @@ export default function BusinessStaffPage() {
         if (result.userType === 'PlatformUser' && result.platformUserData) {
             setExistingPlatformUserToEdit(result.platformUserData);
             initialData.existingPlatformUser = result.platformUserData;
-            setShowDniEntryModal(false);
             setShowDniIsPlatformUserAlert(true); 
+            setShowDniEntryModal(false);
             return;
         } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
             initialData.name = fetchedNameFromApi || `${result.socioVipData.name} ${result.socioVipData.surname}`;
@@ -202,13 +198,11 @@ export default function BusinessStaffPage() {
   };
   
   const handleEditExistingUser = () => {
-      setShowDniIsPlatformUserAlert(false); 
       if (existingPlatformUserToEdit) {
           setEditingUser(existingPlatformUserToEdit);
-          setVerifiedDniResult(null); 
           setShowCreateEditModal(true); 
       }
-      setExistingPlatformUserToEdit(null);
+      setShowDniIsPlatformUserAlert(false);
   };
 
   const handleCreateOrEditUser = async (data: PlatformUserFormData, isEditing: boolean) => {
