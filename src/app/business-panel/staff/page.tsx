@@ -129,19 +129,6 @@ function PlatformUserForm({
     },
   });
 
-  useEffect(() => {
-    form.reset({
-      uid: user?.uid || undefined,
-      name: user?.name || initialDataForCreation?.name || "",
-      dni: user?.dni || initialDataForCreation?.dni || "",
-      email: user?.email || initialDataForCreation?.email || "",
-      password: "",
-      roles: user?.roles || [],
-      businessId: user?.businessId || null,
-      businessIds: user?.businessIds || [],
-    });
-  }, [user, initialDataForCreation, form]);
-
   const selectedRoles = form.watch("roles", user?.roles || []);
   const showBusinessIdSelector = isSuperAdminView && selectedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
   const showMultipleBusinessSelector = isSuperAdminView && selectedRoles.includes('promoter');
@@ -642,5 +629,3 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
-
-    
