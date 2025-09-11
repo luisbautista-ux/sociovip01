@@ -1,4 +1,4 @@
-# **App Name**: QR Code Customizer
+# **App Name**: Sociovip
 
 ## Core Features:
 

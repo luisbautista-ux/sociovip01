@@ -122,7 +122,6 @@ export default function BusinessPanelValidateQrPage() {
         const entitiesQuery = query(
             collection(db, "businessEntities"), 
             where("businessId", "==", currentBusinessId),
-            where("type", "==", "promotion") // Solo promociones
         );
         const snap = await getDocs(entitiesQuery);
         const allEntities = snap.docs.map(d => ({id: d.id, ...d.data()}) as BusinessManagedEntity);
@@ -153,7 +152,6 @@ export default function BusinessPanelValidateQrPage() {
         collection(db, "businessEntities"),
         where("businessId", "==", currentBusinessId),
         where("isActive", "==", true),
-        where("type", "==", "promotion") // Solo buscar en promociones
       );
       const querySnapshot = await getDocs(entitiesQuery);
 
@@ -361,8 +359,8 @@ export default function BusinessPanelValidateQrPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Promociones Activas Hoy</CardTitle>
-          <CardDescription>Entidades vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
+          <CardTitle>Entidades Activas Hoy</CardTitle>
+          <CardDescription>Promociones y eventos vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
         </CardHeader>
         <CardContent>
           {activeBusinessEntities.length === 0 ? (
@@ -385,7 +383,7 @@ export default function BusinessPanelValidateQrPage() {
                     <p><strong>Vigencia:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(anyToDate(entity.endDate)!, "P", { locale: es }) : 'N/A'}</p>
                     {entity.type === 'event' && <p><strong>{getEventAttendance(entity)}</strong></p>}
                     {entity.type === 'promotion' && entity.usageLimit && entity.usageLimit > 0 && <p><strong>Límite de canjes:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.usageLimit}</p>}
-                    <p><strong>Códigos disponibles:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
+                    <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
                   </AccordionContent>
                 </AccordionItem>
               ))}

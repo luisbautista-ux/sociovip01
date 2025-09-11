@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "QR Code Customizer",
+  title: "SocioVip",
   description: "Upload an image, generate AI tiling, customize QR content, and download.",
 };
 

@@ -122,7 +122,6 @@ export default function LectorValidateQrPage() {
         const entitiesQuery = query(
             collection(db, "businessEntities"), 
             where("businessId", "==", currentBusinessId),
-            where("type", "==", "promotion") // Solo promociones
         );
         const snap = await getDocs(entitiesQuery);
         const allEntities = snap.docs.map(d => ({id: d.id, ...d.data()}) as BusinessManagedEntity);
@@ -153,7 +152,6 @@ export default function LectorValidateQrPage() {
         collection(db, "businessEntities"),
         where("businessId", "==", currentBusinessId),
         where("isActive", "==", true),
-        where("type", "==", "promotion") // Solo buscar en promociones
       );
       const querySnapshot = await getDocs(entitiesQuery);
 
@@ -311,7 +309,7 @@ export default function LectorValidateQrPage() {
                      : `Estado: ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCode.status] || foundCode.status}`}
                   </AlertTitle>
                   <AlertDescription>
-                    {!isEntityCurrentlyActivatable(foundEntity) && `La promoción no está vigente.`}
+                    {!isEntityCurrentlyActivatable(foundEntity) && `La promoción/evento no está vigente.`}
                     {foundCode.status === 'used' && `El cliente ya ingresó el ${anyToDate(foundCode.usedDate) ? format(anyToDate(foundCode.usedDate)!, 'Pp', {locale: es}) : ''}`}
                     {foundCode.status === 'available' && `Este código aún no ha sido reclamado por un cliente (no se ha generado su QR).`}
                     {foundCode.status === 'expired' && `Este código ha expirado.`}
@@ -322,7 +320,7 @@ export default function LectorValidateQrPage() {
                 <p className="text-sm text-muted-foreground">{foundEntity.description}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div><CalendarDays className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Vigencia:</strong> {anyToDate(foundEntity.startDate) ? format(anyToDate(foundEntity.startDate)!, "P", { locale: es }) : 'N/A'} - {anyToDate(foundEntity.endDate) ? format(anyToDate(foundEntity.endDate)!, "P", { locale: es }) : 'N/A'}</div>
-                  <div><Ticket className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Tipo:</strong> Promoción</div>
+                  <div><Ticket className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Tipo:</strong> {foundEntity.type === 'promotion' ? "Promoción" : "Evento"}</div>
                   {foundCode.redeemedByInfo && <div><User className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Cliente:</strong> {foundCode.redeemedByInfo.name} (DNI: {foundCode.redeemedByInfo.dni})</div>}
                   {foundCode.redemptionDate && <div><Clock className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Fecha de Canje (QR):</strong> {anyToDate(foundCode.redemptionDate) ? format(anyToDate(foundCode.redemptionDate)!, "Pp", { locale: es }) : 'N/A'}</div>}
                   {foundCode.usedByInfo && <div><UserCheck className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Validado por:</strong> {foundCode.usedByInfo.name}</div>}
@@ -355,19 +353,19 @@ export default function LectorValidateQrPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Promociones Activas Hoy</CardTitle>
-          <CardDescription>Entidades vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
+          <CardTitle>Entidades Activas Hoy</CardTitle>
+          <CardDescription>Promociones y eventos vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
         </CardHeader>
         <CardContent>
           {activeBusinessEntities.length === 0 ? (
-            <p className="text-muted-foreground">No hay promociones activas para hoy.</p>
+            <p className="text-muted-foreground">No hay promociones o eventos activos para hoy.</p>
           ) : (
             <Accordion type="single" collapsible className="w-full">
               {activeBusinessEntities.map(entity => (
                 <AccordionItem value={entity.id} key={entity.id}>
                   <AccordionTrigger>
                     <div className="flex items-center gap-2">
-                        <Ticket className="h-5 w-5 text-primary"/>
+                        {entity.type === 'promotion' ? <Ticket className="h-5 w-5 text-primary"/> : <CalendarDays className="h-5 w-5 text-primary"/>}
                         <span>{entity.name}</span>
                         <Badge variant={entity.isActive ? "default" : "outline"} className={entity.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
                             {entity.isActive ? "Activa" : "Inactiva"}
@@ -377,8 +375,9 @@ export default function LectorValidateQrPage() {
                   <AccordionContent className="space-y-1 text-sm pl-8">
                     <p>{entity.description}</p>
                     <p><strong>Vigencia:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(anyToDate(entity.endDate)!, "P", { locale: es }) : 'N/A'}</p>
+                    {entity.type === 'event' && <p><strong>Aforo:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.maxAttendance === 0 || !entity.maxAttendance ? '∞' : entity.maxAttendance}</p>}
                     {entity.type === 'promotion' && entity.usageLimit && entity.usageLimit > 0 && <p><strong>Límite de canjes:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.usageLimit}</p>}
-                    <p><strong>Códigos disponibles:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
+                    <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
                   </AccordionContent>
                 </AccordionItem>
               ))}
