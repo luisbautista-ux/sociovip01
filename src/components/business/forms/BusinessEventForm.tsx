@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import Switch from "@/components/ui/switch";
+import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
 import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
@@ -242,4 +242,3 @@ React.useEffect(() => {
 BusinessEventForm.displayName = "BusinessEventForm";
 
   
-
