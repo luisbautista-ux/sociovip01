@@ -79,10 +79,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as UIDialogDescription,
   AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
-  AlertDialogTitle as UIAlertDialogTitleAliased,
+  AlertDialogTitle as UIAlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import React from "react";
@@ -1068,8 +1068,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased>
-                            <AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription>
+                            <UIAlertDialogTitle>¿Cerrar Sesión?</UIAlertDialogTitle>
+                            <UIDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescription>
                           </AlertDialogHeader>
                           <ShadcnAlertDialogFooterAliased>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -1272,8 +1272,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased>
-                          <AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription>
+                          <UIAlertDialogTitle>¿Cerrar Sesión?</UIAlertDialogTitle>
+                          <UIDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescription>
                         </AlertDialogHeader>
                         <ShadcnAlertDialogFooterAliased>
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -1569,11 +1569,11 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
       <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
-            <UIDialogDescriptionComponent>
+            <UIAlertDialogTitle className="font-semibold">DNI Ya Registrado</UIAlertDialogTitle>
+            <UIDialogDescription>
               El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los
               datos existentes para generar tu QR?
-            </UIDialogDescriptionComponent>
+            </UIDialogDescription>
           </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
             <AlertDialogCancel

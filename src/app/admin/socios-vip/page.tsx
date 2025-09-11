@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { SocioVipMemberForm } from "@/components/admin/forms/SocioVipMemberForm";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription2, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { MEMBERSHIP_STATUS_TRANSLATIONS, MEMBERSHIP_STATUS_COLORS, MESES_DEL_ANO_ES, PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, query, where, DocumentData } from "firebase/firestore";
@@ -534,10 +534,10 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
-                              <AlertDialogDescription>
+                              <UIDialogDescription2>
                                 Esta acción no se puede deshacer. Esto eliminará permanentemente al socio
                                 <span className="font-semibold"> {member.name} {member.surname}</span>.
-                              </AlertDialogDescription>
+                              </UIDialogDescription2>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
@@ -701,12 +701,12 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             <UIAlertDialogTitle className="flex items-center">
                 <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> DNI/CE ya Registrado como Socio VIP
             </UIAlertDialogTitle>
-            <AlertDialogDescription>
+            <UIDialogDescription2>
               El DNI/CE <span className="font-semibold">{dniForSocioVerification}</span> ya está registrado como Socio VIP
               (<span className="font-semibold">{existingSocioVipToEdit?.name} {existingSocioVipToEdit?.surname}</span>).
               <br/><br/>
               ¿Desea editar este perfil de Socio VIP existente?
-            </AlertDialogDescription>
+            </UIDialogDescription2>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => { setShowDniIsAlreadySocioVipAlert(false); setExistingSocioVipToEdit(null); }}>No, Cancelar</AlertDialogCancel>
