@@ -12,8 +12,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter, 
-  DialogDescription
+  DialogFooter
 } from "@/components/ui/dialog";
 import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -27,14 +26,12 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
 import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDialog';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Input } from '@/components/ui/input';
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -262,8 +259,6 @@ export default function BusinessEventsPage() {
     const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
-    const [openPromoterPopover, setOpenPromoterPopover] = useState(false);
-
 
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
@@ -398,13 +393,13 @@ export default function BusinessEventsPage() {
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
-                        <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
+                        <UIAlertDialogTitle>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</UIAlertDialogTitle>
                     </DialogHeader>
                     
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
                         <TabsList className="w-full grid grid-cols-4">
                             <TabsTrigger value="details">Detalles</TabsTrigger>
-                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || localEventState.maxAttendance || 'Ilimitado'})</TabsTrigger>
+                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
                             <TabsTrigger value="boxes">Boxes</TabsTrigger>
                             <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
                         </TabsList>
@@ -438,7 +433,7 @@ export default function BusinessEventsPage() {
                                                          <AlertDialog>
                                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                                                             <AlertDialogContent>
-                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</AlertDialogDescription></AlertDialogHeader>
+                                                                <AlertDialogHeader><UIAlertDialogTitle>¿Eliminar entrada?</UIAlertDialogTitle><AlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</AlertDialogDescription></AlertDialogHeader>
                                                                 <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                             </AlertDialogContent>
                                                          </AlertDialog>
@@ -553,7 +548,7 @@ export default function BusinessEventsPage() {
       </div>
 
       {!currentBusinessId && !isLoading ? (
-          <Card><CardHeader><AlertDialogTitle className="text-destructive">Negocio no identificado</AlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
+          <Card><CardHeader><UIAlertDialogTitle className="text-destructive">Negocio no identificado</UIAlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
       ) : isLoading ? (
           <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
       ) : events.length === 0 ? (
@@ -600,7 +595,7 @@ export default function BusinessEventsPage() {
                         <AlertDialog>
                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                             <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
                             <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -626,6 +621,8 @@ export default function BusinessEventsPage() {
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
+          maxAttendance={selectedEntityForCreatingCodes.maxAttendance}
+          currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
         />
       )}
 
@@ -655,6 +652,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 

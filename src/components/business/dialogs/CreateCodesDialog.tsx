@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -6,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { GeneratedCode } from "@/lib/types";
-import { CheckCircle, Copy, PlusCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Alert } from "@/components/ui/alert";
 
 function generateAlphanumericCode(length: number): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -29,7 +31,9 @@ interface CreateCodesDialogProps {
   existingCodesValues: string[]; 
   isSubmittingMain?: boolean; 
   currentUserProfileName?: string;
-  currentUserProfileUid?: string; // UID del promotor o usuario de negocio
+  currentUserProfileUid?: string;
+  maxAttendance?: number;
+  currentCodeCount?: number;
 }
 
 export function CreateCodesDialog({ 
@@ -42,6 +46,8 @@ export function CreateCodesDialog({
     isSubmittingMain = false, 
     currentUserProfileName,
     currentUserProfileUid,
+    maxAttendance,
+    currentCodeCount = 0,
 }: CreateCodesDialogProps) {
   const [numCodes, setNumCodes] = useState(1);
   const [observation, setObservation] = useState("");
@@ -49,6 +55,13 @@ export function CreateCodesDialog({
   const [justCreatedCodes, setJustCreatedCodes] = useState<GeneratedCode[]>([]);
   const [isCreating, setIsCreating] = useState(false); 
   const { toast } = useToast();
+
+  const maxCodesCanCreate = useMemo(() => {
+    if (maxAttendance && maxAttendance > 0) {
+      return Math.max(0, maxAttendance - currentCodeCount);
+    }
+    return 50; // Default max per batch if no attendance limit
+  }, [maxAttendance, currentCodeCount]);
 
   useEffect(() => {
     if (open) {
@@ -61,14 +74,24 @@ export function CreateCodesDialog({
   }, [open]);
 
   const handleCreateCodes = () => {
-    if (numCodes < 1 || numCodes > 50) { 
+    if (numCodes < 1 || numCodes > Math.min(50, maxCodesCanCreate === 0 && maxAttendance && maxAttendance > 0 ? 0 : 50)) { 
       toast({
         title: "Cantidad Inválida",
-        description: "Por favor, ingresa un número entre 1 y 50.",
+        description: `Por favor, ingresa un número entre 1 y ${Math.min(50, maxCodesCanCreate || 50)}.`,
         variant: "destructive",
       });
       return;
     }
+
+    if (maxAttendance && maxAttendance > 0 && (currentCodeCount + numCodes > maxAttendance)) {
+       toast({
+        title: "Límite de Aforo Excedido",
+        description: `Solo puedes crear ${maxCodesCanCreate} código(s) más para no superar el aforo de ${maxAttendance}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsCreating(true);
 
     const newCodesBatch: GeneratedCode[] = [];
@@ -131,6 +154,8 @@ export function CreateCodesDialog({
     onOpenChange(false); 
   };
 
+  const canCreateAnyCodes = !maxAttendance || maxAttendance === 0 || maxCodesCanCreate > 0;
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
         if (!isOpen) { 
@@ -156,17 +181,26 @@ export function CreateCodesDialog({
         
         {!showSuccess ? (
           <div className="space-y-4 py-4">
+             {maxAttendance && maxAttendance > 0 && (
+                <Alert variant={canCreateAnyCodes ? "default" : "destructive"}>
+                    {canCreateAnyCodes ? <Info className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                    <DialogTitle>{canCreateAnyCodes ? "Información de Aforo" : "Aforo Completo"}</DialogTitle>
+                    <DialogDescription>
+                    {canCreateAnyCodes ? `Este evento tiene un aforo de ${maxAttendance}. Actualmente hay ${currentCodeCount} códigos. Puedes crear hasta ${maxCodesCanCreate} más.` : `Ya se ha alcanzado el aforo máximo de ${maxAttendance} códigos para este evento.`}
+                    </DialogDescription>
+                </Alert>
+             )}
             <div>
-              <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">Cantidad de Códigos (1-50) <span className="text-destructive">*</span></Label>
+              <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span></Label>
               <Input
                 id="numCodesToGenerate"
                 type="number"
                 min="1"
-                max="50"
+                max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
                 value={numCodes}
                 onChange={(e) => setNumCodes(parseInt(e.target.value, 10) || 1)}
                 className="mt-1"
-                disabled={isCreating || isSubmittingMain}
+                disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
               />
             </div>
             <div>
@@ -178,7 +212,7 @@ export function CreateCodesDialog({
                 onChange={(e) => setObservation(e.target.value)}
                 className="mt-1"
                 rows={3}
-                disabled={isCreating || isSubmittingMain}
+                disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
               />
             </div>
           </div>
@@ -203,7 +237,7 @@ export function CreateCodesDialog({
           ) : (
             <>
               <Button variant="outline" onClick={handleCloseAndReset} disabled={isCreating || isSubmittingMain}>Cancelar</Button>
-              <Button onClick={handleCreateCodes} className="bg-primary hover:bg-primary/90" disabled={isCreating || isSubmittingMain}>
+              <Button onClick={handleCreateCodes} className="bg-primary hover:bg-primary/90" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}>
                 {(isCreating || isSubmittingMain) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <PlusCircle className="mr-2 h-4 w-4" /> Crear Códigos
               </Button>
