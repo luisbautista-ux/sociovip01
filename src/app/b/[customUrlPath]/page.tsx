@@ -52,6 +52,7 @@ import {
   AlertTriangle,
   Info,
   Download,
+  Calendar
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -242,8 +243,7 @@ export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
         const entitiesQuery = query(
           collection(db, "businessEntities"),
           where("businessId", "==", fetchedBusiness.id),
-          where("isActive", "==", true),
-          where("type", "==", "promotion") // Only fetch promotions
+          where("isActive", "==", true)
         );
         const entitiesSnapshot = await getDocs(entitiesQuery);
 
@@ -889,6 +889,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
       resolver: zodResolver(specificCodeFormSchema),
       defaultValues: { specificCode: "" },
     });
+    
+    const isEvent = entity.type === 'event';
 
     return (
       <Form {...form}>
@@ -925,8 +927,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105 h-9"
             disabled={isLoadingQrFlow}
           >
-            {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />}
-            Generar QR
+            {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (isEvent ? <Calendar className="h-4 w-4 mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />)}
+            {isEvent ? "Obtener Entrada" : "Generar QR"}
           </Button>
         </form>
       </Form>
@@ -1104,6 +1106,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
   if (!businessDetails) return null;
 
   const promotions = activeEntitiesForBusiness.filter((e) => e.type === "promotion");
+  const events = activeEntitiesForBusiness.filter((e) => e.type === "event");
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -1166,8 +1169,47 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             </div>
           </section>
         )}
+        
+        {events.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
+              <Calendar className="h-8 w-8 mr-3" /> Próximos Eventos
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {events.map((event) => (
+                <Card
+                  key={event.id}
+                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card"
+                >
+                  <div className="relative aspect-[16/9] w-full">
+                    <NextImage
+                      src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
+                      alt={event.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover"
+                      data-ai-hint={event.aiHint || "party concert"}
+                    />
+                  </div>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl">{event.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow space-y-1">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}
+                    </p>
+                  </CardContent>
+                  <CardFooter className="flex-col items-start p-4 border-t">
+                    <SpecificCodeEntryForm entity={event} />
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
 
-        {!isLoading && !error && promotions.length === 0 && pageViewState === "entityList" && (
+        {!isLoading && !error && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
           <Card className="col-span-full">
             <CardHeader className="text-center">
               <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -1175,7 +1217,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             </CardHeader>
             <CardContent className="text-center">
               <CardDescription>
-                Este negocio no tiene promociones activos en este momento. ¡Vuelve pronto!
+                Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!
               </CardDescription>
             </CardContent>
           </Card>
