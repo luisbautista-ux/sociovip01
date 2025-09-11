@@ -1,64 +1,64 @@
 
-  "use client";
+"use client";
 
-  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-  import { Button } from "@/components/ui/button";
-  import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
-  import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info } from "lucide-react";
-  import type { BusinessPromoterLink, PromoterProfile, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember } from "@/lib/types";
-  import { format, parseISO } from "date-fns";
-  import { es } from "date-fns/locale";
-  import React, { useState, useEffect, useCallback } from "react";
-  import { Input } from "@/components/ui/input";
-  import { useToast } from "@/hooks/use-toast";
-  import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
- 
-  import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
-  import { useAuth } from "@/context/AuthContext";
-  import { db } from "@/lib/firebase";
-  import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch, getDoc } from "firebase/firestore";
-  import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook, FormDescription } from "@/components/ui/form";
-  import { zodResolver } from "@hookform/resolvers/zod";
-  import { useForm } from "react-hook-form";
-  import { z } from "zod";
-  import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-  import { Label } from "@/components/ui/label";
-  import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
+import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info } from "lucide-react";
+import type { BusinessPromoterLink, PromoterProfile, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember } from "@/lib/types";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
+import React, { useState, useEffect, useCallback } from "react";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-
-  const DniEntrySchema = z.object({
-    docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
-    docNumber: z.string().min(1, "El número de documento es requerido."),
-  }).superRefine((data, ctx) => {
-      if (data.docType === 'dni') {
-          if (!/^\d{8}$/.test(data.docNumber)) {
-              ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  message: "El DNI debe contener exactamente 8 dígitos numéricos.",
-                  path: ['docNumber'],
-              });
-          }
-      } else if (data.docType === 'ce') {
-          if (!/^\d{10,20}$/.test(data.docNumber)) {
-              ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
-                  path: ['docNumber'],
-              });
-          }
-      }
-  });
-  type DniEntryValues = z.infer<typeof DniEntrySchema>;
+import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch, getDoc } from "firebase/firestore";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage as FormMessageHook, FormDescription } from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 
 
-  interface CheckDniForPromoterResult {
-    dni: string;
-    existingLink?: BusinessPromoterLink;
-    existingPlatformUserPromoter?: PlatformUser;
-    qrClientData?: QrClient;
-    socioVipData?: SocioVipMember;
-  }
+const DniEntrySchema = z.object({
+  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
+  docNumber: z.string().min(1, "El número de documento es requerido."),
+}).superRefine((data, ctx) => {
+    if (data.docType === 'dni') {
+        if (!/^\d{8}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El DNI debe contener exactamente 8 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    } else if (data.docType === 'ce') {
+        if (!/^\d{10,20}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    }
+});
+type DniEntryValues = z.infer<typeof DniEntrySchema>;
+
+
+interface CheckDniForPromoterResult {
+  dni: string;
+  existingLink?: BusinessPromoterLink;
+  existingPlatformUserPromoter?: PlatformUser;
+  qrClientData?: QrClient;
+  socioVipData?: SocioVipMember;
+}
 
 const promoterFormSchemaBase = z.object({
   promoterDni: z.string(), 
@@ -265,7 +265,9 @@ function BusinessPromoterForm({
     const { toast } = useToast();
     
     // State for modal visibility control
-    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
+    const [showDniEntryModal, setShowDniEntryModal] = useState(false);
+    const [showPromoterFormModal, setShowPromoterFormModal] = useState(false);
+    
     const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     
@@ -373,7 +375,7 @@ function BusinessPromoterForm({
       setEditingPromoterLink(null);
       setVerifiedPromoterDniResult(null);
       dniEntryForm.reset({ docType: 'dni', docNumber: "" });
-      setModalStep('dni_entry');
+      setShowDniEntryModal(true);
     };
 
     const handlePromoterDniVerificationSubmit = async (values: DniEntryValues) => {
@@ -428,11 +430,12 @@ function BusinessPromoterForm({
 
       if (checkResult.existingLink) {
           setPromoterLinkToEditFromAlert(checkResult.existingLink);
-          setModalStep('closed');
+          setShowDniEntryModal(false);
           setShowAlreadyLinkedAlert(true);
       } else {
           setVerifiedPromoterDniResult(checkResult); 
-          setModalStep('promoter_form');
+          setShowDniEntryModal(false);
+          setShowPromoterFormModal(true);
       }
     };
     
@@ -440,7 +443,7 @@ function BusinessPromoterForm({
       if (promoterLinkToEditFromAlert) {
           setEditingPromoterLink(promoterLinkToEditFromAlert);
           setVerifiedPromoterDniResult(null); 
-          setModalStep('promoter_form');
+          setShowPromoterFormModal(true);
       }
       setShowAlreadyLinkedAlert(false);
       setPromoterLinkToEditFromAlert(null);
@@ -511,7 +514,8 @@ function BusinessPromoterForm({
           toast({ title: "Promotor Creado y Vinculado", description: `Se creó el usuario para ${data.promoterName}.` });
         }
         
-        setModalStep('closed');
+        setShowDniEntryModal(false);
+        setShowPromoterFormModal(false);
         setEditingPromoterLink(null);
         setVerifiedPromoterDniResult(null);
         fetchPromoterLinks();
@@ -651,7 +655,7 @@ function BusinessPromoterForm({
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">{link.joinDate ? format(parseISO(link.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-right space-x-1">
-                            <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
+                            <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setShowPromoterFormModal(true); }} disabled={isSubmitting}>
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Editar</span>
                             </Button>
@@ -698,37 +702,37 @@ function BusinessPromoterForm({
           </Card>
         )}
         
-        <UIDialog open={modalStep !== 'closed'} onOpenChange={(isOpen) => !isOpen && setModalStep('closed')}>
-          <UIDialogContent className="sm:max-w-md">
-            {modalStep === 'dni_entry' ? (
-              <>
+        <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
+            <UIDialogContent className="sm:max-w-md">
                 <UIDialogHeader>
-                  <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
-                  <UIDialogDescription>
+                    <UIDialogTitle>Paso 1: Verificar Documento del Promotor</UIDialogTitle>
+                    <UIDialogDescription>
                     Ingresa el documento del promotor para verificar si ya existe o está vinculado.
-                  </UIDialogDescription>
+                    </UIDialogDescription>
                 </UIDialogHeader>
                 <Form {...dniEntryForm}>
-                  <form onSubmit={dniEntryForm.handleSubmit(handlePromoterDniVerificationSubmit)} className="space-y-4 py-2">
-                    <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
-                      <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
-                                <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-promoter" className="sr-only" /></FormControl>DNI</Label></FormItem>
-                                <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-promoter" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
-                      </RadioGroup></FormControl><FormMessageHook /></FormItem>
-                    )} />
-                    <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
-                      <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} {...field} maxLength={watchedDocType === 'dni' ? 8 : 20} onChange={(e) => { const numericValue = e.target.value.replace(/[^0-9]/g, ''); field.onChange(numericValue); }} autoFocus disabled={isSubmitting} /></FormControl><FormMessageHook /></FormItem>
-                    )} />
-                    <DialogFooter className="pt-2">
-                      <Button type="button" variant="outline" onClick={() => setModalStep('closed')} disabled={isSubmitting}>Cancelar</Button>
-                      <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button>
-                    </DialogFooter>
-                  </form>
+                    <form onSubmit={dniEntryForm.handleSubmit(handlePromoterDniVerificationSubmit)} className="space-y-4 py-2">
+                        <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
+                        <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
+                                    <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-promoter" className="sr-only" /></FormControl>DNI</Label></FormItem>
+                                    <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-promoter" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-promoter" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
+                        </RadioGroup></FormControl><FormMessageHook /></FormItem>
+                        )} />
+                        <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
+                        <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} {...field} maxLength={watchedDocType === 'dni' ? 8 : 20} onChange={(e) => { const numericValue = e.target.value.replace(/[^0-9]/g, ''); field.onChange(numericValue); }} autoFocus disabled={isSubmitting} /></FormControl><FormMessageHook /></FormItem>
+                        )} />
+                        <DialogFooter className="pt-2">
+                        <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>Cancelar</Button>
+                        <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button>
+                        </DialogFooter>
+                    </form>
                 </Form>
-              </>
-            ) : modalStep === 'promoter_form' ? (
-              <>
-                <UIDialogHeader>
+            </UIDialogContent>
+        </UIDialog>
+        
+        <UIDialog open={showPromoterFormModal} onOpenChange={setShowPromoterFormModal}>
+            <UIDialogContent className="sm:max-w-lg">
+                 <UIDialogHeader>
                   <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
                   <UIDialogDescription>
                       {editingPromoterLink 
@@ -747,12 +751,10 @@ function BusinessPromoterForm({
                   promoterLinkToEdit={editingPromoterLink || undefined}
                   initialData={verifiedPromoterDniResult || undefined}
                   onSubmit={handleAddOrEditPromoterLink}
-                  onCancel={() => setModalStep('closed')}
+                  onCancel={() => setShowPromoterFormModal(false)}
                   isSubmitting={isSubmitting}
                 />
-              </>
-            ) : null}
-          </UIDialogContent>
+            </UIDialogContent>
         </UIDialog>
 
         <AlertDialog open={showAlreadyLinkedAlert} onOpenChange={setShowAlreadyLinkedAlert}>
@@ -778,5 +780,3 @@ function BusinessPromoterForm({
       </div>
     );
   }
-
-    
