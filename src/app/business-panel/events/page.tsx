@@ -27,7 +27,7 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
@@ -137,8 +137,26 @@ export default function BusinessEventsPage() {
             assignedPromoters: event.assignedPromoters || [],
             generatedCodes: [],
         });
-    } else {
-        setEditingEvent(event);
+    } else if (event) { // Editing existing event
+      setEditingEvent(event);
+    } else { // Creating a new event from scratch
+      const now = new Date();
+      const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      setEditingEvent({
+        id: '',
+        businessId: currentBusinessId || '',
+        type: 'event',
+        name: '',
+        description: '',
+        startDate: now.toISOString(),
+        endDate: oneWeekFromNow.toISOString(),
+        isActive: true,
+        generatedCodes: [],
+        ticketTypes: [],
+        eventBoxes: [],
+        assignedPromoters: [],
+        maxAttendance: 0,
+      });
     }
     setIsManageEventDialogOpen(true);
   };
@@ -434,7 +452,7 @@ export default function BusinessEventsPage() {
                                                          <AlertDialog>
                                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                                                             <AlertDialogContent>
-                                                                <AlertDialogHeader><UIAlertDialogTitle>¿Eliminar entrada?</UIAlertDialogTitle><UIDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><UIDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIDialogDescription></AlertDialogHeader>
                                                                 <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                             </AlertDialogContent>
                                                          </AlertDialog>
@@ -549,7 +567,7 @@ export default function BusinessEventsPage() {
       </div>
 
       {!currentBusinessId && !isLoading ? (
-          <Card><CardHeader><UIAlertDialogTitle className="text-destructive">Negocio no identificado</UIAlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
+          <Card><CardHeader><AlertDialogTitle className="text-destructive">Negocio no identificado</AlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
       ) : isLoading ? (
           <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
       ) : events.length === 0 ? (
@@ -596,7 +614,7 @@ export default function BusinessEventsPage() {
                         <AlertDialog>
                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                             <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
                             <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -622,7 +640,11 @@ export default function BusinessEventsPage() {
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
-          maxAttendance={selectedEntityForCreatingCodes.maxAttendance}
+          maxAttendance={
+            (selectedEntityForCreatingCodes.maxAttendance && selectedEntityForCreatingCodes.maxAttendance > 0)
+            ? selectedEntityForCreatingCodes.maxAttendance
+            : calculateMaxAttendance(selectedEntityForCreatingCodes.ticketTypes)
+          }
           currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
         />
       )}
@@ -653,6 +675,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
