@@ -119,7 +119,11 @@ export default function BusinessPanelValidateQrPage() {
   const fetchActiveEntities = useCallback(async () => {
     if (!currentBusinessId) return;
     try {
-        const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
+        const entitiesQuery = query(
+            collection(db, "businessEntities"), 
+            where("businessId", "==", currentBusinessId),
+            where("type", "==", "promotion") // Solo promociones
+        );
         const snap = await getDocs(entitiesQuery);
         const allEntities = snap.docs.map(d => ({id: d.id, ...d.data()}) as BusinessManagedEntity);
         const currentlyActive = allEntities.filter(e => isEntityCurrentlyActivatable(e));
@@ -148,7 +152,8 @@ export default function BusinessPanelValidateQrPage() {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
         where("businessId", "==", currentBusinessId),
-        where("isActive", "==", true)
+        where("isActive", "==", true),
+        where("type", "==", "promotion") // Solo buscar en promociones
       );
       const querySnapshot = await getDocs(entitiesQuery);
 
@@ -356,7 +361,7 @@ export default function BusinessPanelValidateQrPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Promociones y Eventos Activos Hoy</CardTitle>
+          <CardTitle>Promociones Activas Hoy</CardTitle>
           <CardDescription>Entidades vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
         </CardHeader>
         <CardContent>
