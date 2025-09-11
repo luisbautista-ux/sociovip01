@@ -27,7 +27,7 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIAlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
@@ -133,7 +133,7 @@ export default function BusinessEventsPage() {
             name: `${event.name} (Copia)`,
             isActive: true,
             createdAt: undefined,
-            maxAttendance: 0,
+            maxAttendance: event.maxAttendance, // Keep maxAttendance
             ticketTypes: event.ticketTypes || [],
             eventBoxes: event.eventBoxes || [],
             assignedPromoters: event.assignedPromoters || [],
@@ -262,6 +262,8 @@ export default function BusinessEventsPage() {
     const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
+    const [openPromoterPopover, setOpenPromoterPopover] = useState(false);
+
 
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
@@ -402,7 +404,7 @@ export default function BusinessEventsPage() {
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
                         <TabsList className="w-full grid grid-cols-4">
                             <TabsTrigger value="details">Detalles</TabsTrigger>
-                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes)})</TabsTrigger>
+                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || localEventState.maxAttendance || 'Ilimitado'})</TabsTrigger>
                             <TabsTrigger value="boxes">Boxes</TabsTrigger>
                             <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
                         </TabsList>
@@ -436,7 +438,7 @@ export default function BusinessEventsPage() {
                                                          <AlertDialog>
                                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                                                             <AlertDialogContent>
-                                                                <AlertDialogHeader><UIAlertDialogTitle>¿Eliminar entrada?</UIAlertDialogTitle><UIAlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIAlertDialogDescription></AlertDialogHeader>
+                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</AlertDialogDescription></AlertDialogHeader>
                                                                 <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                             </AlertDialogContent>
                                                          </AlertDialog>
@@ -551,7 +553,7 @@ export default function BusinessEventsPage() {
       </div>
 
       {!currentBusinessId && !isLoading ? (
-          <Card><CardHeader><UIAlertDialogTitle className="text-destructive">Negocio no identificado</UIAlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
+          <Card><CardHeader><AlertDialogTitle className="text-destructive">Negocio no identificado</AlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
       ) : isLoading ? (
           <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
       ) : events.length === 0 ? (
@@ -576,11 +578,16 @@ export default function BusinessEventsPage() {
               <TableBody>
                 {events.map(event => {
                   const isActivatable = isEntityCurrentlyActivatable(event);
+                  const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
+                  const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
+                    ? event.maxAttendance
+                    : (attendanceFromTickets > 0 ? attendanceFromTickets : "Ilimitado");
+                  
                   return (
                     <TableRow key={event.id}>
                       <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                      <TableCell>{calculateMaxAttendance(event.ticketTypes) || (event.maxAttendance || "Ilimitado")}</TableCell>
+                      <TableCell>{displayAttendance}</TableCell>
                       <TableCell>
                         <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
                           {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
@@ -593,7 +600,7 @@ export default function BusinessEventsPage() {
                         <AlertDialog>
                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                             <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><UIAlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIAlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
                             <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -648,6 +655,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
