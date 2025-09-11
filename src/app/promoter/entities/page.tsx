@@ -85,7 +85,8 @@ export default function PromoterEntitiesPage() {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
         where("businessId", "in", assignedBusinessIds),
-        where("isActive", "==", true)
+        where("isActive", "==", true),
+        where("type", "==", "promotion") // Filter for promotions only
       );
       const entitiesSnap = await getDocs(entitiesQuery);
       
@@ -133,7 +134,7 @@ export default function PromoterEntitiesPage() {
 
     } catch (error: any) {
       console.error("Promoter Entities Page: Error fetching assigned entities:", error.code, error.message, error);
-      toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones/eventos asignados. ${error.message}`, variant: "destructive"});
+      toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones asignadas. ${error.message}`, variant: "destructive"});
       setEntities([]);
       setBusinessesMap(new Map());
     } finally {
@@ -169,7 +170,7 @@ export default function PromoterEntitiesPage() {
       const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
       
       const newCodesWithDetails: GeneratedCode[] = newCodes.map((code, index) => (sanitizeObjectForFirestore({
-        id: code.id || `code-${entityId}-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 9)}`,
+        id: code.id || `code-${entityId}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
         entityId: entityId,
         value: code.value,
         status: 'available',
@@ -255,7 +256,7 @@ export default function PromoterEntitiesPage() {
     if (!isEntityCurrentlyActivatable(entity)) {
       toast({ 
         title: "Acción no permitida", 
-        description: "Esta promoción o evento no está activo o está fuera de su periodo de vigencia.", 
+        description: "Esta promoción no está activa o está fuera de su periodo de vigencia.", 
         variant: "destructive"
       });
       return;
@@ -278,7 +279,7 @@ export default function PromoterEntitiesPage() {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando promociones y eventos asignados...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Cargando promociones asignadas...</p>
       </div>
     );
   }
@@ -287,7 +288,7 @@ export default function PromoterEntitiesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <h1 className="text-3xl font-bold text-primary flex items-center">
-          <Gift className="h-8 w-8 mr-2" /> Promociones y Eventos Asignados
+          <Gift className="h-8 w-8 mr-2" /> Promociones Asignadas
         </h1>
       </div>
       
@@ -301,7 +302,7 @@ export default function PromoterEntitiesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[300px]">Promociones y Eventos</TableHead>
+                    <TableHead className="min-w-[300px]">Promoción</TableHead>
                     <TableHead className="min-w-[250px]">Mis Códigos y QRs</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -357,7 +358,7 @@ export default function PromoterEntitiesPage() {
           ) : (
              !isLoading && <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
                 <Info className="h-10 w-10 mb-2 text-primary/70"/>
-                <p className="font-semibold">No tienes promociones o eventos activos asignados.</p>
+                <p className="font-semibold">No tienes promociones activas asignadas.</p>
                 <p className="text-sm">Contacta a los negocios para que te asignen a sus campañas.</p>
             </div>
           )}
@@ -397,7 +398,7 @@ export default function PromoterEntitiesPage() {
                  } else {
                     toast({
                         title: "Acción no permitida",
-                        description: "Esta promoción o evento no está activo o está fuera de su periodo de vigencia.",
+                        description: "Esta promoción no está activa o está fuera de su periodo de vigencia.",
                         variant: "destructive",
                     });
                  }
