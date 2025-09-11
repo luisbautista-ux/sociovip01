@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Calendar, Loader2, Info, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { PlusCircle, Edit, Trash2, Calendar, Loader2, Info } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
@@ -19,8 +19,9 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
+import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 
 export default function BusinessEventsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -88,10 +89,10 @@ export default function BusinessEventsPage() {
             name: `${event.name} (Copia)`,
             isActive: true,
             createdAt: undefined,
-            maxAttendance: 0, // Reset attendance
-            ticketTypes: [], // Reset tickets
-            eventBoxes: [], // Reset boxes
-            assignedPromoters: [], // Reset promoters
+            maxAttendance: 0,
+            ticketTypes: [],
+            eventBoxes: [],
+            assignedPromoters: [],
         });
     } else {
         setEditingEvent(event);
@@ -156,36 +157,44 @@ export default function BusinessEventsPage() {
     const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
 
     useEffect(() => {
-      if (isManageEventDialogOpen) {
-        if (editingEvent) {
-            setLocalEventState({ ...editingEvent });
+        if (isManageEventDialogOpen) {
+            if (editingEvent) {
+                setLocalEventState({ ...editingEvent });
+            } else {
+                const now = new Date();
+                const endDate = new Date(now);
+                endDate.setDate(now.getDate() + 7);
+                setLocalEventState({
+                    id: '',
+                    businessId: currentBusinessId || '',
+                    type: 'event',
+                    name: '',
+                    description: '',
+                    startDate: now.toISOString(),
+                    endDate: endDate.toISOString(),
+                    isActive: true,
+                    maxAttendance: 0,
+                    ticketTypes: [],
+                    eventBoxes: [],
+                    assignedPromoters: []
+                });
+            }
         } else {
-            const now = new Date();
-            const endDate = new Date(now);
-            endDate.setDate(now.getDate() + 7);
-            setLocalEventState({
-                id: '',
-                businessId: currentBusinessId || '',
-                type: 'event',
-                name: '',
-                description: '',
-                startDate: now.toISOString(),
-                endDate: endDate.toISOString(),
-                isActive: true,
-                maxAttendance: 0,
-                ticketTypes: [],
-                eventBoxes: [],
-                assignedPromoters: []
-            });
+            setLocalEventState(null);
         }
-      } else {
-        setLocalEventState(null);
-      }
     }, [isManageEventDialogOpen, editingEvent]);
 
-    const handleLocalDetailsChange = (values: EventDetailsFormValues) => {
+    const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
         setLocalEventState(prev => prev ? { ...prev, ...values } : null);
-    };
+    }, []);
+
+    const handleTicketTypesChange = useCallback((newTicketTypes: TicketType[]) => {
+        setLocalEventState(prev => prev ? { ...prev, ticketTypes: newTicketTypes, maxAttendance: calculateMaxAttendance(newTicketTypes) } : null);
+    }, []);
+
+    const handleBoxesChange = useCallback((newBoxes: EventBox[]) => {
+        setLocalEventState(prev => prev ? { ...prev, eventBoxes: newBoxes } : null);
+    }, []);
 
     if (!isManageEventDialogOpen || !localEventState) return null;
 
@@ -209,18 +218,18 @@ export default function BusinessEventsPage() {
                         <TabsContent value="details">
                             <BusinessEventForm 
                                 event={localEventState} 
-                                onFormChange={handleLocalDetailsChange} 
+                                onFormChange={handleDetailsChange} 
                                 isSubmitting={isSubmitting}
                             />
                         </TabsContent>
                         <TabsContent value="tickets">
-                           <Card><CardHeader><CardTitle>Gestión de Entradas</CardTitle></CardHeader><CardContent className="h-60 flex items-center justify-center text-muted-foreground"><p>Funcionalidad en construcción.</p></CardContent></Card>
+                           <Card><CardHeader><CardTitle>Gestión de Entradas</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
                         </TabsContent>
                         <TabsContent value="boxes">
-                            <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent className="h-60 flex items-center justify-center text-muted-foreground"><p>Funcionalidad en construcción.</p></CardContent></Card>
+                            <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
                         </TabsContent>
                         <TabsContent value="promoters">
-                             <Card><CardHeader><CardTitle>Gestión de Promotores</CardTitle></CardHeader><CardContent className="h-60 flex items-center justify-center text-muted-foreground"><p>Funcionalidad en construcción.</p></CardContent></Card>
+                             <Card><CardHeader><CardTitle>Gestión de Promotores</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
                         </TabsContent>
                     </div>
                 </Tabs>
@@ -288,7 +297,7 @@ export default function BusinessEventsPage() {
                        <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescriptionComponent>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescriptionComponent></AlertDialogHeader>
                             <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
@@ -300,7 +309,7 @@ export default function BusinessEventsPage() {
           </CardContent>
         </Card>
       )}
-      {isManageEventDialogOpen && <ManageEventDialog />}
+      <ManageEventDialog />
     </div>
   );
 }
