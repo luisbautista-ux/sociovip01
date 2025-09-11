@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -9,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect, useMemo } from "react";
 import type { GeneratedCode } from "@/lib/types";
-import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle } from "lucide-react";
+import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert } from "@/components/ui/alert";
 
