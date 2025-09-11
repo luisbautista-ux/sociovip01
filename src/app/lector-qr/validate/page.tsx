@@ -249,7 +249,10 @@ export default function LectorValidateQrPage() {
   };
   
   const handleActivateScanner = () => {
-    lastProcessedCode.current = null; // Reset last scanned code to allow re-scanning
+    lastProcessedCode.current = null;
+    setSearchPerformed(false);
+    setFoundEntity(null);
+    setFoundCode(null);
     setIsScannerActive(true);
   }
 
@@ -418,3 +421,4 @@ export default function LectorValidateQrPage() {
     </div>
   );
 }
+
