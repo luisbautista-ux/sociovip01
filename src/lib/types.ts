@@ -134,7 +134,7 @@ export interface GeneratedCode {
   generatedByName: string; 
   generatedByUid?: string;
   generatedDate: string; 
-  redeemedDate?: string | null; // When client generated their QR
+  redemptionDate?: string | null; // When client generated their QR
   redeemedByInfo?: {
     dni: string;
     name: string;

@@ -24,7 +24,7 @@ import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, parseISO, startOfDay, isBefore, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
-import type { BusinessManagedEntity, BusinessEventFormData } from "@/lib/types";
+import type { BusinessManagedEntity } from "@/lib/types";
 
 const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -50,10 +50,10 @@ export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
-  onFormChange?: (data: EventDetailsFormValues) => void; // ✅ AGREGA EL SIGNO ?
+  onFormChange: (data: EventDetailsFormValues) => void;
 }
 
-export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }: BusinessEventFormProps) => {
+export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFormChange }: BusinessEventFormProps) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     defaultValues: {
@@ -69,12 +69,10 @@ export const BusinessEventForm = ({ event, isSubmitting = false, onFormChange }:
   });
 
   const watchedValues = form.watch();
-React.useEffect(() => {
-  // ✅ VERIFICAR SI onFormChange ES UNA FUNCIÓN ANTES DE LLAMARLA
-  if (typeof onFormChange === 'function') {
+
+  React.useEffect(() => {
     onFormChange(watchedValues);
-  }
-}, [watchedValues, onFormChange]);
+  }, [watchedValues, onFormChange]);
   
   React.useEffect(() => {
     if (event) {
@@ -237,8 +235,6 @@ React.useEffect(() => {
       </form>
     </Form>
   );
-};
+});
 
 BusinessEventForm.displayName = "BusinessEventForm";
-
-  
