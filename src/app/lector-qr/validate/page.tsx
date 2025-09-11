@@ -29,61 +29,46 @@ const QR_READER_ELEMENT_ID = "qr-reader-validator";
 interface QrScannerProps {
   onScanSuccess: (decodedText: string, decodedResult: Html5QrcodeResult) => void;
   onScanFailure: (errorMessage: string, error: Html5QrcodeError) => void;
-  isScannerActive: boolean;
 }
 
-const QrScanner = React.memo(({ onScanSuccess, onScanFailure, isScannerActive }: QrScannerProps) => {
+const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const onScanSuccessRef = useRef(onScanSuccess);
-  const onScanFailureRef = useRef(onScanFailure);
-  const { toast } = useToast();
 
   useEffect(() => {
-    onScanSuccessRef.current = onScanSuccess;
-    onScanFailureRef.current = onScanFailure;
-  }, [onScanSuccess, onScanFailure]);
+    if (typeof window === 'undefined' || !document.getElementById(QR_READER_ELEMENT_ID)) {
+      return;
+    }
 
-  const startScanner = useCallback(async () => {
-      if (typeof window === 'undefined' || !document.getElementById(QR_READER_ELEMENT_ID)) {
-          return;
-      }
-      if (scannerRef.current && scannerRef.current.isScanning) {
+    if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
+    }
+    const scanner = scannerRef.current;
+
+    const startScanner = async () => {
+      try {
+        if (scanner.isScanning) {
           console.log("Scanner is already running.");
           return;
-      }
-      const newScannerInstance = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
-      scannerRef.current = newScannerInstance;
-      try {
-          await newScannerInstance.start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-              onScanSuccessRef.current,
-              onScanFailureRef.current
-          );
+        }
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+          onScanSuccess,
+          onScanFailure
+        );
       } catch (err: any) {
-          console.error("Scanner start failed:", err);
-          let message = "No se pudo iniciar el escáner.";
-          if (err.name === "NotAllowedError") {
-              message = "Permiso de cámara denegado. Por favor, habilita el acceso en tu navegador.";
-          }
-          toast({ title: "Error de Escáner", description: message, variant: "destructive" });
+        console.error("Scanner start failed:", err);
       }
-  }, [toast]);
-  
-  const stopScanner = useCallback(() => {
-      if (scannerRef.current && scannerRef.current.isScanning) {
-          scannerRef.current.stop().catch(err => console.error("Failed to stop scanner.", err));
-      }
-  }, []);
+    };
 
+    startScanner();
 
-  useEffect(() => {
-      if (isScannerActive) {
-          startScanner();
-      } else {
-          stopScanner();
+    return () => {
+      if (scanner && scanner.isScanning) {
+        scanner.stop().catch(err => console.error("Failed to stop scanner cleanly.", err));
       }
-  }, [isScannerActive, startScanner, stopScanner]);
+    };
+  }, [onScanSuccess, onScanFailure]);
 
   return (
     <Card className="shadow-lg">
@@ -114,7 +99,6 @@ export default function LectorValidateQrPage() {
   const [isScannerActive, setIsScannerActive] = useState(false);
   
   const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
-  const lastProcessedCode = useRef<string | null>(null);
 
   const fetchActiveEntities = useCallback(async () => {
     if (!currentBusinessId) return;
@@ -182,10 +166,6 @@ export default function LectorValidateQrPage() {
   }, [currentBusinessId, toast]);
 
   const handleScanSuccess = useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
-    if (decodedText === lastProcessedCode.current) {
-      return; 
-    }
-    lastProcessedCode.current = decodedText;
     setIsScannerActive(false); 
     toast({ title: "QR Escaneado", description: `Verificando código...` });
     findCodeInEntities(decodedText);
@@ -249,7 +229,6 @@ export default function LectorValidateQrPage() {
   };
   
   const handleActivateScanner = () => {
-    lastProcessedCode.current = null;
     setSearchPerformed(false);
     setFoundEntity(null);
     setFoundCode(null);
@@ -274,7 +253,6 @@ export default function LectorValidateQrPage() {
           <QrScanner 
               onScanSuccess={handleScanSuccess} 
               onScanFailure={handleScanFailure} 
-              isScannerActive={isScannerActive}
           />
       )}
 
@@ -364,7 +342,7 @@ export default function LectorValidateQrPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           
-          {activePromotions.length > 0 && (
+           {activePromotions.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-2 flex items-center"><Ticket className="h-5 w-5 mr-2 text-primary"/>Promociones Disponibles</h3>
               <Accordion type="single" collapsible className="w-full">
@@ -403,7 +381,7 @@ export default function LectorValidateQrPage() {
                     <AccordionContent className="space-y-1 text-sm pl-8">
                       <p>{entity.description}</p>
                       <p><strong>Fecha:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'}</p>
-                      <p><strong>Aforo:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.maxAttendance === 0 || !entity.maxAttendance ? '∞' : entity.maxAttendance}</p>
+                      <p><strong>Asistencia:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.maxAttendance === 0 || !entity.maxAttendance ? '∞' : entity.maxAttendance}</p>
                       <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
                     </AccordionContent>
                   </AccordionItem>
