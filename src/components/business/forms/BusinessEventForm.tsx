@@ -32,7 +32,7 @@ const eventDetailsFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
-  maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)),
+  maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
   isActive: z.boolean().default(true),
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
   aiHint: z.string().optional(),
@@ -178,11 +178,12 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
                 <Input
                   type="number"
                   placeholder="100"
+                  className="no-spinner"
                   {...field}
-                  value={field.value === undefined || field.value === null ? '' : field.value}
+                  value={field.value === undefined || field.value === null ? '' : String(field.value)}
                   onChange={e => {
-                    const val = e.target.value;
-                    field.onChange(val === "" ? undefined : parseInt(val, 10));
+                    const value = e.target.value;
+                    field.onChange(value === "" ? undefined : parseInt(value, 10));
                   }}
                   disabled={isSubmitting}
                 />
