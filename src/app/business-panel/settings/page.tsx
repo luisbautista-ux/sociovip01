@@ -2,26 +2,23 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Palette, Image as ImageIconLucide, Type, QrCode, UploadCloud, Loader2 } from "lucide-react"; 
+import { Settings, Palette, Image as ImageIconLucide, Type, QrCode, UploadCloud, Loader2, Link as LinkIcon } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import React, { useState, useEffect, useCallback, useRef } from 'react'; 
+import React, { useState, useEffect, useCallback } from 'react'; 
 import NextImage from "next/image"; 
 import { useToast } from "@/hooks/use-toast"; 
 import { useAuth } from "@/context/AuthContext"; 
-import { db, storage } from "@/lib/firebase"; 
+import { db } from "@/lib/firebase"; 
 import { doc, getDoc, updateDoc, type DocumentData } from "firebase/firestore";
 import type { Business } from "@/lib/types";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-
 
 export default function BusinessSettingsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
 
-  const [businessData, setBusinessData] = useState<Business | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // State for business info
@@ -36,17 +33,8 @@ export default function BusinessSettingsPage() {
   const [slogan, setSlogan] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#B080D0"); 
   const [secondaryColor, setSecondaryColor] = useState("#8E5EA2");
-
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
   
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [isSavingSlogan, setIsSavingSlogan] = useState(false);
-  const [isSavingColors, setIsSavingColors] = useState(false);
-  const [isSavingInfo, setIsSavingInfo] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchBusinessData = useCallback(async () => {
     if (userProfile?.businessId) {
@@ -56,7 +44,6 @@ export default function BusinessSettingsPage() {
         const businessSnap = await getDoc(businessDocRef);
         if (businessSnap.exists()) {
           const data = businessSnap.data() as Business;
-          setBusinessData(data);
           
           setBusinessName(data.name || "");
           setBusinessContactEmail(data.contactEmail || "");
@@ -86,120 +73,39 @@ export default function BusinessSettingsPage() {
   useEffect(() => {
     fetchBusinessData();
   }, [fetchBusinessData]);
-
-  const uploadFileAndGetURL = async (file: File, type: 'logo' | 'cover'): Promise<string | null> => {
-    if (!userProfile?.businessId) {
-      toast({ title: "Error de autenticación", description: "ID de negocio no encontrado.", variant: "destructive"});
-      return null;
-    }
-    const filePath = `businesses/${userProfile.businessId}/${type}-${Date.now()}-${file.name}`;
-    const storageRef = ref(storage, filePath);
-    try {
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-      return downloadURL;
-    } catch (error: any) {
-        console.error(`Error uploading ${type}:`, error);
-        let errorMessage = "No se pudo subir la imagen.";
-        if (error.code === 'storage/unauthorized') {
-            errorMessage = "No tienes permiso para subir archivos. Revisa las reglas de Storage.";
-        } else if (error.code === 'storage/retry-limit-exceeded') {
-            errorMessage = "Se superó el límite de reintentos. Revisa tu conexión a internet o las reglas de Firebase Storage.";
-        }
-        toast({ title: "Error de Subida", description: errorMessage, variant: "destructive" });
-        return null;
-    }
-  };
-
-  const handleLogoUpload = async () => {
-    if (!logoFile) return;
-    setIsUploadingLogo(true);
-    const newUrl = await uploadFileAndGetURL(logoFile, 'logo');
-    if (newUrl) {
-      await updateDoc(doc(db, "businesses", userProfile!.businessId!), { logoUrl: newUrl });
-      setLogoUrl(newUrl);
-      setLogoFile(null);
-      toast({ title: "Éxito", description: "Logo actualizado correctamente." });
-    }
-    setIsUploadingLogo(false);
-  };
-
-  const handleCoverUpload = async () => {
-    if (!coverFile) return;
-    setIsUploadingCover(true);
-    const newUrl = await uploadFileAndGetURL(coverFile, 'cover');
-    if (newUrl) {
-      await updateDoc(doc(db, "businesses", userProfile!.businessId!), { publicCoverImageUrl: newUrl });
-      setCoverUrl(newUrl);
-      setCoverFile(null);
-      toast({ title: "Éxito", description: "Imagen de portada actualizada." });
-    }
-    setIsUploadingCover(false);
-  };
   
-  const handleSaveSlogan = async () => {
+  const handleSaveChanges = async () => {
     if (!userProfile?.businessId) {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       return;
     }
-    setIsSavingSlogan(true);
-    try {
-        const businessDocRef = doc(db, "businesses", userProfile.businessId);
-        await updateDoc(businessDocRef, { slogan });
-        toast({ title: "Slogan Guardado", description: "El slogan se ha guardado." });
-    } catch (error: any) {
-        console.error("Error saving slogan:", error);
-        toast({ title: "Error al Guardar", description: `No se pudo guardar el slogan. ${error.message}`, variant: "destructive"});
-    } finally {
-        setIsSavingSlogan(false);
-    }
-  };
+    setIsSaving(true);
 
-  const handleSaveColors = async () => {
-    if (!userProfile?.businessId) {
-      toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
-      return;
-    }
-    setIsSavingColors(true);
-    try {
-        const businessDocRef = doc(db, "businesses", userProfile.businessId);
-        await updateDoc(businessDocRef, { primaryColor, secondaryColor });
-        toast({ title: "Colores Guardados", description: "Los colores de la marca se han guardado." });
-    } catch (error: any) {
-        console.error("Error saving colors:", error);
-        toast({ title: "Error al Guardar", description: `No se pudieron guardar los colores. ${error.message}`, variant: "destructive"});
-    } finally {
-        setIsSavingColors(false);
-    }
-  };
-  
-  const handleSaveChangesInfo = async () => {
-    if (!userProfile?.businessId) {
-      toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
-      return;
-    }
-    setIsSavingInfo(true);
-
-    const infoUpdateData: Partial<Business> = {
+    const updateData: Partial<Business> = {
         name: businessName,
         contactEmail: businessContactEmail,
         publicAddress: businessAddress, 
         publicPhone: businessPublicPhone,
+        slogan,
+        primaryColor,
+        secondaryColor,
+        logoUrl,
+        publicCoverImageUrl: coverUrl,
     };
 
     try {
         const businessDocRef = doc(db, "businesses", userProfile.businessId);
-        await updateDoc(businessDocRef, sanitizeObjectForFirestore(infoUpdateData as DocumentData));
-        toast({ title: "Información Guardada", description: "Los datos del negocio se han actualizado." });
+        await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
+        toast({ title: "Configuración Guardada", description: "Los datos de tu negocio se han actualizado." });
         fetchBusinessData(); 
     } catch (error: any) {
-        console.error("Error saving business info:", error);
+        console.error("Error saving business settings:", error);
         const description = error?.message 
           ? `No se pudieron guardar los cambios. ${error.message}` 
           : "No se pudieron guardar los cambios. Ocurrió un error desconocido.";
-        toast({ title: "Error al Guardar Información", description, variant: "destructive"});
+        toast({ title: "Error al Guardar", description, variant: "destructive"});
     } finally {
-        setIsSavingInfo(false);
+        setIsSaving(false);
     }
   };
   
@@ -235,9 +141,15 @@ export default function BusinessSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary flex items-center">
-        <Settings className="h-8 w-8 mr-2" /> Configuración del Negocio
-      </h1>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <h1 className="text-3xl font-bold text-primary flex items-center">
+          <Settings className="h-8 w-8 mr-2" /> Configuración del Negocio
+        </h1>
+        <Button onClick={handleSaveChanges} className="w-full sm:w-auto bg-primary hover:bg-primary/90" disabled={isSaving || isLoadingData}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar Todos los Cambios
+        </Button>
+      </div>
       
       <Card className="shadow-lg">
         <CardHeader>
@@ -247,24 +159,20 @@ export default function BusinessSettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="businessName">Nombre del Negocio</Label>
-            <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} disabled={isSavingInfo || isLoadingData} />
+            <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} disabled={isSaving || isLoadingData} />
           </div>
           <div>
             <Label htmlFor="businessEmail">Email de Contacto</Label>
-            <Input id="businessEmail" type="email" value={businessContactEmail} onChange={(e) => setBusinessContactEmail(e.target.value)} disabled={isSavingInfo || isLoadingData} />
+            <Input id="businessEmail" type="email" value={businessContactEmail} onChange={(e) => setBusinessContactEmail(e.target.value)} disabled={isSaving || isLoadingData} />
           </div>
            <div>
             <Label htmlFor="businessAddress">Dirección Pública</Label>
-            <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} disabled={isSavingInfo || isLoadingData} />
+            <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} disabled={isSaving || isLoadingData} />
           </div>
            <div>
             <Label htmlFor="businessPhone">Teléfono Público</Label>
-            <Input id="businessPhone" type="tel" value={businessPublicPhone} onChange={(e) => setBusinessPublicPhone(e.target.value)} disabled={isSavingInfo || isLoadingData}/>
+            <Input id="businessPhone" type="tel" value={businessPublicPhone} onChange={(e) => setBusinessPublicPhone(e.target.value)} disabled={isSaving || isLoadingData}/>
           </div>
-          <Button onClick={handleSaveChangesInfo} className="bg-primary hover:bg-primary/90" disabled={isSavingInfo || isLoadingData}>
-            {isSavingInfo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar Cambios de Información
-          </Button>
         </CardContent>
       </Card>
 
@@ -276,12 +184,10 @@ export default function BusinessSettingsPage() {
         <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="space-y-2">
-                <Label htmlFor="logo" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Logo del Negocio</Label>
-                <div className="flex items-center gap-4">
+                <Label htmlFor="logoUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> URL del Logo del Negocio</Label>
+                <div className="flex items-center gap-2">
                     <div className="w-16 h-16 flex-shrink-0">
-                      {logoFile ? (
-                        <NextImage src={URL.createObjectURL(logoFile)} alt="Previsualización Logo" width={64} height={64} className="rounded-md border p-1 object-contain" />
-                      ) : logoUrl ? (
+                      {logoUrl ? (
                         <NextImage src={logoUrl} alt="Logo actual" width={64} height={64} className="rounded-md border p-1 object-contain" />
                       ) : (
                         <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
@@ -289,25 +195,17 @@ export default function BusinessSettingsPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()} disabled={isUploadingLogo || isUploadingCover}>
-                        {logoUrl ? 'Cambiar Logo' : 'Seleccionar Logo'}
-                      </Button>
-                      <Button size="sm" onClick={handleLogoUpload} disabled={!logoFile || isUploadingLogo || isUploadingCover}>
-                          {isUploadingLogo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                          Subir Logo
-                      </Button>
+                    <div className="flex items-center gap-2 w-full">
+                       <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                       <Input id="logoUrl" type="url" placeholder="https://ejemplo.com/logo.png" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} disabled={isSaving || isLoadingData}/>
                     </div>
-                    <Input ref={logoInputRef} type="file" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cover" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Imagen de Portada</Label>
-                <div className="flex items-center gap-4">
+                <Label htmlFor="coverUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> URL de Imagen de Portada</Label>
+                 <div className="flex items-center gap-2">
                    <div className="w-24 h-14 flex-shrink-0">
-                      {coverFile ? (
-                        <NextImage src={URL.createObjectURL(coverFile)} alt="Previsualización Portada" width={100} height={56} className="rounded-md border p-1 object-cover" />
-                      ) : coverUrl ? (
+                      {coverUrl ? (
                          <NextImage src={coverUrl} alt="Portada actual" width={100} height={56} className="rounded-md border p-1 object-cover" />
                       ) : (
                          <div className="w-24 h-14 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
@@ -315,42 +213,28 @@ export default function BusinessSettingsPage() {
                         </div>
                       )}
                     </div>
-                     <div className="flex flex-col gap-2">
-                        <Button variant="outline" size="sm" onClick={() => coverInputRef.current?.click()} disabled={isUploadingLogo || isUploadingCover}>
-                          {coverUrl ? 'Cambiar Portada' : 'Seleccionar Portada'}
-                        </Button>
-                        <Button size="sm" onClick={handleCoverUpload} disabled={!coverFile || isUploadingLogo || isUploadingCover}>
-                            {isUploadingCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                            Subir Portada
-                        </Button>
-                     </div>
-                    <Input ref={coverInputRef} type="file" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
+                     <div className="flex items-center gap-2 w-full">
+                       <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                       <Input id="coverUrl" type="url" placeholder="https://ejemplo.com/portada.jpg" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} disabled={isSaving || isLoadingData}/>
+                    </div>
                 </div>
               </div>
             </div>
           <div className="space-y-2">
             <Label htmlFor="slogan" className="flex items-center"><Type className="h-4 w-4 mr-1 text-muted-foreground"/> Slogan del Negocio</Label>
-            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSavingSlogan || isLoadingData} />
-            <Button onClick={handleSaveSlogan} size="sm" className="bg-primary hover:bg-primary/90 mt-2" disabled={isSavingSlogan || isLoadingData}>
-              {isSavingSlogan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Guardar Slogan
-            </Button>
+            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSaving || isLoadingData} />
           </div>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="primaryColor">Color Primario</Label>
-                  <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingColors || isLoadingData}/>
+                  <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSaving || isLoadingData}/>
                 </div>
                 <div>
                   <Label htmlFor="secondaryColor">Color Secundario</Label>
-                  <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSavingColors || isLoadingData}/>
+                  <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSaving || isLoadingData}/>
                 </div>
             </div>
-             <Button onClick={handleSaveColors} size="sm" className="bg-primary hover:bg-primary/90" disabled={isSavingColors || isLoadingData}>
-              {isSavingColors && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Guardar Colores
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -375,3 +259,4 @@ export default function BusinessSettingsPage() {
     </div>
   );
 }
+
