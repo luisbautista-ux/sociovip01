@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -620,6 +619,7 @@ function BusinessPromoterForm({
                   No hay promotores vinculados. Haz clic en "Añadir/Vincular Promotor" para empezar.
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -696,6 +696,7 @@ function BusinessPromoterForm({
                     )}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -782,3 +783,5 @@ function BusinessPromoterForm({
       </div>
     );
   }
+
+    
