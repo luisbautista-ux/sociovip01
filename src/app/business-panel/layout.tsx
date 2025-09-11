@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Menu, Building } from "lucide-react";
+import { Loader2, Menu, Building, Calendar, Ticket } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
@@ -198,7 +198,7 @@ export default function BusinessPanelLayout({
   const navLinks = [
     { href: "/business-panel/dashboard", label: "Dashboard" },
     { href: "/business-panel/promotions", label: "Promociones" },
-    // { href: "/business-panel/events", label: "Eventos" }, // This line is removed
+    { href: "/business-panel/events", label: "Eventos" },
     { href: "/business-panel/clients", label: "Mis Clientes" },
     { href: "/business-panel/surveys", label: "Encuestas" },
     { href: "/business-panel/promoters", label: "Mis Promotores" },
@@ -241,7 +241,8 @@ export default function BusinessPanelLayout({
                       onClick={() => setIsSheetOpen(false)} 
                       className="flex items-center space-x-2 text-muted-foreground hover:text-foreground"
                     >
-                      {link.label}
+                      {link.label === 'Promociones' ? <Ticket size={16} /> : link.label === 'Eventos' ? <Calendar size={16} /> : null}
+                      <span>{link.label}</span>
                     </Link>
                   ))}
                 </nav>

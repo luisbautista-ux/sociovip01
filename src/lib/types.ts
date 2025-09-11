@@ -12,7 +12,7 @@ export interface PromotionDetails {
   promoCode: string; // The original 9-digit code
   qrValue: string; // The value embedded in the QR (e.g., the code's unique ID)
   aiHint: string;
-  type: 'promotion';
+  type: 'promotion' | 'event';
   termsAndConditions?: string;
 }
 
@@ -124,7 +124,7 @@ export interface RegisteredClient {
   newRegistrations: number;
 }
 
-export type BusinessEntityType = 'promotion' | 'survey';
+export type BusinessEntityType = 'promotion' | 'event';
 
 export interface GeneratedCode { 
   id: string; 
@@ -207,6 +207,12 @@ export interface BusinessManagedEntity {
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
+  // Event-specific fields
+  maxAttendance?: number;
+  ticketTypes?: TicketType[];
+  eventBoxes?: EventBox[];
+  assignedPromoters?: EventPromoterAssignment[];
+  // Common fields
   businessName?: string; 
   businessLogoUrl?: string;
   businessCustomUrlPath?: string | null;
@@ -352,7 +358,7 @@ export interface PromoterCommissionEntry {
     id: string;
     businessName: string;
     entityName: string;
-    entityType: 'promotion';
+    entityType: 'promotion' | 'event';
     promoterCodesRedeemed: number; 
     commissionRateApplied: string; // Ej: "10%" o "S/ 5.00 por código"
     commissionEarned: number;
