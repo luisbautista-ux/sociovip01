@@ -17,14 +17,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Check, ChevronsUpDown, Info, Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { DialogFooter } from "@/components/ui/dialog";
 import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ALL_PLATFORM_USER_ROLES, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 
 
@@ -119,7 +116,7 @@ export function PlatformUserForm({
              <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="text-blue-700 dark:text-blue-300">
-                  DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForPlatformUserCreation.preExistingUserType]}
+                  DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation.preExistingUserType]}
                 </AlertTitle>
                 <AlertDescription className="text-blue-600 dark:text-blue-400">
                   Algunos datos se han pre-rellenado. Completa el perfil para crear la cuenta de usuario.
@@ -179,18 +176,47 @@ export function PlatformUserForm({
           )}
         />
         
-        {showBusinessIdSelector && (
-            <FormField control={form.control} name="businessId" render={({ field }) => (
-                <FormItem className="flex flex-col"><FormLabel>Negocio Principal (Para Staff/Host) <span className="text-destructive">*</span></FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")} disabled={businesses.length === 0}>{field.value ? businesses.find((b) => b.id === field.value)?.name : "Seleccionar negocio"}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-full p-0"><Command><CommandInput placeholder="Buscar negocio..." /><CommandEmpty>No se encontraron negocios.</CommandEmpty><CommandGroup>
-                {businesses.map((b) => (<CommandItem value={b.id} key={b.id} onSelect={() => form.setValue("businessId", b.id)}><Check className={cn("mr-2 h-4 w-4", b.id === field.value ? "opacity-100" : "opacity-0")}/>{b.name}</CommandItem>))}
-                </CommandGroup></Command></PopoverContent></Popover><FormDescription className="text-xs">Negocio al que el Staff/Host pertenece.</FormDescription><FormMessage /></FormItem>
-            )}/>
+       {showBusinessIdSelector && (
+          <FormField
+            control={form.control}
+            name="businessId"
+            render={() => (
+              <FormItem>
+                <FormLabel>Negocio Principal (Para Staff/Admin/Host) <span className="text-destructive">*</span></FormLabel>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded-md">
+                  {businesses.map((biz) => (
+                    <FormField
+                      key={biz.id}
+                      control={form.control}
+                      name="businessId"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value === biz.id}
+                              onCheckedChange={() => {
+                                field.onChange(biz.id);
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal text-sm">{biz.name}</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </div>
+                <FormDescription className="text-xs">Negocio al que el Staff/Host/Admin pertenece.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         )}
+
 
         {showMultipleBusinessSelector && (
              <FormField control={form.control} name="businessIds" render={() => (
                 <FormItem><FormLabel>Negocios Asignados (Para Promotor)</FormLabel>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded-md">
                   {businesses.map(biz => (
                      <FormField key={biz.id} control={form.control} name="businessIds" render={({ field }) => (
                        <FormItem className="flex items-center space-x-2"><FormControl><Checkbox
