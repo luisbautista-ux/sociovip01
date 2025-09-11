@@ -60,8 +60,8 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle as UIDialogTitleComponent,
-  DialogDescription as UIDialogDescriptionComponent,
+  DialogTitle,
+  DialogDescription as UIDialogDescription,
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -1324,14 +1324,14 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <UIDialogTitleComponent>
+            <DialogTitle>
               {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
-            </UIDialogTitleComponent>
-            <UIDialogDescriptionComponent>
+            </DialogTitle>
+            <UIDialogDescription>
               {currentStepInModal === "enterDni"
                 ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
                 : "Necesitamos algunos datos para generar tu QR."}
-            </UIDialogDescriptionComponent>
+            </UIDialogDescription>
           </DialogHeader>
           {currentStepInModal === "enterDni" ? (
             <Form {...dniForm}>
@@ -1576,10 +1576,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         <AlertDialogContent>
           <AlertDialogHeader>
             <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
-            <UIDialogDescriptionComponent>
+            <UIDialogDescription>
               El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los
               datos existentes para generar tu QR?
-            </UIDialogDescriptionComponent>
+            </UIDialogDescription>
           </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
             <AlertDialogCancel
