@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -113,21 +114,18 @@ export default function PromoterEntitiesPage() {
 
         if (isEntityCurrentlyActivatable(entity)) {
           const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
-
-          const enrichedEntity: PromoterEntityView = {
-            ...entity,
-            businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
-            promoterCodesCreated: promoterCodeStats.created,
-            promoterCodesUsed: promoterCodeStats.used,
-          };
+          const isAssignedToEvent = (entity.type === 'event' && (entity.assignedPromoters || []).some(p => p.promoterProfileId === userProfile.uid));
+          const isPromotion = entity.type === 'promotion';
           
-          if(entity.type === 'promotion') {
-            promoterAssignedPromotions.push(enrichedEntity);
-          } else if (entity.type === 'event') {
-            const isPromoterAssigned = (entity.assignedPromoters || []).some(p => p.promoterProfileId === userProfile.uid);
-            if (isPromoterAssigned) {
-              promoterAssignedEvents.push(enrichedEntity);
-            }
+          if(isPromotion || isAssignedToEvent) {
+             const enrichedEntity: PromoterEntityView = {
+              ...entity,
+              businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
+              promoterCodesCreated: promoterCodeStats.created,
+              promoterCodesUsed: promoterCodeStats.used,
+            };
+            if(entity.type === 'promotion') promoterAssignedPromotions.push(enrichedEntity);
+            if(entity.type === 'event') promoterAssignedEvents.push(enrichedEntity);
           }
         }
       });
@@ -392,7 +390,9 @@ export default function PromoterEntitiesPage() {
           onCodesCreated={handleNewCodesCreated}
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
-          currentUserProfileUid={userProfile.uid} 
+          currentUserProfileUid={userProfile.uid}
+          maxAttendance={selectedEntityForCreatingCodes.maxAttendance}
+          currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
         />
       )}
 
