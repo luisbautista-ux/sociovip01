@@ -28,7 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import type { AuthError, UserCredential } from "firebase/auth";
 import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
@@ -44,6 +44,7 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const { login, currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
   const router = useRouter();
@@ -199,15 +200,34 @@ export default function LoginPage() {
                             <FormLabel>
                               Ingresa 6 caracteres o más <span className="text-destructive">*</span>
                             </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="password"
-                                placeholder="••••••••"
-                                {...field}
+                            <div className="relative">
+                              <FormControl>
+                                <Input
+                                  type={showPassword ? "text" : "password"}
+                                  placeholder="••••••••"
+                                  {...field}
+                                  disabled={isSubmitting}
+                                  className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full pr-10"
+                                />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground"
+                                onClick={() => setShowPassword(!showPassword)}
                                 disabled={isSubmitting}
-                                className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
-                              />
-                            </FormControl>
+                              >
+                                {showPassword ? (
+                                  <EyeOff className="h-5 w-5" />
+                                ) : (
+                                  <Eye className="h-5 w-5" />
+                                )}
+                                <span className="sr-only">
+                                  {showPassword ? "Ocultar" : "Mostrar"} contraseña
+                                </span>
+                              </Button>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
