@@ -4,10 +4,9 @@
 import * as React from "react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, ListChecks, BarChart3, Gift, Building, Loader2, Info } from "lucide-react";
+import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar } from "lucide-react";
 import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -30,7 +29,8 @@ import {
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
-  const [entities, setEntities] = useState<PromoterEntityView[]>([]);
+  const [promotions, setPromotions] = useState<PromoterEntityView[]>([]);
+  const [events, setEvents] = useState<PromoterEntityView[]>([]);
   const [businessesMap, setBusinessesMap] = useState<Map<string, Business>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,7 +64,8 @@ export default function PromoterEntitiesPage() {
   const fetchAssignedEntities = useCallback(async () => {
     if (!userProfile || !userProfile.businessIds || userProfile.businessIds.length === 0) {
       console.warn("Promoter Entities Page: No businessIds found in profile, cannot fetch entities.");
-      setEntities([]);
+      setPromotions([]);
+      setEvents([]);
       setIsLoading(false);
       return;
     }
@@ -85,12 +86,13 @@ export default function PromoterEntitiesPage() {
       const entitiesQuery = query(
         collection(db, "businessEntities"),
         where("businessId", "in", assignedBusinessIds),
-        where("isActive", "==", true),
-        where("type", "==", "promotion") // Filter for promotions only
+        where("isActive", "==", true)
+        // No longer filtering by type, will fetch both promotions and events
       );
       const entitiesSnap = await getDocs(entitiesQuery);
       
-      const promoterAssignedEntities: PromoterEntityView[] = [];
+      const promoterAssignedPromotions: PromoterEntityView[] = [];
+      const promoterAssignedEvents: PromoterEntityView[] = [];
 
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data();
@@ -116,26 +118,33 @@ export default function PromoterEntitiesPage() {
 
         if (isEntityCurrentlyActivatable(entity)) {
           const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
-          promoterAssignedEntities.push({
+          const enrichedEntity: PromoterEntityView = {
             ...entity,
             businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
             promoterCodesCreated: promoterCodeStats.created,
             promoterCodesUsed: promoterCodeStats.used,
-          });
+          };
+          
+          if(entity.type === 'promotion') {
+            promoterAssignedPromotions.push(enrichedEntity);
+          } else if (entity.type === 'event') {
+            promoterAssignedEvents.push(enrichedEntity);
+          }
         }
       });
+      
+      promoterAssignedPromotions.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      promoterAssignedEvents.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
-      setEntities(promoterAssignedEntities.sort((a, b) => {
-        const aDate = a.createdAt ? new Date(a.createdAt).getTime() : (a.startDate ? new Date(a.startDate).getTime() : 0);
-        const bDate = b.createdAt ? new Date(b.createdAt).getTime() : (b.startDate ? new Date(b.startDate).getTime() : 0);
-        return bDate - aDate;
-      }));
-      console.log("Promoter Entities Page: Fetched and filtered entities:", promoterAssignedEntities.length);
+      setPromotions(promoterAssignedPromotions);
+      setEvents(promoterAssignedEvents);
+      console.log(`Promoter Entities Page: Fetched ${promoterAssignedPromotions.length} promotions and ${promoterAssignedEvents.length} events.`);
 
     } catch (error: any) {
       console.error("Promoter Entities Page: Error fetching assigned entities:", error.code, error.message, error);
-      toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones asignadas. ${error.message}`, variant: "destructive"});
-      setEntities([]);
+      toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones y eventos asignados. ${error.message}`, variant: "destructive"});
+      setPromotions([]);
+      setEvents([]);
       setBusinessesMap(new Map());
     } finally {
       setIsLoading(false);
@@ -256,7 +265,7 @@ export default function PromoterEntitiesPage() {
     if (!isEntityCurrentlyActivatable(entity)) {
       toast({ 
         title: "Acción no permitida", 
-        description: "Esta promoción no está activa o está fuera de su periodo de vigencia.", 
+        description: `Esta ${entity.type === 'event' ? 'evento' : 'promoción'} no está activa o está fuera de su periodo de vigencia.`, 
         variant: "destructive"
       });
       return;
@@ -269,58 +278,41 @@ export default function PromoterEntitiesPage() {
     setSelectedEntityForViewingCodes(entity);
     setShowManageCodesModal(true);
   };
-
-  const openStatsModal = (entity: PromoterEntityView) => {
-    setSelectedEntityForStats(entity);
-    setShowStatsModal(true);
-  };
   
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando promociones asignadas...</p>
-      </div>
-    );
-  }
+  const EntityTable = ({ entitiesToShow, type }: { entitiesToShow: PromoterEntityView[], type: 'promotion' | 'event' }) => {
+    if (entitiesToShow.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-24 text-muted-foreground border border-dashed rounded-md p-4 text-center">
+            <Info className="h-8 w-8 mb-2 text-primary/70"/>
+            <p className="font-semibold">No hay {type === 'event' ? 'eventos' : 'promociones'} activas asignadas.</p>
+        </div>
+      );
+    }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
-          <Gift className="h-8 w-8 mr-2" /> Promociones Asignadas
-        </h1>
-      </div>
-      
-      <Card className="shadow-lg">
-        <CardHeader>
-          {/* Search input removed as per request */}
-        </CardHeader>
-        <CardContent>
-          {entities.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
+    return (
+        <div className="overflow-x-auto">
+            <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[300px]">Promoción</TableHead>
+                <TableRow>
+                    <TableHead className="min-w-[300px]">{type === 'event' ? 'Evento' : 'Promoción'}</TableHead>
                     <TableHead className="min-w-[250px]">Mis Códigos y QRs</TableHead>
-                  </TableRow>
+                </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entities.map((entity) => {
+                {entitiesToShow.map((entity) => {
                     const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
                     const isActivatable = isEntityCurrentlyActivatable(entity);
                     
                     return (
                     <TableRow key={entity.id || `entity-fallback-${Math.random()}`}>
-                      <TableCell className="font-medium align-top py-3 space-y-1">
-                          <div className="font-semibold text-base">{entity.name}</div>
-                          {entity.businessName && <div className="text-xs text-muted-foreground flex items-center mt-0.5"><Building size={14} className="mr-1"/>{entity.businessName}</div>}
-                          <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
-                                 className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
-                            {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
-                          </Badge>
-                          <div className="flex flex-col items-start gap-1 pt-1.5">
+                        <TableCell className="font-medium align-top py-3 space-y-1">
+                            <div className="font-semibold text-base">{entity.name}</div>
+                            {entity.businessName && <div className="text-xs text-muted-foreground flex items-center mt-0.5"><Building size={14} className="mr-1"/>{entity.businessName}</div>}
+                            <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
+                                    className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
+                                {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
+                            </Badge>
+                            <div className="flex flex-col items-start gap-1 pt-1.5">
                             <Button 
                                 variant="outline" 
                                 size="xs" 
@@ -339,31 +331,59 @@ export default function PromoterEntitiesPage() {
                             >
                                 <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
                             </Button>
-                             {/* Botón de Estadísticas oculto como se pidió */}
-                          </div>
-                      </TableCell>
-                      
-                      <TableCell className="align-top py-3 text-left text-xs">
+                            </div>
+                        </TableCell>
+                        
+                        <TableCell className="align-top py-3 text-left text-xs">
                         <div className="flex flex-col space-y-0.5">
                             <div>Códigos Creados ({promoterCodeStats.created})</div>
-                            <div>QRs Generados (0)</div>
-                            <div>QRs Usados ({promoterCodeStats.used})</div>
+                            <div>QRs Generados ({entity.promoterCodesUsed || 0})</div>
+                            <div>QRs Usados ({entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0})</div>
                         </div>
-                      </TableCell>
+                        </TableCell>
                     </TableRow>
-                  )})}
+                    )})}
                 </TableBody>
-              </Table>
-            </div>
-          ) : (
-             !isLoading && <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
-                <Info className="h-10 w-10 mb-2 text-primary/70"/>
-                <p className="font-semibold">No tienes promociones activas asignadas.</p>
-                <p className="text-sm">Contacta a los negocios para que te asignen a sus campañas.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </Table>
+        </div>
+    );
+  };
+  
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Cargando promociones y eventos asignados...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <h1 className="text-3xl font-bold text-primary flex items-center">
+          <Gift className="h-8 w-8 mr-2" /> Promociones y Eventos
+        </h1>
+      </div>
+      
+      <section>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4 flex items-center"><Ticket className="h-6 w-6 mr-2 text-muted-foreground" />Promociones Activas</h2>
+        <Card className="shadow-lg">
+            <CardContent className="pt-6">
+                <EntityTable entitiesToShow={promotions} type="promotion" />
+            </CardContent>
+        </Card>
+      </section>
+
+      <section>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4 flex items-center"><Calendar className="h-6 w-6 mr-2 text-muted-foreground" />Eventos Activos</h2>
+        <Card className="shadow-lg">
+            <CardContent className="pt-6">
+                <EntityTable entitiesToShow={events} type="event" />
+            </CardContent>
+        </Card>
+      </section>
+
 
     {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
@@ -389,7 +409,7 @@ export default function PromoterEntitiesPage() {
           entity={selectedEntityForViewingCodes}
           onCodesUpdated={handleCodesUpdatedFromManageDialog} 
           onRequestCreateNewCodes={() => { 
-            const currentEntity = entities.find(e => e.id === selectedEntityForViewingCodes?.id); 
+            const currentEntity = [...promotions, ...events].find(e => e.id === selectedEntityForViewingCodes?.id); 
             if(currentEntity) { 
                  if (isEntityCurrentlyActivatable(currentEntity)) {
                     setShowManageCodesModal(false); 
@@ -398,7 +418,7 @@ export default function PromoterEntitiesPage() {
                  } else {
                     toast({
                         title: "Acción no permitida",
-                        description: "Esta promoción no está activa o está fuera de su periodo de vigencia.",
+                        description: `Esta ${currentEntity.type === 'event' ? 'evento' : 'promoción'} no está activa o está fuera de su periodo de vigencia.`,
                         variant: "destructive",
                     });
                  }
@@ -409,35 +429,8 @@ export default function PromoterEntitiesPage() {
           currentUserProfileUid={userProfile.uid}
         />
       )}
-
-      {selectedEntityForStats && (
-         <Dialog open={showStatsModal} onOpenChange={(isOpen) => {if(!isOpen) setSelectedEntityForStats(null); setShowStatsModal(isOpen);}}>
-            <DialogContent className="sm:max-w-md">
-                <ShadcnDialogHeader>
-                    <ShadcnDialogTitle>Estadísticas para: {selectedEntityForStats?.name}</ShadcnDialogTitle>
-                    <DialogDescription>Resumen de tus códigos y rendimiento para esta entidad ({selectedEntityForStats.businessName}).</DialogDescription>
-                </ShadcnDialogHeader>
-                <div className="space-y-3 py-4">
-                   <p><strong>Mis Códigos Creados:</strong> ({selectedEntityForStats.promoterCodesCreated || 0})</p>
-                   <p><strong>Mis Códigos Usados:</strong> ({selectedEntityForStats.promoterCodesUsed || 0})</p>
-                   <p><strong>Tasa de Uso (Mis Códigos):</strong> 
-                     {(() => {
-                        const created = selectedEntityForStats.promoterCodesCreated || 0;
-                        const used = selectedEntityForStats.promoterCodesUsed || 0;
-                        return created > 0 ? `${((used / created) * 100).toFixed(1)}%` : '0%';
-                     })()}
-                   </p>
-                   <hr className="my-2"/>
-                   <p className="text-xs text-muted-foreground">Estadísticas generales de la entidad:</p>
-                   <p className="text-xs"><strong>Total Códigos Creados (Entidad):</strong> ({(selectedEntityForStats.generatedCodes || []).length})</p>
-                   <p className="text-xs"><strong>Total Códigos Usados (Entidad):</strong> ({(selectedEntityForStats.generatedCodes || []).filter(c => c.status === 'redeemed' || c.status === 'used').length})</p>
-                </div>
-                <ShadcnDialogFooter>
-                    <Button variant="outline" onClick={() => {setShowStatsModal(false); setSelectedEntityForStats(null);}}>Cerrar</Button>
-                </ShadcnDialogFooter>
-            </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
+
+    
