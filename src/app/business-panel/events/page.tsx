@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp } from "firebase/firestore";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment } from "@/lib/types";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -154,7 +154,10 @@ export default function BusinessEventsPage() {
 
   const ManageEventDialog = () => {
     const [activeTab, setActiveTab] = useState("details");
-    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
+    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(editingEvent);
+
+    const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
+    const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
 
     useEffect(() => {
         if (isManageEventDialogOpen) {
@@ -188,62 +191,133 @@ export default function BusinessEventsPage() {
         setLocalEventState(prev => prev ? { ...prev, ...values } : null);
     }, []);
 
-    const handleTicketTypesChange = useCallback((newTicketTypes: TicketType[]) => {
-        setLocalEventState(prev => prev ? { ...prev, ticketTypes: newTicketTypes, maxAttendance: calculateMaxAttendance(newTicketTypes) } : null);
-    }, []);
-
-    const handleBoxesChange = useCallback((newBoxes: EventBox[]) => {
-        setLocalEventState(prev => prev ? { ...prev, eventBoxes: newBoxes } : null);
-    }, []);
+    const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            let updatedTicketTypes: TicketType[];
+            if (editingTicket) {
+                // Update
+                updatedTicketTypes = prev.ticketTypes!.map(t => t.id === editingTicket.id ? { ...t, ...ticketData } : t);
+            } else {
+                // Create
+                const newTicket: TicketType = {
+                    ...ticketData,
+                    id: `ticket_${Date.now()}`,
+                    eventId: prev.id,
+                    businessId: prev.businessId,
+                };
+                updatedTicketTypes = [...(prev.ticketTypes || []), newTicket];
+            }
+            return { ...prev, ticketTypes: updatedTicketTypes, maxAttendance: calculateMaxAttendance(updatedTicketTypes) };
+        });
+        setIsTicketFormOpen(false);
+        setEditingTicket(null);
+    };
+    
+    const handleTicketDelete = (ticketId: string) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedTicketTypes = prev.ticketTypes!.filter(t => t.id !== ticketId);
+            return { ...prev, ticketTypes: updatedTicketTypes, maxAttendance: calculateMaxAttendance(updatedTicketTypes) };
+        });
+    };
 
     if (!isManageEventDialogOpen || !localEventState) return null;
 
     return (
-        <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
-                    <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
-                </DialogHeader>
-                
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
-                    <TabsList className="w-full grid grid-cols-4">
-                        <TabsTrigger value="details">Detalles</TabsTrigger>
-                        <TabsTrigger value="tickets">Entradas</TabsTrigger>
-                        <TabsTrigger value="boxes">Boxes</TabsTrigger>
-                        <TabsTrigger value="promoters">Promotores</TabsTrigger>
-                    </TabsList>
+        <>
+            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
+                    </DialogHeader>
+                    
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
+                        <TabsList className="w-full grid grid-cols-4">
+                            <TabsTrigger value="details">Detalles</TabsTrigger>
+                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes)})</TabsTrigger>
+                            <TabsTrigger value="boxes">Boxes</TabsTrigger>
+                            <TabsTrigger value="promoters">Promotores</TabsTrigger>
+                        </TabsList>
 
-                    <div className="flex-grow overflow-y-auto mt-4 pr-2">
-                        <TabsContent value="details">
-                            <BusinessEventForm 
-                                key={localEventState.id || 'new-event'}
-                                event={localEventState} 
-                                onFormChange={handleLocalDetailsChange} 
-                                isSubmitting={isSubmitting}
-                            />
-                        </TabsContent>
-                        <TabsContent value="tickets">
-                           <Card><CardHeader><CardTitle>Gestión de Entradas</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
-                        </TabsContent>
-                        <TabsContent value="boxes">
-                            <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
-                        </TabsContent>
-                        <TabsContent value="promoters">
-                             <Card><CardHeader><CardTitle>Gestión de Promotores</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
-                        </TabsContent>
-                    </div>
-                </Tabs>
-                
-                <DialogFooter className="pt-4 border-t mt-auto">
-                    <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                    <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                        Guardar Evento
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                        <div className="flex-grow overflow-y-auto mt-4 pr-2">
+                            <TabsContent value="details">
+                                <BusinessEventForm 
+                                    key={`details-${localEventState.id || 'new'}`}
+                                    event={localEventState} 
+                                    onFormChange={handleLocalDetailsChange} 
+                                    isSubmitting={isSubmitting}
+                                />
+                            </TabsContent>
+                            <TabsContent value="tickets">
+                               <Card>
+                                 <CardHeader>
+                                     <CardTitle>Gestión de Tipos de Entrada</CardTitle>
+                                     <CardDescription>Añade y configura las entradas para tu evento. El aforo total se calcula sumando las cantidades.</CardDescription>
+                                 </CardHeader>
+                                 <CardContent>
+                                     <Button onClick={() => { setEditingTicket(null); setIsTicketFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Tipo de Entrada</Button>
+                                     <Table className="mt-4">
+                                         <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                                         <TableBody>
+                                             {(localEventState.ticketTypes || []).map(ticket => (
+                                                 <TableRow key={ticket.id}>
+                                                     <TableCell>{ticket.name}</TableCell>
+                                                     <TableCell>{ticket.cost.toFixed(2)}</TableCell>
+                                                     <TableCell>{ticket.quantity || 'Ilimitadas'}</TableCell>
+                                                     <TableCell className="text-right">
+                                                         <Button variant="ghost" size="icon" onClick={() => { setEditingTicket(ticket); setIsTicketFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                         <AlertDialog>
+                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader><UIAlertDialogTitle>¿Eliminar entrada?</UIAlertDialogTitle><UIDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                         </AlertDialog>
+                                                     </TableCell>
+                                                 </TableRow>
+                                             ))}
+                                         </TableBody>
+                                     </Table>
+                                      {(!localEventState.ticketTypes || localEventState.ticketTypes.length === 0) && (
+                                        <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
+                                      )}
+                                 </CardContent>
+                               </Card>
+                            </TabsContent>
+                            <TabsContent value="boxes">
+                                <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
+                            </TabsContent>
+                            <TabsContent value="promoters">
+                                 <Card><CardHeader><CardTitle>Gestión de Promotores</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+                    
+                    <DialogFooter className="pt-4 border-t mt-auto">
+                        <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                        <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Guardar Evento
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isTicketFormOpen} onOpenChange={setIsTicketFormOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingTicket ? 'Editar Tipo de Entrada' : 'Nuevo Tipo de Entrada'}</DialogTitle>
+                </DialogHeader>
+                <TicketTypeForm 
+                    ticketType={editingTicket || undefined} 
+                    onSubmit={handleTicketSubmit} 
+                    onCancel={() => setIsTicketFormOpen(false)}
+                    isSubmitting={isSubmitting}
+                />
+              </DialogContent>
+            </Dialog>
+        </>
     );
   };
 
@@ -314,3 +388,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+

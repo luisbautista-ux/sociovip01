@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { BusinessManagedEntity, TicketType } from "./types";
@@ -85,12 +86,13 @@ export function calculateMaxAttendance(ticketTypes: TicketType[] | undefined): n
   if (!ticketTypes || ticketTypes.length === 0) {
     return 0; 
   }
-  return ticketTypes.reduce((sum, ticket) => {
-    if (ticket.quantity && typeof ticket.quantity === 'number' && ticket.quantity > 0) {
-      return sum + ticket.quantity;
-    }
-    return sum;
-  }, 0);
+  // Check if any ticket has an undefined or zero quantity
+  const hasUnlimitedTickets = ticketTypes.some(ticket => ticket.quantity === undefined || ticket.quantity === 0);
+  if (hasUnlimitedTickets) {
+    return 0; // Represents unlimited attendance
+  }
+  // Sum quantities if all are defined
+  return ticketTypes.reduce((sum, ticket) => sum + (ticket.quantity || 0), 0);
 }
 
 // Helper function to sanitize an object for Firestore by converting undefined to null
