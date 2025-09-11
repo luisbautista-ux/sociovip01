@@ -32,6 +32,7 @@ const eventDetailsFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
+  maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)),
   isActive: z.boolean().default(true),
   imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
   aiHint: z.string().optional(),
@@ -62,19 +63,12 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
       termsAndConditions: event?.termsAndConditions || "",
       startDate: anyToDate(event?.startDate) ?? new Date(),
       endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+      maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
       aiHint: event?.aiHint || "",
     },
   });
-
-  // This effect was the cause of the infinite loop.
-  // It was being called on every render, which triggered a state update in the parent,
-  // which caused a re-render, and so on.
-  // By removing it, the form now only communicates its state up when submitted.
-  // useEffect(() => {
-  //   onFormChange(form.getValues());
-  // }, [form, onFormChange]);
   
   React.useEffect(() => {
     if (event) {
@@ -84,6 +78,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           termsAndConditions: event.termsAndConditions || "",
           startDate: anyToDate(event.startDate) ?? new Date(),
           endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+          maxAttendance: event.maxAttendance === undefined || event.maxAttendance === null ? undefined : event.maxAttendance,
           isActive: event.isActive === undefined ? true : event.isActive,
           imageUrl: event.imageUrl || "",
           aiHint: event.aiHint || "",
@@ -92,12 +87,6 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
   }, [event, form]);
 
   const handleSubmit = (values: EventDetailsFormValues) => {
-    // We now call onFormChange ONLY when a "submit" happens inside the form.
-    // In this case, there's no submit button, so we'll rely on the parent's save button.
-    // The most robust way is to pass the form instance up or handle save inside.
-    // For now, we will assume the parent will get the values from the state.
-    // To make sure the parent has the latest values, we can call onFormChange on blur or a similar event,
-    // but the safest is to remove the dependency entirely from the parent's useEffect.
     onFormChange(values); 
   };
 
@@ -187,17 +176,32 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           />
         </div>
         
-        <div>
-          <FormLabel>Aforo Máximo (Calculado)</FormLabel>
-          <div className="mt-1 p-2 border rounded-md bg-muted/50">
-            <p className="text-sm font-medium">
-              {event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance < 0 ? '0 (o Ilimitado si no hay entradas con cantidad)' : event.maxAttendance}
-            </p>
-          </div>
-          <FormDescription className="text-xs mt-1">
-            Se calcula sumando las cantidades de los tipos de entrada definidos en la pestaña "Entradas".
-          </FormDescription>
-        </div>
+        <FormField
+          control={form.control}
+          name="maxAttendance"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Aforo Máximo</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  placeholder="100"
+                  {...field}
+                  value={field.value === undefined || field.value === null ? '' : field.value}
+                  onChange={e => {
+                    const val = e.target.value;
+                    field.onChange(val === "" ? undefined : parseInt(val, 10));
+                  }}
+                  disabled={isSubmitting}
+                />
+              </FormControl>
+              <FormDescription className="text-xs">
+                Número total de personas permitidas. Si defines entradas, este valor será informativo.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

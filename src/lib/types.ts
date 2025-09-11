@@ -332,6 +332,7 @@ export interface BusinessEventFormData {
   description: string;
   startDate: Date;
   endDate: Date;
+  maxAttendance?: number;
   isActive: boolean;
   imageUrl?: string;
   aiHint?: string;
