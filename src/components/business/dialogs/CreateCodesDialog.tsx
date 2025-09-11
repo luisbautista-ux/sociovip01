@@ -48,7 +48,7 @@ export function CreateCodesDialog({
     maxAttendance,
     currentCodeCount = 0,
 }: CreateCodesDialogProps) {
-  const [numCodes, setNumCodes] = useState(1);
+  const [numCodes, setNumCodes] = useState<number | string>(1);
   const [observation, setObservation] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [justCreatedCodes, setJustCreatedCodes] = useState<GeneratedCode[]>([]);
@@ -73,7 +73,8 @@ export function CreateCodesDialog({
   }, [open]);
 
   const handleCreateCodes = () => {
-    if (numCodes < 1 || numCodes > Math.min(50, maxCodesCanCreate === 0 && maxAttendance && maxAttendance > 0 ? 0 : 50)) { 
+    const numToCreate = Number(numCodes);
+    if (isNaN(numToCreate) || numToCreate < 1 || numToCreate > Math.min(50, maxCodesCanCreate === 0 && maxAttendance && maxAttendance > 0 ? 0 : 50)) { 
       toast({
         title: "Cantidad Inválida",
         description: `Por favor, ingresa un número entre 1 y ${Math.min(50, maxCodesCanCreate || 50)}.`,
@@ -82,7 +83,7 @@ export function CreateCodesDialog({
       return;
     }
 
-    if (maxAttendance && maxAttendance > 0 && (currentCodeCount + numCodes > maxAttendance)) {
+    if (maxAttendance && maxAttendance > 0 && (currentCodeCount + numToCreate > maxAttendance)) {
        toast({
         title: "Límite de Aforo Excedido",
         description: `Solo puedes crear ${maxCodesCanCreate} código(s) más para no superar el aforo de ${maxAttendance}.`,
@@ -96,7 +97,7 @@ export function CreateCodesDialog({
     const newCodesBatch: GeneratedCode[] = [];
     const currentAndNewCodes = new Set(existingCodesValues);
 
-    for (let i = 0; i < numCodes; i++) {
+    for (let i = 0; i < numToCreate; i++) {
       let newCodeValue = generateAlphanumericCode(9);
       let attemptCount = 0;
       const maxAttempts = 100; 
@@ -197,7 +198,17 @@ export function CreateCodesDialog({
                 min="1"
                 max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
                 value={numCodes}
-                onChange={(e) => setNumCodes(parseInt(e.target.value, 10) || 1)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty string to clear the input, otherwise parse it.
+                  if (value === "") {
+                    setNumCodes("");
+                  } else {
+                    const numberValue = parseInt(value, 10);
+                    // Check for NaN and negative values, default to a sensible state if needed
+                    setNumCodes(isNaN(numberValue) || numberValue < 0 ? "" : numberValue);
+                  }
+                }}
                 className="mt-1 no-spinner"
                 disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
               />
