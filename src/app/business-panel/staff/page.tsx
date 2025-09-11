@@ -523,10 +523,11 @@ export default function BusinessStaffPage() {
             </div>
         </CardHeader>
         
+        <CardContent>
         {isLoading ? (
-            <CardContent><div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg text-muted-foreground">Cargando personal...</p></div></CardContent>
+            <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg text-muted-foreground">Cargando personal...</p></div>
         ) : staffMembers.length === 0 && !searchTerm ? (
-            <CardContent><p className="text-center text-muted-foreground h-24 flex items-center justify-center">No hay personal registrado.</p></CardContent>
+            <p className="text-center text-muted-foreground h-24 flex items-center justify-center">No hay personal registrado.</p>
         ) : (
           <Table>
             <TableHeader>
@@ -571,6 +572,7 @@ export default function BusinessStaffPage() {
             </TableBody>
           </Table>
         )}
+        </CardContent>
       </Card>
       
       <UIDialog open={modalStep !== 'closed'} onOpenChange={(open) => !open && setModalStep('closed')}>
@@ -615,7 +617,7 @@ export default function BusinessStaffPage() {
           )}
         </UIDialogContent>
       </UIDialog>
-      
+
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -628,3 +630,6 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
+
+    
