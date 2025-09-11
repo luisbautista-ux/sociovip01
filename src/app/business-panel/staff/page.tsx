@@ -175,14 +175,16 @@ export default function BusinessStaffPage() {
     setIsSubmitting(false);
     
     let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-    if (fetchedNameFromApi) initialData.name = fetchedNameFromApi;
+    if (fetchedNameFromApi) {
+      initialData.name = fetchedNameFromApi;
+    }
 
     if (result.exists) {
         if (result.userType === 'PlatformUser' && result.platformUserData) {
             setExistingPlatformUserToEdit(result.platformUserData);
             initialData.existingPlatformUser = result.platformUserData;
+            setShowDniEntryModal(false);
             setShowDniIsPlatformUserAlert(true); 
-            setShowDniEntryModal(false); 
             return;
         } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
             initialData.name = fetchedNameFromApi || `${result.socioVipData.name} ${result.socioVipData.surname}`;
@@ -195,8 +197,7 @@ export default function BusinessStaffPage() {
     }
     
     setVerifiedDniResult(initialData);
-    setEditingUser(null); 
-    setShowDniEntryModal(false); 
+    setShowDniEntryModal(false);
     setShowCreateEditModal(true); 
   };
   

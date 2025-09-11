@@ -225,12 +225,15 @@ export default function BusinessPromotersPage() {
     const checkResult = await checkDniForPromoterAndLink(docNumberCleaned, currentBusinessId);
     
     if (fetchedNameFromApi) {
+        const nameParts = fetchedNameFromApi.split(' ');
+        const surname = nameParts.slice(0, 2).join(' ');
+        const name = nameParts.slice(2).join(' ');
         if(checkResult.qrClientData) {
-            checkResult.qrClientData.name = fetchedNameFromApi.split(' ').slice(2).join(' ');
-            checkResult.qrClientData.surname = fetchedNameFromApi.split(' ').slice(0,2).join(' ');
+            checkResult.qrClientData.name = name;
+            checkResult.qrClientData.surname = surname;
         } else if (checkResult.socioVipData) {
-            checkResult.socioVipData.name = fetchedNameFromApi.split(' ').slice(2).join(' ');
-            checkResult.socioVipData.surname = fetchedNameFromApi.split(' ').slice(0,2).join(' ');
+            checkResult.socioVipData.name = name;
+            checkResult.socioVipData.surname = surname;
         }
     }
     
@@ -242,7 +245,6 @@ export default function BusinessPromotersPage() {
         setShowAlreadyLinkedAlert(true);
     } else {
         setVerifiedPromoterDniResult(checkResult); 
-        setEditingPromoterLink(null); 
         setShowAddEditModal(true);
     }
   };
@@ -462,7 +464,7 @@ export default function BusinessPromotersPage() {
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">{link.joinDate ? format(parseISO(link.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                         <TableCell className="text-right space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setVerifiedPromoterDniResult(null); setShowAddEditModal(true); }} disabled={isSubmitting}>
+                          <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setShowAddEditModal(true); }} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Editar</span>
                           </Button>
@@ -630,7 +632,7 @@ export default function BusinessPromotersPage() {
           </UIDialogHeader>
           <BusinessPromoterForm
             promoterLinkToEdit={editingPromoterLink || undefined}
-            initialData={!editingPromoterLink && verifiedPromoterDniResult ? verifiedPromoterDniResult : undefined}
+            initialData={!editingPromoterLink ? verifiedPromoterDniResult : undefined}
             onSubmit={handleAddOrEditPromoterLink} 
             onCancel={() => { setShowAddEditModal(false); setEditingPromoterLink(null); setVerifiedPromoterDniResult(null); }}
             isSubmitting={isSubmitting}

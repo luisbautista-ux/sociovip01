@@ -89,17 +89,38 @@ export function PlatformUserForm({
 
   type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
 
+  const getInitialValues = () => {
+    if (isEditing && user) {
+        return {
+            dni: user.dni || "", name: user.name || "", email: user.email || "",
+            roles: user.roles || [], 
+            businessId: user.businessId || undefined, 
+            businessIds: user.businessIds || [],
+            password: "",
+        };
+    }
+    if (!isEditing && initialDataForCreation) {
+        const nameParts = initialDataForCreation.name?.split(" ") || [];
+        return {
+            dni: initialDataForCreation.dni, 
+            name: initialDataForCreation.name || "",
+            email: initialDataForCreation.email || "",
+            roles: initialDataForCreation.existingPlatformUserRoles || (isBusinessAdminView ? ['staff'] : []),
+            businessId: initialDataForCreation.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
+            businessIds: initialDataForCreation.existingPlatformUser?.businessIds || [],
+            password: initialDataForCreation.dni,
+        };
+    }
+    return {
+        dni: "", name: "", email: "", roles: isBusinessAdminView ? ['staff'] : [],
+        businessId: isBusinessAdminView ? userProfile?.businessId : undefined,
+        businessIds: [], password: "",
+    };
+  };
+
   const form = useForm<PlatformUserFormValues>({
     resolver: zodResolver(platformUserFormSchema),
-    defaultValues: {
-      dni: initialDataForCreation?.dni || user?.dni || "",
-      name: initialDataForCreation?.name || user?.name || "",
-      email: initialDataForCreation?.email || user?.email || "",
-      roles: initialDataForCreation?.existingPlatformUserRoles || user?.roles || (isBusinessAdminView ? ['staff'] : []),
-      businessId: user?.businessId || initialDataForCreation?.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
-      businessIds: user?.businessIds || [],
-      password: initialDataForCreation?.dni || "",
-    },
+    defaultValues: getInitialValues(),
   });
 
   const watchedRoles = form.watch("roles");
@@ -114,27 +135,6 @@ export function PlatformUserForm({
     if (!watchedRoles || watchedRoles.length === 0) return false;
     return watchedRoles.includes('promoter');
   }, [watchedRoles, isSuperAdminView]);
-
-  React.useEffect(() => {
-    if (isEditing && user) {
-      form.reset({
-        dni: user.dni || "", name: user.name || "", email: user.email || "",
-        roles: user.roles || [], 
-        businessId: user.businessId || undefined, 
-        businessIds: user.businessIds || [],
-        password: "",
-      });
-    } else if (!isEditing && initialDataForCreation) {
-      form.reset({
-        dni: initialDataForCreation.dni, name: initialDataForCreation.name || "",
-        email: initialDataForCreation.email || "",
-        roles: initialDataForCreation.existingPlatformUserRoles || (isBusinessAdminView ? ['staff'] : []),
-        businessId: initialDataForCreation.existingPlatformUser?.businessId || (isBusinessAdminView ? userProfile?.businessId : undefined),
-        businessIds: initialDataForCreation.existingPlatformUser?.businessIds || [],
-        password: initialDataForCreation.dni,
-      });
-    }
-  }, [user, initialDataForCreation, isEditing, form, isBusinessAdminView, userProfile?.businessId]);
 
   React.useEffect(() => {
     if (!showSingleBusinessField && !watchedRoles.includes('promoter')) {

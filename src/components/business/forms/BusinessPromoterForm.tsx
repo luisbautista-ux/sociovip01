@@ -59,6 +59,39 @@ export function BusinessPromoterForm({
   const isPrePopulatedFromOtherSource = !!(initialData && (initialData.qrClientData || initialData.socioVipData) && !isPrePopulatedFromPlatformUser);
   const needsPassword = !isEditingLink && !isPrePopulatedFromPlatformUser;
 
+  const getInitialValues = () => {
+    let defaultVals: PromoterFormValues = {
+      promoterDni: initialData?.dni || promoterLinkToEdit?.promoterDni || "",
+      promoterName: "",
+      promoterEmail: "",
+      promoterPhone: "",
+      commissionRate: promoterLinkToEdit?.commissionRate || "",
+      password: initialData?.dni || "",
+    };
+
+    if (isEditingLink && promoterLinkToEdit) {
+      defaultVals.promoterName = promoterLinkToEdit.promoterName || "";
+      defaultVals.promoterEmail = promoterLinkToEdit.promoterEmail || "";
+      defaultVals.promoterPhone = promoterLinkToEdit.promoterPhone || "";
+    } else if (initialData) {
+      const platformUser = initialData.existingPlatformUserPromoter;
+      const qrClient = initialData.qrClientData;
+      const socioVip = initialData.socioVipData;
+      
+      if (platformUser) {
+          defaultVals.promoterName = platformUser.name || "";
+          defaultVals.promoterEmail = platformUser.email || "";
+          defaultVals.promoterPhone = (platformUser as any).phone || ""; 
+      } else {
+           const name = qrClient ? `${qrClient.name || ''} ${qrClient.surname || ''}`.trim() : (socioVip ? `${socioVip.name || ''} ${socioVip.surname || ''}`.trim() : (initialData.dni));
+           defaultVals.promoterName = name;
+           defaultVals.promoterEmail = socioVip?.email || "";
+           defaultVals.promoterPhone = qrClient?.phone?.toString() || socioVip?.phone?.toString() || "";
+      }
+    }
+    return defaultVals;
+  };
+
   const form = useForm<PromoterFormValues>({
     resolver: zodResolver(
       needsPassword
@@ -67,49 +100,8 @@ export function BusinessPromoterForm({
           })
         : promoterFormSchemaCreate
     ),
-    defaultValues: {
-      promoterDni: "",
-      promoterName: "",
-      promoterEmail: "",
-      promoterPhone: "",
-      commissionRate: "",
-      password: "",
-    },
+    defaultValues: getInitialValues(),
   });
-
-  useEffect(() => {
-    let defaultVals: PromoterFormValues = {
-        promoterDni: initialData?.dni || promoterLinkToEdit?.promoterDni || "",
-        promoterName: "",
-        promoterEmail: "",
-        promoterPhone: "",
-        commissionRate: promoterLinkToEdit?.commissionRate || "",
-        password: initialData?.dni || "",
-    };
-
-    if (isEditingLink && promoterLinkToEdit) {
-        defaultVals.promoterName = promoterLinkToEdit.promoterName || "";
-        defaultVals.promoterEmail = promoterLinkToEdit.promoterEmail || "";
-        defaultVals.promoterPhone = promoterLinkToEdit.promoterPhone || "";
-    } else if (initialData) {
-        const platformUser = initialData.existingPlatformUserPromoter;
-        const qrClient = initialData.qrClientData;
-        const socioVip = initialData.socioVipData;
-        
-        if (platformUser) {
-            defaultVals.promoterName = platformUser.name || "";
-            defaultVals.promoterEmail = platformUser.email || "";
-            defaultVals.promoterPhone = (platformUser as any).phone || ""; 
-        } else {
-             const name = qrClient ? `${qrClient.name || ''} ${qrClient.surname || ''}`.trim() : (socioVip ? `${socioVip.name || ''} ${socioVip.surname || ''}`.trim() : "");
-             defaultVals.promoterName = name;
-             defaultVals.promoterEmail = socioVip?.email || "";
-             defaultVals.promoterPhone = qrClient?.phone || socioVip?.phone || "";
-        }
-    }
-    form.reset(defaultVals);
-  }, [promoterLinkToEdit, initialData, form, isEditingLink]);
-
 
   const handleSubmit = (values: PromoterFormValues) => {
     onSubmit(values);
