@@ -779,5 +779,3 @@ function BusinessPromoterForm({
       </div>
     );
   }
-
-    

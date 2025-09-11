@@ -510,21 +510,21 @@ export default function BusinessStaffPage() {
         <CardHeader>
           <CardTitle>Mi Personal</CardTitle>
           <CardDescription>Administra los usuarios staff, anfitriones y lectores QR de tu negocio.</CardDescription>
-          <div className="relative mt-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar por nombre, email o DNI..."
-              className="pl-8 w-full sm:w-[300px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
+           <div className="relative mt-4">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar por nombre, email o DNI..."
+                className="pl-8 w-full sm:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
         </CardHeader>
         
         {isLoading ? (
-            <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg text-muted-foreground">Cargando personal...</p></div>
+            <CardContent><div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-4 text-lg text-muted-foreground">Cargando personal...</p></div></CardContent>
         ) : staffMembers.length === 0 && !searchTerm ? (
             <CardContent><p className="text-center text-muted-foreground h-24 flex items-center justify-center">No hay personal registrado.</p></CardContent>
         ) : (
@@ -628,7 +628,3 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
-
-    
-
-    
