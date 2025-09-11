@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo } from "react";
 import type { GeneratedCode } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 
 function generateAlphanumericCode(length: number): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -145,7 +145,7 @@ export function CreateCodesDialog({
       await navigator.clipboard.writeText(codesToCopy);
       toast({ title: "Códigos Copiados", description: `${justCreatedCodes.length} códigos recién creados han sido copiados.` });
     } catch (err) {
-      toast({ title: "Error al Copiar", description: "No se pudieron copiar los códigos.", variant: "destructive" });
+      toast({ title: "Error al Copiar", description: "No se pudo copiar los códigos.", variant: "destructive" });
     }
   };
 
@@ -183,7 +183,7 @@ export function CreateCodesDialog({
              {maxAttendance && maxAttendance > 0 && (
                 <Alert variant={canCreateAnyCodes ? "default" : "destructive"}>
                     {canCreateAnyCodes ? <Info className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-                    <DialogTitle>{canCreateAnyCodes ? "Información de Aforo" : "Aforo Completo"}</DialogTitle>
+                    <AlertTitle>{canCreateAnyCodes ? "Información de Aforo" : "Aforo Completo"}</AlertTitle>
                     <DialogDescription>
                     {canCreateAnyCodes ? `Este evento tiene un aforo de ${maxAttendance}. Actualmente hay ${currentCodeCount} códigos. Puedes crear hasta ${maxCodesCanCreate} más.` : `Ya se ha alcanzado el aforo máximo de ${maxAttendance} códigos para este evento.`}
                     </DialogDescription>
@@ -198,7 +198,7 @@ export function CreateCodesDialog({
                 max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
                 value={numCodes}
                 onChange={(e) => setNumCodes(parseInt(e.target.value, 10) || 1)}
-                className="mt-1"
+                className="mt-1 no-spinner"
                 disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
               />
             </div>
