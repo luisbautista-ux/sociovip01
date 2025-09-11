@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -26,15 +27,16 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as ShadcnAlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as ShadcnAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
 import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDialog';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Input } from '@/components/ui/input';
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 export default function BusinessEventsPage() {
@@ -260,11 +262,7 @@ export default function BusinessEventsPage() {
     const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
-    
-    // States for Promoters Tab
-    const [selectedPromoterId, setSelectedPromoterId] = useState<string>("");
-    const [isPromoterPopoverOpen, setIsPromoterPopoverOpen] = useState(false);
-    
+
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
             setLocalEventState({ ...editingEvent });
@@ -274,7 +272,10 @@ export default function BusinessEventsPage() {
     }, [isManageEventDialogOpen, editingEvent]);
 
     const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
-        setLocalEventState(prev => prev ? { ...prev, ...values } : null);
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            return { ...prev, ...values };
+        });
     }, []);
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
@@ -308,27 +309,36 @@ export default function BusinessEventsPage() {
         });
     };
 
-    const handleAssignPromoter = () => {
-        if (!selectedPromoterId) return;
-        const promoterToAdd = availablePromoters.find(p => p.platformUserUid === selectedPromoterId);
-        if (!promoterToAdd) return;
+    const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
+        const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
+        if (!promoterData) return;
+
         setLocalEventState(prev => {
             if (!prev) return null;
-            const isAlreadyAssigned = (prev.assignedPromoters || []).some(p => p.promoterProfileId === promoterToAdd.platformUserUid);
-            if (isAlreadyAssigned) {
-                toast({ title: "Promotor ya asignado", variant: "default" });
-                return prev;
+            
+            let updatedAssignments = [...(prev.assignedPromoters || [])];
+
+            if (isChecked) {
+                // Add promoter if not already assigned
+                const isAlreadyAssigned = updatedAssignments.some(p => p.promoterProfileId === promoterId);
+                if (!isAlreadyAssigned) {
+                    const newAssignment: EventPromoterAssignment = {
+                        promoterProfileId: promoterData.platformUserUid!,
+                        promoterName: promoterData.promoterName,
+                        promoterEmail: promoterData.promoterEmail,
+                        commissionRules: [],
+                    };
+                    updatedAssignments.push(newAssignment);
+                }
+            } else {
+                // Remove promoter
+                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
             }
-            const newAssignment: EventPromoterAssignment = {
-                promoterProfileId: promoterToAdd.platformUserUid!,
-                promoterName: promoterToAdd.promoterName,
-                promoterEmail: promoterToAdd.promoterEmail,
-                commissionRules: [],
-            };
-            return { ...prev, assignedPromoters: [...(prev.assignedPromoters || []), newAssignment] };
+
+            return { ...prev, assignedPromoters: updatedAssignments };
         });
-        setSelectedPromoterId("");
     };
+
 
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
         setLocalEventState(prev => {
@@ -378,17 +388,7 @@ export default function BusinessEventsPage() {
         });
     };
 
-    const handleRemovePromoter = (promoterId: string) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            const updatedAssignments = (prev.assignedPromoters || []).filter(p => p.promoterProfileId !== promoterId);
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
-    };
-
     if (!isManageEventDialogOpen || !localEventState) return null;
-
-    const unassignedPromoters = availablePromoters.filter(ap => !(localEventState.assignedPromoters || []).some(p => p.promoterProfileId === ap.platformUserUid));
 
     return (
         <>
@@ -436,7 +436,7 @@ export default function BusinessEventsPage() {
                                                          <AlertDialog>
                                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                                                             <AlertDialogContent>
-                                                                <AlertDialogHeader><ShadcnAlertDialogTitle>¿Eliminar entrada?</ShadcnAlertDialogTitle><ShadcnAlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</ShadcnAlertDialogDescription></AlertDialogHeader>
+                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</AlertDialogDescription></AlertDialogHeader>
                                                                 <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                             </AlertDialogContent>
                                                          </AlertDialog>
@@ -454,65 +454,61 @@ export default function BusinessEventsPage() {
                             <TabsContent value="boxes">
                                 <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
                             </TabsContent>
-                            <TabsContent value="promoters">
-                                 <Card>
-                                     <CardHeader>
-                                         <CardTitle>Asignar Promotores al Evento</CardTitle>
-                                         <CardDescription>Selecciona los promotores de tu negocio y define sus comisiones para este evento específico.</CardDescription>
-                                     </CardHeader>
-                                     <CardContent className="space-y-6">
-                                         <div className="flex items-end gap-2">
-                                             <div className="flex-grow">
-                                                 <Label>Promotores del Negocio</Label>
-                                                  <Popover open={isPromoterPopoverOpen} onOpenChange={setIsPromoterPopoverOpen}>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="outline" role="combobox" className={cn("w-full justify-between", unassignedPromoters.length === 0 && "text-muted-foreground")}>
-                                                            {selectedPromoterId ? unassignedPromoters.find(p => p.platformUserUid === selectedPromoterId)?.promoterName : (unassignedPromoters.length > 0 ? "Seleccionar promotor a asignar..." : "No hay promotores disponibles")}
-                                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-[300px] p-0">
-                                                        <Command><CommandInput placeholder="Buscar promotor..." /><CommandEmpty>No se encontraron promotores.</CommandEmpty><CommandGroup>
-                                                            {unassignedPromoters.map(p => (<CommandItem value={p.platformUserUid} key={p.platformUserUid!} onSelect={(currentValue) => {
-                                                                setSelectedPromoterId(currentValue === selectedPromoterId ? "" : p.platformUserUid!);
-                                                                setIsPromoterPopoverOpen(false);
-                                                            }}>{p.promoterName}</CommandItem>))}
-                                                        </CommandGroup></Command>
-                                                    </PopoverContent>
-                                                </Popover>
-                                             </div>
-                                             <Button onClick={handleAssignPromoter} disabled={!selectedPromoterId}>Asignar</Button>
-                                         </div>
-                                         <div className="space-y-4">
-                                            <h4 className="font-semibold">Promotores Asignados</h4>
-                                            {(localEventState.assignedPromoters || []).map(assignment => (
-                                                <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3">
-                                                    <div className="flex justify-between items-center">
-                                                        <p className="font-medium">{assignment.promoterName}</p>
-                                                        <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemovePromoter(assignment.promoterProfileId)}><Trash2 className="h-4 w-4"/></Button>
-                                                    </div>
-                                                    
-                                                    {/* Commission Rules */}
-                                                    <div className="space-y-2">
-                                                        {(assignment.commissionRules || []).map((rule, index) => (
-                                                            <div key={rule.id} className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
-                                                                <div className="flex-grow grid grid-cols-2 gap-2">
-                                                                    <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
-                                                                    <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
-                                                                </div>
-                                                                <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemoveCommissionRule(assignment.promoterProfileId, rule.id)}><Trash2 className="h-4 w-4"/></Button>
-                                                            </div>
-                                                        ))}
-                                                        <Button size="sm" variant="outline" onClick={() => handleAddCommissionRule(assignment.promoterProfileId)}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Regla de Comisión</Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {(!localEventState.assignedPromoters || localEventState.assignedPromoters.length === 0) && (
-                                                <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
-                                            )}
-                                         </div>
-                                     </CardContent>
-                                 </Card>
+                           <TabsContent value="promoters">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Asignar Promotores al Evento</CardTitle>
+                                        <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento y luego configura sus comisiones.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        <div>
+                                            <Label className="font-semibold">Promotores del Negocio</Label>
+                                            <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
+                                                {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
+                                                    const isChecked = (localEventState.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                    return (
+                                                        <div key={promoter.platformUserUid} className="flex items-center space-x-2">
+                                                            <Checkbox
+                                                                id={`promoter-${promoter.platformUserUid}`}
+                                                                checked={isChecked}
+                                                                onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter.platformUserUid!, Boolean(checked))}
+                                                            />
+                                                            <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
+                                                        </div>
+                                                    );
+                                                }) : <p className="text-sm text-muted-foreground">No hay promotores vinculados a tu negocio.</p>}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                          <h4 className="font-semibold">Promotores Asignados ({localEventState.assignedPromoters?.length || 0})</h4>
+                                          {(localEventState.assignedPromoters || []).map(assignment => (
+                                              <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
+                                                  <div className="flex justify-between items-center">
+                                                      <p className="font-medium">{assignment.promoterName}</p>
+                                                      {/* El promotor se desasigna desmarcando el checkbox de arriba */}
+                                                  </div>
+                                                  
+                                                  <div className="space-y-2">
+                                                      {(assignment.commissionRules || []).map((rule, index) => (
+                                                          <div key={rule.id} className="flex items-center gap-2 bg-background p-2 rounded-md border">
+                                                              <div className="flex-grow grid grid-cols-2 gap-2">
+                                                                  <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
+                                                                  <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
+                                                              </div>
+                                                              <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemoveCommissionRule(assignment.promoterProfileId, rule.id)}><Trash2 className="h-4 w-4"/></Button>
+                                                          </div>
+                                                      ))}
+                                                      <Button size="sm" variant="outline" onClick={() => handleAddCommissionRule(assignment.promoterProfileId)}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Regla de Comisión</Button>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                          {(!localEventState.assignedPromoters || localEventState.assignedPromoters.length === 0) && (
+                                              <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
+                                          )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </TabsContent>
                         </div>
                     </Tabs>
@@ -597,7 +593,7 @@ export default function BusinessEventsPage() {
                         <AlertDialog>
                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                             <AlertDialogContent>
-                            <AlertDialogHeader><ShadcnAlertDialogTitle>¿Confirmar eliminación?</ShadcnAlertDialogTitle><ShadcnAlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</ShadcnAlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
                             <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -652,4 +648,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
