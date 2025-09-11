@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -96,7 +95,8 @@ interface ManageCodesDialogProps {
   onCodesUpdated: (entityId: string, updatedCodes: GeneratedCode[]) => void;
   onRequestCreateNewCodes: () => void;
   isPromoterView?: boolean; 
-  currentUserProfileName?: string; // Necesario para la lógica de eliminación del promotor
+  currentUserProfileName?: string;
+  currentUserProfileUid?: string;
 }
 
 export function ManageCodesDialog({
@@ -107,6 +107,7 @@ export function ManageCodesDialog({
     onRequestCreateNewCodes,
     isPromoterView = false, 
     currentUserProfileName,
+    currentUserProfileUid,
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
@@ -125,7 +126,7 @@ export function ManageCodesDialog({
       if (entitySnap.exists()) {
         const latestEntityData = entitySnap.data() as BusinessManagedEntity;
         const codesToDisplay = isPromoterView
-          ? (latestEntityData.generatedCodes || []).filter(c => c.generatedByName === currentUserProfileName)
+          ? (latestEntityData.generatedCodes || []).filter(c => c.generatedByUid === currentUserProfileUid)
           : (latestEntityData.generatedCodes || []);
         setInternalCodes([...codesToDisplay]);
       } else {
@@ -139,7 +140,7 @@ export function ManageCodesDialog({
     } finally {
       setIsLoadingCodes(false);
     }
-  }, [entity, isPromoterView, currentUserProfileName, toast]);
+  }, [entity, isPromoterView, currentUserProfileUid, toast]);
 
   useEffect(() => {
     if (open && entity) {
@@ -158,12 +159,12 @@ export function ManageCodesDialog({
     if (!entity || !codeIdToDelete) return;
     const codeToDelete = internalCodes.find(c => c.id === codeIdToDelete);
 
-    if (isPromoterView && codeToDelete?.generatedByName !== currentUserProfileName) {
+    if (isPromoterView && codeToDelete?.generatedByUid !== currentUserProfileUid) {
         toast({ title: "Acción no permitida", description: "Solo puedes eliminar códigos generados por ti.", variant: "destructive" });
         return;
     }
 
-    if (codeToDelete && codeToDelete.status === 'redeemed') {
+    if (codeToDelete && (codeToDelete.status === 'redeemed' || codeToDelete.status === 'used')) {
         toast({
             title: "Acción no permitida",
             description: "No se pueden eliminar códigos que ya han sido canjeados/utilizados.",
@@ -182,7 +183,7 @@ export function ManageCodesDialog({
 
     const codesToDeleteFromBatchIds = batchItem.codesInBatch
       .filter(c => {
-        const canDelete = c.status !== 'redeemed' && (!isPromoterView || c.generatedByName === currentUserProfileName);
+        const canDelete = (c.status !== 'redeemed' && c.status !== 'used') && (!isPromoterView || c.generatedByUid === currentUserProfileUid);
         return canDelete;
       })
       .map(c => c.id);
@@ -253,8 +254,8 @@ export function ManageCodesDialog({
     }
     const uniqueKeyForRow = `code-row-${code.id}-${batchId || 'single'}`;
 
-    const canPromoterDeleteThisCode = isPromoterView && code.generatedByName === currentUserProfileName && code.status !== 'redeemed';
-    const canAdminDeleteThisCode = !isPromoterView && code.status !== 'redeemed';
+    const canPromoterDeleteThisCode = isPromoterView && code.generatedByUid === currentUserProfileUid && (code.status !== 'redeemed' && code.status !== 'used');
+    const canAdminDeleteThisCode = !isPromoterView && (code.status !== 'redeemed' && code.status !== 'used');
 
     return (
     <TableRow 
@@ -367,7 +368,7 @@ export function ManageCodesDialog({
                 {processedAndGroupedCodes.map((item) => {
                   if (item.isBatch && item.codesInBatch && item.batchId) {
                     const isExpanded = !!expandedBatches[item.batchId];
-                    const nonRedeemedInBatch = item.codesInBatch.filter(c => c.status !== 'redeemed' && (!isPromoterView || c.generatedByName === currentUserProfileName));
+                    const nonRedeemedInBatch = item.codesInBatch.filter(c => (c.status !== 'redeemed' && c.status !== 'used') && (!isPromoterView || c.generatedByUid === currentUserProfileUid));
                     const nonRedeemedInBatchCount = nonRedeemedInBatch.length;
 
                     return (
