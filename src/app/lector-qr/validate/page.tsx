@@ -253,6 +253,9 @@ export default function LectorValidateQrPage() {
     setIsScannerActive(true);
   }
 
+  const activePromotions = activeBusinessEntities.filter(e => e.type === 'promotion');
+  const activeEvents = activeBusinessEntities.filter(e => e.type === 'event');
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -353,36 +356,63 @@ export default function LectorValidateQrPage() {
 
       <Card className="mt-8">
         <CardHeader>
-          <CardTitle>Entidades Activas Hoy</CardTitle>
-          <CardDescription>Promociones y eventos vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
+          <CardTitle>Promociones y Eventos Disponibles</CardTitle>
+          <CardDescription>Actividades vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
         </CardHeader>
-        <CardContent>
-          {activeBusinessEntities.length === 0 ? (
-            <p className="text-muted-foreground">No hay promociones o eventos activos para hoy.</p>
-          ) : (
-            <Accordion type="single" collapsible className="w-full">
-              {activeBusinessEntities.map(entity => (
-                <AccordionItem value={entity.id} key={entity.id}>
-                  <AccordionTrigger>
-                    <div className="flex items-center gap-2">
-                        {entity.type === 'promotion' ? <Ticket className="h-5 w-5 text-primary"/> : <CalendarDays className="h-5 w-5 text-primary"/>}
-                        <span>{entity.name}</span>
-                        <Badge variant={entity.isActive ? "default" : "outline"} className={entity.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
-                            {entity.isActive ? "Activa" : "Inactiva"}
-                        </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-1 text-sm pl-8">
-                    <p>{entity.description}</p>
-                    <p><strong>Vigencia:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(anyToDate(entity.endDate)!, "P", { locale: es }) : 'N/A'}</p>
-                    {entity.type === 'event' && <p><strong>Aforo:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.maxAttendance === 0 || !entity.maxAttendance ? '∞' : entity.maxAttendance}</p>}
-                    {entity.type === 'promotion' && entity.usageLimit && entity.usageLimit > 0 && <p><strong>Límite de canjes:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.usageLimit}</p>}
-                    <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+        <CardContent className="space-y-6">
+          
+          {activePromotions.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-2 flex items-center"><Ticket className="h-5 w-5 mr-2 text-primary"/>Promociones Disponibles</h3>
+              <Accordion type="single" collapsible className="w-full">
+                {activePromotions.map(entity => (
+                  <AccordionItem value={entity.id} key={entity.id}>
+                    <AccordionTrigger>
+                      <div className="flex items-center gap-2">
+                          <span>{entity.name}</span>
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Activa</Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="space-y-1 text-sm pl-8">
+                      <p>{entity.description}</p>
+                      <p><strong>Vigencia:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(anyToDate(entity.endDate)!, "P", { locale: es }) : 'N/A'}</p>
+                      {entity.usageLimit && entity.usageLimit > 0 && <p><strong>Límite de canjes:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.usageLimit}</p>}
+                      <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
           )}
+
+          {activeEvents.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-2 flex items-center"><CalendarDays className="h-5 w-5 mr-2 text-primary"/>Eventos Vigentes</h3>
+              <Accordion type="single" collapsible className="w-full">
+                {activeEvents.map(entity => (
+                  <AccordionItem value={entity.id} key={entity.id}>
+                    <AccordionTrigger>
+                      <div className="flex items-center gap-2">
+                          <span>{entity.name}</span>
+                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Activo</Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="space-y-1 text-sm pl-8">
+                      <p>{entity.description}</p>
+                      <p><strong>Fecha:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'}</p>
+                      <p><strong>Aforo:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.maxAttendance === 0 || !entity.maxAttendance ? '∞' : entity.maxAttendance}</p>
+                      <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          )}
+          
+          {activeBusinessEntities.length === 0 && (
+            <p className="text-muted-foreground">No hay promociones o eventos activos para hoy.</p>
+          )}
+
         </CardContent>
       </Card>
     </div>
