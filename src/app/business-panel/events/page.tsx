@@ -263,6 +263,7 @@ export default function BusinessEventsPage() {
     
     // States for Promoters Tab
     const [selectedPromoterId, setSelectedPromoterId] = useState<string>("");
+    const [isPromoterPopoverOpen, setIsPromoterPopoverOpen] = useState(false);
     
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
@@ -463,7 +464,7 @@ export default function BusinessEventsPage() {
                                          <div className="flex items-end gap-2">
                                              <div className="flex-grow">
                                                  <Label>Promotores del Negocio</Label>
-                                                  <Popover>
+                                                  <Popover open={isPromoterPopoverOpen} onOpenChange={setIsPromoterPopoverOpen}>
                                                     <PopoverTrigger asChild>
                                                         <Button variant="outline" role="combobox" className={cn("w-full justify-between", unassignedPromoters.length === 0 && "text-muted-foreground")}>
                                                             {selectedPromoterId ? unassignedPromoters.find(p => p.platformUserUid === selectedPromoterId)?.promoterName : (unassignedPromoters.length > 0 ? "Seleccionar promotor a asignar..." : "No hay promotores disponibles")}
@@ -472,7 +473,10 @@ export default function BusinessEventsPage() {
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[300px] p-0">
                                                         <Command><CommandInput placeholder="Buscar promotor..." /><CommandEmpty>No se encontraron promotores.</CommandEmpty><CommandGroup>
-                                                            {unassignedPromoters.map(p => (<CommandItem value={p.platformUserUid} key={p.platformUserUid} onSelect={() => setSelectedPromoterId(p.platformUserUid!)}>{p.promoterName}</CommandItem>))}
+                                                            {unassignedPromoters.map(p => (<CommandItem value={p.platformUserUid} key={p.platformUserUid!} onSelect={(currentValue) => {
+                                                                setSelectedPromoterId(currentValue === selectedPromoterId ? "" : p.platformUserUid!);
+                                                                setIsPromoterPopoverOpen(false);
+                                                            }}>{p.promoterName}</CommandItem>))}
                                                         </CommandGroup></Command>
                                                     </PopoverContent>
                                                 </Popover>
@@ -648,3 +652,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
