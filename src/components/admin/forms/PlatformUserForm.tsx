@@ -38,9 +38,6 @@ const platformUserFormSchema = z.object({
   }),
   businessId: z.string().optional().nullable(),
   businessIds: z.array(z.string()).optional().nullable(),
-  acceptTerms: z.boolean().refine((val) => val === true, {
-    message: "Debes aceptar los términos.",
-  }),
 });
 
 type PlatformUserFormValues = z.infer<typeof platformUserFormSchema>;
@@ -100,7 +97,6 @@ export function PlatformUserForm({
       roles: user?.roles || [],
       businessId: user?.businessId || null,
       businessIds: user?.businessIds || [],
-      acceptTerms: !needsPassword, // auto-accept for existing users
     },
   });
 
@@ -118,7 +114,6 @@ export function PlatformUserForm({
       roles: user?.roles || [],
       businessId: user?.businessId || null,
       businessIds: user?.businessIds || [],
-      acceptTerms: !needsPassword,
     });
   }, [user, initialDataForCreation, form, needsPassword]);
 
@@ -225,30 +220,6 @@ export function PlatformUserForm({
              )}/>
         )}
         
-        {needsPassword && (
-          <FormField
-            control={form.control}
-            name="acceptTerms"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={isSubmitting}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>
-                    Acepto el tratamiento de mis datos personales
-                  </FormLabel>
-                  <FormMessage />
-                </div>
-              </FormItem>
-            )}
-          />
-        )}
-        
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableSubmitOverride}>
@@ -260,4 +231,3 @@ export function PlatformUserForm({
     </Form>
   );
 }
-
