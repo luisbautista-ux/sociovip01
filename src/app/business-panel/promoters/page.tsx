@@ -24,6 +24,7 @@
   import { z } from "zod";
   import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
   import { Label } from "@/components/ui/label";
+  import { BusinessPromoterForm } from "@/components/business/forms/BusinessPromoterForm";
 
   const DniEntrySchema = z.object({
     docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
@@ -630,7 +631,17 @@
                   }
               </UIDialogDescription>
             </UIDialogHeader>
-            
+            <BusinessPromoterForm
+                promoterLinkToEdit={editingPromoterLink || undefined}
+                initialData={verifiedPromoterDniResult || undefined}
+                onSubmit={handleAddOrEditPromoterLink}
+                onCancel={() => {
+                  setShowAddEditModal(false);
+                  setEditingPromoterLink(null);
+                  setVerifiedPromoterDniResult(null);
+                }}
+                isSubmitting={isSubmitting}
+              />
           </UIDialogContent>
         </UIDialog>
 

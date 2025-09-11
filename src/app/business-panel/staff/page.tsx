@@ -142,6 +142,10 @@ export default function BusinessStaffPage() {
   
   const handleOpenCreateUserFlow = () => {
     setEditingUser(null);
+    setVerifiedDniResult(null);
+    dniEntryForm.reset({ docType: 'dni', docNumber: "" });
+    setExistingPlatformUserToEdit(null);
+    setShowDniIsPlatformUserAlert(false);
     setShowDniEntryModal(true); 
   };
   
@@ -169,6 +173,7 @@ export default function BusinessStaffPage() {
     
     const result = await checkDniExists(docNumberCleaned);
     setIsSubmitting(false);
+    setShowDniEntryModal(false);
     
     let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
     if (fetchedNameFromApi) {
@@ -180,7 +185,6 @@ export default function BusinessStaffPage() {
             setExistingPlatformUserToEdit(result.platformUserData);
             initialData.existingPlatformUser = result.platformUserData;
             setShowDniIsPlatformUserAlert(true); 
-            setShowDniEntryModal(false);
             return;
         } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
             initialData.name = fetchedNameFromApi || `${result.socioVipData.name} ${result.socioVipData.surname}`;
@@ -193,7 +197,6 @@ export default function BusinessStaffPage() {
     }
     
     setVerifiedDniResult(initialData);
-    setShowDniEntryModal(false);
     setShowCreateEditModal(true); 
   };
   

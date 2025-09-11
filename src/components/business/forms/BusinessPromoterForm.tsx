@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -59,39 +59,6 @@ export function BusinessPromoterForm({
   const isPrePopulatedFromOtherSource = !!(initialData && (initialData.qrClientData || initialData.socioVipData) && !isPrePopulatedFromPlatformUser);
   const needsPassword = !isEditingLink && !isPrePopulatedFromPlatformUser;
 
-  const getInitialValues = () => {
-    let defaultVals: PromoterFormValues = {
-      promoterDni: initialData?.dni || promoterLinkToEdit?.promoterDni || "",
-      promoterName: "",
-      promoterEmail: "",
-      promoterPhone: "",
-      commissionRate: promoterLinkToEdit?.commissionRate || "",
-      password: initialData?.dni || "",
-    };
-
-    if (isEditingLink && promoterLinkToEdit) {
-      defaultVals.promoterName = promoterLinkToEdit.promoterName || "";
-      defaultVals.promoterEmail = promoterLinkToEdit.promoterEmail || "";
-      defaultVals.promoterPhone = promoterLinkToEdit.promoterPhone || "";
-    } else if (initialData) {
-      const platformUser = initialData.existingPlatformUserPromoter;
-      const qrClient = initialData.qrClientData;
-      const socioVip = initialData.socioVipData;
-      
-      if (platformUser) {
-          defaultVals.promoterName = platformUser.name || "";
-          defaultVals.promoterEmail = platformUser.email || "";
-          defaultVals.promoterPhone = (platformUser as any).phone || ""; 
-      } else {
-           const name = qrClient ? `${qrClient.name || ''} ${qrClient.surname || ''}`.trim() : (socioVip ? `${socioVip.name || ''} ${socioVip.surname || ''}`.trim() : (initialData.dni));
-           defaultVals.promoterName = name;
-           defaultVals.promoterEmail = socioVip?.email || "";
-           defaultVals.promoterPhone = qrClient?.phone?.toString() || socioVip?.phone?.toString() || "";
-      }
-    }
-    return defaultVals;
-  };
-
   const form = useForm<PromoterFormValues>({
     resolver: zodResolver(
       needsPassword
@@ -100,7 +67,14 @@ export function BusinessPromoterForm({
           })
         : promoterFormSchemaCreate
     ),
-    defaultValues: getInitialValues(),
+    defaultValues: {
+        promoterDni: initialData?.dni || promoterLinkToEdit?.promoterDni || "",
+        promoterName: promoterLinkToEdit?.promoterName || initialData?.existingPlatformUserPromoter?.name || `${initialData?.qrClientData?.name || initialData?.socioVipData?.name || ''} ${initialData?.qrClientData?.surname || initialData?.socioVipData?.surname || ''}`.trim() || "",
+        promoterEmail: promoterLinkToEdit?.promoterEmail || initialData?.existingPlatformUserPromoter?.email || initialData?.socioVipData?.email || "",
+        promoterPhone: promoterLinkToEdit?.promoterPhone || (initialData?.existingPlatformUserPromoter as any)?.phone || initialData?.qrClientData?.phone?.toString() || initialData?.socioVipData?.phone?.toString() || "",
+        commissionRate: promoterLinkToEdit?.commissionRate || "",
+        password: initialData?.dni || "",
+    },
   });
 
   const handleSubmit = (values: PromoterFormValues) => {
@@ -195,7 +169,7 @@ export function BusinessPromoterForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contraseña Inicial para el Promotor <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input type="text" placeholder="Mínimo 6 caracteres" {...field} disabled={isSubmitting} /></FormControl>
+                  <FormControl><Input type="text" placeholder="Mínimo 6 caracteres" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
                   <FormDescription className="text-xs">Por defecto, es el DNI del promotor. Puedes cambiarla.</FormDescription>
                   <FormMessage />
                 </FormItem>
