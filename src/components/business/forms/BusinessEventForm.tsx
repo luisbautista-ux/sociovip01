@@ -68,11 +68,13 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
     },
   });
 
-  const watchedValues = form.watch();
-
-  React.useEffect(() => {
-    onFormChange(watchedValues);
-  }, [watchedValues, onFormChange]);
+  // This effect was the cause of the infinite loop.
+  // It was being called on every render, which triggered a state update in the parent,
+  // which caused a re-render, and so on.
+  // By removing it, the form now only communicates its state up when submitted.
+  // useEffect(() => {
+  //   onFormChange(form.getValues());
+  // }, [form, onFormChange]);
   
   React.useEffect(() => {
     if (event) {
@@ -90,14 +92,19 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
   }, [event, form]);
 
   const handleSubmit = (values: EventDetailsFormValues) => {
-    // The parent component will handle the actual submission.
-    console.log("BusinessEventForm validated with values (local):", values);
+    // We now call onFormChange ONLY when a "submit" happens inside the form.
+    // In this case, there's no submit button, so we'll rely on the parent's save button.
+    // The most robust way is to pass the form instance up or handle save inside.
+    // For now, we will assume the parent will get the values from the state.
+    // To make sure the parent has the latest values, we can call onFormChange on blur or a similar event,
+    // but the safest is to remove the dependency entirely from the parent's useEffect.
+    onFormChange(values); 
   };
 
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+      <form onBlur={() => onFormChange(form.getValues())} className="space-y-4">
         <FormField
           control={form.control}
           name="name"

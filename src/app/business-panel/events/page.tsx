@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { PlusCircle, Edit, Trash2, Calendar, Loader2, Info } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 
@@ -184,9 +184,9 @@ export default function BusinessEventsPage() {
         }
     }, [isManageEventDialogOpen, editingEvent]);
 
-    const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
+    const handleLocalDetailsChange = (values: EventDetailsFormValues) => {
         setLocalEventState(prev => prev ? { ...prev, ...values } : null);
-    }, []);
+    };
 
     const handleTicketTypesChange = useCallback((newTicketTypes: TicketType[]) => {
         setLocalEventState(prev => prev ? { ...prev, ticketTypes: newTicketTypes, maxAttendance: calculateMaxAttendance(newTicketTypes) } : null);
@@ -217,8 +217,9 @@ export default function BusinessEventsPage() {
                     <div className="flex-grow overflow-y-auto mt-4 pr-2">
                         <TabsContent value="details">
                             <BusinessEventForm 
+                                key={localEventState.id || 'new-event'}
                                 event={localEventState} 
-                                onFormChange={handleDetailsChange} 
+                                onFormChange={handleLocalDetailsChange} 
                                 isSubmitting={isSubmitting}
                             />
                         </TabsContent>
@@ -297,7 +298,7 @@ export default function BusinessEventsPage() {
                        <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescriptionComponent>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescriptionComponent></AlertDialogHeader>
+                            <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><AlertDialogDescriptionComponent>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescriptionComponent></AlertDialogHeader>
                             <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
