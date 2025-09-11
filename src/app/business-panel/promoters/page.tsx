@@ -605,7 +605,13 @@ export default function BusinessPromotersPage() {
         </UIDialogContent>
       </UIDialog>
 
-      <UIDialog open={showAddEditModal} onOpenChange={setShowAddEditModal}>
+      <UIDialog open={showAddEditModal} onOpenChange={(open) => {
+          if (!open) {
+              setEditingPromoterLink(null);
+              setVerifiedPromoterDniResult(null);
+          }
+          setShowAddEditModal(open);
+      }}>
         <UIDialogContent className="sm:max-w-lg">
           <UIDialogHeader>
             <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>

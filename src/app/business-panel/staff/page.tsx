@@ -400,7 +400,13 @@ export default function BusinessStaffPage() {
         </UIDialogContent>
       </UIDialog>
 
-      <UIDialog open={showCreateEditModal} onOpenChange={setShowCreateEditModal}>
+      <UIDialog open={showCreateEditModal} onOpenChange={(open) => {
+          if (!open) {
+              setEditingUser(null);
+              setVerifiedDniResult(null);
+          }
+          setShowCreateEditModal(open);
+      }}>
         <UIDialogContent className="sm:max-w-lg">
           <UIDialogHeader>
             <UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
