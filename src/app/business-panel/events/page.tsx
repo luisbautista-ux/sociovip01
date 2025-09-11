@@ -14,12 +14,12 @@ import {
   DialogFooter, 
   DialogDescription
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc } from "firebase/firestore";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode } from "@/lib/types";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, BusinessPromoterLink, CommissionRule } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -31,6 +31,11 @@ import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
 import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDialog';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
+
 
 export default function BusinessEventsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -53,22 +58,34 @@ export default function BusinessEventsPage() {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
 
+  const [availablePromoters, setAvailablePromoters] = useState<BusinessPromoterLink[]>([]);
+
   useEffect(() => {
     if (!loadingAuth && !loadingProfile && userProfile?.businessId) {
       setCurrentBusinessId(userProfile.businessId);
     }
   }, [userProfile, loadingAuth, loadingProfile]);
 
-  const fetchEvents = useCallback(async (businessId: string) => {
+  const fetchEventsAndPromoters = useCallback(async (businessId: string) => {
     setIsLoading(true);
     try {
-      const q = query(
+      const eventsQuery = query(
         collection(db, "businessEntities"),
         where("businessId", "==", businessId),
         where("type", "==", "event")
       );
-      const querySnapshot = await getDocs(q);
-      const fetchedEvents: BusinessManagedEntity[] = querySnapshot.docs.map(docSnap => {
+      const promotersQuery = query(
+        collection(db, "businessPromoterLinks"),
+        where("businessId", "==", businessId),
+        where("isActive", "==", true)
+      );
+
+      const [eventsSnapshot, promotersSnapshot] = await Promise.all([
+        getDocs(eventsQuery),
+        getDocs(promotersQuery)
+      ]);
+      
+      const fetchedEvents: BusinessManagedEntity[] = eventsSnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
           id: docSnap.id,
@@ -79,9 +96,17 @@ export default function BusinessEventsPage() {
         } as BusinessManagedEntity;
       });
       setEvents(fetchedEvents.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
+
+      const fetchedPromoters: BusinessPromoterLink[] = promotersSnapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+          joinDate: anyToDate(docSnap.data().joinDate)?.toISOString() || "",
+      } as BusinessPromoterLink));
+      setAvailablePromoters(fetchedPromoters);
+
     } catch (error: any) {
-      console.error("Error fetching events:", error);
-      toast({ title: "Error", description: `No se pudieron cargar los eventos: ${error.message}`, variant: "destructive" });
+      console.error("Error fetching events or promoters:", error);
+      toast({ title: "Error", description: `No se pudieron cargar los datos: ${error.message}`, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -89,11 +114,11 @@ export default function BusinessEventsPage() {
 
   useEffect(() => {
     if (currentBusinessId) {
-      fetchEvents(currentBusinessId);
+      fetchEventsAndPromoters(currentBusinessId);
     } else if (!loadingAuth && !loadingProfile) {
         setIsLoading(false);
     }
-  }, [currentBusinessId, fetchEvents, loadingAuth, loadingProfile]);
+  }, [currentBusinessId, fetchEventsAndPromoters, loadingAuth, loadingProfile]);
 
   const handleOpenManageEventDialog = (event: BusinessManagedEntity | null, duplicate = false) => {
     setIsSubmitting(false);
@@ -123,7 +148,7 @@ export default function BusinessEventsPage() {
     try {
         await deleteDoc(doc(db, "businessEntities", eventId));
         toast({ title: "Evento Eliminado", description: `El evento "${eventName}" ha sido eliminado.`, variant: "destructive" });
-        if(currentBusinessId) fetchEvents(currentBusinessId);
+        if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
     } catch (error: any) {
         toast({ title: "Error al Eliminar", description: error.message, variant: "destructive" });
     } finally {
@@ -161,7 +186,7 @@ export default function BusinessEventsPage() {
               toast({title: "Evento Creado", description: `El evento "${payload.name}" ha sido creado.`});
           }
           setIsManageEventDialogOpen(false);
-          if(currentBusinessId) fetchEvents(currentBusinessId);
+          if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
       } catch (error: any) {
           toast({title: "Error al Guardar", description: error.message, variant: "destructive"});
           console.error("Error saving event:", error);
@@ -205,7 +230,7 @@ export default function BusinessEventsPage() {
         await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
         toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetEntityData.name}. Guardados en la base de datos.`});
         
-        if (currentBusinessId) fetchEvents(currentBusinessId); 
+        if (currentBusinessId) fetchEventsAndPromoters(currentBusinessId); 
         
         if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
           setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
@@ -222,7 +247,7 @@ export default function BusinessEventsPage() {
     try {
         await updateDoc(doc(db, "businessEntities", entityId), { generatedCodes: updatedCodes });
         toast({title: "Códigos Actualizados", description: "Los cambios en los códigos se han guardado."});
-        if (currentBusinessId) fetchEvents(currentBusinessId);
+        if (currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
     } catch (error: any) {
         toast({title: "Error", description: "No se pudieron guardar los cambios en los códigos.", variant: "destructive"});
     } finally {
@@ -235,10 +260,17 @@ export default function BusinessEventsPage() {
     const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
-
+    
+    // States for Promoters Tab
+    const [selectedPromoterId, setSelectedPromoterId] = useState<string>("");
+    
     useEffect(() => {
-      setLocalEventState(editingEvent ? { ...editingEvent } : null);
-    }, [editingEvent]);
+        if (isManageEventDialogOpen && editingEvent) {
+            setLocalEventState({ ...editingEvent });
+        } else {
+            setLocalEventState(null);
+        }
+    }, [isManageEventDialogOpen, editingEvent]);
 
     const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
         setLocalEventState(prev => prev ? { ...prev, ...values } : null);
@@ -248,16 +280,18 @@ export default function BusinessEventsPage() {
         setLocalEventState(prev => {
             if (!prev) return null;
             let updatedTicketTypes: TicketType[];
+            const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
+            const newOrUpdatedTicket: TicketType = {
+                ...ticketData,
+                id: ticketId,
+                eventId: prev.id,
+                businessId: prev.businessId,
+            };
+
             if (editingTicket) {
-                updatedTicketTypes = (prev.ticketTypes || []).map(t => t.id === editingTicket.id ? { ...t, ...ticketData } : t);
+                updatedTicketTypes = (prev.ticketTypes || []).map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t);
             } else {
-                const newTicket: TicketType = {
-                    ...ticketData,
-                    id: `ticket_${Date.now()}`,
-                    eventId: prev.id,
-                    businessId: prev.businessId,
-                };
-                updatedTicketTypes = [...(prev.ticketTypes || []), newTicket];
+                updatedTicketTypes = [...(prev.ticketTypes || []), newOrUpdatedTicket];
             }
             return { ...prev, ticketTypes: updatedTicketTypes };
         });
@@ -273,7 +307,87 @@ export default function BusinessEventsPage() {
         });
     };
 
+    const handleAssignPromoter = () => {
+        if (!selectedPromoterId) return;
+        const promoterToAdd = availablePromoters.find(p => p.platformUserUid === selectedPromoterId);
+        if (!promoterToAdd) return;
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const isAlreadyAssigned = (prev.assignedPromoters || []).some(p => p.promoterProfileId === promoterToAdd.platformUserUid);
+            if (isAlreadyAssigned) {
+                toast({ title: "Promotor ya asignado", variant: "default" });
+                return prev;
+            }
+            const newAssignment: EventPromoterAssignment = {
+                promoterProfileId: promoterToAdd.platformUserUid!,
+                promoterName: promoterToAdd.promoterName,
+                promoterEmail: promoterToAdd.promoterEmail,
+                commissionRules: [],
+            };
+            return { ...prev, assignedPromoters: [...(prev.assignedPromoters || []), newAssignment] };
+        });
+        setSelectedPromoterId("");
+    };
+
+    const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const updatedRules = [...p.commissionRules!];
+                    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
+                    return { ...p, commissionRules: updatedRules };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+
+    const handleAddCommissionRule = (promoterId: string) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const newRule: CommissionRule = {
+                        id: `rule_${Date.now()}`,
+                        appliesTo: 'event_general',
+                        commissionType: 'fixed',
+                        commissionValue: 0,
+                    };
+                    return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+    
+    const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
+         setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const updatedRules = (p.commissionRules || []).filter(r => r.id !== ruleId);
+                    return { ...p, commissionRules: updatedRules };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+
+    const handleRemovePromoter = (promoterId: string) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).filter(p => p.promoterProfileId !== promoterId);
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+
     if (!isManageEventDialogOpen || !localEventState) return null;
+
+    const unassignedPromoters = availablePromoters.filter(ap => !(localEventState.assignedPromoters || []).some(p => p.promoterProfileId === ap.platformUserUid));
 
     return (
         <>
@@ -289,13 +403,12 @@ export default function BusinessEventsPage() {
                             <TabsTrigger value="details">Detalles</TabsTrigger>
                             <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes)})</TabsTrigger>
                             <TabsTrigger value="boxes">Boxes</TabsTrigger>
-                            <TabsTrigger value="promoters">Promotores</TabsTrigger>
+                            <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
                         </TabsList>
 
                         <div className="flex-grow overflow-y-auto mt-4 pr-2">
                             <TabsContent value="details">
                                 <BusinessEventForm 
-                                    key={`details-${localEventState.id || 'new'}`}
                                     event={localEventState} 
                                     onFormChange={handleDetailsChange} 
                                     isSubmitting={isSubmitting}
@@ -341,7 +454,61 @@ export default function BusinessEventsPage() {
                                 <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
                             </TabsContent>
                             <TabsContent value="promoters">
-                                 <Card><CardHeader><CardTitle>Gestión de Promotores</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
+                                 <Card>
+                                     <CardHeader>
+                                         <CardTitle>Asignar Promotores al Evento</CardTitle>
+                                         <CardDescription>Selecciona los promotores de tu negocio y define sus comisiones para este evento específico.</CardDescription>
+                                     </CardHeader>
+                                     <CardContent className="space-y-6">
+                                         <div className="flex items-end gap-2">
+                                             <div className="flex-grow">
+                                                 <Label>Promotores del Negocio</Label>
+                                                  <Popover>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" role="combobox" className={cn("w-full justify-between", unassignedPromoters.length === 0 && "text-muted-foreground")}>
+                                                            {selectedPromoterId ? unassignedPromoters.find(p => p.platformUserUid === selectedPromoterId)?.promoterName : (unassignedPromoters.length > 0 ? "Seleccionar promotor a asignar..." : "No hay promotores disponibles")}
+                                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[300px] p-0">
+                                                        <Command><CommandInput placeholder="Buscar promotor..." /><CommandEmpty>No se encontraron promotores.</CommandEmpty><CommandGroup>
+                                                            {unassignedPromoters.map(p => (<CommandItem value={p.platformUserUid} key={p.platformUserUid} onSelect={() => setSelectedPromoterId(p.platformUserUid!)}>{p.promoterName}</CommandItem>))}
+                                                        </CommandGroup></Command>
+                                                    </PopoverContent>
+                                                </Popover>
+                                             </div>
+                                             <Button onClick={handleAssignPromoter} disabled={!selectedPromoterId}>Asignar</Button>
+                                         </div>
+                                         <div className="space-y-4">
+                                            <h4 className="font-semibold">Promotores Asignados</h4>
+                                            {(localEventState.assignedPromoters || []).map(assignment => (
+                                                <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3">
+                                                    <div className="flex justify-between items-center">
+                                                        <p className="font-medium">{assignment.promoterName}</p>
+                                                        <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemovePromoter(assignment.promoterProfileId)}><Trash2 className="h-4 w-4"/></Button>
+                                                    </div>
+                                                    
+                                                    {/* Commission Rules */}
+                                                    <div className="space-y-2">
+                                                        {(assignment.commissionRules || []).map((rule, index) => (
+                                                            <div key={rule.id} className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
+                                                                <div className="flex-grow grid grid-cols-2 gap-2">
+                                                                    <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
+                                                                    <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
+                                                                </div>
+                                                                <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemoveCommissionRule(assignment.promoterProfileId, rule.id)}><Trash2 className="h-4 w-4"/></Button>
+                                                            </div>
+                                                        ))}
+                                                        <Button size="sm" variant="outline" onClick={() => handleAddCommissionRule(assignment.promoterProfileId)}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Regla de Comisión</Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!localEventState.assignedPromoters || localEventState.assignedPromoters.length === 0) && (
+                                                <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
+                                            )}
+                                         </div>
+                                     </CardContent>
+                                 </Card>
                             </TabsContent>
                         </div>
                     </Tabs>
