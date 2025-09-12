@@ -147,7 +147,7 @@ export default function HomePage() {
         </div>
         <CardHeader className="pb-3">
           <CardTitle className="text-xl">
-            <Link href={businessUrl} className="hover:underline">
+            <Link href={businessUrl}>
               {entity.name}
             </Link>
           </CardTitle>
