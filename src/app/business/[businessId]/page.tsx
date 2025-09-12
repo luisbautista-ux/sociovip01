@@ -671,33 +671,12 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         const canvasWidth = 350;
         const contentWidth = canvasWidth - padding * 2;
         const qrSize = 180;
-        let currentY = padding;
-
-        // --- Medición de la altura de cada elemento ---
-        let totalHeight = 0;
-        const heights = {
-            logo: 0,
-            businessName: 0,
-            entityTitle: 0,
-            qr: qrSize,
-            userName: 0,
-            userDni: 0,
-            validUntil: 0,
-            terms: 0,
-        };
-        const spacing = {
-            afterLogo: 10,
-            afterBusinessName: 20,
-            afterEntityTitle: 20,
-            afterQr: 20,
-            afterUserName: 5,
-            afterUserDni: 20,
-            afterValidUntil: 15,
-        };
-
+        
         const businessLogo = new Image();
         businessLogo.crossOrigin = "anonymous";
         let logoLoaded = false;
+        let logoHeight = 0;
+        const maxLogoHeight = 50;
 
         if (businessDetails.logoUrl) {
             try {
@@ -707,46 +686,55 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                     businessLogo.onerror = () => reject(new Error('Failed to load logo'));
                 });
                 logoLoaded = true;
-                const maxLogoHeight = 50;
                 const aspectRatio = businessLogo.width / businessLogo.height;
-                heights.logo = Math.min(maxLogoHeight, contentWidth / aspectRatio);
+                logoHeight = Math.min(maxLogoHeight, contentWidth / aspectRatio);
             } catch (e) {
                 console.warn("Could not load business logo for canvas render.");
             }
         }
         
-        ctx.font = 'bold 16px Arial';
-        heights.businessName = 16;
-        
+        // --- Medición de la altura de cada elemento ANTES de dibujar ---
+        const businessNameLines = getWrappedTextLines(businessDetails.name, contentWidth, 'bold 16px Arial');
         const entityTitleLines = getWrappedTextLines(qrData.promotion.title, contentWidth, 'bold 22px Arial');
-        heights.entityTitle = entityTitleLines.length * 22 + (entityTitleLines.length - 1) * 6;
-
         const userNameLines = getWrappedTextLines(`${qrData.user.name} ${qrData.user.surname}`, contentWidth, 'bold 20px Arial');
-        heights.userName = userNameLines.length * 20 + (userNameLines.length - 1) * 6;
+        const userDniLines = getWrappedTextLines(`DNI/CE: ${qrData.user.dni}`, contentWidth, '16px Arial');
+        const validUntilLines = getWrappedTextLines(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, contentWidth, 'italic 12px Arial');
+        const termsLines = qrData.promotion.termsAndConditions ? getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, 'italic 11px Arial') : [];
 
-        ctx.font = '16px Arial';
-        heights.userDni = 16;
+        // Line heights
+        const businessNameLineHeight = 20;
+        const entityTitleLineHeight = 28;
+        const userNameLineHeight = 26;
+        const userDniLineHeight = 20;
+        const validUntilLineHeight = 16;
+        const termsLineHeight = 14;
 
-        ctx.font = 'italic 12px Arial';
-        heights.validUntil = 12;
-
-        if (qrData.promotion.termsAndConditions) {
-            const termsLines = getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, 'italic 11px Arial');
-            heights.terms = termsLines.length * 11 + (termsLines.length - 1) * 2;
-        }
-
-        totalHeight = padding +
-            (heights.logo ? heights.logo + spacing.afterLogo : 0) +
-            heights.businessName + spacing.afterBusinessName +
-            heights.entityTitle + spacing.afterEntityTitle +
-            heights.qr + spacing.afterQr +
-            heights.userName + spacing.afterUserName +
-            heights.userDni + spacing.afterUserDni +
-            heights.validUntil + (heights.terms ? spacing.afterValidUntil + heights.terms : 0) +
+        // Spacings
+        const spacing = {
+            afterLogo: 10,
+            afterBusinessName: 20,
+            afterEntityTitle: 20,
+            afterQr: 20,
+            afterUserName: 5,
+            afterUserDni: 20,
+            afterValidUntil: 15,
+        };
+        
+        let totalHeight = padding +
+            (logoLoaded ? logoHeight + spacing.afterLogo : 0) +
+            (businessNameLines.length * businessNameLineHeight) + spacing.afterBusinessName +
+            (entityTitleLines.length * entityTitleLineHeight) + spacing.afterEntityTitle +
+            qrSize + spacing.afterQr +
+            (userNameLines.length * userNameLineHeight) + spacing.afterUserName +
+            (userDniLines.length * userDniLineHeight) + spacing.afterUserDni +
+            (validUntilLines.length * validUntilLineHeight) +
+            (termsLines.length > 0 ? spacing.afterValidUntil + (termsLines.length * termsLineHeight) : 0) +
             padding;
 
         canvas.width = canvasWidth;
         canvas.height = totalHeight;
+        
+        let currentY = padding;
 
         // --- Dibujado ---
 
@@ -761,24 +749,27 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
 
         // 2. Logo
         if (logoLoaded) {
-            const logoWidth = heights.logo * (businessLogo.width / businessLogo.height);
-            ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, heights.logo);
-            currentY += heights.logo + spacing.afterLogo;
+            const logoWidth = logoHeight * (businessLogo.width / businessLogo.height);
+            ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
+            currentY += logoHeight + spacing.afterLogo;
         }
 
         // 3. Nombre del negocio
         ctx.fillStyle = 'white';
-        ctx.font = `bold ${heights.businessName}px Arial`;
-        ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
-        currentY += heights.businessName + spacing.afterBusinessName;
+        ctx.font = `bold 16px Arial`;
+        businessNameLines.forEach(line => {
+            ctx.fillText(line, canvas.width / 2, currentY);
+            currentY += businessNameLineHeight;
+        });
+        currentY += spacing.afterBusinessName;
 
         // 4. Título de la entidad
         ctx.font = `bold 22px Arial`;
         entityTitleLines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += 28;
+            currentY += entityTitleLineHeight;
         });
-        currentY += spacing.afterEntityTitle - 28;
+        currentY += spacing.afterEntityTitle;
         
         // 5. QR
         const qrImage = new Image();
@@ -796,30 +787,35 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         ctx.font = `bold 20px Arial`;
         userNameLines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += 26;
+            currentY += userNameLineHeight;
         });
-        currentY += spacing.afterUserName - 26;
+        currentY += spacing.afterUserName;
         
         // 7. DNI
         ctx.font = `16px Arial`;
-        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
-        currentY += heights.userDni + spacing.afterUserDni;
+        userDniLines.forEach(line => {
+            ctx.fillText(line, canvas.width / 2, currentY);
+            currentY += userDniLineHeight;
+        });
+        currentY += spacing.afterUserDni;
 
         // 8. Fecha de validez
         ctx.font = `italic 12px Arial`;
         ctx.globalAlpha = 0.8;
-        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+        validUntilLines.forEach(line => {
+            ctx.fillText(line, canvas.width / 2, currentY);
+            currentY += validUntilLineHeight;
+        });
         ctx.globalAlpha = 1.0;
-        currentY += heights.validUntil + spacing.afterValidUntil;
+        currentY += spacing.afterValidUntil;
         
         // 9. Términos y condiciones
-        if (qrData.promotion.termsAndConditions) {
+        if (termsLines.length > 0) {
             ctx.font = `italic 11px Arial`;
             ctx.globalAlpha = 0.7;
-            const termsLines = getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, ctx.font);
             termsLines.forEach((line) => {
                 ctx.fillText(line, canvas.width / 2, currentY);
-                currentY += 13;
+                currentY += termsLineHeight;
             });
             ctx.globalAlpha = 1.0;
         }
@@ -899,23 +895,47 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     );
   };
 
-  if (isLoadingPage) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-muted-foreground">Cargando...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
+          <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
+          <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
+        </div>
       </div>
     );
   }
 
   if (pageError) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-center p-4">
-        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-        <h1 className="text-2xl font-bold text-destructive">{pageError}</h1>
-        <Link href="/" passHref>
-          <Button variant="outline" className="mt-6">Volver al Inicio</Button>
-        </Link>
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
+          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-destructive">{pageError}</h1>
+          <p className="text-muted-foreground mt-2">Ruta intentada: /business/{businessIdFromParams}</p>
+          <Link href="/" passHref>
+            <Button variant="outline" className="mt-6">Volver al Inicio</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!businessDetails && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
+          <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
+          <p className="text-muted-foreground mt-2">
+            El negocio con el ID "{businessIdFromParams}" no existe o ha sido movido.
+          </p>
+          <Link href="/" passHref>
+            <Button variant="outline" className="mt-6">
+              Volver a la Página Principal
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -1503,6 +1523,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
