@@ -645,10 +645,14 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             return;
         }
 
-        const getWrappedTextLines = (text: string, maxWidth: number, font: string): string[] => {
+        const getWrappedTextLines = (text: string, maxWidth: number, font: string, lineHeightMultiplier = 1.2): { lines: string[], height: number } => {
             ctx.font = font;
             const words = text.split(' ');
-            if (words.length === 0) return [];
+            if (words.length === 0) return { lines: [], height: 0 };
+            
+            const metrics = ctx.measureText('M'); // Approx height of one line
+            const lineHeight = (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) * lineHeightMultiplier;
+
             const lines: string[] = [];
             let currentLine = words[0] || '';
 
@@ -663,7 +667,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                 }
             }
             lines.push(currentLine);
-            return lines;
+            return { lines, height: lines.length * lineHeight };
         };
         
         const padding = 30;
@@ -692,20 +696,13 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             }
         }
         
-        const businessNameLines = getWrappedTextLines(businessDetails.name, contentWidth, 'bold 18px Arial');
-        const entityTitleLines = getWrappedTextLines(qrData.promotion.title, contentWidth, 'bold 24px Arial');
-        const userNameLines = getWrappedTextLines(`${qrData.user.name} ${qrData.user.surname}`, contentWidth, 'bold 22px Arial');
-        const userDniLines = getWrappedTextLines(`DNI/CE: ${qrData.user.dni}`, contentWidth, '16px Arial');
-        const validUntilLines = getWrappedTextLines(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, contentWidth, 'italic 13px Arial');
-        const termsLines = qrData.promotion.termsAndConditions ? getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, 'italic 12px Arial') : [];
-
-        const businessNameLineHeight = 22;
-        const entityTitleLineHeight = 30;
-        const userNameLineHeight = 28;
-        const userDniLineHeight = 20;
-        const validUntilLineHeight = 16;
-        const termsLineHeight = 15;
-
+        const businessNameInfo = getWrappedTextLines(businessDetails.name, contentWidth, 'bold 18px Arial');
+        const entityTitleInfo = getWrappedTextLines(qrData.promotion.title, contentWidth, 'bold 24px Arial', 1.3);
+        const userNameInfo = getWrappedTextLines(`${qrData.user.name} ${qrData.user.surname}`, contentWidth, 'bold 22px Arial', 1.3);
+        const userDniInfo = getWrappedTextLines(`DNI/CE: ${qrData.user.dni}`, contentWidth, '16px Arial');
+        const validUntilInfo = getWrappedTextLines(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, contentWidth, 'italic 13px Arial');
+        const termsInfo = qrData.promotion.termsAndConditions ? getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, 'italic 12px Arial') : { lines: [], height: 0 };
+        
         const spacing = {
             afterLogo: 15,
             afterBusinessName: 20,
@@ -718,13 +715,13 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         
         let totalHeight = padding +
             (logoLoaded ? logoHeight + spacing.afterLogo : 0) +
-            (businessNameLines.length * businessNameLineHeight) + spacing.afterBusinessName +
-            (entityTitleLines.length * entityTitleLineHeight) + spacing.afterEntityTitle +
+            businessNameInfo.height + spacing.afterBusinessName +
+            entityTitleInfo.height + spacing.afterEntityTitle +
             qrSize + spacing.afterQr +
-            (userNameLines.length * userNameLineHeight) + spacing.afterUserName +
-            (userDniLines.length * userDniLineHeight) + spacing.afterUserDni +
-            (validUntilLines.length * validUntilLineHeight) +
-            (termsLines.length > 0 ? spacing.afterValidUntil + (termsLines.length * termsLineHeight) : 0) +
+            userNameInfo.height + spacing.afterUserName +
+            userDniInfo.height + spacing.afterUserDni +
+            validUntilInfo.height +
+            (termsInfo.lines.length > 0 ? spacing.afterValidUntil + termsInfo.height : 0) +
             padding;
 
         canvas.width = canvasWidth;
@@ -736,9 +733,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
+        const framePadding = 15;
         ctx.strokeStyle = "#D4AF37";
         ctx.lineWidth = 4;
-        ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+        ctx.strokeRect(framePadding, framePadding, canvas.width - (framePadding * 2), canvas.height - (framePadding * 2));
         
         let currentY = padding;
         ctx.textAlign = "center";
@@ -750,19 +748,19 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             currentY += logoHeight + spacing.afterLogo;
         }
 
-        ctx.font = `bold 18px Arial`;
-        businessNameLines.forEach(line => {
+        ctx.font = 'bold 18px Arial';
+        businessNameInfo.lines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += businessNameLineHeight;
+            currentY += 18 * 1.2;
         });
-        currentY += spacing.afterBusinessName;
+        currentY += spacing.afterBusinessName - (18 * 0.2);
 
-        ctx.font = `bold 24px Arial`;
-        entityTitleLines.forEach(line => {
+        ctx.font = 'bold 24px Arial';
+        entityTitleInfo.lines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += entityTitleLineHeight;
+            currentY += 24 * 1.3;
         });
-        currentY += spacing.afterEntityTitle;
+        currentY += spacing.afterEntityTitle - (24 * 0.3);
         
         const qrImage = new Image();
         qrImage.crossOrigin = "anonymous";
@@ -775,35 +773,35 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         currentY += qrSize + spacing.afterQr;
 
         ctx.fillStyle = 'white';
-        ctx.font = `bold 22px Arial`;
-        userNameLines.forEach(line => {
+        ctx.font = 'bold 22px Arial';
+        userNameInfo.lines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += userNameLineHeight;
+            currentY += 22 * 1.3;
         });
-        currentY += spacing.afterUserName;
+        currentY += spacing.afterUserName - (22 * 0.3);
         
-        ctx.font = `16px Arial`;
-        userDniLines.forEach(line => {
+        ctx.font = '16px Arial';
+        userDniInfo.lines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += userDniLineHeight;
+            currentY += 16 * 1.2;
         });
-        currentY += spacing.afterUserDni;
+        currentY += spacing.afterUserDni - (16 * 0.2);
 
-        ctx.font = `italic 13px Arial`;
+        ctx.font = 'italic 13px Arial';
         ctx.globalAlpha = 0.8;
-        validUntilLines.forEach(line => {
+        validUntilInfo.lines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += validUntilLineHeight;
+            currentY += 13 * 1.2;
         });
         ctx.globalAlpha = 1.0;
         
-        if (termsLines.length > 0) {
-            currentY += spacing.afterValidUntil;
-            ctx.font = `italic 12px Arial`;
+        if (termsInfo.lines.length > 0) {
+            currentY += spacing.afterValidUntil - (13 * 0.2);
+            ctx.font = 'italic 12px Arial';
             ctx.globalAlpha = 0.7;
-            termsLines.forEach((line) => {
+            termsInfo.lines.forEach((line) => {
                 ctx.fillText(line, canvas.width / 2, currentY);
-                currentY += termsLineHeight;
+                currentY += 12 * 1.2;
             });
             ctx.globalAlpha = 1.0;
         }
@@ -1510,6 +1508,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
