@@ -137,7 +137,7 @@ export default function LoginPage() {
     <div className="relative min-h-screen bg-[#f4eef7]">
       <Link
         href="/"
-        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text hover:text-primary/80"
+        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text hover:text-primary/80"
       >
         <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
         Volver al inicio
@@ -147,10 +147,10 @@ export default function LoginPage() {
         <div className="w-full max-w-xl mx-auto px-6 md:px-12 pt-20 md:pt-28">
           <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md md:shadow-lg">
             <CardHeader className="py-6">
-              <CardTitle className="text-center text-3xl font-extrabold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
+              <CardTitle className="text-center text-3xl font-extrabold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text">
                 Bienvenido a
               </CardTitle>
-              <CardTitle className="text-center text-3xl font-extrabold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
+              <CardTitle className="text-center text-3xl font-extrabold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text">
                 SocioVIP
               </CardTitle>
             </CardHeader>
@@ -235,7 +235,7 @@ export default function LoginPage() {
 
                       <Button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:bg-gradient-to-l text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
+                        className="w-full bg-gradient-to-r from-purple-800 to-red-600 text-white hover:opacity-90 transition-opacity font-bold py-2 px-4 rounded-full shadow-lg"
                         disabled={isSubmitting}
                       >
                         {isSubmitting ? (
