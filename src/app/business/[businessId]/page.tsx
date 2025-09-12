@@ -645,10 +645,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       return;
     }
 
-    // --- Helper para texto con line-wrapping ---
     const getWrappedTextLines = (text: string, maxWidth: number, font: string): string[] => {
         ctx.font = font;
         const words = text.split(' ');
+        if (words.length === 0) return [];
         const lines: string[] = [];
         let currentLine = words[0];
 
@@ -665,8 +665,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         lines.push(currentLine);
         return lines;
     };
-
-
+    
     // --- Definición de medidas y estilos ---
     const padding = 20;
     const canvasWidth = 320;
@@ -683,20 +682,14 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     const lineSpacing = 6;
     const smallTextFontSize = 10;
     
-    // --- Pre-cálculo de alturas dinámicas ---
-    const primaryHsl = getComputedStyle(document.documentElement).getPropertyValue('--primary');
-    const primaryFgHsl = getComputedStyle(document.documentElement).getPropertyValue('--primary-foreground');
-    const fgHsl = getComputedStyle(document.documentElement).getPropertyValue('--foreground');
-    const mutedFgHsl = getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground');
-
     const entityTitleLines = getWrappedTextLines(qrData.promotion.title, contentWidth, `bold ${entityTitleFontSize}px Arial`);
-    const entityTitleHeight = entityTitleLines.length * (entityTitleFontSize + lineSpacing);
+    const entityTitleHeight = entityTitleLines.length * entityTitleFontSize + (entityTitleLines.length - 1) * lineSpacing;
     
     let termsHeight = 0;
     let termsLines: string[] = [];
     if (qrData.promotion.termsAndConditions) {
         termsLines = getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, `italic ${smallTextFontSize}px Arial`);
-        termsHeight = termsLines.length * (smallTextFontSize + 2);
+        termsHeight = termsLines.length * smallTextFontSize + (termsLines.length > 0 ? (termsLines.length - 1) * 2 : 0);
     }
     
     const headerBgHeight = padding + maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding;
@@ -715,15 +708,17 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     canvas.width = canvasWidth;
     canvas.height = totalHeight;
 
-    // --- Inicio del dibujado ---
     let currentY = 0;
     
     // 1. Fondo blanco
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // 2. Header con color de la marca
-    ctx.fillStyle = `hsl(${primaryHsl})`;
+    // 2. Header con gradiente de colores del negocio
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    gradient.addColorStop(0, businessDetails.primaryColor || '#B080D0');
+    gradient.addColorStop(1, businessDetails.secondaryColor || '#8E5EA2');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, headerBgHeight);
     currentY = padding;
 
@@ -734,9 +729,9 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     if (businessDetails.logoUrl) {
         businessLogo.src = businessDetails.logoUrl;
         try {
-            await new Promise((resolve, reject) => {
-              businessLogo.onload = resolve;
-              businessLogo.onerror = reject;
+            await new Promise<void>((resolve, reject) => {
+              businessLogo.onload = () => resolve();
+              businessLogo.onerror = (e) => reject(e);
             });
             logoLoaded = true;
         } catch (e) {
@@ -746,27 +741,31 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
 
     if (logoLoaded) {
       const aspectRatio = businessLogo.width / businessLogo.height;
-      let logoHeight = businessLogo.height > maxLogoHeight ? maxLogoHeight : businessLogo.height;
+      let logoHeight = maxLogoHeight;
       let logoWidth = logoHeight * aspectRatio;
+      if (logoWidth > contentWidth) {
+          logoWidth = contentWidth;
+          logoHeight = logoWidth / aspectRatio;
+      }
       ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
     }
     currentY += maxLogoHeight + spacingAfterLogo;
     
     // 4. Dibujar nombre del negocio
-    ctx.fillStyle = `hsl(${primaryFgHsl})`;
+    ctx.fillStyle = 'white';
     ctx.font = `bold ${businessNameFontSize}px Arial`;
     ctx.textAlign = "center";
     ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
     currentY = headerBgHeight + spacingAfterBusinessName;
 
     // 5. Dibujar título de la entidad (con wrapping)
-    ctx.fillStyle = `hsl(${primaryHsl})`;
+    ctx.fillStyle = businessDetails.primaryColor || '#B080D0';
     ctx.font = `bold ${entityTitleFontSize}px Arial`;
     entityTitleLines.forEach(line => {
         ctx.fillText(line, canvas.width / 2, currentY);
         currentY += entityTitleFontSize + lineSpacing;
     });
-    currentY += spacingAfterEntityTitle - (entityTitleFontSize + lineSpacing); // Adjust for loop over-increment
+    currentY += spacingAfterEntityTitle - lineSpacing; 
 
     // 6. Dibujar QR
     const qrImage = new Image();
@@ -776,24 +775,24 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     
     const qrX = (canvas.width - qrSize) / 2;
     ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
-    ctx.strokeStyle = `hsl(${primaryHsl})`;
+    ctx.strokeStyle = businessDetails.primaryColor || '#B080D0';
     ctx.lineWidth = 2;
     ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
     currentY += qrSize + padding;
 
     // 7. Detalles del usuario
-    ctx.fillStyle = `hsl(${primaryHsl})`;
+    ctx.fillStyle = businessDetails.primaryColor || '#B080D0';
     ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
     ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
     currentY += userDetailsFontSize + 2 + lineSpacing;
-    ctx.fillStyle = `hsl(${fgHsl})`;
+    ctx.fillStyle = `#333333`;
     ctx.font = `${userDetailsFontSize - 2}px Arial`;
     ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
     currentY += userDetailsFontSize - 2 + padding;
 
     // 8. Fecha de validez
     ctx.font = `italic ${smallTextFontSize}px Arial`;
-    ctx.fillStyle = `hsl(${mutedFgHsl})`;
+    ctx.fillStyle = `#666666`;
     ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
     currentY += smallTextFontSize + lineSpacing + 15;
     
@@ -1151,7 +1150,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           </section>
         )}
 
-        {!isLoading && !error && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
+        {!isLoading && !pageError && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
           <Card className="col-span-full">
             <CardHeader className="text-center">
               <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -1209,9 +1208,9 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <UIDialogTitleComponent>
+            <DialogTitle>
               {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
-            </UIDialogTitleComponent>
+            </DialogTitle>
             <UIDialogDescription>
               {currentStepInModal === "enterDni"
                 ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
@@ -1460,11 +1459,11 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <UIAlertDialogTitle className="font-semibold">DNI Ya Registrado</UIAlertDialogTitle>
-            <UIDialogDescription>
+            <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
+            <AlertDialogDescription>
               El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los
               datos existentes para generar tu QR?
-            </UIDialogDescription>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
             <AlertDialogCancel
@@ -1485,5 +1484,6 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
