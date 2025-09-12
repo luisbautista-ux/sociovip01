@@ -67,3 +67,23 @@ export function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+// WhatsApp Icon SVG Component
+export function WhatsAppIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M21.44 11.05c-1.27-5.35-6.09-9.35-11.44-9.35-6.04 0-10.91 4.84-10.91 10.88 0 2.37.76 4.6 2.11 6.44l-2.11 7.88 7.88-2.11c1.84.95 3.89 1.48 6.04 1.48h.01c6.04 0 10.91-4.84 10.91-10.88 0-2.37-.76-4.6-2.11-6.44z" />
+    </svg>
+  );
+}

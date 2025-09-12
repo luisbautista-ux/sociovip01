@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2, Copy, WhatsAppIcon } from "lucide-react";
+import { PlusCircle, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as UIAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { GENERATED_CODE_STATUS_TRANSLATIONS, GENERATED_CODE_STATUS_COLORS } from "@/lib/constants";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { WhatsAppIcon } from "@/components/icons";
 
 
 interface ProcessedCodeItem {
@@ -219,8 +220,8 @@ export function ManageCodesDialog({
         }
 
         const businessUrl = entity?.businessCustomUrlPath
-            ? `https://sociovip.app/b/${entity.businessCustomUrlPath}`
-            : `https://sociovip.app/business/${entity?.businessId}`;
+            ? `https://sociosvip.app/b/${entity.businessCustomUrlPath}`
+            : `https://sociosvip.app/business/${entity?.businessId}`;
 
         const codesText = codes.join('\n');
         const message = `Genera Entrada(s) QR(s) con tu código(s) en ${businessUrl}\n\n${codesText}`;
