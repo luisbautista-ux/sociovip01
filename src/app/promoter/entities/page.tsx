@@ -466,6 +466,7 @@ export default function PromoterEntitiesPage() {
           isPromoterView={true} 
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
+          currentUserProfilePhone={userProfile.phone}
         />
       )}
     </div>
