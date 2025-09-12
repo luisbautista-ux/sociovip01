@@ -869,7 +869,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           <Button
             type="submit"
             size="sm"
-            className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105 h-9"
+            className="w-full h-9"
+            style={{
+                backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`
+            }}
             disabled={isLoadingQrFlow}
           >
             {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (isEvent ? <Calendar className="h-4 w-4 mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />)}
@@ -1113,7 +1116,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
         {promotions.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
+            <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
               <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1152,7 +1155,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         
         {events.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
+            <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
               <Calendar className="h-8 w-8 mr-3" /> Próximos Eventos
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1523,6 +1526,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
