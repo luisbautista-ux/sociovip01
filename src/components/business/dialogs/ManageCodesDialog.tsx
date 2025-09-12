@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -254,9 +255,6 @@ export function ManageCodesDialog({
     }
     const uniqueKeyForRow = `code-row-${code.id}-${batchId || 'single'}`;
 
-    const canPromoterDeleteThisCode = isPromoterView && code.generatedByUid === currentUserProfileUid && (code.status !== 'redeemed' && code.status !== 'used');
-    const canAdminDeleteThisCode = !isPromoterView && (code.status !== 'redeemed' && code.status !== 'used');
-
     return (
     <TableRow 
         key={uniqueKeyForRow} 
@@ -280,44 +278,11 @@ export function ManageCodesDialog({
             </Button>
         </div>
       </TableCell>
-      <TableCell className="py-1.5 px-2">{code.generatedByName}</TableCell>
       <TableCell className="py-1.5 px-2">
           <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status] || 'outline'} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status] || code.status}</Badge>
       </TableCell>
-      <TableCell className="py-1.5 px-2 max-w-[150px] truncate" title={code.observation || undefined}>{code.observation || "N/A"}</TableCell>
-      <TableCell className="py-1.5 px-2">{code.generatedDate ? format(new Date(code.generatedDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}</TableCell>
       <TableCell className="py-1.5 px-2">
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
-      </TableCell>
-      <TableCell className="text-right py-1.5 px-2">
-          {(canAdminDeleteThisCode || canPromoterDeleteThisCode) && ( 
-               <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive h-6 w-6" onClick={(e) => e.stopPropagation()}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span className="sr-only">Eliminar Código</span>
-                      </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                  <AlertDialogHeader>
-                      <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
-                      <UIDialogDescription>
-                      Esta acción no se puede deshacer. Esto eliminará permanentemente el código:
-                      <span className="font-semibold font-mono"> {code.value}</span>.
-                      </UIDialogDescription>
-                  </AlertDialogHeader>
-                  <UIAlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                      onClick={() => handleDeleteCode(code.id!)}
-                      className="bg-destructive hover:bg-destructive/90"
-                      >
-                      Eliminar
-                      </AlertDialogAction>
-                  </UIAlertDialogFooter>
-                  </AlertDialogContent>
-              </AlertDialog>
-          )}
       </TableCell>
     </TableRow>
   )};
@@ -356,21 +321,15 @@ export function ManageCodesDialog({
               <TableHeader>
                 <TableRow className="text-sm">
                   <TableHead className="w-[150px] px-2 py-2">Código</TableHead>
-                  <TableHead className="px-2 py-2">Creado Por</TableHead>
                   <TableHead className="px-2 py-2">Estado</TableHead>
-                  <TableHead className="px-2 py-2">Observación</TableHead>
-                  <TableHead className="px-2 py-2">Fecha Creación</TableHead>
                   <TableHead className="px-2 py-2">Fecha Canje</TableHead>
-                  <TableHead className="text-right px-2 py-2">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {processedAndGroupedCodes.map((item) => {
                   if (item.isBatch && item.codesInBatch && item.batchId) {
                     const isExpanded = !!expandedBatches[item.batchId];
-                    const nonRedeemedInBatch = item.codesInBatch.filter(c => (c.status !== 'redeemed' && c.status !== 'used') && (!isPromoterView || c.generatedByUid === currentUserProfileUid));
-                    const nonRedeemedInBatchCount = nonRedeemedInBatch.length;
-
+                    
                     return (
                       <React.Fragment key={item.id}>
                         <TableRow 
@@ -378,7 +337,7 @@ export function ManageCodesDialog({
                             onClick={() => toggleBatchExpansion(item.batchId!)}
                             data-state={isExpanded ? "open" : "closed"}
                         >
-                          <TableCell colSpan={7} className="py-2 px-3 text-xs">
+                          <TableCell colSpan={isPromoterView ? 3 : 7} className="py-2 px-3 text-xs">
                             <div className="flex items-center justify-between group w-full">
                               <div className="flex items-center">
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
@@ -397,35 +356,6 @@ export function ManageCodesDialog({
                                 >
                                     <Copy className="mr-1 h-3 w-3" /> Copiar Lote ({item.codesInBatch!.length})
                                 </Button>
-                                {nonRedeemedInBatchCount > 0 && (
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="xs"
-                                                className="text-destructive hover:text-destructive text-xs h-auto py-1 px-1.5"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <Trash2 className="mr-1 h-3 w-3" /> Eliminar No Canjeados ({nonRedeemedInBatchCount})
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-destructive mr-2"/>¿Eliminar Códigos del Lote?</UIAlertDialogTitle>
-                                                <UIDialogDescription>
-                                                    Se eliminarán {nonRedeemedInBatchCount} código(s) no canjeado(s) de este lote (Observación: {item.observation || "N/A"}). 
-                                                    Los códigos ya canjeados no se verán afectados. Esta acción no se puede deshacer.
-                                                </UIDialogDescription>
-                                            </AlertDialogHeader>
-                                            <UIAlertDialogFooter>
-                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteBatchCodes(item)} className="bg-destructive hover:bg-destructive/90">
-                                                    Sí, Eliminar No Canjeados
-                                                </AlertDialogAction>
-                                            </UIAlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                )}
                               </div>
                             </div>
                           </TableCell>
