@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -149,58 +150,52 @@ export default function PromoterEntitiesPage() {
     }
   }, [userProfile, loadingAuth, loadingProfile, fetchAssignedEntities]);
 
-  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
+  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string): Promise<void> => {
     if (!userProfile?.name || !userProfile.uid) {
-      toast({ title: "Error de Usuario", description: "Nombre o UID de promotor no disponible.", variant: "destructive" });
-      return;
+        toast({ title: "Error de Usuario", description: "Nombre o UID de promotor no disponible.", variant: "destructive" });
+        throw new Error("User profile not available");
     }
-    setIsSubmitting(true); // Set submitting at the beginning
-    console.log(`Promoter Entities Page: Promoter ${userProfile.name} (UID: ${userProfile.uid}) creating ${newCodes.length} codes for entityId: ${entityId}`);
-  
+
     try {
-      const targetEntityRef = doc(db, "businessEntities", entityId);
-      const targetEntitySnap = await getDoc(targetEntityRef);
-      if (!targetEntitySnap.exists()) {
-        toast({ title: "Error", description: `La entidad "${entityId}" no fue encontrada.`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
-      
-      const newCodesWithDetails: GeneratedCode[] = newCodes.map((code, index) => (sanitizeObjectForFirestore({
-        id: code.id || `code-${entityId}-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
-        entityId: entityId,
-        value: code.value,
-        status: 'available',
-        generatedByName: userProfile.name,
-        generatedByUid: userProfile.uid, 
-        generatedDate: new Date().toISOString(),
-        observation: observation || null, 
-        redemptionDate: null, 
-        redeemedByInfo: null, 
-        isVipCandidate: false,
-      }) as GeneratedCode));
-      
-      const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-      const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
-      
-      await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
-      toast({ title: "Códigos Creados Exitosamente", description: `${newCodes.length} código(s) añadido(s) a "${targetEntityData.name}".` });
-      
-      await fetchAssignedEntities();
-      
-      // Update state for open modals
-      if (selectedEntityForViewingCodes?.id === entityId) {
-        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-      }
-      if (selectedEntityForCreatingCodes?.id === entityId) {
-        setSelectedEntityForCreatingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-      }
+        const targetEntityRef = doc(db, "businessEntities", entityId);
+        const targetEntitySnap = await getDoc(targetEntityRef);
+        if (!targetEntitySnap.exists()) {
+            throw new Error(`La entidad "${entityId}" no fue encontrada.`);
+        }
+        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
+        
+        const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
+            ...code,
+            id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            entityId: entityId,
+            value: code.value,
+            status: 'available',
+            generatedByName: userProfile.name,
+            generatedByUid: userProfile.uid,
+            generatedDate: new Date().toISOString(),
+            observation: observation || null,
+            redemptionDate: null, 
+            redeemedByInfo: null, 
+            isVipCandidate: false,
+        }) as GeneratedCode));
+        
+        const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
+        
+        await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
+        
+        // Update local state instead of full refetch
+        const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
+            e.id === entityId ? { ...e, generatedCodes: updatedCodes } : e
+        );
+        setPromotions(updateLocalState);
+        setEvents(updateLocalState);
+
+        toast({ title: "Códigos Creados", description: `${newCodes.length} código(s) añadido(s) a "${targetEntityData.name}".` });
     } catch (error: any) {
-      console.error("Promoter Entities Page: Error saving new codes to Firestore:", error.code, error.message, error);
-      toast({ title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive" });
-    } finally {
-      setIsSubmitting(false); // Reset submitting at the end
+        console.error("Promoter Page: Error saving new codes:", error);
+        toast({ title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive" });
+        throw error;
     }
   };
   

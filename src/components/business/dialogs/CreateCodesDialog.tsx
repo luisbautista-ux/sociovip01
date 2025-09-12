@@ -63,6 +63,7 @@ export function CreateCodesDialog({
   }, [maxAttendance, currentCodeCount]);
 
   useEffect(() => {
+    // Reset state only when the dialog is opened
     if (open) {
       setNumCodes(1);
       setObservation("");
@@ -132,15 +133,19 @@ export function CreateCodesDialog({
         isVipCandidate: false,
       });
     }
-    
-    // First, show the success message UI
-    setJustCreatedCodes(newCodesBatch);
-    setShowSuccess(true);
-    setIsCreating(false);
 
-    // Then, call the async database operation without waiting for it to complete in this function
-    // This prevents the UI from being blocked or re-rendered unexpectedly
-    onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim(), currentUserProfileUid);
+    try {
+        // Await the database operation
+        await onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim(), currentUserProfileUid);
+        // On success, update the UI
+        setJustCreatedCodes(newCodesBatch);
+        setShowSuccess(true);
+    } catch (e) {
+        // onCodesCreated should handle its own errors/toasts
+        console.error("Error passed up from onCodesCreated:", e);
+    } finally {
+        setIsCreating(false);
+    }
   };
 
   const handleCopyCreatedCodes = async () => {
@@ -161,16 +166,7 @@ export function CreateCodesDialog({
   const canCreateAnyCodes = !maxAttendance || maxAttendance === 0 || maxCodesCanCreate > 0;
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-        if (!isOpen) { 
-            setNumCodes(1);
-            setObservation("");
-            setShowSuccess(false);
-            setJustCreatedCodes([]);
-            setIsCreating(false);
-        }
-        onOpenChange(isOpen);
-    }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>

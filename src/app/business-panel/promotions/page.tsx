@@ -348,20 +348,18 @@ export default function BusinessPromotionsPage() {
     }
   };
   
-  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
+  const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string): Promise<void> => {
     if (!userProfile?.name || !userProfile.uid) {
         toast({title: "Error de Usuario", description: "No se pudo obtener el nombre del usuario para registrar los códigos.", variant: "destructive"});
-        setIsSubmitting(false);
-        return;
+        throw new Error("User profile not available");
     }
-    setIsSubmitting(true);
+
     const targetPromotionRef = doc(db, "businessEntities", entityId);
     try {
         const targetPromotionSnap = await getDoc(targetPromotionRef);
         if (!targetPromotionSnap.exists()) {
             toast({title:"Error", description:"Promoción no encontrada para añadir códigos.", variant: "destructive"});
-            setIsSubmitting(false);
-            return;
+            throw new Error("Entity not found");
         }
         const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
         
@@ -384,22 +382,18 @@ export default function BusinessPromotionsPage() {
         const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
             
         await updateDoc(targetPromotionRef, { generatedCodes: updatedCodes });
-        toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}. Guardados en la base de datos.`});
         
-        if (currentBusinessId) fetchBusinessPromotions(currentBusinessId); 
+        // Update local state instead of re-fetching
+        setPromotions(prevPromos => prevPromos.map(p => 
+            p.id === entityId ? { ...p, generatedCodes: updatedCodes } : p
+        ));
         
-        if (selectedEntityForViewingCodes && selectedEntityForViewingCodes.id === entityId) {
-          setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-        }
-         if (editingPromotion && editingPromotion.id === entityId) { 
-            setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
-        }
-
+        toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}.`});
+        
     } catch (error: any) {
         console.error("Promotions Page: Error saving new codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
-    } finally {
-        setIsSubmitting(false);
+        throw error; // Re-throw to be caught by the dialog
     }
   }; 
 
