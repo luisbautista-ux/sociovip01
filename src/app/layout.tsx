@@ -7,7 +7,7 @@ import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "SocioVip",
-  description: "Upload an image, generate AI tiling, customize QR content, and download.",
+  description: "Descubre las mejores promociones y proximos eventos cerca de tí.",
 };
 
 export default function RootLayout({
@@ -30,5 +30,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
