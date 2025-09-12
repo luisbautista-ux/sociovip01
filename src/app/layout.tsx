@@ -4,14 +4,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
-import { LOGO_URL } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "SocioVip",
   description: "Upload an image, generate AI tiling, customize QR content, and download.",
-  icons: {
-    icon: LOGO_URL,
-  },
 };
 
 export default function RootLayout({
@@ -34,4 +30,5 @@ export default function RootLayout({
     </html>
   );
 }
+
 
