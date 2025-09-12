@@ -1,10 +1,9 @@
-
 "use client";
 
 import Image, { type ImageProps } from "next/image";
 
 export const LOGO_URL =
-  "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
+  "https://i.ibb.co/Ldvq9TN/Orange-and-Purple-Modern-Tech-Logo.png";
 
 type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
   size?: number;
