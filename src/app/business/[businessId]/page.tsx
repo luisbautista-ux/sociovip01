@@ -970,21 +970,26 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
   if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <header
+          className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full"
+          style={{
+            background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+          }}
+        >
+          <div className="max-w-7xl mx-auto flex items-center justify-start space-x-4">
             {businessDetails.logoUrl && (
               <NextImage
                 src={businessDetails.logoUrl}
                 alt={`${businessDetails.name} logo`}
                 width={40}
                 height={40}
-                className="h-10 w-auto object-contain rounded"
+                className="h-10 w-10 object-contain rounded-md bg-white/20 p-1"
               />
             )}
-            <div className="ml-3">
-              <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
+            <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-x-3">
+              <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
               {businessDetails.slogan && (
-                <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>
+                <p className="text-xs text-white/80">{businessDetails.slogan}</p>
               )}
             </div>
           </div>
@@ -1103,7 +1108,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
        >
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                  <Link href="/" className="flex items-center gap-2">
                     <SocioVipLogo size={32} />
                     <span className="font-bold text-xl text-white hidden sm:inline">SocioVIP</span>
@@ -1569,5 +1574,6 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
