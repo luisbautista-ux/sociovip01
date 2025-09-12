@@ -12,9 +12,10 @@ import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, Search, Calendar } from "lucide-react";
+import { Loader2, Building, Tag, Search, Calendar, UserCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface EnrichedEntity extends BusinessManagedEntity {
   businessName?: string;
@@ -27,6 +28,7 @@ export default function HomePage() {
   const [events, setEvents] = useState<EnrichedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
   const { toast } = useToast();
 
   const fetchEntitiesAndBusinesses = useCallback(async () => {
@@ -181,36 +183,52 @@ export default function HomePage() {
       );
   };
 
+  const showPromotions = view === 'all' || view === 'promotions';
+  const showEvents = view === 'all' || view === 'events';
+
   return (
     <div className="min-h-screen bg-muted/40 text-foreground">
-      <header className="py-6 px-4 sm:px-6 lg:px-8 bg-background shadow-md sticky top-0 z-20">
+      <header className="py-4 px-4 sm:px-6 lg:px-8 bg-background shadow-md sticky top-0 z-20 w-full">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 md:gap-4">
+          
+          <div className="flex items-center gap-3 self-start sm:self-center">
             <NextImage
               src="https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg"
               alt="SocioVIP logo"
-              width={65}
-              height={65}
+              width={50}
+              height={50}
               priority
               className="rounded-full ring-2 ring-purple-200/50 object-cover shadow-sm"
             />
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">SocioVIP</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Descubre los mejores eventos y promociones
-              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">SocioVIP</h1>
             </div>
           </div>
 
-          <div className="relative w-full sm:w-auto sm:max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar evento, promoción o negocio..."
-              className="pl-8 w-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+            <div className="flex items-center gap-2">
+              <Button variant={view === 'promotions' ? 'default' : 'ghost'} onClick={() => setView('promotions')}>Promociones</Button>
+              <Button variant={view === 'events' ? 'default' : 'ghost'} onClick={() => setView('events')}>Eventos</Button>
+            </div>
+            <div className="relative w-full sm:w-auto">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <div className="hidden sm:flex">
+             <Link href="/login" passHref>
+              <Button variant="outline">
+                <UserCircle className="mr-2 h-4 w-4" />
+                Inicia Sesión
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -223,57 +241,59 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-12">
-            {/* Promotions Section */}
-            <section>
-              <h2 className="text-2xl font-bold tracking-tight text-gradient mb-6 flex items-center">
-                <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
-              </h2>
-              {filteredPromotions.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                </div>
-              ) : (
-                <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                  <p className="text-lg font-semibold">No se encontraron promociones</p>
-                  <p className="text-muted-foreground mt-1">
-                    {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
-                  </p>
-                </div>
-              )}
-            </section>
+            {showPromotions && (
+              <section>
+                <h2 className="text-2xl font-bold tracking-tight text-gradient mb-6 flex items-center">
+                  <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
+                </h2>
+                {filteredPromotions.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
+                    <p className="text-lg font-semibold">No se encontraron promociones</p>
+                    <p className="text-muted-foreground mt-1">
+                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
             
-            {/* Events Section */}
-            <section>
-              <h2 className="text-2xl font-bold tracking-tight text-gradient mb-6 flex items-center">
-                <Calendar className="h-7 w-7 mr-3" /> Próximos Eventos
-              </h2>
-              {filteredEvents.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                </div>
-              ) : (
-                <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                  <p className="text-lg font-semibold">No se encontraron eventos</p>
-                  <p className="text-muted-foreground mt-1">
-                    {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevos eventos."}
-                  </p>
-                </div>
-              )}
-            </section>
+            {showEvents && (
+              <section>
+                <h2 className="text-2xl font-bold tracking-tight text-gradient mb-6 flex items-center">
+                  <Calendar className="h-7 w-7 mr-3" /> Próximos Eventos
+                </h2>
+                {filteredEvents.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
+                    <p className="text-lg font-semibold">No se encontraron eventos</p>
+                    <p className="text-muted-foreground mt-1">
+                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevos eventos."}
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
           </div>
         )}
       </main>
+      
+       {/* Botón de Iniciar Sesión visible solo en móvil, al final */}
+      <div className="sm:hidden p-4 fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t">
+        <Link href="/login" passHref className="w-full">
+            <Button className="w-full">
+              <UserCircle className="mr-2 h-4 w-4" />
+              Inicia Sesión / Acceso a Paneles
+            </Button>
+        </Link>
+      </div>
 
-      <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-background text-sm border-t">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-muted-foreground">
-            &copy; {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.
-          </p>
-          <Link href="/login" passHref>
-            <Button variant="ghost" size="sm">Acceso a Paneles</Button>
-          </Link>
-        </div>
-      </footer>
     </div>
   );
 }
