@@ -482,30 +482,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           setShowDniModal(false);
           setPageViewState("qrDisplay");
       } else {
-            let fetchedNameFromApi: string | undefined = undefined;
-              if (data.docType === 'dni') {
-                try {
-                    const response = await fetch('/api/admin/consult-dni', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ dni: docNumberCleaned }),
-                    });
-                    const resData = await response.json();
-                    if (response.ok && resData.nombreCompleto) {
-                        fetchedNameFromApi = resData.nombreCompleto;
-                    }
-                } catch (apiError) {
-                    console.warn("DNI consultation API failed, continuing without prefill.", apiError);
-                }
-            }
-            
-            const nameParts = fetchedNameFromApi?.split(' ') || [];
-            const surname = nameParts.slice(0, 2).join(' '); // Apellido paterno y materno
-            const name = nameParts.slice(2).join(' '); // Nombres
-
             newQrClientForm.reset({ 
-                name: name || "", 
-                surname: surname || "", 
+                name: "", 
+                surname: "", 
                 phone: "", 
                 dob: undefined, 
                 dni: docNumberCleaned,
@@ -1550,6 +1529,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
