@@ -138,12 +138,6 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
           </form>
         </Form>
         <DialogFooter className="text-center text-sm flex-col items-center">
-          <p className="text-muted-foreground">
-            ¿No tienes una cuenta de Super Admin?{" "}
-            <Link href="/signup" className="font-medium text-primary hover:underline" onClick={() => onOpenChange(false)}>
-              Regístrate aquí
-            </Link>
-          </p>
           <DialogClose asChild>
              <Button type="button" variant="ghost" className="mt-2 text-muted-foreground">Cancelar</Button>
           </DialogClose>
