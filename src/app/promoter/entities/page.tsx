@@ -152,14 +152,13 @@ export default function PromoterEntitiesPage() {
   const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
     if (!userProfile?.name || !userProfile.uid) {
       toast({ title: "Error de Usuario", description: "Nombre o UID de promotor no disponible.", variant: "destructive" });
-      setIsSubmitting(false);
       return;
     }
-    setIsSubmitting(true);
+    setIsSubmitting(true); // Set submitting at the beginning
     console.log(`Promoter Entities Page: Promoter ${userProfile.name} (UID: ${userProfile.uid}) creating ${newCodes.length} codes for entityId: ${entityId}`);
-
-    const targetEntityRef = doc(db, "businessEntities", entityId);
+  
     try {
+      const targetEntityRef = doc(db, "businessEntities", entityId);
       const targetEntitySnap = await getDoc(targetEntityRef);
       if (!targetEntitySnap.exists()) {
         toast({ title: "Error", description: `La entidad "${entityId}" no fue encontrada.`, variant: "destructive" });
@@ -188,19 +187,20 @@ export default function PromoterEntitiesPage() {
       await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
       toast({ title: "Códigos Creados Exitosamente", description: `${newCodes.length} código(s) añadido(s) a "${targetEntityData.name}".` });
       
-      fetchAssignedEntities(); 
-
+      await fetchAssignedEntities();
+      
+      // Update state for open modals
       if (selectedEntityForViewingCodes?.id === entityId) {
         setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
       }
-       if (selectedEntityForCreatingCodes?.id === entityId) {
-         setSelectedEntityForCreatingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
+      if (selectedEntityForCreatingCodes?.id === entityId) {
+        setSelectedEntityForCreatingCodes(prev => prev ? {...prev, generatedCodes: updatedCodes} : null);
       }
     } catch (error: any) {
       console.error("Promoter Entities Page: Error saving new codes to Firestore:", error.code, error.message, error);
       toast({ title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive" });
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // Reset submitting at the end
     }
   };
   

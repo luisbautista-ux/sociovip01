@@ -26,7 +26,7 @@ interface CreateCodesDialogProps {
   onOpenChange: (open: boolean) => void;
   entityName: string;
   entityId: string;
-  onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string, creatorUid?: string) => void; 
+  onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string, creatorUid?: string) => Promise<void>; 
   existingCodesValues: string[]; 
   isSubmittingMain?: boolean; 
   currentUserProfileName?: string;
@@ -72,7 +72,7 @@ export function CreateCodesDialog({
     }
   }, [open]);
 
-  const handleCreateCodes = () => {
+  const handleCreateCodes = async () => {
     const numToCreate = Number(numCodes);
     if (isNaN(numToCreate) || numToCreate < 1 || numToCreate > Math.min(50, maxCodesCanCreate === 0 && maxAttendance && maxAttendance > 0 ? 0 : 50)) { 
       toast({
@@ -133,10 +133,14 @@ export function CreateCodesDialog({
       });
     }
     
-    onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim(), currentUserProfileUid);
+    // First, show the success message UI
     setJustCreatedCodes(newCodesBatch);
     setShowSuccess(true);
     setIsCreating(false);
+
+    // Then, call the async database operation without waiting for it to complete in this function
+    // This prevents the UI from being blocked or re-rendered unexpectedly
+    onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim(), currentUserProfileUid);
   };
 
   const handleCopyCreatedCodes = async () => {
