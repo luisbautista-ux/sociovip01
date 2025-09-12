@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -10,8 +11,8 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        headline: ['Poppins', 'sans-serif'],
-        body: ['PT Sans', 'sans-serif'],
+        headline: ['Baskervville', 'serif'],
+        body: ['Baskervville', 'serif'],
       },
   		colors: {
   			background: 'hsl(var(--background))',
