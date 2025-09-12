@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -624,6 +625,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
       toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
       return;
     }
+
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) {
@@ -631,6 +633,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
       return;
     }
 
+    // --- Definición de medidas ---
     const padding = 20;
     const qrSize = 180;
     const maxLogoHeight = 50;
@@ -643,212 +646,136 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     const smallTextFontSize = 10;
     const lineSpacing = 5;
     const canvasWidth = 320;
-
-    let currentY = 0;
-    const businessLogo = document.createElement("img");
-    businessLogo.crossOrigin = "anonymous";
-
-    let initialEstimatedHeight =
-      padding +
-      maxLogoHeight +
-      spacingAfterLogo +
-      businessNameFontSize +
-      spacingAfterBusinessName +
-      entityTitleFontSize +
-      spacingAfterEntityTitle +
-      qrSize +
-      padding +
-      userDetailsFontSize +
-      lineSpacing +
-      userDetailsFontSize +
-      padding +
-      smallTextFontSize +
-      lineSpacing +
-      padding;
-    if (qrData.promotion.termsAndConditions) {
-      initialEstimatedHeight += 50;
-    }
-    canvas.height = initialEstimatedHeight;
-    canvas.width = canvasWidth;
-
-    const drawContent = () => {
-      ctx.fillStyle = "hsl(280, 13%, 96%)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      currentY = 0;
-
-      const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
-      ctx.fillStyle = "hsl(var(--primary))";
-      ctx.fillRect(0, currentY, canvas.width, headerBgHeight);
-      currentY += padding;
-
-      if (businessDetails.logoUrl) {
-        const aspectRatio = businessLogo.width / businessLogo.height;
-        let logoHeight = businessLogo.height;
-        let logoWidth = businessLogo.width;
-
-        if (logoHeight > maxLogoHeight) {
-          logoHeight = maxLogoHeight;
-          logoWidth = logoHeight * aspectRatio;
-        }
-        if (logoWidth > canvas.width / 2 - padding) {
-          logoWidth = canvas.width / 2 - padding;
-          logoHeight = logoWidth / aspectRatio;
-        }
-        ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
-        currentY += logoHeight + spacingAfterLogo / 2;
-      } else {
-        currentY += maxLogoHeight + spacingAfterLogo / 2;
-      }
-
-      ctx.fillStyle = "hsl(var(--primary-foreground))";
-      ctx.font = `bold ${businessNameFontSize}px Arial`;
-      ctx.textAlign = "center";
-      ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
-      currentY += businessNameFontSize + padding / 2;
-
-      currentY = headerBgHeight;
-      currentY += spacingAfterBusinessName;
-
-      ctx.fillStyle = "hsl(var(--primary))";
-      ctx.font = `bold ${entityTitleFontSize}px Arial`;
-      ctx.textAlign = "center";
-      ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
-      currentY += entityTitleFontSize + spacingAfterEntityTitle;
-
-      const qrImage = document.createElement("img");
-      qrImage.crossOrigin = "anonymous";
-      qrImage.onload = () => {
-        const qrX = (canvas.width - qrSize) / 2;
-        ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
-        ctx.strokeStyle = "hsl(var(--primary))";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
-        currentY += qrSize + padding;
-
-        ctx.fillStyle = "hsl(var(--primary))";
-        ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
-        ctx.textAlign = "center";
-        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
-        currentY += userDetailsFontSize + 2 + lineSpacing;
-
-        ctx.fillStyle = "hsl(var(--foreground))";
-        ctx.font = `${userDetailsFontSize - 2}px Arial`;
-        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
-        currentY += userDetailsFontSize - 2 + padding;
-
-        ctx.font = `italic ${smallTextFontSize}px Arial`;
-        ctx.fillStyle = "hsl(var(--muted-foreground))";
-        ctx.textAlign = "center";
-        ctx.fillText(
-          `Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`,
-          canvas.width / 2,
-          currentY
-        );
-        currentY += smallTextFontSize + lineSpacing + 15;
-
-        const termsLines = qrData.promotion.termsAndConditions ? qrData.promotion.termsAndConditions.split("\n") : [];
-        if (qrData.promotion.termsAndConditions) {
-          ctx.font = `italic ${smallTextFontSize - 1}px Arial`;
-          ctx.fillStyle = "hsl(var(--muted-foreground))";
-          termsLines.forEach((line) => {
-            ctx.fillText(line, canvas.width / 2, currentY);
-            currentY += smallTextFontSize + 2;
-          });
-          currentY += padding / 2;
-        }
-
-        canvas.height = currentY;
-
-        ctx.fillStyle = "hsl(280, 13%, 96%)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "hsl(var(--primary))";
-        const headerHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
-        ctx.fillRect(0, 0, canvas.width, headerHeight);
-        let redrawY = padding;
-        if (businessDetails.logoUrl) {
-          const aspectRatio = businessLogo.width / businessLogo.height;
-          let logoHeight = businessLogo.height;
-          let logoWidth = businessLogo.width;
-          if (logoHeight > maxLogoHeight) {
-            logoHeight = maxLogoHeight;
-            logoWidth = logoHeight * aspectRatio;
-          }
-          if (logoWidth > canvas.width / 2 - padding) {
-            logoWidth = canvas.width / 2 - padding;
-            logoHeight = logoWidth / aspectRatio;
-          }
-          ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, redrawY, logoWidth, logoHeight);
-          redrawY += logoHeight + spacingAfterLogo / 2;
-        } else {
-          redrawY += maxLogoHeight + spacingAfterLogo / 2;
-        }
-        ctx.fillStyle = "hsl(var(--primary-foreground))";
-        ctx.font = `bold ${businessNameFontSize}px Arial`;
-        ctx.textAlign = "center";
-        ctx.fillText(businessDetails.name, canvas.width / 2, redrawY);
-        redrawY = headerHeight + spacingAfterBusinessName;
-        ctx.fillStyle = "hsl(var(--primary))";
-        ctx.font = `bold ${entityTitleFontSize}px Arial`;
-        ctx.fillText(qrData.promotion.title, canvas.width / 2, redrawY);
-        redrawY += entityTitleFontSize + spacingAfterEntityTitle;
-        const qrX2 = (canvas.width - qrSize) / 2;
-        ctx.drawImage(qrImage, qrX2, redrawY, qrSize, qrSize);
-        ctx.strokeStyle = "hsl(var(--primary))";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(qrX2 - 2, redrawY - 2, qrSize + 4, qrSize + 4);
-        redrawY += qrSize + padding;
-        ctx.fillStyle = "hsl(var(--primary))";
-        ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
-        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, redrawY);
-        redrawY += userDetailsFontSize + 2 + lineSpacing;
-        ctx.fillStyle = "hsl(var(--foreground))";
-        ctx.font = `${userDetailsFontSize - 2}px Arial`;
-        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, redrawY);
-        redrawY += userDetailsFontSize - 2 + padding;
-        ctx.font = `italic ${smallTextFontSize}px Arial`;
-        ctx.fillStyle = "hsl(var(--muted-foreground))";
-        ctx.fillText(
-          `Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`,
-          canvas.width / 2,
-          redrawY
-        );
-        redrawY += smallTextFontSize + lineSpacing + 15;
-        if (qrData.promotion.termsAndConditions) {
-          ctx.font = `italic ${smallTextFontSize - 1}px Arial`;
-          ctx.fillStyle = "hsl(var(--muted-foreground))";
-          termsLines.forEach((line) => {
-            ctx.fillText(line, canvas.width / 2, redrawY);
-            redrawY += smallTextFontSize + 2;
-          });
-        }
-
-        const dataUrl = canvas.toDataURL("image/png");
-        const linkElement = document.createElement("a");
-        linkElement.href = dataUrl;
-        const entityTypeForFilename = qrData.promotion.type === "event" ? "Evento" : "Promo";
-        linkElement.download = `SocioVIP_QR_${entityTypeForFilename}_${qrData.promotion.promoCode}.png`;
-        document.body.appendChild(linkElement);
-        linkElement.click();
-        document.body.removeChild(linkElement);
-        toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
-      };
-      qrImage.onerror = () => {
-        toast({ title: "Error", description: "No se pudo cargar la imagen del QR para guardarla.", variant: "destructive" });
-      };
-      if (generatedQrDataUrl) qrImage.src = generatedQrDataUrl;
-      else toast({ title: "Error", description: "URL de QR no generada aún.", variant: "destructive" });
+    
+    // Función para calcular la altura de los términos y condiciones
+    const calculateTermsHeight = (context: CanvasRenderingContext2D, terms: string, maxWidth: number) => {
+      context.font = `italic ${smallTextFontSize - 1}px Arial`;
+      const lines = terms.split("\n");
+      let height = 0;
+      lines.forEach(line => {
+        height += smallTextFontSize + 2;
+      });
+      return height + padding / 2; // Añadir un poco de espacio extra
     };
 
+    // Pre-cargar la imagen del logo si existe
+    const businessLogo = new Image();
+    businessLogo.crossOrigin = "anonymous";
     if (businessDetails.logoUrl) {
-      businessLogo.onload = drawContent;
-      businessLogo.onerror = () => {
-        toast({ title: "Advertencia", description: "No se pudo cargar el logo del negocio para incluirlo en la descarga.", variant: "default" });
-        drawContent();
-      };
       businessLogo.src = businessDetails.logoUrl;
-    } else {
-      drawContent();
+      await new Promise((resolve, reject) => {
+        businessLogo.onload = resolve;
+        businessLogo.onerror = () => {
+          toast({ title: "Advertencia", description: "No se pudo cargar el logo del negocio para incluirlo en la descarga.", variant: "default" });
+          resolve(null); // Continuar sin el logo
+        };
+      });
     }
+
+    // Calcular altura total dinámicamente
+    let totalHeight = padding; // Top padding
+    const headerBgHeight = maxLogoHeight + spacingAfterLogo + businessNameFontSize + padding * 1.5;
+    totalHeight = headerBgHeight + spacingAfterBusinessName + entityTitleFontSize + spacingAfterEntityTitle + qrSize + padding + (userDetailsFontSize + 2) + lineSpacing + (userDetailsFontSize - 2) + padding + (smallTextFontSize + lineSpacing + 15);
+    if (qrData.promotion.termsAndConditions) {
+        totalHeight += calculateTermsHeight(ctx, qrData.promotion.termsAndConditions, canvasWidth - padding * 2);
+    }
+    totalHeight += padding; // Bottom padding
+    canvas.width = canvasWidth;
+    canvas.height = totalHeight;
+
+    // --- Inicio del dibujado ---
+    let currentY = 0;
+    
+    // Fondo blanco
+    ctx.fillStyle = "#FFFFFF"; // Usar blanco para el fondo de la imagen
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Header con color de la marca
+    const primaryHsl = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+    ctx.fillStyle = `hsl(${primaryHsl})`;
+    ctx.fillRect(0, 0, canvas.width, headerBgHeight);
+    currentY = padding;
+
+    // Dibujar logo
+    if (businessDetails.logoUrl && businessLogo.complete && businessLogo.naturalHeight !== 0) {
+      const aspectRatio = businessLogo.width / businessLogo.height;
+      let logoHeight = businessLogo.height;
+      let logoWidth = businessLogo.width;
+      if (logoHeight > maxLogoHeight) {
+        logoHeight = maxLogoHeight;
+        logoWidth = logoHeight * aspectRatio;
+      }
+      ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
+      currentY += logoHeight + spacingAfterLogo / 2;
+    } else {
+      currentY += maxLogoHeight + spacingAfterLogo / 2;
+    }
+
+    // Dibujar nombre del negocio
+    const primaryFgHsl = getComputedStyle(document.documentElement).getPropertyValue('--primary-foreground');
+    ctx.fillStyle = `hsl(${primaryFgHsl})`;
+    ctx.font = `bold ${businessNameFontSize}px Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText(businessDetails.name, canvas.width / 2, currentY);
+    currentY = headerBgHeight + spacingAfterBusinessName;
+
+    // Dibujar título de la entidad
+    ctx.fillStyle = `hsl(${primaryHsl})`;
+    ctx.font = `bold ${entityTitleFontSize}px Arial`;
+    ctx.fillText(qrData.promotion.title, canvas.width / 2, currentY);
+    currentY += entityTitleFontSize + spacingAfterEntityTitle;
+
+    // Dibujar QR
+    const qrImage = new Image();
+    qrImage.crossOrigin = "anonymous";
+    qrImage.src = generatedQrDataUrl;
+    await new Promise(resolve => qrImage.onload = resolve);
+    
+    const qrX = (canvas.width - qrSize) / 2;
+    ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
+    ctx.strokeStyle = `hsl(${primaryHsl})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(qrX - 2, currentY - 2, qrSize + 4, qrSize + 4);
+    currentY += qrSize + padding;
+
+    // Detalles del usuario
+    ctx.fillStyle = `hsl(${primaryHsl})`;
+    ctx.font = `bold ${userDetailsFontSize + 2}px Arial`;
+    ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, currentY);
+    currentY += userDetailsFontSize + 2 + lineSpacing;
+    const fgHsl = getComputedStyle(document.documentElement).getPropertyValue('--foreground');
+    ctx.fillStyle = `hsl(${fgHsl})`;
+    ctx.font = `${userDetailsFontSize - 2}px Arial`;
+    ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, currentY);
+    currentY += userDetailsFontSize - 2 + padding;
+
+    // Fecha de validez
+    const mutedFgHsl = getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground');
+    ctx.font = `italic ${smallTextFontSize}px Arial`;
+    ctx.fillStyle = `hsl(${mutedFgHsl})`;
+    ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, currentY);
+    currentY += smallTextFontSize + lineSpacing + 15;
+
+    // Términos y condiciones
+    if (qrData.promotion.termsAndConditions) {
+        ctx.font = `italic ${smallTextFontSize - 1}px Arial`;
+        const termsLines = qrData.promotion.termsAndConditions.split("\n");
+        termsLines.forEach((line) => {
+            ctx.fillText(line, canvas.width / 2, currentY);
+            currentY += smallTextFontSize + 2;
+        });
+    }
+
+    // --- Descarga ---
+    const dataUrl = canvas.toDataURL("image/png");
+    const linkElement = document.createElement("a");
+    linkElement.href = dataUrl;
+    const entityTypeForFilename = qrData.promotion.type === "event" ? "Evento" : "Promo";
+    linkElement.download = `SocioVIP_QR_${entityTypeForFilename}_${qrData.promotion.promoCode}.png`;
+    document.body.appendChild(linkElement);
+    linkElement.click();
+    document.body.removeChild(linkElement);
+    toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
   };
 
   const resetQrFlow = () => {
@@ -1544,3 +1471,4 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
