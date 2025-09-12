@@ -146,7 +146,11 @@ export default function HomePage() {
           />
         </div>
         <CardHeader className="pb-3">
-          <CardTitle className="text-xl">{entity.name}</CardTitle>
+          <CardTitle className="text-xl">
+            <Link href={businessUrl} className="hover:underline">
+              {entity.name}
+            </Link>
+          </CardTitle>
           <CardDescription className="text-xs pt-1">
             <Link href={businessUrl} className="flex items-center text-muted-foreground hover:text-primary transition-colors">
               {entity.businessLogoUrl ? (
