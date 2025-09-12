@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, Download, Info, Loader2 } from "lucide-react";
+import { DollarSign, Download, Info, Loader2, Calendar, Briefcase, Hash, BadgeCent } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +17,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { anyToDate } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 export default function PromoterCommissionsPage() {
   const { toast } = useToast();
@@ -176,34 +177,74 @@ export default function PromoterCommissionsPage() {
               <p className="text-muted-foreground mt-4">Calculando comisiones...</p>
             </div>
           ) : filteredCommissions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Período</TableHead>
-                  <TableHead>Negocio</TableHead>
-                  <TableHead>Promoción/Evento</TableHead>
-                  <TableHead className="text-center">Códigos Usados</TableHead>
-                  <TableHead className="text-right">Comisión (S/)</TableHead>
-                  <TableHead className="text-center">Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Vista para pantallas grandes (tabla) */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Negocio</TableHead>
+                      <TableHead>Promoción/Evento</TableHead>
+                      <TableHead className="text-center">Códigos Usados</TableHead>
+                      <TableHead className="text-right">Comisión (S/)</TableHead>
+                      <TableHead className="text-center">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCommissions.map((comm) => (
+                      <TableRow key={comm.id}>
+                        <TableCell>{comm.period}</TableCell>
+                        <TableCell className="font-medium">{comm.businessName}</TableCell>
+                        <TableCell>{comm.entityName}</TableCell>
+                        <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">{comm.commissionEarned.toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                            <Badge variant={comm.paymentStatus === 'Pagado' ? 'default' : 'secondary'}>
+                                {comm.paymentStatus}
+                            </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Vista para pantallas pequeñas (tarjetas) */}
+              <div className="md:hidden space-y-4">
                 {filteredCommissions.map((comm) => (
-                  <TableRow key={comm.id}>
-                    <TableCell>{comm.period}</TableCell>
-                    <TableCell className="font-medium">{comm.businessName}</TableCell>
-                    <TableCell>{comm.entityName}</TableCell>
-                    <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
-                    <TableCell className="text-right font-semibold text-green-600">{comm.commissionEarned.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">
-                        <Badge variant={comm.paymentStatus === 'Pagado' ? 'default' : 'secondary'}>
-                            {comm.paymentStatus}
-                        </Badge>
-                    </TableCell>
-                  </TableRow>
+                  <Card key={comm.id} className="overflow-hidden">
+                    <CardHeader className="p-4">
+                      <CardTitle className="text-base">{comm.entityName}</CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground flex items-center pt-1">
+                        <Briefcase size={14} className="mr-1.5"/>{comm.businessName}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-3">
+                       <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground flex items-center"><Calendar size={14} className="mr-1.5"/> Período</span>
+                          <span className="font-medium">{comm.period}</span>
+                       </div>
+                       <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground flex items-center"><Hash size={14} className="mr-1.5"/> Códigos Usados</span>
+                          <span className="font-semibold text-lg text-primary">{comm.promoterCodesRedeemed}</span>
+                       </div>
+                       <Separator />
+                       <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground flex items-center"><BadgeCent size={14} className="mr-1.5"/> Comisión Ganada</span>
+                          <span className="font-semibold text-lg text-green-600">S/ {comm.commissionEarned.toFixed(2)}</span>
+                       </div>
+                    </CardContent>
+                     <CardFooter className="p-4 bg-muted/50">
+                        <div className="w-full flex justify-center">
+                          <Badge variant={comm.paymentStatus === 'Pagado' ? 'default' : 'secondary'}>
+                            Estado: {comm.paymentStatus}
+                          </Badge>
+                        </div>
+                    </CardFooter>
+                  </Card>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </>
           ) : (
             <div className="min-h-[200px] flex flex-col items-center justify-center text-center p-6">
               <Info className="h-16 w-16 text-primary/70 mb-4" />
