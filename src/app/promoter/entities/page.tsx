@@ -18,15 +18,8 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp, doc, updateDoc, getDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle as ShadcnDialogTitle, 
-  DialogDescription, 
-  DialogFooter as ShadcnDialogFooter 
-} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -285,7 +278,9 @@ export default function PromoterEntitiesPage() {
     }
 
     return (
-        <div className="overflow-x-auto">
+      <div className="space-y-4">
+        {/* Vista para pantallas grandes (tabla) */}
+        <div className="hidden md:block">
             <Table>
                 <TableHeader>
                 <TableRow>
@@ -341,6 +336,58 @@ export default function PromoterEntitiesPage() {
                 </TableBody>
             </Table>
         </div>
+        {/* Vista para pantallas pequeñas (tarjetas) */}
+        <div className="md:hidden space-y-4">
+           {entitiesToShow.map(entity => {
+                const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
+                const isActivatable = isEntityCurrentlyActivatable(entity);
+                return (
+                    <Card key={entity.id} className="overflow-hidden">
+                        <CardHeader className="p-4">
+                            <CardTitle className="text-lg">{entity.name}</CardTitle>
+                            {entity.businessName && <CardDescription className="text-xs text-muted-foreground flex items-center pt-1"><Building size={14} className="mr-1.5"/>{entity.businessName}</CardDescription>}
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-4">
+                           <div className="flex justify-between items-start gap-4">
+                                <div>
+                                    <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
+                                            className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
+                                        {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
+                                    </Badge>
+                                </div>
+                                <div className="text-xs text-right shrink-0">
+                                    <p>Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></p>
+                                    <p>QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></p>
+                                    <p>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></p>
+                                </div>
+                           </div>
+                           <Separator />
+                           <div className="flex gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="flex-1"
+                                    onClick={() => openCreateCodesDialog(entity)} 
+                                    disabled={!isActivatable || isSubmitting}
+                                >
+                                    <QrCodeIcon className="h-4 w-4 mr-2" /> Crear
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="flex-1"
+                                    onClick={() => openViewCodesDialog(entity)}
+                                    disabled={isSubmitting}
+                                >
+                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos
+                                </Button>
+                           </div>
+                        </CardContent>
+                    </Card>
+                )
+           })}
+        </div>
+      </div>
     );
   };
   
