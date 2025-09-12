@@ -345,7 +345,7 @@ export default function PromoterEntitiesPage() {
                     <Card key={entity.id} className="overflow-hidden">
                         <CardHeader className="p-4">
                             <CardTitle className="text-lg">{entity.name}</CardTitle>
-                            {entity.businessName && <CardDescription className="text-xs text-muted-foreground flex items-center pt-1"><Building size={14} className="mr-1.5"/>{entity.businessName}</CardDescription>}
+                            {entity.businessName && <ShadcnCardDescription className="text-xs text-muted-foreground flex items-center pt-1"><Building size={14} className="mr-1.5"/>{entity.businessName}</ShadcnCardDescription>}
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                            <div className="flex justify-between items-start gap-4">
