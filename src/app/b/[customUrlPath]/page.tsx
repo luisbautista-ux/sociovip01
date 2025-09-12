@@ -945,7 +945,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
           <Card className="w-full max-w-md shadow-xl">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-gradient">
+              <CardTitle className="text-2xl font-bold" style={{ color: businessDetails.primaryColor }}>
                 {activeEntityForQr.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción Adquirida"}
               </CardTitle>
               <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
@@ -965,7 +965,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 </div>
               )}
               <div className="text-center">
-                <p className="text-2xl font-semibold text-gradient">
+                <p className="text-2xl font-semibold" style={{ color: businessDetails.primaryColor }}>
                   Hola, {qrData.user.name} {qrData.user.surname}
                 </p>
                 <p className="text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
@@ -978,7 +978,15 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               </div>
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleSaveQrWithDetails} className="w-full sm:flex-1" variant="outline" disabled={!generatedQrDataUrl}>
+              <Button
+                onClick={handleSaveQrWithDetails}
+                className="w-full sm:flex-1"
+                variant="gradient"
+                style={{
+                  backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`,
+                }}
+                disabled={!generatedQrDataUrl}
+              >
                 <Download className="mr-2 h-4 w-4" /> Guardar QR con Detalles
               </Button>
               <Button 
@@ -1505,6 +1513,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
 
 
 

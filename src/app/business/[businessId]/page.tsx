@@ -880,7 +880,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     );
   };
 
-  if (isLoading) {
+  if (isLoadingPage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
@@ -906,7 +906,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     );
   }
 
-  if (!businessDetails && !isLoading) {
+  if (!businessDetails && !isLoadingPage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
@@ -955,7 +955,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
           <Card className="w-full max-w-md shadow-xl">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-bold text-gradient">
+              <CardTitle className="text-2xl font-bold" style={{ color: businessDetails.primaryColor }}>
                 {activeEntityForQr.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción Adquirida"}
               </CardTitle>
               <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
@@ -975,7 +975,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                 </div>
               )}
               <div className="text-center">
-                <p className="text-2xl font-semibold text-gradient">
+                <p className="text-2xl font-semibold" style={{ color: businessDetails.primaryColor }}>
                   Hola, {qrData.user.name} {qrData.user.surname}
                 </p>
                 <p className="text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
@@ -988,7 +988,15 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
               </div>
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-2">
-              <Button onClick={handleSaveQrWithDetails} className="w-full sm:flex-1" variant="outline" disabled={!generatedQrDataUrl}>
+              <Button
+                onClick={handleSaveQrWithDetails}
+                className="w-full sm:flex-1"
+                variant="gradient"
+                style={{
+                  backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`,
+                }}
+                disabled={!generatedQrDataUrl}
+              >
                 <Download className="mr-2 h-4 w-4" /> Guardar QR con Detalles
               </Button>
               <Button 
@@ -1181,7 +1189,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           </section>
         )}
 
-        {!isLoading && !pageError && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
+        {!isLoadingPage && !pageError && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
           <Card className="col-span-full">
             <CardHeader className="text-center">
               <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -1515,6 +1523,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
