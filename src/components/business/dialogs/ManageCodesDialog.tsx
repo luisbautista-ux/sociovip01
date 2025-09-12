@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
+import type { BusinessManagedEntity, GeneratedCode, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { PlusCircle, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2 } from "lucide-react";
@@ -115,32 +115,51 @@ export function ManageCodesDialog({
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const { toast } = useToast();
   const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
 
-  const fetchLatestCodes = useCallback(async () => {
+  const fetchLatestData = useCallback(async () => {
     if (!entity?.id) {
       setInternalCodes([]);
+      setBusinessDetails(null);
       return;
     }
     setIsLoadingCodes(true);
     try {
       const entityRef = doc(db, "businessEntities", entity.id);
       const entitySnap = await getDoc(entityRef);
+
       if (entitySnap.exists()) {
         const latestEntityData = entitySnap.data() as BusinessManagedEntity;
         const codesToDisplay = isPromoterView
           ? (latestEntityData.generatedCodes || []).filter(c => c.generatedByUid === currentUserProfileUid)
           : (latestEntityData.generatedCodes || []);
         setInternalCodes([...codesToDisplay]);
+
+        // Fetch business details to get customUrlPath
+        if (latestEntityData.businessId) {
+            const businessRef = doc(db, "businesses", latestEntityData.businessId);
+            const businessSnap = await getDoc(businessRef);
+            if(businessSnap.exists()) {
+                setBusinessDetails({id: businessSnap.id, ...businessSnap.data()} as Business);
+            } else {
+                setBusinessDetails(null);
+            }
+        } else {
+            setBusinessDetails(null);
+        }
+
       } else {
         toast({ title: "Error", description: "La promoción o evento ya no existe.", variant: "destructive" });
         setInternalCodes([]);
+        setBusinessDetails(null);
       }
     } catch (error) {
-      console.error("Error fetching latest codes:", error);
-      toast({ title: "Error", description: "No se pudieron cargar los datos actualizados de los códigos.", variant: "destructive" });
+      console.error("Error fetching latest codes/business details:", error);
+      toast({ title: "Error", description: "No se pudieron cargar los datos actualizados.", variant: "destructive" });
       setInternalCodes(entity.generatedCodes || []); // Fallback to stale data
+      setBusinessDetails(null);
     } finally {
       setIsLoadingCodes(false);
     }
@@ -148,10 +167,10 @@ export function ManageCodesDialog({
 
   useEffect(() => {
     if (open && entity) {
-      fetchLatestCodes();
+      fetchLatestData();
       setExpandedBatches({}); 
     }
-  }, [entity, open, fetchLatestCodes]);
+  }, [entity, open, fetchLatestData]);
 
   const processedAndGroupedCodes = useMemo(() => groupAndSortCodes(internalCodes), [internalCodes]);
 
@@ -219,8 +238,8 @@ export function ManageCodesDialog({
             return;
         }
 
-        const businessUrl = entity?.businessCustomUrlPath
-            ? `https://sociovip.app/b/${entity.businessCustomUrlPath}`
+        const businessUrl = businessDetails?.customUrlPath
+            ? `https://sociovip.app/b/${businessDetails.customUrlPath}`
             : `https://sociovip.app/business/${entity?.businessId}`;
 
         const codesText = codes.join('\n');
