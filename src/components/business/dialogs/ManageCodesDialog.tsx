@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ClipboardCopy, ChevronDown, ChevronUp, Copy, AlertTriangle, Loader2 } from "lucide-react";
+import { PlusCircle, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2, Copy, WhatsAppIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as UIAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -98,6 +98,7 @@ interface ManageCodesDialogProps {
   isPromoterView?: boolean; 
   currentUserProfileName?: string;
   currentUserProfileUid?: string;
+  currentUserProfilePhone?: string;
 }
 
 export function ManageCodesDialog({
@@ -109,6 +110,7 @@ export function ManageCodesDialog({
     isPromoterView = false, 
     currentUserProfileName,
     currentUserProfileUid,
+    currentUserProfilePhone
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
@@ -209,42 +211,44 @@ export function ManageCodesDialog({
       });
     }
   };
+  
+    const openWhatsApp = (codes: string[]) => {
+        if (!currentUserProfilePhone) {
+            toast({ title: "Teléfono no encontrado", description: "No tienes un número de teléfono configurado en tu perfil.", variant: "destructive" });
+            return;
+        }
 
-  const handleCopyIndividualCode = async (codeValue: string | undefined) => {
-    if (!codeValue) return;
-    try {
-      await navigator.clipboard.writeText(codeValue);
-      toast({ title: "Código Copiado", description: `El código ${codeValue} ha sido copiado.` });
-    } catch (err) {
-      toast({ title: "Error al Copiar", description: "No se pudo copiar el código.", variant: "destructive" });
-    }
-  };
+        const businessUrl = entity?.businessCustomUrlPath
+            ? `https://sociovip.app/b/${entity.businessCustomUrlPath}`
+            : `https://sociovip.app/business/${entity?.businessId}`;
 
-  const handleCopyAllAvailableCodes = async () => {
-    const availableCodes = internalCodes.filter(c => c.status === 'available').map(c => c.value).join('\n');
-    if (!availableCodes) {
-      toast({ title: "Sin Códigos Disponibles", description: "No hay códigos disponibles para copiar." });
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(availableCodes);
-      toast({ title: "Códigos Copiados", description: "Los códigos disponibles han sido copiados al portapapeles." });
-    } catch (err) {
-      toast({ title: "Error al Copiar", description: "No se pudieron copiar los códigos.", variant: "destructive" });
-      console.error("Failed to copy codes: ", err);
-    }
-  };
+        const codesText = codes.join('\n');
+        const message = `Genera Entrada(s) QR(s) con tu código(s) en ${businessUrl}\n\n${codesText}`;
+        const whatsappUrl = `https://wa.me/${currentUserProfilePhone}?text=${encodeURIComponent(message)}`;
+        
+        window.open(whatsappUrl, '_blank');
+        toast({ title: "Abriendo WhatsApp", description: "Se está abriendo una pestaña con tu mensaje." });
+    };
 
-  const handleCopyBatchCodes = async (batchCodes: GeneratedCode[] | undefined) => {
-    if (!batchCodes || batchCodes.length === 0) return;
-    const codesToCopy = batchCodes.map(c => c.value).join('\n');
-    try {
-      await navigator.clipboard.writeText(codesToCopy);
-      toast({ title: "Códigos del Lote Copiados", description: `${batchCodes.length} códigos del lote han sido copiados.` });
-    } catch (err) {
-      toast({ title: "Error al Copiar Lote", description: "No se pudieron copiar los códigos del lote.", variant: "destructive" });
-    }
-  };
+    const handleShareIndividualCode = (codeValue: string | undefined) => {
+        if (!codeValue) return;
+        openWhatsApp([codeValue]);
+    };
+
+    const handleShareBatchCodes = (batchCodes: GeneratedCode[] | undefined) => {
+        if (!batchCodes || batchCodes.length === 0) return;
+        const codesToShare = batchCodes.map(c => c.value);
+        openWhatsApp(codesToShare);
+    };
+
+    const handleShareAllAvailableCodes = () => {
+        const availableCodes = internalCodes.filter(c => c.status === 'available').map(c => c.value);
+        if (availableCodes.length === 0) {
+            toast({ title: "Sin Códigos Disponibles", description: "No hay códigos disponibles para compartir." });
+            return;
+        }
+        openWhatsApp(availableCodes);
+    };
 
   if (!entity) return null; 
 
@@ -267,14 +271,14 @@ export function ManageCodesDialog({
       <TableCell className={cn("font-mono py-1.5 px-2", isInsideBatch && "pl-4")}>
         <div className="flex items-center gap-1">
             <span>{code.value}</span>
-            <Button
+             <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.stopPropagation(); handleCopyIndividualCode(code.value);}}
-                title="Copiar código"
+                className="h-6 w-6 text-green-600 hover:bg-green-100"
+                onClick={(e) => { e.stopPropagation(); handleShareIndividualCode(code.value);}}
+                title="Compartir código por WhatsApp"
             >
-                <ClipboardCopy className="h-3 w-3" />
+                <WhatsAppIcon className="h-4 w-4" />
             </Button>
         </div>
       </TableCell>
@@ -302,11 +306,11 @@ export function ManageCodesDialog({
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevos Códigos
           </Button>
           <Button
-            onClick={handleCopyAllAvailableCodes}
+            onClick={handleShareAllAvailableCodes}
             variant="outline"
             disabled={!internalCodes.some(c => c.status === 'available')}
           >
-            <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Disponibles ({internalCodes.filter(c => c.status === 'available').length})
+            <WhatsAppIcon className="mr-2 h-4 w-4 text-green-600" /> Compartir Disponibles ({internalCodes.filter(c => c.status === 'available').length})
           </Button>
         </div>
 
@@ -338,7 +342,7 @@ export function ManageCodesDialog({
                             data-state={isExpanded ? "open" : "closed"}
                         >
                           <TableCell colSpan={3} className="py-2 px-3 text-xs">
-                            <div className="flex items-center justify-between group w-full">
+                             <div className="flex items-center justify-between group w-full">
                               <div className="flex items-center">
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
                                 <span>Lote de {item.codesInBatch.length} códigos</span>
@@ -348,9 +352,9 @@ export function ManageCodesDialog({
                                     variant="ghost"
                                     size="xs"
                                     className="text-xs h-auto py-1 px-1.5"
-                                    onClick={(e) => { e.stopPropagation(); handleCopyBatchCodes(item.codesInBatch);}}
+                                    onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}
                                 >
-                                    <Copy className="mr-1 h-3 w-3" /> Copiar Lote ({item.codesInBatch!.length})
+                                    <WhatsAppIcon className="mr-1 h-4 w-4 text-green-600" /> Compartir Lote ({item.codesInBatch!.length})
                                 </Button>
                               </div>
                             </div>
@@ -369,7 +373,7 @@ export function ManageCodesDialog({
           </ScrollArea>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
-            <ClipboardCopy className="h-12 w-12 mb-2"/>
+            <Copy className="h-12 w-12 mb-2"/>
             <p>No has generado códigos para esta entidad aún.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>
           </div>
