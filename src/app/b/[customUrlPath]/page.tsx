@@ -1059,54 +1059,30 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           </Card>
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="flex items-center gap-3">
-              {!loadingAuth && !loadingProfile && (
-                <>
-                  {currentUser && userProfile ? (
-                    <>
-                      <span className="text-foreground flex items-center">
-                        <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                        Hola, {userProfile.name || currentUser.email?.split("@")[0]}
-                      </span>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">
-                            Cerrar Sesión
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <UIAlertDialogTitle>¿Cerrar Sesión?</UIAlertDialogTitle>
-                            <UIDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescription>
-                          </AlertDialogHeader>
-                          <ShadcnAlertDialogFooterAliased>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">
-                              Sí, Cerrar Sesión
-                            </AlertDialogAction>
-                          </ShadcnAlertDialogFooterAliased>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                      <Link href="/auth/dispatcher" passHref className="inline-block">
-                        <Button variant="outline" size="sm">Ir a Administración</Button>
-                      </Link>
-                    </>
-                  ) : (
-                    <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
-                      Iniciar Sesión
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                <Link href="/login" passHref>
+                    <Button 
+                        variant="gradient" 
+                        style={{
+                            backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                        }}
+                    >
+                        <UserCircle className="mr-2 h-4 w-4" />
+                        Iniciar Sesión
                     </Button>
-                  )}
-                </>
-              )}
-              {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                </Link>
+                <Link href="/" passHref>
+                    <Button 
+                        variant="gradient"
+                        style={{
+                            backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                        }}
+                    >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Volver al Inicio
+                    </Button>
+                </Link>
             </div>
-            <div className="text-muted-foreground">
-              <Link href="/" className="hover:text-primary hover:underline">
-                Plataforma de sociosvip.app
-              </Link>
-            </div>
-          </div>
         </footer>
       </div>
     );
@@ -1593,6 +1569,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
 
 
 
