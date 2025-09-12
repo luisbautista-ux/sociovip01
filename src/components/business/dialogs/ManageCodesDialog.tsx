@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -11,7 +10,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { PlusCircle, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2, Copy } from "lucide-react";
+import { PlusCircle, Trash2, ChevronDown, ChevronUp, AlertTriangle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as UIAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -225,7 +224,7 @@ export function ManageCodesDialog({
             : `https://sociosvip.app/business/${entity?.businessId}`;
 
         const codesText = codes.join('\n');
-        const message = `Genera Entrada(s) QR(s) con tu código(s) en ${businessUrl}\n\n${codesText}`;
+        const message = `Genera tu entrada QR con tu condigo en:\n${businessUrl}\n\n${codesText}`;
         const whatsappUrl = `https://wa.me/${currentUserProfilePhone}?text=${encodeURIComponent(message)}`;
         
         window.open(whatsappUrl, '_blank');
@@ -326,7 +325,7 @@ export function ManageCodesDialog({
             <Table>
               <TableHeader>
                 <TableRow className="text-sm">
-                  <TableHead className="w-1/3 px-2 py-2">Código</TableHead>
+                  <TableHead className="w-1/3 px-2 py-2 text-center">Código</TableHead>
                   <TableHead className="w-1/3 px-2 py-2 text-center">Estado</TableHead>
                   <TableHead className="w-1/3 px-2 py-2 text-center">Fecha Canje</TableHead>
                 </TableRow>
@@ -375,7 +374,6 @@ export function ManageCodesDialog({
           </ScrollArea>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
-            <Copy className="h-12 w-12 mb-2"/>
             <p>No has generado códigos para esta entidad aún.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>
           </div>
