@@ -8,9 +8,6 @@ import { AuthProvider } from "@/context/AuthContext";
 export const metadata: Metadata = {
   title: "SocioVip",
   description: "Descubre las mejores promociones y proximos eventos cerca de tí.",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({
