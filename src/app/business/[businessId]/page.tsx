@@ -1117,20 +1117,34 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <header className="py-4 px-4 sm:px-6 lg:px-8 bg-card/80 backdrop-blur-sm shadow-sm sticky top-0 z-20 w-full">
-        <div className="max-w-7xl mx-auto flex items-center justify-start">
-          {businessDetails.logoUrl && (
-            <NextImage
-              src={businessDetails.logoUrl}
-              alt={`${businessDetails.name} logo`}
-              width={40}
-              height={40}
-              className="h-10 w-auto object-contain rounded mr-3"
-            />
-          )}
-          <div>
-            <h1 className="font-semibold text-xl text-primary">{businessDetails.name}</h1>
-            {businessDetails.slogan && <p className="text-xs text-muted-foreground">{businessDetails.slogan}</p>}
+       <header className="relative w-full h-48 md:h-64">
+        {businessDetails.publicCoverImageUrl ? (
+          <NextImage
+            src={businessDetails.publicCoverImageUrl}
+            alt={`${businessDetails.name} cover image`}
+            fill
+            className="object-cover"
+            priority
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-r from-purple-500 to-purple-700"></div>
+        )}
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center p-4 bg-black/30 backdrop-blur-sm rounded-lg">
+             {businessDetails.logoUrl && (
+              <NextImage
+                src={businessDetails.logoUrl}
+                alt={`${businessDetails.name} logo`}
+                width={80}
+                height={80}
+                className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md mx-auto mb-2 border-2 border-white/50 shadow-lg"
+              />
+            )}
+            <h1 className="font-bold text-2xl md:text-4xl text-white shadow-md">{businessDetails.name}</h1>
+            {businessDetails.slogan && (
+              <p className="text-sm md:text-lg text-white/90 mt-1 shadow-sm">{businessDetails.slogan}</p>
+            )}
           </div>
         </div>
       </header>
