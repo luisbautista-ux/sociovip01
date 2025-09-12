@@ -235,7 +235,8 @@ export default function BusinessPublicPageById(): React.JSX.Element | null {
           managerName: bizData.managerName,
           managerDni: bizData.managerDni,
           businessType: bizData.businessType,
-          primaryColor: bizData.primaryColor || '#B080D0'
+          primaryColor: bizData.primaryColor || '#B080D0',
+          secondaryColor: bizData.secondaryColor || '#8E5EA2',
         };
 
         // Si tiene customUrlPath, redirige a /b/[customUrlPath]
@@ -945,49 +946,23 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     );
   };
 
-  if (isLoading) {
+  if (isLoadingPage) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="flex flex-col items-center justify-center flex-grow pt-12">
-          <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-          <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-muted-foreground">Cargando...</p>
       </div>
     );
   }
 
-  if (error) {
+  if (pageError) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-        <div className="flex flex-col items-center justify-center flex-grow pt-12">
-          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-destructive">{error}</h1>
-          <p className="text-muted-foreground mt-2">Ruta intentada: /b/{customUrlPath}</p>
-          <Link href="/" passHref>
-            <Button variant="outline" className="mt-6">
-              Volver a la Página Principal
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!businessDetails && !isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
-        <div className="flex flex-col items-center justify-center flex-grow pt-12">
-          <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
-          <p className="text-muted-foreground mt-2">
-            La página del negocio con la URL "/b/{customUrlPath}" no existe o la URL es incorrecta.
-          </p>
-          <Link href="/" passHref>
-            <Button variant="outline" className="mt-6">
-              Volver a la Página Principal
-            </Button>
-          </Link>
-        </div>
+      <div className="flex items-center justify-center min-h-screen text-center p-4">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-destructive">{pageError}</h1>
+        <Link href="/" passHref>
+          <Button variant="outline" className="mt-6">Volver al Inicio</Button>
+        </Link>
       </div>
     );
   }
@@ -1078,8 +1053,8 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <UIAlertDialogTitle>¿Cerrar Sesión?</UIAlertDialogTitle>
-                            <UIDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescription>
+                            <UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased>
+                            <AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription>
                           </AlertDialogHeader>
                           <ShadcnAlertDialogFooterAliased>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -1260,7 +1235,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           </section>
         )}
 
-        {!isLoading && !error && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
+        {!isLoadingPage && !pageError && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
           <Card className="col-span-full">
             <CardHeader className="text-center">
               <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -1318,14 +1293,14 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <UIDialogTitleComponent>
+            <DialogTitle>
               {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
-            </UIDialogTitleComponent>
-            <UIDialogDescriptionComponent>
+            </DialogTitle>
+            <UIDialogDescription>
               {currentStepInModal === "enterDni"
                 ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
                 : "Necesitamos algunos datos para generar tu QR."}
-            </UIDialogDescriptionComponent>
+            </UIDialogDescription>
           </DialogHeader>
           {currentStepInModal === "enterDni" ? (
             <Form {...dniForm}>
@@ -1570,10 +1545,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         <AlertDialogContent>
           <AlertDialogHeader>
             <UIAlertDialogTitleAliased className="font-semibold">DNI Ya Registrado</UIAlertDialogTitleAliased>
-            <UIDialogDescription>
+            <AlertDialogDescription>
               El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los
               datos existentes para generar tu QR?
-            </UIDialogDescription>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <ShadcnAlertDialogFooterAliased>
             <AlertDialogCancel
@@ -1594,4 +1569,5 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 

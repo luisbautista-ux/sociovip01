@@ -239,7 +239,8 @@ export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
           publicAddress: bizData.publicAddress || undefined,
-          primaryColor: bizData.primaryColor || '#B080D0'
+          primaryColor: bizData.primaryColor || '#B080D0',
+          secondaryColor: bizData.secondaryColor || '#8E5EA2',
         };
         setBusinessDetails(fetchedBusiness);
 
@@ -1114,8 +1115,10 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
        <header 
-         className="sticky top-0 z-20 w-full bg-background/90 backdrop-blur-sm border-b"
-         style={{ backgroundColor: businessDetails.primaryColor ? `${businessDetails.primaryColor}E6` : `hsla(var(--background) / 0.9)` }}
+         className="sticky top-0 z-20 w-full"
+         style={{ 
+           background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})` 
+         }}
        >
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
@@ -1585,4 +1588,5 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
 
