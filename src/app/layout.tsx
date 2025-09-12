@@ -18,11 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Baskervville:ital@0;1&display=swap" rel="stylesheet" />
+        {/* The Inter font is typically handled by Tailwind's default font stack or can be loaded via Next/Font if needed. 
+            For simplicity and alignment with modern Tailwind setups, we'll rely on the tailwind.config.ts definition. */}
       </head>
-      <body className="font-body antialiased"> {/* Added font-body here */}
+      <body className="font-body antialiased">
         <AuthProvider>
           {children}
           <Toaster />
@@ -31,3 +30,4 @@ export default function RootLayout({
     </html>
   );
 }
+

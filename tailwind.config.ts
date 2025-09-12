@@ -11,8 +11,8 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        headline: ['Baskervville', 'serif'],
-        body: ['Baskervville', 'serif'],
+        headline: ['Inter', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
       },
   		colors: {
   			background: 'hsl(var(--background))',
@@ -97,3 +97,4 @@ export default {
   },
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;
+
