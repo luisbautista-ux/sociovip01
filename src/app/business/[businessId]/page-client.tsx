@@ -95,7 +95,7 @@ const normalizeCode = (v: unknown) =>
   String(v ?? "")
     .toUpperCase()
     .replace(/[\s-]/g, "")            // quita espacios y guiones
-    .replace(/[^A-Z0-9]/g, "");       // deja solo A-Z0-9
+    .replace(/[^A-Z0-9]/g, "");       // deja solo A-Z-0-9
 
 const extractCodeString = (codeObj: any) =>
   normalizeCode(codeObj?.value ?? codeObj?.code ?? codeObj?.codigo ?? codeObj?.val);
