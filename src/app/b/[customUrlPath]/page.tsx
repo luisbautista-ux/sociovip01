@@ -653,10 +653,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             lines.push(currentLine);
             return lines;
         };
-
-        // --- Definición de medidas y estilos ---
-        const padding = 25;
-        const canvasWidth = 350;
+        
+        const padding = 30;
+        const canvasWidth = 380;
         const contentWidth = canvasWidth - padding * 2;
         const qrSize = 180;
         
@@ -681,30 +680,27 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             }
         }
         
-        // --- Medición de la altura de cada elemento ANTES de dibujar ---
-        const businessNameLines = getWrappedTextLines(businessDetails.name, contentWidth, 'bold 16px Arial');
-        const entityTitleLines = getWrappedTextLines(qrData.promotion.title, contentWidth, 'bold 22px Arial');
-        const userNameLines = getWrappedTextLines(`${qrData.user.name} ${qrData.user.surname}`, contentWidth, 'bold 20px Arial');
+        const businessNameLines = getWrappedTextLines(businessDetails.name, contentWidth, 'bold 18px Arial');
+        const entityTitleLines = getWrappedTextLines(qrData.promotion.title, contentWidth, 'bold 24px Arial');
+        const userNameLines = getWrappedTextLines(`${qrData.user.name} ${qrData.user.surname}`, contentWidth, 'bold 22px Arial');
         const userDniLines = getWrappedTextLines(`DNI/CE: ${qrData.user.dni}`, contentWidth, '16px Arial');
-        const validUntilLines = getWrappedTextLines(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, contentWidth, 'italic 12px Arial');
-        const termsLines = qrData.promotion.termsAndConditions ? getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, 'italic 11px Arial') : [];
+        const validUntilLines = getWrappedTextLines(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, contentWidth, 'italic 13px Arial');
+        const termsLines = qrData.promotion.termsAndConditions ? getWrappedTextLines(qrData.promotion.termsAndConditions, contentWidth, 'italic 12px Arial') : [];
 
-        // Line heights
-        const businessNameLineHeight = 20;
-        const entityTitleLineHeight = 28;
-        const userNameLineHeight = 26;
+        const businessNameLineHeight = 22;
+        const entityTitleLineHeight = 30;
+        const userNameLineHeight = 28;
         const userDniLineHeight = 20;
         const validUntilLineHeight = 16;
-        const termsLineHeight = 14;
+        const termsLineHeight = 15;
 
-        // Spacings
         const spacing = {
-            afterLogo: 10,
+            afterLogo: 15,
             afterBusinessName: 20,
-            afterEntityTitle: 20,
-            afterQr: 20,
-            afterUserName: 5,
-            afterUserDni: 20,
+            afterEntityTitle: 25,
+            afterQr: 25,
+            afterUserName: 8,
+            afterUserDni: 25,
             afterValidUntil: 15,
         };
         
@@ -722,44 +718,40 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         canvas.width = canvasWidth;
         canvas.height = totalHeight;
         
-        let currentY = padding;
-
-        // --- Dibujado ---
-
-        // 1. Fondo con gradiente
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
         gradient.addColorStop(0, businessDetails.primaryColor || '#B080D0');
         gradient.addColorStop(1, businessDetails.secondaryColor || '#8E5EA2');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
+        ctx.strokeStyle = "#D4AF37";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+        
+        let currentY = padding;
         ctx.textAlign = "center";
+        ctx.fillStyle = 'white';
 
-        // 2. Logo
         if (logoLoaded) {
             const logoWidth = logoHeight * (businessLogo.width / businessLogo.height);
             ctx.drawImage(businessLogo, (canvas.width - logoWidth) / 2, currentY, logoWidth, logoHeight);
             currentY += logoHeight + spacing.afterLogo;
         }
 
-        // 3. Nombre del negocio
-        ctx.fillStyle = 'white';
-        ctx.font = `bold 16px Arial`;
+        ctx.font = `bold 18px Arial`;
         businessNameLines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
             currentY += businessNameLineHeight;
         });
         currentY += spacing.afterBusinessName;
 
-        // 4. Título de la entidad
-        ctx.font = `bold 22px Arial`;
+        ctx.font = `bold 24px Arial`;
         entityTitleLines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
             currentY += entityTitleLineHeight;
         });
         currentY += spacing.afterEntityTitle;
         
-        // 5. QR
         const qrImage = new Image();
         qrImage.crossOrigin = "anonymous";
         qrImage.src = generatedQrDataUrl;
@@ -770,16 +762,14 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         ctx.drawImage(qrImage, qrX, currentY, qrSize, qrSize);
         currentY += qrSize + spacing.afterQr;
 
-        // 6. Nombre del usuario
         ctx.fillStyle = 'white';
-        ctx.font = `bold 20px Arial`;
+        ctx.font = `bold 22px Arial`;
         userNameLines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
             currentY += userNameLineHeight;
         });
         currentY += spacing.afterUserName;
         
-        // 7. DNI
         ctx.font = `16px Arial`;
         userDniLines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
@@ -787,19 +777,17 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         });
         currentY += spacing.afterUserDni;
 
-        // 8. Fecha de validez
-        ctx.font = `italic 12px Arial`;
+        ctx.font = `italic 13px Arial`;
         ctx.globalAlpha = 0.8;
         validUntilLines.forEach(line => {
             ctx.fillText(line, canvas.width / 2, currentY);
             currentY += validUntilLineHeight;
         });
         ctx.globalAlpha = 1.0;
-        currentY += spacing.afterValidUntil;
         
-        // 9. Términos y condiciones
         if (termsLines.length > 0) {
-            ctx.font = `italic 11px Arial`;
+            currentY += spacing.afterValidUntil;
+            ctx.font = `italic 12px Arial`;
             ctx.globalAlpha = 0.7;
             termsLines.forEach((line) => {
                 ctx.fillText(line, canvas.width / 2, currentY);
@@ -808,7 +796,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             ctx.globalAlpha = 1.0;
         }
 
-        // --- Descarga ---
         const dataUrl = canvas.toDataURL("image/png");
         const linkElement = document.createElement("a");
         linkElement.href = dataUrl;
@@ -1513,6 +1500,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
 
 
 
