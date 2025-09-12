@@ -1,3 +1,4 @@
+
 // next.config.ts
 import type { NextConfig } from "next";
 
@@ -10,7 +11,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "i.ibb.co",               // Logo alojado en imgbb
+        hostname: "i.ibb.co",               // Logo alojado en imgbb y ahora icono de WhatsApp
         pathname: "/**",
       },
       {

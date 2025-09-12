@@ -330,7 +330,7 @@ export function ManageCodesDialog({
             variant="outline"
             disabled={!internalCodes.some(c => c.status === 'available')}
           >
-            <WhatsAppIcon className="mr-2 h-4 w-4 text-green-600" /> Compartir Disponibles ({internalCodes.filter(c => c.status === 'available').length})
+            <WhatsAppIcon className="mr-2 h-4 w-4" /> Compartir Disponibles ({internalCodes.filter(c => c.status === 'available').length})
           </Button>
         </div>
 
@@ -374,7 +374,7 @@ export function ManageCodesDialog({
                                     className="text-xs h-auto py-1 px-1.5"
                                     onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}
                                 >
-                                    <WhatsAppIcon className="mr-1 h-4 w-4 text-green-600" /> Compartir Lote ({item.codesInBatch!.length})
+                                    <WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir Lote ({item.codesInBatch!.length})
                                 </Button>
                               </div>
                             </div>
