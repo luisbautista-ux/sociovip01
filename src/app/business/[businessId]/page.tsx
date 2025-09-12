@@ -53,7 +53,8 @@ import {
   AlertTriangle,
   Info,
   Download,
-  Calendar
+  Calendar,
+  ArrowLeft,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -1116,8 +1117,38 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
   const events = activeEntitiesForBusiness.filter((e) => e.type === "event");
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-       <header className="relative w-full h-48 md:h-64">
+    <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
+       <header className="sticky top-0 z-20 w-full bg-background/90 backdrop-blur-sm border-b">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-3">
+                 {businessDetails.logoUrl ? (
+                    <NextImage 
+                        src={businessDetails.logoUrl}
+                        alt={`${businessDetails.name} Logo`}
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 object-contain rounded-sm"
+                    />
+                 ) : <Building className="h-7 w-7 text-primary" />}
+                 <span className="font-semibold text-lg text-primary hidden sm:inline">{businessDetails.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                 <Link href="/" passHref>
+                    <Button variant="outline" size="sm">
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
+                    </Button>
+                 </Link>
+                  <Button variant="ghost" size="sm" onClick={() => setShowLoginModal(true)}>
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    Iniciar Sesión
+                  </Button>
+              </div>
+            </div>
+         </div>
+       </header>
+
+       <div className="relative w-full h-48 md:h-64">
         {businessDetails.publicCoverImageUrl ? (
           <NextImage
             src={businessDetails.publicCoverImageUrl}
@@ -1131,14 +1162,14 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         )}
         <div className="absolute inset-0 bg-black/50" />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center p-4 bg-black/30 backdrop-blur-sm rounded-lg">
+          <div className="text-center p-4">
              {businessDetails.logoUrl && (
               <NextImage
                 src={businessDetails.logoUrl}
                 alt={`${businessDetails.name} logo`}
                 width={80}
                 height={80}
-                className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md mx-auto mb-2 border-2 border-white/50 shadow-lg"
+                className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md mx-auto mb-2 border-2 border-white/50 shadow-lg bg-black/20 p-1"
               />
             )}
             <h1 className="font-bold text-2xl md:text-4xl text-white shadow-md">{businessDetails.name}</h1>
@@ -1147,7 +1178,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             )}
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
         {promotions.length > 0 && (
@@ -1272,57 +1303,6 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           </section>
         ) : null}
       </main>
-
-      <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="flex items-center gap-3">
-            {!loadingAuth && !loadingProfile && (
-              <>
-                {currentUser && userProfile ? (
-                  <>
-                    <span className="text-foreground flex items-center">
-                      <UserCircle className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                      Hola, {userProfile.name || currentUser.email?.split("@")[0]}
-                    </span>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-primary">
-                          Cerrar Sesión
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased>
-                          <AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <ShadcnAlertDialogFooterAliased>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">
-                            Sí, Cerrar Sesión
-                          </AlertDialogAction>
-                        </ShadcnAlertDialogFooterAliased>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                    <Link href="/auth/dispatcher" passHref className="inline-block">
-                      <Button variant="outline" size="sm">Ir a Administración</Button>
-                    </Link>
-                  </>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setShowLoginModal(true)}>
-                    Iniciar Sesión
-                  </Button>
-                )}
-              </>
-            )}
-            {(loadingAuth || loadingProfile) && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-          </div>
-          <div className="text-muted-foreground">
-            <Link href="/" className="hover:text-primary hover:underline">
-              Plataforma de sociosvip.app
-            </Link>
-          </div>
-        </div>
-      </footer>
 
       <Dialog
         open={showDniModal}
