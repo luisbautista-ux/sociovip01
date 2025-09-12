@@ -48,8 +48,8 @@ export default function AuthDispatcherPage() {
         console.log("AuthDispatcher: Redirecting business_admin/staff to /business-panel/dashboard");
         router.replace("/business-panel/dashboard");
       } else if (userProfile.roles.includes('promoter')) {
-        console.log("AuthDispatcher: Redirecting promoter to /promoter/dashboard");
-        router.replace("/promoter/dashboard");
+        console.log("AuthDispatcher: Redirecting promoter to /promoter/entities");
+        router.replace("/promoter/entities");
       } else if (userProfile.roles.includes('host') || userProfile.roles.includes('lector_qr')) {
         console.log("AuthDispatcher: Redirecting host/lector_qr to /lector-qr/validate");
         router.replace("/lector-qr/validate");
