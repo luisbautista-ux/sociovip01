@@ -278,10 +278,10 @@ export function ManageCodesDialog({
             </Button>
         </div>
       </TableCell>
-      <TableCell className="py-1.5 px-2">
+      <TableCell className="py-1.5 px-2 text-center">
           <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status] || 'outline'} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status] || code.status}</Badge>
       </TableCell>
-      <TableCell className="py-1.5 px-2">
+      <TableCell className="py-1.5 px-2 text-center">
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
       </TableCell>
     </TableRow>
@@ -289,11 +289,11 @@ export function ManageCodesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-5xl"> 
+      <DialogContent className="sm:max-w-xl"> 
         <DialogHeader>
-          <DialogTitle>Códigos para: {entity.name}</DialogTitle>
+          <DialogTitle>Mis Códigos para: {entity.name}</DialogTitle>
           <DialogDescription>
-            Visualiza y gestiona los códigos existentes. {isPromoterView ? "Solo puedes gestionar los códigos que tú has generado." : "Se agrupan si se crearon juntos con la misma observación y por el mismo usuario."}
+            Visualiza los códigos que has generado para esta campaña. Se agrupan si se crearon juntos.
           </DialogDescription>
         </DialogHeader>
 
@@ -313,16 +313,16 @@ export function ManageCodesDialog({
         {isLoadingCodes ? (
           <div className="flex justify-center items-center h-[50vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-3 text-muted-foreground">Cargando códigos actualizados...</p>
+            <p className="ml-3 text-muted-foreground">Cargando mis códigos...</p>
           </div>
         ) : processedAndGroupedCodes.length > 0 ? (
           <ScrollArea className="h-[50vh] border rounded-md">
             <Table>
               <TableHeader>
                 <TableRow className="text-sm">
-                  <TableHead className="w-[150px] px-2 py-2">Código</TableHead>
-                  <TableHead className="px-2 py-2">Estado</TableHead>
-                  <TableHead className="px-2 py-2">Fecha Canje</TableHead>
+                  <TableHead className="w-1/3 px-2 py-2">Código</TableHead>
+                  <TableHead className="w-1/3 px-2 py-2 text-center">Estado</TableHead>
+                  <TableHead className="w-1/3 px-2 py-2 text-center">Fecha Canje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -337,15 +337,11 @@ export function ManageCodesDialog({
                             onClick={() => toggleBatchExpansion(item.batchId!)}
                             data-state={isExpanded ? "open" : "closed"}
                         >
-                          <TableCell colSpan={isPromoterView ? 3 : 7} className="py-2 px-3 text-xs">
+                          <TableCell colSpan={3} className="py-2 px-3 text-xs">
                             <div className="flex items-center justify-between group w-full">
                               <div className="flex items-center">
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
-                                <span>Lote de {item.codesInBatch.length} códigos (Por: {item.generatedByName || 'N/A'})</span>
-                                {item.generatedDate && <span className="text-muted-foreground ml-1 text-xs"> - {format(new Date(item.generatedDate), "dd/MM/yy HH:mm", { locale: es })}</span>}
-                              </div>
-                              <div className="flex-grow mx-2 text-muted-foreground text-xs truncate text-center" title={item.observation || undefined}>
-                                {item.observation ? `Obs: ${item.observation}` : "Sin observación"}
+                                <span>Lote de {item.codesInBatch.length} códigos</span>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
                                 <Button
@@ -374,7 +370,7 @@ export function ManageCodesDialog({
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
             <ClipboardCopy className="h-12 w-12 mb-2"/>
-            <p>No hay códigos generados para esta entidad aún.</p>
+            <p>No has generado códigos para esta entidad aún.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>
           </div>
         )}
