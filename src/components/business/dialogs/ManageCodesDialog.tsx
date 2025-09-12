@@ -220,11 +220,11 @@ export function ManageCodesDialog({
         }
 
         const businessUrl = entity?.businessCustomUrlPath
-            ? `https://sociosvip.app/b/${entity.businessCustomUrlPath}`
-            : `https://sociosvip.app/business/${entity?.businessId}`;
+            ? `https://sociovip.app/b/${entity.businessCustomUrlPath}`
+            : `https://sociovip.app/business/${entity?.businessId}`;
 
         const codesText = codes.join('\n');
-        const message = `Genera tu entrada QR con tu condigo en:\n${businessUrl}\n\n${codesText}`;
+        const message = `Genera tu entrada QR con tu código en:\n${businessUrl}\n\n${codesText}`;
         const whatsappUrl = `https://wa.me/${currentUserProfilePhone}?text=${encodeURIComponent(message)}`;
         
         window.open(whatsappUrl, '_blank');
