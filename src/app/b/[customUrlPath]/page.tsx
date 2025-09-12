@@ -89,6 +89,7 @@ import {
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { SocioVipLogo } from "@/components/icons";
 
 // --- Helpers robustos para códigos ---
 const normalizeCode = (v: unknown) =>
@@ -238,6 +239,7 @@ export default function BusinessPublicPageByUrl(): React.JSX.Element | null {
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
           publicAddress: bizData.publicAddress || undefined,
+          primaryColor: bizData.primaryColor || '#B080D0'
         };
         setBusinessDetails(fetchedBusiness);
 
@@ -1111,28 +1113,25 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
-       <header className="sticky top-0 z-20 w-full bg-background/90 backdrop-blur-sm border-b">
+       <header 
+         className="sticky top-0 z-20 w-full bg-background/90 backdrop-blur-sm border-b"
+         style={{ backgroundColor: businessDetails.primaryColor ? `${businessDetails.primaryColor}E6` : `hsla(var(--background) / 0.9)` }}
+       >
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-3">
-                 {businessDetails.logoUrl ? (
-                    <NextImage 
-                        src={businessDetails.logoUrl}
-                        alt={`${businessDetails.name} Logo`}
-                        width={32}
-                        height={32}
-                        className="h-8 w-8 object-contain rounded-sm"
-                    />
-                 ) : <Building className="h-7 w-7 text-primary" />}
-                 <span className="font-semibold text-lg text-primary hidden sm:inline">{businessDetails.name}</span>
+                 <Link href="/" className="flex items-center gap-2">
+                    <SocioVipLogo size={32} />
+                    <span className="font-bold text-xl text-white hidden sm:inline">SocioVIP</span>
+                 </Link>
               </div>
               <div className="flex items-center gap-2">
                  <Link href="/" passHref>
-                    <Button variant="outline" size="sm">
+                    <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
                       <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
                     </Button>
                  </Link>
-                  <Button variant="ghost" size="sm" onClick={() => setShowLoginModal(true)}>
+                  <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white" onClick={() => setShowLoginModal(true)}>
                     <UserCircle className="mr-2 h-4 w-4" />
                     Iniciar Sesión
                   </Button>

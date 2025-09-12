@@ -89,6 +89,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { SocioVipLogo } from "@/components/icons";
 
 // --- Helpers robustos para códigos ---
 const normalizeCode = (v: unknown) =>
@@ -234,6 +235,7 @@ export default function BusinessPublicPageById(): React.JSX.Element | null {
           managerName: bizData.managerName,
           managerDni: bizData.managerDni,
           businessType: bizData.businessType,
+          primaryColor: bizData.primaryColor || '#B080D0'
         };
 
         // Si tiene customUrlPath, redirige a /b/[customUrlPath]
@@ -943,9 +945,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     );
   };
 
-  // ----------------- Renders -----------------
-
-  if (isLoadingPage) {
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
@@ -956,13 +956,13 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     );
   }
 
-  if (pageError) {
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
           <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-destructive">{pageError}</h1>
-          <p className="text-muted-foreground mt-2">Ruta intentada: /business/{businessIdFromParams}</p>
+          <h1 className="text-3xl font-bold text-destructive">{error}</h1>
+          <p className="text-muted-foreground mt-2">Ruta intentada: /b/{customUrlPath}</p>
           <Link href="/" passHref>
             <Button variant="outline" className="mt-6">
               Volver a la Página Principal
@@ -973,14 +973,14 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     );
   }
 
-  if (!businessDetails && !isLoadingPage) {
+  if (!businessDetails && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
           <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
           <p className="text-muted-foreground mt-2">
-            La página del negocio con ID "{businessIdFromParams}" no existe o la URL es incorrecta.
+            La página del negocio con la URL "/b/{customUrlPath}" no existe o la URL es incorrecta.
           </p>
           <Link href="/" passHref>
             <Button variant="outline" className="mt-6">
@@ -1007,8 +1007,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
               />
             )}
             <div className="ml-3">
-              <h1 className="font-semibold text-xl text-primary">{businessDetails.name}</h1>
-              {businessDetails.slogan && <p className="text-xs text-muted-foreground">{businessDetails.slogan}</p>}
+              <h1 className="font-semibold text-xl text-primary group-hover:text-primary/80">{businessDetails.name}</h1>
+              {businessDetails.slogan && (
+                <p className="text-xs text-muted-foreground group-hover:text-primary/70">{businessDetails.slogan}</p>
+              )}
             </div>
           </div>
         </header>
@@ -1076,8 +1078,8 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <UIAlertDialogTitleAliased>¿Cerrar Sesión?</UIAlertDialogTitleAliased>
-                            <AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription>
+                            <UIAlertDialogTitle>¿Cerrar Sesión?</UIAlertDialogTitle>
+                            <UIDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</UIDialogDescription>
                           </AlertDialogHeader>
                           <ShadcnAlertDialogFooterAliased>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -1118,28 +1120,27 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
-       <header className="sticky top-0 z-20 w-full bg-background/90 backdrop-blur-sm border-b">
+       <header 
+         className="sticky top-0 z-20 w-full"
+         style={{ 
+           background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})` 
+         }}
+       >
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-3">
-                 {businessDetails.logoUrl ? (
-                    <NextImage 
-                        src={businessDetails.logoUrl}
-                        alt={`${businessDetails.name} Logo`}
-                        width={32}
-                        height={32}
-                        className="h-8 w-8 object-contain rounded-sm"
-                    />
-                 ) : <Building className="h-7 w-7 text-primary" />}
-                 <span className="font-semibold text-lg text-primary hidden sm:inline">{businessDetails.name}</span>
+                 <Link href="/" className="flex items-center gap-2">
+                    <SocioVipLogo size={32} />
+                    <span className="font-bold text-xl text-white hidden sm:inline">SocioVIP</span>
+                 </Link>
               </div>
               <div className="flex items-center gap-2">
                  <Link href="/" passHref>
-                    <Button variant="outline" size="sm">
+                    <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
                       <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
                     </Button>
                  </Link>
-                  <Button variant="ghost" size="sm" onClick={() => setShowLoginModal(true)}>
+                  <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white" onClick={() => setShowLoginModal(true)}>
                     <UserCircle className="mr-2 h-4 w-4" />
                     Iniciar Sesión
                   </Button>
@@ -1219,7 +1220,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             </div>
           </section>
         )}
-
+        
         {events.length > 0 && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-gradient mb-6 flex items-center">
@@ -1258,9 +1259,8 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             </div>
           </section>
         )}
-        
 
-        {!isLoadingPage && !pageError && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
+        {!isLoading && !error && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
           <Card className="col-span-full">
             <CardHeader className="text-center">
               <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -1318,19 +1318,19 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <UIDialogTitleComponent>
               {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
-            </DialogTitle>
-            <UIDialogDescription>
+            </UIDialogTitleComponent>
+            <UIDialogDescriptionComponent>
               {currentStepInModal === "enterDni"
                 ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
                 : "Necesitamos algunos datos para generar tu QR."}
-            </UIDialogDescription>
+            </UIDialogDescriptionComponent>
           </DialogHeader>
           {currentStepInModal === "enterDni" ? (
             <Form {...dniForm}>
               <form onSubmit={dniForm.handleSubmit(handleDniSubmitInModal)} className="space-y-4 py-2">
-                 <FormField
+                <FormField
                 control={dniForm.control}
                 name="docType"
                 render={({ field }) => (
@@ -1348,28 +1348,28 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                         >
                             <FormItem className="flex items-center space-x-3 space-y-0">
                                 <Label
-                                    htmlFor="docType-dni-public-id"
+                                    htmlFor="docType-dni-public"
                                     className={cn(
                                         "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
                                         field.value === 'dni' && "bg-primary text-primary-foreground border-primary"
                                     )}
                                 >
                                     <FormControl>
-                                        <RadioGroupItem value="dni" id="docType-dni-public-id" className="sr-only" />
+                                        <RadioGroupItem value="dni" id="docType-dni-public" className="sr-only" />
                                     </FormControl>
                                     DNI
                                 </Label>
                             </FormItem>
                             <FormItem className="flex items-center space-x-3 space-y-0">
                                  <Label
-                                    htmlFor="docType-ce-public-id"
+                                    htmlFor="docType-ce-public"
                                     className={cn(
                                         "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
                                         field.value === 'ce' && "bg-primary text-primary-foreground border-primary"
                                     )}
                                 >
                                     <FormControl>
-                                        <RadioGroupItem value="ce" id="docType-ce-public-id" className="sr-only" />
+                                        <RadioGroupItem value="ce" id="docType-ce-public" className="sr-only" />
                                     </FormControl>
                                     Carnet de Extranjería
                                 </Label>
@@ -1447,7 +1447,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                   )}
                 />
                 <div className="grid grid-cols-2 gap-4">
-                <FormField
+                 <FormField
                   control={newQrClientForm.control}
                   name="surname"
                   render={({ field }) => (
@@ -1462,7 +1462,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                     </FormItem>
                   )}
                 />
-                <FormField
+                 <FormField
                   control={newQrClientForm.control}
                   name="name"
                   render={({ field }) => (
@@ -1488,15 +1488,15 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                       </FormLabel>
                       <FormControl>
                         <Input 
-                          type="tel" 
-                          placeholder="987654321" 
-                          {...field} 
-                          maxLength={9}
-                          onChange={(e) => {
-                              const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                              field.onChange(numericValue);
-                          }}
-                          disabled={isLoadingQrFlow} />
+                            type="tel" 
+                            placeholder="987654321" 
+                            {...field} 
+                            maxLength={9}
+                            onChange={(e) => {
+                                const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(numericValue);
+                            }}
+                            disabled={isLoadingQrFlow} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1594,3 +1594,4 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
