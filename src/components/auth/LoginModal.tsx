@@ -29,6 +29,7 @@ import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import type { AuthError } from "firebase/auth";
+import { useRouter } from "next/navigation"; // Importar useRouter
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
@@ -46,6 +47,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { login } = useAuth();
+  const router = useRouter(); // Instanciar el router
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -62,11 +64,11 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
       if ("user" in result) { // UserCredential
         toast({
           title: "Inicio de Sesión Exitoso",
-          description: "Bienvenido/a de nuevo.",
+          description: "Bienvenido/a de nuevo. Redirigiendo...",
         });
         onOpenChange(false); // Cierra el modal
         form.reset(); // Limpia el formulario
-        // El AuthContext se encargará de actualizar el estado global y la UI
+        router.push("/auth/dispatcher"); // <<<--- CORRECCIÓN: Redirigir al dispatcher
       } else { // AuthError
         const errorCode = (result as AuthError).code;
         let errorMessage = "Ocurrió un error al iniciar sesión.";
