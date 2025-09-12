@@ -6,8 +6,7 @@ import Image, { type ImageProps } from "next/image";
 export const LOGO_URL =
   "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
 
-type SocioVipLogoProps = Omit<ImageProps, "src" | "alt" | "width" | "height"> & {
-  /** Tamaño en px (alto y ancho) */
+type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
   size?: number;
   className?: string;
 };
