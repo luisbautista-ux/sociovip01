@@ -139,7 +139,7 @@ export default function LoginPage() {
         href="/"
         className="z-10 absolute left-4 top-5 md:left-10 md:top-10 group"
       >
-        <span className="inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
+        <span className="inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
             <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
             Volver al inicio
         </span>
