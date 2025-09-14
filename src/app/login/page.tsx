@@ -137,10 +137,10 @@ export default function LoginPage() {
     <div className="relative min-h-screen bg-[#f4eef7]">
       <Link
         href="/"
-        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 group"
+        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 group inline-flex items-center gap-2"
       >
-        <span className="inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
-            <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
+        <ArrowLeft className="h-4 w-4 md:h-5 md:w-5 text-purple-800 group-hover:opacity-90 transition-opacity" />
+        <span className="text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
             Volver al inicio
         </span>
       </Link>
