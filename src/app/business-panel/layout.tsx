@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Menu, Building, Calendar, Ticket } from "lucide-react";
+import { Loader2, Menu, Building, Calendar, Ticket, LayoutDashboard, Contact, ClipboardList, UserPlus, Users, BarChart3, Settings, QrCode } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
@@ -196,16 +196,16 @@ export default function BusinessPanelLayout({
   }
   
   const navLinks = [
-    { href: "/business-panel/dashboard", label: "Dashboard" },
-    { href: "/business-panel/promotions", label: "Promociones" },
-    { href: "/business-panel/events", label: "Eventos" },
-    { href: "/business-panel/clients", label: "Mis Clientes" },
-    { href: "/business-panel/surveys", label: "Encuestas" },
-    { href: "/business-panel/promoters", label: "Mis Promotores" },
-    { href: "/business-panel/staff", label: "Mi Personal" },
-    { href: "/business-panel/analytics", label: "Analíticas" },
-    { href: "/business-panel/settings", label: "Configuración" },
-    { href: "/business-panel/validate-qr", label: "Validar QR" },
+    { href: "/business-panel/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/business-panel/promotions", label: "Promociones", icon: Ticket },
+    { href: "/business-panel/events", label: "Eventos", icon: Calendar },
+    { href: "/business-panel/clients", label: "Mis Clientes", icon: Contact },
+    { href: "/business-panel/surveys", label: "Encuestas", icon: ClipboardList },
+    { href: "/business-panel/promoters", label: "Mis Promotores", icon: UserPlus },
+    { href: "/business-panel/staff", label: "Mi Personal", icon: Users },
+    { href: "/business-panel/analytics", label: "Analíticas", icon: BarChart3 },
+    { href: "/business-panel/settings", label: "Configuración", icon: Settings },
+    { href: "/business-panel/validate-qr", label: "Validar QR", icon: QrCode },
   ];
 
   return (
@@ -241,7 +241,7 @@ export default function BusinessPanelLayout({
                       onClick={() => setIsSheetOpen(false)} 
                       className="flex items-center space-x-2 text-muted-foreground hover:text-foreground"
                     >
-                      {link.label === 'Promociones' ? <Ticket size={16} /> : link.label === 'Eventos' ? <Calendar size={16} /> : null}
+                      <link.icon size={16} />
                       <span>{link.label}</span>
                     </Link>
                   ))}
