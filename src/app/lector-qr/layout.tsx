@@ -162,7 +162,7 @@ export default function LectorQrLayout({
           ) : (
             <SocioVipLogo className="h-7 w-7" />
           )}
-          <h1 className="text-xl font-semibold text-gradient">{businessDisplayName}</h1>
+          <h1 className="text-xl font-semibold text-primary">{businessDisplayName}</h1>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-muted-foreground hidden sm:inline">

@@ -244,7 +244,14 @@ export default function LectorValidateQrPage() {
         <h1 className="text-3xl font-bold text-primary flex items-center">
           <QrCodeIcon className="h-8 w-8 mr-2" /> Validación de Códigos QR
         </h1>
-        <Button onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} variant={isScannerActive ? "destructive" : "default"} className="w-full sm:w-auto">
+        <Button 
+            onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} 
+            variant={isScannerActive ? "destructive" : "default"} 
+            className="w-full sm:w-auto"
+            style={!isScannerActive ? {
+                backgroundImage: 'linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)))'
+            } : {}}
+        >
           <Camera className="mr-2 h-5 w-5" /> {isScannerActive ? "Detener Escáner" : "Activar Escáner"}
         </Button>
       </div>
@@ -399,4 +406,3 @@ export default function LectorValidateQrPage() {
     </div>
   );
 }
-
