@@ -205,8 +205,8 @@ export default function HomePage() {
         </div>
         
         {/* Barra principal con logo, búsqueda y login */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between sm:h-20 gap-4 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between sm:h-20 gap-4">
               <div className="flex items-center justify-between w-full sm:w-auto">
                 <div className="flex items-center gap-3">
                   <SocioVipLogo size={50} />
@@ -249,14 +249,14 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center text-center py-20">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
             <p className="mt-4 text-lg text-muted-foreground">Cargando...</p>
           </div>
         ) : (
-          <div className="space-y-12">
+          <div className="space-y-8">
             {showPromotions && (
               <section>
                 <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient mt-4 sm:mt-0">
