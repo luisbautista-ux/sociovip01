@@ -32,38 +32,44 @@ interface QrScannerProps {
 }
 
 const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) => {
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
   useEffect(() => {
-    let html5Qrcode: Html5Qrcode | null = null;
-    let isMounted = true;
-
-    if (document.getElementById(QR_READER_ELEMENT_ID)) {
-      html5Qrcode = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
-
-      const startScanner = async () => {
-        try {
-          if (isMounted && !html5Qrcode?.isScanning) {
-            await html5Qrcode.start(
-              { facingMode: "environment" },
-              { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-              onScanSuccess,
-              onScanFailure
-            );
-          }
-        } catch (err: any) {
-          if (isMounted) {
-            console.error("Scanner start failed:", err);
-          }
-        }
-      };
-
-      startScanner();
+    // Inicializa la instancia del escáner solo una vez
+    if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
     }
+    const html5Qrcode = scannerRef.current;
+    let isComponentMounted = true;
 
+    const startScanner = async () => {
+      try {
+        if (isComponentMounted && html5Qrcode && !html5Qrcode.isScanning) {
+          await html5Qrcode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+            onScanSuccess,
+            onScanFailure
+          );
+        }
+      } catch (err: any) {
+        if (isComponentMounted) {
+          console.error("Scanner start failed:", err);
+        }
+      }
+    };
+
+    startScanner();
+
+    // Función de limpieza para detener el escáner
     return () => {
-      isMounted = false;
+      isComponentMounted = false;
       if (html5Qrcode && html5Qrcode.isScanning) {
         html5Qrcode.stop().catch(err => {
-          console.error("Failed to stop scanner cleanly on unmount:", err);
+          // El error "Cannot transition..." puede ocurrir aquí en Hot Reload, es seguro ignorarlo.
+          if (!err.message.includes("Cannot transition")) {
+             console.error("Failed to stop scanner cleanly on unmount:", err);
+          }
         });
       }
     };
