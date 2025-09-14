@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -237,7 +238,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         />
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+          <Button type="submit" variant="gradient" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {promotion ? "Guardar Cambios" : "Crear Promoción"}
           </Button>

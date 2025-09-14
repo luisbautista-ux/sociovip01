@@ -857,7 +857,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           <Button
             type="submit"
             size="sm"
-            className="w-full h-9"
+            className="w-full h-9 text-white"
             style={{
                 backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`
             }}
@@ -983,8 +983,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             <CardFooter className="flex flex-col sm:flex-row gap-2">
               <Button
                 onClick={handleSaveQrWithDetails}
-                className="w-full sm:flex-1"
-                variant="gradient"
+                className="w-full sm:flex-1 text-white"
                 style={{
                   backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`,
                 }}
@@ -994,8 +993,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               </Button>
               <Button 
                 onClick={resetQrFlow} 
-                className="w-full sm:flex-1" 
-                variant="gradient"
+                className="w-full sm:flex-1 text-white"
                 style={{
                     backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                 }}
@@ -1008,8 +1006,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
                 <Link href="/login" passHref>
-                    <Button 
-                        variant="gradient" 
+                    <Button
+                        className="text-white"
                         style={{
                             backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                         }}
@@ -1020,7 +1018,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 </Link>
                 <Link href="/" passHref>
                     <Button 
-                        variant="gradient"
+                        className="text-white"
                         style={{
                             backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                         }}
@@ -1339,7 +1337,11 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   >
                     Cancelar
                   </Button>
-                  <Button type="submit" className="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105" disabled={isLoadingQrFlow}>
+                  <Button type="submit" className="text-white font-bold shadow-lg" 
+                    style={{
+                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                    }}
+                    disabled={isLoadingQrFlow}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                   </Button>
                 </ShadcnDialogFooter>
@@ -1478,7 +1480,11 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   >
                     Volver
                   </Button>
-                  <Button type="submit" className="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-700 hover:to-purple-500 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105" disabled={isLoadingQrFlow}>
+                  <Button type="submit" className="text-white font-bold shadow-lg" 
+                    style={{
+                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                    }}
+                    disabled={isLoadingQrFlow}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar y Generar QR"}
                   </Button>
                 </ShadcnDialogFooter>
@@ -1516,6 +1522,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
 
 
 

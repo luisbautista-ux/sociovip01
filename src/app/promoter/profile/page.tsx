@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -106,7 +107,7 @@ export default function PromoterProfilePage() {
 
   return (
     <div className="space-y-6">
-       <h1 className="text-3xl font-bold text-primary flex items-center">
+       <h1 className="text-3xl font-bold text-gradient flex items-center">
         <UserCircle className="h-8 w-8 mr-2" /> Mi Perfil de Promotor
       </h1>
 
@@ -194,7 +195,7 @@ export default function PromoterProfilePage() {
                 )}
               />
               <div className="flex justify-end">
-                <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90">
+                <Button type="submit" disabled={isSubmitting} variant="gradient">
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Guardar Cambios"}
                 </Button>
               </div>

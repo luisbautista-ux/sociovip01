@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from "next/link";
@@ -175,7 +176,7 @@ export default function PromoterLayout({
               No tienes los permisos necesarios para acceder al Panel de Promotor.
               Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
             </CardDescription>
-            <Button onClick={() => router.push('/')} className="mt-6">
+            <Button onClick={() => router.push('/')} variant="gradient">
               Ir a la Página Principal
             </Button>
           </CardContent>

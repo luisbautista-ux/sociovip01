@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -145,7 +146,7 @@ export default function PromoterCommissionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary flex items-center">
+      <h1 className="text-3xl font-bold text-gradient flex items-center">
         <DollarSign className="h-8 w-8 mr-2" /> Mis Comisiones
       </h1>
 
@@ -257,7 +258,7 @@ export default function PromoterCommissionsPage() {
         </CardContent>
          <CardFooter className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t gap-4">
              <div className="text-lg font-bold">
-                Total Ganado (filtrado): <span className="text-primary">S/ {totalCommissions.toFixed(2)}</span>
+                Total Ganado (filtrado): <span className="text-gradient">S/ {totalCommissions.toFixed(2)}</span>
              </div>
              <Button variant="outline" onClick={handleExport} disabled={filteredCommissions.length === 0}>
                 <Download className="mr-2 h-4 w-4" /> Exportar a CSV

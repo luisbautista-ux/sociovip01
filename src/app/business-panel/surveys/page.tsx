@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,10 +11,10 @@ export default function BusinessSurveysPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
+        <h1 className="text-3xl font-bold text-gradient flex items-center">
           <ClipboardList className="h-8 w-8 mr-2" /> Gestión de Encuestas
         </h1>
-        <Button className="bg-primary hover:bg-primary/90">
+        <Button variant="gradient">
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Encuesta
         </Button>
       </div>

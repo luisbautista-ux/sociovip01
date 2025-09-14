@@ -18,7 +18,7 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
-        gradient: "bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105 hover:bg-gradient-to-l"
+        gradient: "text-white font-bold shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
       },
       size: {
         default: "h-10 px-4 py-2",
@@ -44,10 +44,17 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
+    
+    const style = variant === 'gradient' ? {
+      ...props.style,
+      backgroundImage: 'linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)))',
+    } : props.style;
+
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        style={style}
         {...props}
       />
     )

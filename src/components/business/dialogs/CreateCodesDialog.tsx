@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -247,7 +248,7 @@ export function CreateCodesDialog({
           ) : (
             <>
               <Button variant="outline" onClick={handleCloseAndReset} disabled={isCreating || isSubmittingMain}>Cancelar</Button>
-              <Button onClick={handleCreateCodes} className="bg-primary hover:bg-primary/90" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}>
+              <Button onClick={handleCreateCodes} variant="gradient" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}>
                 {(isCreating || isSubmittingMain) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <PlusCircle className="mr-2 h-4 w-4" /> Crear Códigos
               </Button>

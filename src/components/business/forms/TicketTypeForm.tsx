@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from "react";
@@ -113,7 +114,7 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+          <Button type="submit" variant="gradient" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {ticketType ? "Guardar Cambios" : "Crear Tipo de Entrada"}
           </Button>
