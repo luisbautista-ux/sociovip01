@@ -32,40 +32,39 @@ interface QrScannerProps {
 }
 
 const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-
   useEffect(() => {
-    if (typeof window === 'undefined' || !document.getElementById(QR_READER_ELEMENT_ID)) {
-      return;
-    }
+    let html5Qrcode: Html5Qrcode | null = null;
+    let isMounted = true;
 
-    if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
-    }
-    const scanner = scannerRef.current;
+    if (document.getElementById(QR_READER_ELEMENT_ID)) {
+      html5Qrcode = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
 
-    const startScanner = async () => {
-      try {
-        if (scanner.isScanning) {
-          console.log("Scanner is already running.");
-          return;
+      const startScanner = async () => {
+        try {
+          if (isMounted && !html5Qrcode?.isScanning) {
+            await html5Qrcode.start(
+              { facingMode: "environment" },
+              { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+              onScanSuccess,
+              onScanFailure
+            );
+          }
+        } catch (err: any) {
+          if (isMounted) {
+            console.error("Scanner start failed:", err);
+          }
         }
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-          onScanSuccess,
-          onScanFailure
-        );
-      } catch (err: any) {
-        console.error("Scanner start failed:", err);
-      }
-    };
+      };
 
-    startScanner();
+      startScanner();
+    }
 
     return () => {
-      if (scanner && scanner.isScanning) {
-        scanner.stop().catch(err => console.error("Failed to stop scanner cleanly.", err));
+      isMounted = false;
+      if (html5Qrcode && html5Qrcode.isScanning) {
+        html5Qrcode.stop().catch(err => {
+          console.error("Failed to stop scanner cleanly on unmount:", err);
+        });
       }
     };
   }, [onScanSuccess, onScanFailure]);
