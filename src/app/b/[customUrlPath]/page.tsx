@@ -1216,7 +1216,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               {businessDetails.publicContactEmail && (
                 <p>
                   <strong>Email:</strong>{" "}
-                  <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">
+                  <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-muted-foreground hover:underline">
                     {businessDetails.publicContactEmail}
                   </a>
                 </p>
@@ -1516,6 +1516,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
+
 
 
 
