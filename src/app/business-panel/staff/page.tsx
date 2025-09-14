@@ -2,11 +2,11 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
-import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info } from "lucide-react";
+import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -29,6 +29,7 @@ import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "fi
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { DialogFooter } from "@/components/ui/dialog";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 
 const DniEntrySchema = z.object({
@@ -307,10 +308,10 @@ export default function BusinessStaffPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
+        <h1 className="text-3xl font-bold text-gradient flex items-center">
           <Users className="h-8 w-8 mr-2" /> Gestión de Personal
         </h1>
-        <Button onClick={handleOpenCreateUserFlow} className="bg-primary hover:bg-primary/90" disabled={isLoading || !currentBusinessId}>
+        <Button onClick={handleOpenCreateUserFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
           <PlusCircle className="mr-2 h-4 w-4" /> Añadir Personal
         </Button>
       </div>
@@ -338,48 +339,113 @@ export default function BusinessStaffPage() {
         ) : staffMembers.length === 0 && !searchTerm ? (
             <p className="text-center text-muted-foreground h-24 flex items-center justify-center">No hay personal registrado.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>DNI/CE</TableHead>
-                <TableHead className="hidden md:table-cell">Email</TableHead>
-                <TableHead>Roles</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
               {filteredStaff.map((staff) => (
-                <TableRow key={staff.id}>
-                  <TableCell className="font-medium">{staff.name}</TableCell>
-                  <TableCell>{staff.dni}</TableCell>
-                  <TableCell className="hidden md:table-cell">{staff.email}</TableCell>
-                  <TableCell>
-                    {staff.roles?.map(role => (
-                        <Badge key={role} variant="secondary" className="mr-1 mb-1 text-xs">
-                            {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
-                        </Badge>
-                    ))}
-                  </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingUser(staff); setShowUserFormModal(true); }} disabled={isSubmitting}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
-                        <ShadcnAlertDialogFooter>
-                          <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
-                        </ShadcnAlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                </TableRow>
+                <Card key={staff.id} className="overflow-hidden">
+                  <CardHeader className="p-4">
+                    <CardTitle>{staff.name}</CardTitle>
+                    <CardDescription>{staff.email}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">DNI/CE</span>
+                      <span className="font-semibold">{staff.dni}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Roles</span>
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {staff.roles?.map(role => (
+                          <Badge key={role} variant="secondary" className="text-xs">
+                              {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="p-2 bg-muted/50">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="w-full justify-center">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => { setEditingUser(staff); setShowUserFormModal(true); }} disabled={isSubmitting}>
+                          <Edit className="h-4 w-4 mr-2" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator/>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem 
+                              onSelect={(e) => e.preventDefault()} 
+                              className="text-destructive focus:bg-destructive/10"
+                              disabled={isSubmitting || staff.uid === userProfile?.uid}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
+                            <ShadcnAlertDialogFooter>
+                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
+                            </ShadcnAlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </CardFooter>
+                </Card>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+            {/* Desktop View */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>DNI/CE</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Roles</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStaff.map((staff) => (
+                    <TableRow key={staff.id}>
+                      <TableCell className="font-medium">{staff.name}</TableCell>
+                      <TableCell>{staff.dni}</TableCell>
+                      <TableCell>{staff.email}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {staff.roles?.map(role => (
+                              <Badge key={role} variant="secondary" className="text-xs">
+                                  {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
+                              </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingUser(staff); setShowUserFormModal(true); }} disabled={isSubmitting}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
+                            <ShadcnAlertDialogFooter>
+                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
+                            </ShadcnAlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
         </CardContent>
       </Card>
@@ -436,3 +502,4 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
