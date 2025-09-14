@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,7 @@ import {
   DialogDescription as ShadcnDialogDescription,
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
-import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle } from "lucide-react";
+import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle, MoreVertical } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -42,6 +42,7 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function BusinessPromotionsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -499,7 +500,7 @@ export default function BusinessPromotionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
+        <h1 className="text-3xl font-bold text-gradient flex items-center">
           <TicketIconLucide className="h-8 w-8 mr-2" /> Gestión de Promociones
         </h1>
         <Button 
@@ -543,124 +544,182 @@ export default function BusinessPromotionsPage() {
                 <p className="text-sm">Haz clic en "Crear Promoción" para empezar.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[250px]">Promociones y Gestión</TableHead>
-                      <TableHead className="min-w-[220px]">QRs Promocionales</TableHead>
-                      <TableHead className="min-w-[180px]">Vigencia</TableHead>
-                      <TableHead className="min-w-[180px] text-left">Acciones Adicionales</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPromotions.length > 0 ? filteredPromotions.map((promo) => {
-                      const codesRedeemedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
-                      const codesCreatedCount = promo.generatedCodes?.length || 0;
-                      const isActivatable = isEntityCurrentlyActivatable(promo);
-                      
-                      return (
-                      <TableRow key={promo.id || `promo-fallback-${Math.random()}`}>
-                        <TableCell className="font-medium align-top py-3">
-                            <div className="font-semibold text-base">{promo.name}</div>
-                             <div className="flex items-center space-x-2 mt-1.5 mb-2">
-                                <Switch
-                                    checked={promo.isActive}
-                                    onCheckedChange={() => handleTogglePromotionStatus(promo)}
-                                    aria-label={`Estado de la promoción ${promo.name}`}
-                                    id={`status-switch-${promo.id}`}
-                                    disabled={isSubmitting}
-                                />
-                                <Label htmlFor={`status-switch-${promo.id}`} className="sr-only">
-                                    {promo.isActive ? "Activa" : "Inactiva"}
-                                </Label>
-                                <Badge variant={promo.isActive ? "default" : "outline"} 
-                                      className={cn(promo.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (promo.isActive ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-red-500 hover:bg-red-600 text-white"), "text-xs")}>
-                                    {promo.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
+              <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                  {filteredPromotions.map(promo => {
+                    const codesRedeemedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
+                    const codesCreatedCount = promo.generatedCodes?.length || 0;
+                    const isActivatable = isEntityCurrentlyActivatable(promo);
+                    return(
+                      <Card key={promo.id} className="overflow-hidden">
+                        <CardHeader className="p-4">
+                          <CardTitle>{promo.name}</CardTitle>
+                          <ShadcnCardDescription>Vigencia: {format(parseISO(promo.startDate), "dd/MM")} - {format(parseISO(promo.endDate), "dd/MM")}</ShadcnCardDescription>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                              <Switch id={`mobile-status-${promo.id}`} checked={promo.isActive} onCheckedChange={() => handleTogglePromotionStatus(promo)} disabled={isSubmitting}/>
+                              <Label htmlFor={`mobile-status-${promo.id}`}>
+                                <Badge variant={promo.isActive ? "default" : "outline"} className={cn(promo.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (promo.isActive ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-red-500 hover:bg-red-600 text-white"), "text-xs")}>
+                                  {promo.isActive ? (isActivatable ? "Vigente" : "Fuera de Fecha") : "Inactiva"}
                                 </Badge>
+                              </Label>
                             </div>
-                           <div className="flex flex-col items-start gap-1">
-                                <Button 
-                                    variant="outline" 
-                                    size="xs" 
-                                    onClick={() => openCreateCodesDialog(promo)} 
-                                    disabled={!isActivatable || isSubmitting} 
-                                    className="px-2 py-1 h-auto text-xs"
-                                >
-                                    <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
-                                </Button>
-                                <Button 
-                                    variant="outline" 
-                                    size="xs" 
-                                    onClick={() => openViewCodesDialog(promo)} 
-                                    disabled={isSubmitting} 
-                                    className="px-2 py-1 h-auto text-xs"
-                                >
-                                    <ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({codesCreatedCount})
-                                </Button>
-                                <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                    <Edit className="h-3 w-3 mr-1" /> Editar
-                                </Button>
-                                <Button variant="outline" size="xs" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                    <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
-                                </Button>
+                            <div className="text-right text-xs">
+                              <p>Creados: {codesCreatedCount}</p>
+                              <p>Usados: {codesRedeemedCount}</p>
+                              <p>Límite: {promo.usageLimit && promo.usageLimit > 0 ? promo.usageLimit : '∞'}</p>
                             </div>
-                        </TableCell>
-                        <TableCell className="align-top py-3 text-xs">
-                           <div className="flex flex-col">
-                                <span>Códigos Creados ({codesCreatedCount})</span>
-                                <span>QRs Generados (0)</span>
-                                <span>QRs Usados ({codesRedeemedCount})</span>
-                                <span>Límite de promociones ({promo.usageLimit && promo.usageLimit > 0 ? promo.usageLimit : 'Ilimitado'})</span>
-                           </div>
-                         </TableCell>
-                        <TableCell className="align-top py-3 text-xs">
-                          {promo.startDate ? format(parseISO(promo.startDate), "P p", { locale: es }) : 'N/A'}
-                          <br />
-                          {promo.endDate ? format(parseISO(promo.endDate), "P p", { locale: es }) : 'N/A'}
-                        </TableCell>
-                          <TableCell className="align-top py-3">
-                             <div className="flex flex-col items-start gap-1">
-                                <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo, true)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                    <Copy className="h-3 w-3 mr-1" /> Duplicar
-                                </Button>
+                          </div>
+                        </CardContent>
+                        <CardFooter className="p-2 bg-muted/50">
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" className="w-full justify-center">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem onClick={() => openCreateCodesDialog(promo)} disabled={!isActivatable}><QrCodeIcon className="h-4 w-4 mr-2"/>Crear Códigos</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openViewCodesDialog(promo)}><ListChecks className="h-4 w-4 mr-2"/>Ver Códigos</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo)}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openStatsModal(promo)}><BarChart3 className="h-4 w-4 mr-2"/>Estadísticas</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo, true)}><Copy className="h-4 w-4 mr-2"/>Duplicar</DropdownMenuItem>
                                 <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="xs" disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                            <Trash2 className="h-3 w-3 mr-1" /> Eliminar
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Esta acción no se puede deshacer. Esto eliminará permanentemente la promoción:
-                                                <span className="font-semibold"> {promo.name}</span> y todos sus códigos asociados.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <UIAlertDialogFooter>
-                                            <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction
-                                                onClick={() => handleDeletePromotion(promo.id!, promo.name)}
-                                                className="bg-destructive hover:bg-destructive/90"
-                                                disabled={isSubmitting}
-                                            >
-                                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                                Eliminar
-                                            </AlertDialogAction>
-                                        </UIAlertDialogFooter>
-                                    </AlertDialogContent>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><AlertDialogDescription>Se eliminará la promoción "{promo.name}".</AlertDialogDescription></AlertDialogHeader>
+                                    <UIAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePromotion(promo.id!, promo.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></UIAlertDialogFooter>
+                                  </AlertDialogContent>
                                 </AlertDialog>
-                            </div>
-                        </TableCell>
+                              </DropdownMenuContent>
+                          </DropdownMenu>
+                        </CardFooter>
+                      </Card>
+                    )
+                  })}
+                </div>
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[250px]">Promociones y Gestión</TableHead>
+                        <TableHead className="min-w-[220px]">QRs Promocionales</TableHead>
+                        <TableHead className="min-w-[180px]">Vigencia</TableHead>
+                        <TableHead className="min-w-[180px] text-left">Acciones Adicionales</TableHead>
                       </TableRow>
-                    );
-                    }) : (
-                        !isLoadingPageData && <TableRow><TableCell colSpan={4} className="text-center h-24">No se encontraron promociones con los filtros aplicados.</TableCell></TableRow> 
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPromotions.length > 0 ? filteredPromotions.map((promo) => {
+                        const codesRedeemedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
+                        const codesCreatedCount = promo.generatedCodes?.length || 0;
+                        const isActivatable = isEntityCurrentlyActivatable(promo);
+                        
+                        return (
+                        <TableRow key={promo.id || `promo-fallback-${Math.random()}`}>
+                          <TableCell className="font-medium align-top py-3">
+                              <div className="font-semibold text-base">{promo.name}</div>
+                              <div className="flex items-center space-x-2 mt-1.5 mb-2">
+                                  <Switch
+                                      checked={promo.isActive}
+                                      onCheckedChange={() => handleTogglePromotionStatus(promo)}
+                                      aria-label={`Estado de la promoción ${promo.name}`}
+                                      id={`status-switch-${promo.id}`}
+                                      disabled={isSubmitting}
+                                  />
+                                  <Label htmlFor={`status-switch-${promo.id}`} className="sr-only">
+                                      {promo.isActive ? "Activa" : "Inactiva"}
+                                  </Label>
+                                  <Badge variant={promo.isActive ? "default" : "outline"} 
+                                        className={cn(promo.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (promo.isActive ? "bg-yellow-500 hover:bg-yellow-600 text-black" : "bg-red-500 hover:bg-red-600 text-white"), "text-xs")}>
+                                      {promo.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
+                                  </Badge>
+                              </div>
+                            <div className="flex flex-col items-start gap-1">
+                                  <Button 
+                                      variant="outline" 
+                                      size="xs" 
+                                      onClick={() => openCreateCodesDialog(promo)} 
+                                      disabled={!isActivatable || isSubmitting} 
+                                      className="px-2 py-1 h-auto text-xs"
+                                  >
+                                      <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
+                                  </Button>
+                                  <Button 
+                                      variant="outline" 
+                                      size="xs" 
+                                      onClick={() => openViewCodesDialog(promo)} 
+                                      disabled={isSubmitting} 
+                                      className="px-2 py-1 h-auto text-xs"
+                                  >
+                                      <ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({codesCreatedCount})
+                                  </Button>
+                                  <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                      <Edit className="h-3 w-3 mr-1" /> Editar
+                                  </Button>
+                                  <Button variant="outline" size="xs" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                      <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
+                                  </Button>
+                              </div>
+                          </TableCell>
+                          <TableCell className="align-top py-3 text-xs">
+                            <div className="flex flex-col">
+                                  <span>Códigos Creados ({codesCreatedCount})</span>
+                                  <span>QRs Generados (0)</span>
+                                  <span>QRs Usados ({codesRedeemedCount})</span>
+                                  <span>Límite de promociones ({promo.usageLimit && promo.usageLimit > 0 ? promo.usageLimit : 'Ilimitado'})</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-top py-3 text-xs">
+                            {promo.startDate ? format(parseISO(promo.startDate), "P p", { locale: es }) : 'N/A'}
+                            <br />
+                            {promo.endDate ? format(parseISO(promo.endDate), "P p", { locale: es }) : 'N/A'}
+                          </TableCell>
+                            <TableCell className="align-top py-3">
+                              <div className="flex flex-col items-start gap-1">
+                                  <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo, true)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                      <Copy className="h-3 w-3 mr-1" /> Duplicar
+                                  </Button>
+                                  <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                          <Button variant="destructive" size="xs" disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                              <Trash2 className="h-3 w-3 mr-1" /> Eliminar
+                                          </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                              <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                  Esta acción no se puede deshacer. Esto eliminará permanentemente la promoción:
+                                                  <span className="font-semibold"> {promo.name}</span> y todos sus códigos asociados.
+                                              </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <UIAlertDialogFooter>
+                                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                                              <AlertDialogAction
+                                                  onClick={() => handleDeletePromotion(promo.id!, promo.name)}
+                                                  className="bg-destructive hover:bg-destructive/90"
+                                                  disabled={isSubmitting}
+                                              >
+                                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                                  Eliminar
+                                              </AlertDialogAction>
+                                          </UIAlertDialogFooter>
+                                      </AlertDialogContent>
+                                  </AlertDialog>
+                              </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                      }) : (
+                          !isLoadingPageData && <TableRow><TableCell colSpan={4} className="text-center h-24">No se encontraron promociones con los filtros aplicados.</TableCell></TableRow> 
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
