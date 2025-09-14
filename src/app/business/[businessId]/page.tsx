@@ -1209,7 +1209,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
           <section className="mt-12 pt-8 border-t">
             <h2 className="text-xl font-semibold tracking-tight text-foreground mb-4 flex items-center">
-              <Info className="h-6 w-6 mr-2 text-primary" />
+              <Info className="h-6 w-6 mr-2 text-foreground" />
               Información de Contacto
             </h2>
             <div className="space-y-2 text-sm text-muted-foreground">
@@ -1526,6 +1526,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
