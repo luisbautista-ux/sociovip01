@@ -55,8 +55,7 @@ export function BusinessSidebar() {
   const pathname = usePathname();
   const { currentUser, userProfile, logout } = useAuth();
   
-  const [currentBusinessName, setCurrentBusinessName] = useState<string | null>(null);
-  const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
 
   useEffect(() => {
     const fetchBusinessDetails = async () => {
@@ -65,21 +64,16 @@ export function BusinessSidebar() {
           const businessDocRef = doc(db, "businesses", userProfile.businessId);
           const businessSnap = await getDoc(businessDocRef);
           if (businessSnap.exists()) {
-            const businessData = businessSnap.data() as Business;
-            setCurrentBusinessName(businessData.name);
-            setCurrentLogoUrl(businessData.logoUrl || null);
+            setBusinessDetails({id: businessSnap.id, ...businessSnap.data()} as Business);
           } else {
-            setCurrentBusinessName("Panel Negocio");
-            setCurrentLogoUrl(null);
+            setBusinessDetails(null);
           }
         } catch (error) {
           console.error("Error fetching business details for sidebar:", error);
-          setCurrentBusinessName("Panel Negocio");
-          setCurrentLogoUrl(null);
+          setBusinessDetails(null);
         }
       } else {
-        setCurrentBusinessName("Panel Negocio");
-        setCurrentLogoUrl(null);
+        setBusinessDetails(null);
       }
     };
 
@@ -89,32 +83,41 @@ export function BusinessSidebar() {
   }, [userProfile]);
 
   const displayName = userProfile?.name || currentUser?.email || "Usuario";
-  const businessDisplay = currentBusinessName || "Panel Negocio";
+  const businessDisplay = businessDetails?.name || "Panel Negocio";
+  const primaryColor = businessDetails?.primaryColor || 'hsl(var(--primary))';
+  const secondaryColor = businessDetails?.secondaryColor || 'hsl(var(--accent))';
+
 
   return (
     <aside className="w-64 bg-card text-card-foreground border-r border-border flex-col flex">
       <div className="p-4 border-b border-border flex items-center space-x-2">
-        {currentLogoUrl ? (
-          <NextImage src={currentLogoUrl} alt={`${businessDisplay} Logo`} width={32} height={32} className="h-8 w-8 object-contain rounded-sm" data-ai-hint="logo"/>
+        {businessDetails?.logoUrl ? (
+          <NextImage src={businessDetails.logoUrl} alt={`${businessDisplay} Logo`} width={32} height={32} className="h-8 w-8 object-contain rounded-sm" data-ai-hint="logo"/>
         ) : (
-          <Building className="h-8 w-8 text-gradient" />
+          <Building className="h-8 w-8" style={{color: primaryColor}} />
         )}
-        <h1 className="text-xl font-semibold text-gradient">{businessDisplay}</h1>
+        <h1 className="text-xl font-semibold" style={{color: primaryColor}}>{businessDisplay}</h1>
       </div>
       <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
-        {navItems.map((item) => (
+        {navItems.map((item) => {
+          const isActive = pathname.startsWith(item.href);
+          const activeStyle = {
+            backgroundImage: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})`,
+          };
+          return(
           <Link
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
-              pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             )}
+            style={isActive ? activeStyle : {}}
           >
             <item.icon className="h-5 w-5" />
             <span>{item.label}</span>
           </Link>
-        ))}
+        )})}
       </nav>
       <div className="p-4 border-t border-border mt-auto space-y-2">
         <div className="mb-2">
