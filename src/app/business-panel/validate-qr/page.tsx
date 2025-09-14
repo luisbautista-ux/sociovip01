@@ -54,7 +54,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
         }
       } catch (err: any) {
         if (isComponentMounted) {
-          if (!err.message.includes("Cannot transition")) {
+          if (!err?.message?.includes("Cannot transition")) {
             console.error("Scanner start failed:", err);
           }
         }
@@ -68,8 +68,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
       isComponentMounted = false;
       if (html5Qrcode && html5Qrcode.isScanning) {
         html5Qrcode.stop().catch(err => {
-          // The error "Cannot transition..." can happen in Hot Reload, it's safe to ignore.
-          if (!err.message.includes("Cannot transition")) {
+          if (!err?.message?.includes("Cannot transition")) {
              console.error("Failed to stop scanner cleanly on unmount:", err);
           }
         });

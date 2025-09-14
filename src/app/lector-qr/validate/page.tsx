@@ -19,8 +19,8 @@ import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html
 import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
 import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 
 
@@ -53,8 +53,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
         }
       } catch (err: any) {
         if (isComponentMounted) {
-          // This error is common in React's strict mode and hot-reloading, safe to ignore.
-          if (!err.message.includes("Cannot transition")) {
+          if (!err?.message?.includes("Cannot transition")) {
             console.error("Scanner start failed:", err);
           }
         }
@@ -67,7 +66,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
       isComponentMounted = false;
       if (html5Qrcode && html5Qrcode.isScanning) {
         html5Qrcode.stop().catch(err => {
-          if (!err.message.includes("Cannot transition")) {
+          if (!err?.message?.includes("Cannot transition")) {
              console.error("Failed to stop scanner cleanly on unmount:", err);
           }
         });
