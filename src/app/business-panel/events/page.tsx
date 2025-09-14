@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -559,10 +559,10 @@ export default function BusinessEventsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
+        <h1 className="text-3xl font-bold text-gradient flex items-center">
           <Calendar className="h-8 w-8 mr-2" /> Gestión de Eventos
         </h1>
-        <Button onClick={() => handleOpenManageEventDialog(null)} disabled={isLoading || !currentBusinessId}>
+        <Button onClick={() => handleOpenManageEventDialog(null)} variant="gradient" disabled={isLoading || !currentBusinessId}>
           <PlusCircle className="h-4 w-4 mr-2" /> Crear Evento
         </Button>
       </div>
