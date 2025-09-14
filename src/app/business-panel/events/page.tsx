@@ -15,7 +15,7 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
@@ -35,6 +35,7 @@ import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDial
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 
 export default function BusinessEventsPage() {
@@ -579,51 +580,116 @@ export default function BusinessEventsPage() {
             <CardDescription>Lista de todos los eventos creados para tu negocio.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Evento</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Aforo Total</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {events.map(event => {
-                  const isActivatable = isEntityCurrentlyActivatable(event);
-                  const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
-                  const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
-                    ? event.maxAttendance
-                    : (attendanceFromTickets > 0 ? attendanceFromTickets : "Ilimitado");
-                  
-                  return (
-                    <TableRow key={event.id}>
-                      <TableCell className="font-medium">{event.name}</TableCell>
-                      <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                      <TableCell>{displayAttendance}</TableCell>
-                      <TableCell>
-                        <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
-                          {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos</Button>
-                        <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                            <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
-                            <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
+              {events.map(event => {
+                const isActivatable = isEntityCurrentlyActivatable(event);
+                const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
+                const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
+                  ? event.maxAttendance
+                  : (attendanceFromTickets > 0 ? attendanceFromTickets : "Ilimitado");
+                return (
+                  <Card key={event.id} className="overflow-hidden">
+                    <CardHeader className="p-4">
+                       <CardTitle>{event.name}</CardTitle>
+                       <CardDescription>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-2">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Aforo Total</span>
+                            <span className="font-semibold">{displayAttendance}</span>
+                        </div>
+                        <div className="flex justify-between text-sm items-center">
+                            <span className="text-muted-foreground">Estado</span>
+                            <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
+                              {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
+                            </Badge>
+                        </div>
+                    </CardContent>
+                    <CardFooter className="p-2 bg-muted/50">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="w-full justify-center">
+                                    Acciones <MoreVertical className="ml-2 h-4 w-4"/>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                               <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
+                                  <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
+                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos ({event.generatedCodes?.length || 0})
+                                </DropdownMenuItem>
+                               <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
+                                  <Edit className="h-4 w-4 mr-2" /> Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator/>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                            <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
+                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </CardFooter>
+                  </Card>
+                )
+              })}
+            </div>
+            {/* Desktop View */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Aforo Total</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {events.map(event => {
+                    const isActivatable = isEntityCurrentlyActivatable(event);
+                    const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
+                    const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
+                      ? event.maxAttendance
+                      : (attendanceFromTickets > 0 ? attendanceFromTickets : "Ilimitado");
+                    
+                    return (
+                      <TableRow key={event.id}>
+                        <TableCell className="font-medium">{event.name}</TableCell>
+                        <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell>{displayAttendance}</TableCell>
+                        <TableCell>
+                          <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
+                            {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos</Button>
+                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
+                          <AlertDialog>
+                              <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                              <AlertDialogContent>
+                              <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
+                              <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                              </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -675,10 +741,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
