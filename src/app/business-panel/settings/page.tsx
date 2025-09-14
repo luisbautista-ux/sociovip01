@@ -239,25 +239,6 @@ export default function BusinessSettingsPage() {
           </div>
         </CardContent>
       </Card>
-
-       <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center"><QrCode className="h-6 w-6 mr-2 text-primary"/> Personalización de QR (Próximamente)</CardTitle>
-          <CardDescription>Define cómo se verán los códigos QR generados para tu negocio.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-muted-foreground font-semibold">En futuras versiones, podrás personalizar:</p>
-          <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 pl-4">
-            <li>Añadir tu logo al centro del código QR (subiendo una imagen pequeña).</li>
-            <li>Elegir el color principal de los puntos del QR.</li>
-            <li>Seleccionar el color de fondo del QR (asegurando contraste).</li>
-            <li>Cambiar la forma de los puntos (ej: cuadrados, redondos, fluidos).</li>
-            <li>Modificar el estilo de los "ojos" (las formas cuadradas en las esquinas).</li>
-          </ul>
-          <p className="text-sm text-primary font-medium pt-2">¡Esta funcionalidad está en desarrollo para ayudarte a reforzar tu marca!</p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
-
