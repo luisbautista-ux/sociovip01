@@ -53,7 +53,10 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
         }
       } catch (err: any) {
         if (isComponentMounted) {
-          console.error("Scanner start failed:", err);
+          // This error is common in React's strict mode and hot-reloading, safe to ignore.
+          if (!err.message.includes("Cannot transition")) {
+            console.error("Scanner start failed:", err);
+          }
         }
       }
     };

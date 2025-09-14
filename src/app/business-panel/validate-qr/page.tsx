@@ -35,7 +35,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
-    // Inicializa la instancia del escáner solo una vez
+    // Initialize the scanner instance only once
     if (!scannerRef.current) {
         scannerRef.current = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
     }
@@ -54,19 +54,21 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
         }
       } catch (err: any) {
         if (isComponentMounted) {
-          console.error("Scanner start failed:", err);
+          if (!err.message.includes("Cannot transition")) {
+            console.error("Scanner start failed:", err);
+          }
         }
       }
     };
 
     startScanner();
 
-    // Función de limpieza para detener el escáner
+    // Cleanup function to stop the scanner
     return () => {
       isComponentMounted = false;
       if (html5Qrcode && html5Qrcode.isScanning) {
         html5Qrcode.stop().catch(err => {
-          // El error "Cannot transition..." puede ocurrir aquí en Hot Reload, es seguro ignorarlo.
+          // The error "Cannot transition..." can happen in Hot Reload, it's safe to ignore.
           if (!err.message.includes("Cannot transition")) {
              console.error("Failed to stop scanner cleanly on unmount:", err);
           }
@@ -410,4 +412,3 @@ export default function BusinessPanelValidateQrPage() {
     </div>
   );
 }
-
