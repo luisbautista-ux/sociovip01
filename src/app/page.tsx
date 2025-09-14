@@ -218,7 +218,7 @@ export default function HomePage() {
                     <Link href="/login" passHref>
                         <Button variant="ghost" className="font-semibold text-base">
                             <UserCircle className="mr-2 h-5 w-5" />
-                            Login
+                            Inicia Sesión
                         </Button>
                     </Link>
                 </div>
