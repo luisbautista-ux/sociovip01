@@ -109,7 +109,7 @@ export default function LectorQrLayout({
   if (loadingAuth || loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <Loader2 className="h-12 w-12 animate-spin text-gradient" />
         <p className="ml-4 text-lg text-muted-foreground">Verificando...</p>
       </div>
     );
@@ -162,7 +162,7 @@ export default function LectorQrLayout({
           ) : (
             <SocioVipLogo className="h-7 w-7" />
           )}
-          <h1 className="text-xl font-semibold text-primary">{businessDisplayName}</h1>
+          <h1 className="text-xl font-semibold text-gradient">{businessDisplayName}</h1>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-muted-foreground hidden sm:inline">
@@ -180,7 +180,7 @@ export default function LectorQrLayout({
         </div>
       </header>
       <main className="flex-1 p-4 sm:p-6 overflow-auto">{children}</main>
-      <footer className="py-4 px-6 border-t text-center text-xs text-muted-foreground bg-background sm:bg-transparent"><p>&copy; {new Date().getFullYear()} SocioVIP Validador</p></footer>
+      <footer className="py-4 px-6 border-t text-center text-xs text-muted-foreground bg-background sm:bg-transparent"><p>© {new Date().getFullYear()} SocioVIP Validador</p></footer>
     </div>
   );
 }

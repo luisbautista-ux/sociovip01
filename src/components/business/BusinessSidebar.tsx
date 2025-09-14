@@ -97,9 +97,9 @@ export function BusinessSidebar() {
         {currentLogoUrl ? (
           <NextImage src={currentLogoUrl} alt={`${businessDisplay} Logo`} width={32} height={32} className="h-8 w-8 object-contain rounded-sm" data-ai-hint="logo"/>
         ) : (
-          <Building className="h-8 w-8 text-primary" />
+          <Building className="h-8 w-8 text-gradient" />
         )}
-        <h1 className="text-xl font-semibold text-primary">{businessDisplay}</h1>
+        <h1 className="text-xl font-semibold text-gradient">{businessDisplay}</h1>
       </div>
       <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
         {navItems.map((item) => (

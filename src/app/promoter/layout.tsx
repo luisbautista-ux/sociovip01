@@ -45,7 +45,7 @@ function PromoterSidebarNavContent({ closeSheet, promoterName, promoterPhotoUrl 
             <AvatarFallback>{promoterName ? promoterName.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-md font-semibold text-primary">Panel Promotor</h1>
+          <h1 className="text-md font-semibold text-gradient">Panel Promotor</h1>
           {promoterName && <p className="text-xs text-muted-foreground">{promoterName}</p>}
         </div>
       </div>
@@ -209,8 +209,8 @@ export default function PromoterLayout({
             </Sheet>
           </div>
           <div className="flex items-center gap-2">
-            <SocioVipLogo className="h-7 w-7 text-primary md:hidden" />
-            <h1 className="text-xl font-semibold text-primary hidden md:block">Panel Promotor</h1>
+            <SocioVipLogo className="h-7 w-7 text-gradient md:hidden" />
+            <h1 className="text-xl font-semibold text-gradient hidden md:block">Panel Promotor</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
@@ -250,5 +250,3 @@ export default function PromoterLayout({
     </div>
   );
 }
-
-    
