@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -505,7 +504,7 @@ export default function BusinessPromotionsPage() {
         </h1>
         <Button 
             onClick={() => handleOpenCreateEditModal(null)} 
-            className="bg-primary hover:bg-primary/90" 
+            variant="gradient"
             disabled={!currentBusinessId || isSubmitting || isLoadingPageData}
         >
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Promoción
@@ -780,4 +779,6 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
+    
+
     
