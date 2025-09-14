@@ -206,15 +206,25 @@ export default function HomePage() {
         
         {/* Barra principal con logo, búsqueda y login */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <SocioVipLogo size={50} />
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-gradient">SocioVIP</h1>
+          <div className="flex flex-col sm:flex-row items-center justify-between sm:h-20 gap-4 py-4">
+              <div className="flex items-center justify-between w-full sm:w-auto">
+                <div className="flex items-center gap-3">
+                  <SocioVipLogo size={50} />
+                  <div>
+                      <h1 className="text-2xl font-bold tracking-tight text-gradient">SocioVIP</h1>
+                  </div>
+                </div>
+                <div className="sm:hidden">
+                    <Link href="/login" passHref>
+                        <Button variant="ghost" className="font-semibold text-base">
+                            <UserCircle className="mr-2 h-5 w-5" />
+                            Login
+                        </Button>
+                    </Link>
                 </div>
               </div>
 
-              <div className="flex-grow flex justify-center items-center order-3 sm:order-2 w-full sm:w-auto">
+              <div className="flex-grow flex justify-center items-center w-full sm:w-auto">
                  <div className="relative w-full max-w-lg">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
@@ -227,7 +237,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="flex items-center order-2 sm:order-3">
+              <div className="hidden sm:flex items-center">
                 <Link href="/login" passHref>
                     <Button variant="ghost" className="font-semibold text-base">
                         <UserCircle className="mr-2 h-5 w-5" />
@@ -249,7 +259,7 @@ export default function HomePage() {
           <div className="space-y-12">
             {showPromotions && (
               <section>
-                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
+                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient mt-4 sm:mt-0">
                   <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
                 </h2>
                 {filteredPromotions.length > 0 ? (
