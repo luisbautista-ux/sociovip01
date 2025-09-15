@@ -132,7 +132,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" variant="gradient" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" variant="default" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Ingresar"}
             </Button>
           </form>
