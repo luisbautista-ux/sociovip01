@@ -237,7 +237,8 @@ export default function LoginPage() {
 
                       <Button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-purple-800 to-red-600 text-white hover:opacity-90 transition-opacity font-bold py-2 px-4 rounded-full shadow-lg"
+                        variant="gradient"
+                        className="w-full font-bold py-2 px-4 rounded-full"
                         disabled={isSubmitting}
                       >
                         {isSubmitting ? (
