@@ -358,7 +358,6 @@ export default function BusinessPromotionsPage() {
     try {
         const targetPromotionSnap = await getDoc(targetPromotionRef);
         if (!targetPromotionSnap.exists()) {
-            toast({title:"Error", description:"Promoción no encontrada para añadir códigos.", variant: "destructive"});
             throw new Error("Entity not found");
         }
         const targetPromotionData = targetPromotionSnap.data() as BusinessManagedEntity;
@@ -499,10 +498,7 @@ export default function BusinessPromotionsPage() {
   
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-gradient flex items-center">
-          <TicketIconLucide className="h-8 w-8 mr-2" /> Gestión de Promociones
-        </h1>
+      <div className="flex justify-end items-center">
         <Button 
             onClick={() => handleOpenCreateEditModal(null)} 
             variant="gradient"

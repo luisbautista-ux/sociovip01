@@ -307,10 +307,7 @@ export default function BusinessStaffPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gradient flex items-center">
-          <Users className="h-8 w-8 mr-2" /> Gestión de Personal
-        </h1>
+      <div className="flex justify-end items-center">
         <Button onClick={handleOpenCreateUserFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
           <PlusCircle className="mr-2 h-4 w-4" /> Añadir Personal
         </Button>
@@ -502,4 +499,5 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
 
