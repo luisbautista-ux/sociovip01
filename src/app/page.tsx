@@ -216,7 +216,7 @@ export default function HomePage() {
                 </div>
                 <div className="sm:hidden">
                     <Link href="/login" passHref>
-                        <Button variant="gradient" size="sm">
+                        <Button variant="outline" size="sm" className="text-gradient border-purple-800/50 hover:bg-gradient-to-r hover:from-purple-800 hover:to-red-600 hover:text-white font-bold">
                             <UserCircle className="mr-2 h-5 w-5" />
                             Inicia Sesión
                         </Button>
@@ -239,7 +239,7 @@ export default function HomePage() {
 
               <div className="hidden sm:flex items-center">
                 <Link href="/login" passHref>
-                    <Button variant="gradient" size="lg">
+                    <Button variant="outline" size="lg" className="text-gradient border-purple-800/50 hover:bg-gradient-to-r hover:from-purple-800 hover:to-red-600 hover:text-white font-bold">
                         <UserCircle className="mr-2 h-5 w-5" />
                         Inicia Sesión
                     </Button>
