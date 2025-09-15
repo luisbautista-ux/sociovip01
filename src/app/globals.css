@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 275 25% 15%;
 
-    --primary: 266 83% 56%;  /* purple-600 #9333ea - Base for non-gradient elements */
+    --primary: 266 83% 56%;  /* purple-600 */
     --primary-foreground: 0 0% 98%; /* White */
 
     --secondary: 270 50% 95%; /* Lighter purple for secondary elements */
@@ -23,7 +23,7 @@
     --muted: 270 30% 94%;
     --muted-foreground: 270 10% 45%;
 
-    --accent: 268 70% 65%;   /* A slightly lighter purple for accents */
+    --accent: 340 85% 55%;   /* Reddish-pink for gradient */
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
@@ -61,7 +61,7 @@
     --muted: 270 15% 25%;
     --muted-foreground: 270 15% 65%;
 
-    --accent: 268 80% 75%;
+    --accent: 340 90% 75%;
     --accent-foreground: 275 25% 10%;
 
     --destructive: 0 70% 50%;
