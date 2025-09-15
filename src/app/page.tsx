@@ -216,7 +216,7 @@ export default function HomePage() {
                 </div>
                 <div className="sm:hidden">
                     <Link href="/login" passHref>
-                        <Button variant="ghost" className="font-semibold text-base">
+                        <Button variant="gradient" size="sm">
                             <UserCircle className="mr-2 h-5 w-5" />
                             Inicia Sesión
                         </Button>
@@ -239,7 +239,7 @@ export default function HomePage() {
 
               <div className="hidden sm:flex items-center">
                 <Link href="/login" passHref>
-                    <Button variant="ghost" className="font-semibold text-base">
+                    <Button variant="gradient" size="lg">
                         <UserCircle className="mr-2 h-5 w-5" />
                         Inicia Sesión
                     </Button>
