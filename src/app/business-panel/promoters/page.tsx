@@ -577,10 +577,7 @@ function BusinessPromoterForm({
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-          <h1 className="text-3xl font-bold text-gradient flex items-center">
-            <UserPlus className="h-8 w-8 mr-2" /> Gestión de Promotores
-          </h1>
+        <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center space-y-2 sm:space-y-0">
           <Button onClick={handleOpenAddPromoterFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
             <PlusCircle className="mr-2 h-4 w-4" /> Añadir/Vincular Promotor
           </Button>

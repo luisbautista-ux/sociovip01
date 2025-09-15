@@ -129,9 +129,6 @@ export default function BusinessAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center">
-        <BarChart3 className="h-8 w-8 mr-2" /> Analíticas del Negocio
-      </h1>
       
       <Card className="shadow-lg">
         <CardHeader>
@@ -238,4 +235,3 @@ export default function BusinessAnalyticsPage() {
     </div>
   );
 }
-

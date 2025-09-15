@@ -53,10 +53,8 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
           );
         }
       } catch (err: any) {
-        if (isComponentMounted) {
-          if (!err?.message?.includes("Cannot transition")) {
-            console.error("Scanner start failed:", err);
-          }
+        if (isComponentMounted && err && typeof err.message === 'string' && !err.message.includes("Cannot transition")) {
+          console.error("Scanner start failed:", err);
         }
       }
     };
@@ -68,7 +66,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
       isComponentMounted = false;
       if (html5Qrcode && html5Qrcode.isScanning) {
         html5Qrcode.stop().catch(err => {
-          if (!err?.message?.includes("Cannot transition")) {
+          if (err && typeof err.message === 'string' && !err.message.includes("Cannot transition")) {
              console.error("Failed to stop scanner cleanly on unmount:", err);
           }
         });
@@ -252,10 +250,7 @@ export default function BusinessPanelValidateQrPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
-          <QrCodeIcon className="h-8 w-8 mr-2" /> Validación de Códigos QR
-        </h1>
+      <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
         <Button onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} variant={isScannerActive ? "destructive" : "default"} className="w-full sm:w-auto">
           <Camera className="mr-2 h-5 w-5" /> {isScannerActive ? "Detener Escáner" : "Activar Escáner"}
         </Button>

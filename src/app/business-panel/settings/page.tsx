@@ -142,10 +142,7 @@ export default function BusinessSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold text-gradient flex items-center">
-          <Settings className="h-8 w-8 mr-2" /> Configuración del Negocio
-        </h1>
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
         <Button onClick={handleSaveChanges} variant="gradient" className="w-full sm:w-auto" disabled={isSaving || isLoadingData}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Guardar Todos los Cambios

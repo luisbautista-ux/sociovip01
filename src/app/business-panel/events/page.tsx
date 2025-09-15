@@ -558,10 +558,7 @@ export default function BusinessEventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gradient flex items-center">
-          <Calendar className="h-8 w-8 mr-2" /> Gestión de Eventos
-        </h1>
+      <div className="flex justify-end items-center">
         <Button onClick={() => handleOpenManageEventDialog(null)} variant="gradient" disabled={isLoading || !currentBusinessId}>
           <PlusCircle className="h-4 w-4 mr-2" /> Crear Evento
         </Button>
