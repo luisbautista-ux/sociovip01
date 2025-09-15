@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 275 25% 15%;
 
-    --primary: 266 83% 56%;  /* purple-600 */
+    --primary: 258 69% 42%;  /* purple-800 */
     --primary-foreground: 0 0% 98%; /* White */
 
     --secondary: 270 50% 95%; /* Lighter purple for secondary elements */
@@ -23,7 +23,7 @@
     --muted: 270 30% 94%;
     --muted-foreground: 270 10% 45%;
 
-    --accent: 340 85% 55%;   /* Reddish-pink for gradient */
+    --accent: 0 79% 49%;   /* red-600 */
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
@@ -31,7 +31,7 @@
 
     --border: 270 20% 88%;
     --input: 270 20% 98%;
-    --ring: 266 83% 66%;     /* Lighter primary for focus rings */
+    --ring: 258 69% 52%; /* Lighter primary for focus rings */
 
     --radius: 0.5rem;
 
@@ -52,7 +52,7 @@
     --popover: 275 25% 5%;
     --popover-foreground: 270 30% 90%;
 
-    --primary: 266 90% 70%; 
+    --primary: 258 75% 65%; 
     --primary-foreground: 275 25% 10%;
 
     --secondary: 270 20% 20%;
@@ -61,7 +61,7 @@
     --muted: 270 15% 25%;
     --muted-foreground: 270 15% 65%;
 
-    --accent: 340 90% 75%;
+    --accent: 0 85% 65%;
     --accent-foreground: 275 25% 10%;
 
     --destructive: 0 70% 50%;
@@ -69,7 +69,7 @@
 
     --border: 270 15% 28%;
     --input: 270 15% 20%;
-    --ring: 266 90% 75%;
+    --ring: 258 75% 70%;
 
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
