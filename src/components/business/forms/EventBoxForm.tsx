@@ -107,7 +107,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Detalles del box, ej: Incluye 2 botellas y piqueos." {...field} value={field.value || ''} rows={2} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del box, ej: Incluye 2 botellas y piqueos." {...field} value={field.value || ""} rows={2} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -141,7 +141,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Vendedor Asignado (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Nombre del vendedor" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Nombre del vendedor" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -152,7 +152,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre Dueño del Box (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormDescription className="text-xs">Si el box es reservado por un cliente específico.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -164,7 +164,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>DNI/CE Dueño del Box (Opcional)</FormLabel>
-              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}

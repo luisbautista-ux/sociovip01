@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from "react";
@@ -93,7 +92,7 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción (Opcional)</FormLabel>
-              <FormControl><Textarea placeholder="Detalles de la entrada, ej: Acceso a zona preferencial." {...field} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles de la entrada, ej: Acceso a zona preferencial." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -104,7 +103,7 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Cantidad Disponible (Opcional)</FormLabel>
-              <FormControl><Input type="number" placeholder="100" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input type="number" placeholder="100" {...field} value={field.value ?? ""} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)} disabled={isSubmitting} /></FormControl>
               <FormDescription>Dejar vacío o 0 para cantidad ilimitada.</FormDescription>
               <FormMessage />
             </FormItem>
