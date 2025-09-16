@@ -2,11 +2,11 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
-import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle, Check, ChevronsUpDown, MoreVertical } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -15,7 +15,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as ShadcnAlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -27,6 +27,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext"; 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, writeBatch, getDoc, setDoc, DocumentData } from "firebase/firestore";
@@ -449,97 +451,160 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
               No hay usuarios registrados. Haz clic en "Crear Usuario" para empezar.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>DNI/CE <span className="text-destructive">*</span></TableHead>
-                    <TableHead className="hidden md:table-cell">Email <span className="text-destructive">*</span></TableHead>
-                    <TableHead>Roles <span className="text-destructive">*</span></TableHead>
-                    <TableHead className="hidden lg:table-cell">Negocio Asociado</TableHead>
-                    <TableHead className="hidden xl:table-cell">Último Acceso</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => {
-                      const lastLoginDate = anyToDate(user.lastLogin);
-                      const getBusinessDisplay = () => {
-                        if (user.roles.includes('promoter')) {
-                           if (user.businessIds && user.businessIds.length > 0) {
-                            return "Múltiples";
-                           }
-                           return "N/A";
-                        }
-                        if (user.businessId) {
-                          return businessNameMap.get(user.businessId) || `ID: ${user.businessId.substring(0, 6)}...`;
-                        }
-                        return "N/A";
-                      };
+            <>
+              {/* Mobile View */}
+              <div className="md:hidden space-y-4">
+                {filteredUsers.map(user => (
+                   <Card key={user.id} className="overflow-hidden">
+                      <CardHeader className="p-4">
+                        <CardTitle>{user.name}</CardTitle>
+                        <CardDescription>{user.email}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-3 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">DNI/CE</span>
+                            <span className="font-semibold">{user.dni}</span>
+                        </div>
+                        <div className="flex justify-between items-start">
+                            <span className="text-muted-foreground">Roles</span>
+                            <div className="flex flex-wrap gap-1 justify-end">
+                                {user.roles && user.roles.map(role => (
+                                    <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="text-xs">
+                                        {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="p-2 bg-muted/50">
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="w-full justify-center">
+                                      Acciones <MoreVertical className="ml-2 h-4 w-4"/>
+                                  </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem onClick={() => { setEditingUser(user); setShowCreateEditModal(true); }} disabled={isSubmitting}>
+                                  <Edit className="h-4 w-4 mr-2" /> Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                      <Trash2 className="h-4 w-4 mr-2" /> Eliminar Perfil
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle>
+                                      <ShadcnAlertDialogDescription>Se eliminará el perfil de "{user.name}". Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteUser(user)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                          </DropdownMenu>
+                      </CardFooter>
+                   </Card>
+                ))}
+              </div>
 
-                      return (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>{user.dni}</TableCell>
-                        <TableCell className="hidden md:table-cell">{user.email}</TableCell>
-                        <TableCell>
-                          {user.roles && user.roles.map(role => (
-                              <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
-                                  {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
-                              </Badge>
-                          ))}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">{getBusinessDisplay()}</TableCell>
-                        <TableCell className="hidden xl:table-cell">{lastLoginDate ? format(lastLoginDate, "P p", { locale: es }) : "N/A"}</TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => {
-                              setEditingUser(user);
-                              setShowCreateEditModal(true);
-                          }} disabled={isSubmitting}>
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Editar</span>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Eliminar</span>
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. Esto eliminará permanentemente el perfil del usuario 
-                                  <span className="font-semibold"> {user.name}</span> (UID: {user.uid}) de Firestore. No elimina la cuenta de Firebase Authentication.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteUser(user)}
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  disabled={isSubmitting}
-                                >
-                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                  Eliminar Perfil
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    )})
-                  ) : (
+              {/* Desktop View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>DNI/CE <span className="text-destructive">*</span></TableHead>
+                      <TableHead className="hidden md:table-cell">Email <span className="text-destructive">*</span></TableHead>
+                      <TableHead>Roles <span className="text-destructive">*</span></TableHead>
+                      <TableHead className="hidden lg:table-cell">Negocio Asociado</TableHead>
+                      <TableHead className="hidden xl:table-cell">Último Acceso</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.length > 0 ? (
+                      filteredUsers.map((user) => {
+                        const lastLoginDate = anyToDate(user.lastLogin);
+                        const getBusinessDisplay = () => {
+                          if (user.roles.includes('promoter')) {
+                            if (user.businessIds && user.businessIds.length > 0) {
+                              return "Múltiples";
+                            }
+                            return "N/A";
+                          }
+                          if (user.businessId) {
+                            return businessNameMap.get(user.businessId) || `ID: ${user.businessId.substring(0, 6)}...`;
+                          }
+                          return "N/A";
+                        };
+
+                        return (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell>{user.dni}</TableCell>
+                          <TableCell className="hidden md:table-cell">{user.email}</TableCell>
+                          <TableCell>
+                            {user.roles && user.roles.map(role => (
+                                <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
+                                    {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
+                                </Badge>
+                            ))}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">{getBusinessDisplay()}</TableCell>
+                          <TableCell className="hidden xl:table-cell">{lastLoginDate ? format(lastLoginDate, "P p", { locale: es }) : "N/A"}</TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button variant="ghost" size="icon" onClick={() => {
+                                setEditingUser(user);
+                                setShowCreateEditModal(true);
+                            }} disabled={isSubmitting}>
+                              <Edit className="h-4 w-4" />
+                              <span className="sr-only">Editar</span>
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="sr-only">Eliminar</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
+                                  <ShadcnAlertDialogDescription>
+                                    Esta acción no se puede deshacer. Esto eliminará permanentemente el perfil del usuario 
+                                    <span className="font-semibold"> {user.name}</span> (UID: {user.uid}) de Firestore. No elimina la cuenta de Firebase Authentication.
+                                  </ShadcnAlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    disabled={isSubmitting}
+                                  >
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    Eliminar Perfil
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      )})
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -682,11 +747,11 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             <UIAlertDialogTitle className="flex items-center">
                 <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Documento ya Registrado como Usuario de Plataforma
             </UIAlertDialogTitle>
-            <AlertDialogDescription>
+            <ShadcnAlertDialogDescription>
               El documento <span className="font-semibold">{dniForVerification}</span> ya está registrado en la Plataforma con el/los rol(es) de: <span className="font-semibold">{(existingPlatformUserRoles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
               <br/><br/>
               ¿Desea editar este perfil de usuario existente?
-            </AlertDialogDescription>
+            </ShadcnAlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
@@ -706,4 +771,5 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     </div>
   );
 }
+
 
