@@ -158,31 +158,12 @@ export default function BusinessStaffPage() {
     const docNumberCleaned = values.docNumber.trim();
     setIsSubmitting(true);
     
-    let fetchedNameFromApi: string | undefined = undefined;
-    if (values.docType === 'dni') {
-      try {
-        const response = await fetch('/api/admin/consult-dni', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dni: docNumberCleaned }) });
-        const data = await response.json();
-        if (response.ok && data.nombreCompleto) {
-          fetchedNameFromApi = data.nombreCompleto;
-          toast({ title: "DNI Encontrado", description: `Nombre: ${fetchedNameFromApi}` });
-        } else {
-           toast({ title: "Consulta DNI", description: data.error || "No se pudo obtener el nombre para este DNI.", variant: "default" });
-        }
-      } catch (error) {
-        toast({ title: "Error de Red", description: "No se pudo comunicar con el servicio de consulta de DNI.", variant: "destructive" });
-      }
-    }
-    
     const result = await checkDniExists(docNumberCleaned);
     
     setIsSubmitting(false);
     
     let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-    if (fetchedNameFromApi) {
-      initialData.name = fetchedNameFromApi;
-    }
-
+    
     if (result.exists) {
         if (result.userType === 'PlatformUser' && result.platformUserData) {
             setExistingPlatformUserToEdit(result.platformUserData);
@@ -191,11 +172,11 @@ export default function BusinessStaffPage() {
             setShowDniIsPlatformUserAlert(true); 
             return;
         } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
-            initialData.name = fetchedNameFromApi || `${result.socioVipData.name} ${result.socioVipData.surname}`;
+            initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
             initialData.email = result.socioVipData.email;
             initialData.preExistingUserType = 'SocioVipMember';
         } else if (result.userType === 'QrClient' && result.qrClientData) {
-            initialData.name = fetchedNameFromApi || `${result.qrClientData.name} ${result.qrClientData.surname}`;
+            initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
             initialData.preExistingUserType = 'QrClient';
         }
     }
@@ -456,10 +437,22 @@ export default function BusinessStaffPage() {
           <Form {...dniEntryForm}>
             <form onSubmit={dniEntryForm.handleSubmit(handleDniVerificationSubmit)} className="space-y-4 py-2">
               <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
-                <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-2 gap-2">
-                  <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI</Label></FormItem>
-                  <FormItem className="flex items-center space-x-3 space-y-0"><Label htmlFor="docType-ce-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}><FormControl><RadioGroupItem value="ce" id="docType-ce-staff" className="sr-only" /></FormControl>Carnet de Extranjería</Label></FormItem>
-                </RadioGroup></FormControl><FormMessage /></FormItem>
+                <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel>
+                    <FormControl>
+                        <RadioGroup onValueChange={(value) => { field.onChange(value); dniEntryForm.setValue('docNumber', ''); dniEntryForm.clearErrors('docNumber'); }} defaultValue={field.value} className="grid grid-cols-2 gap-2">
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                <Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}>
+                                    <FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI
+                                </Label>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                                 <Label htmlFor="docType-ce-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}>
+                                    <FormControl><RadioGroupItem value="ce" id="docType-ce-staff" className="sr-only" /></FormControl>Carnet de Extranjería
+                                </Label>
+                            </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                <FormMessage /></FormItem>
               )} />
               <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
                 <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
@@ -500,6 +493,7 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
 
 
 

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -241,31 +242,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     setIsSubmitting(true);
     setDniForSocioVerification(docNumberCleaned);
 
-    let fetchedNameFromApi: string | undefined = undefined;
-    let fetchedSurnameFromApi: string | undefined = undefined;
-
-    if (values.docType === 'dni') {
-      try {
-        const response = await fetch('/api/admin/consult-dni', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dni: docNumberCleaned }),
-        });
-        const data = await response.json();
-        if (response.ok && data.nombreCompleto) {
-          const nameParts = data.nombreCompleto.split(' ');
-          fetchedSurnameFromApi = nameParts.slice(0, 2).join(' '); // Apellido paterno y materno
-          fetchedNameFromApi = nameParts.slice(2).join(' '); // Nombres
-          toast({ title: "DNI Encontrado", description: `Nombre: ${data.nombreCompleto}` });
-        } else if (!response.ok) {
-           toast({ title: "Consulta DNI", description: data.error || "No se pudo obtener el nombre para este DNI.", variant: "default" });
-        }
-      } catch (error) {
-        console.error("Error calling DNI consultation API route:", error);
-        toast({ title: "Error de Red", description: "No se pudo comunicar con el servicio de consulta de DNI.", variant: "destructive" });
-      }
-    }
-    
     const result = await checkDniAcrossCollections(docNumberCleaned);
     setIsSubmitting(false);
     
@@ -276,18 +252,12 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     } else {
         let initialData: InitialDataForSocioVipCreation = { dni: docNumberCleaned };
         
-        // Prioritize API data for name if available
-        if(fetchedNameFromApi) initialData.name = fetchedNameFromApi;
-        if(fetchedSurnameFromApi) initialData.surname = fetchedSurnameFromApi;
-
         if (result.existsAsQrClient && result.qrClientData) {
             initialData.existingUserType = 'QrClient';
-            if(!initialData.name) initialData.name = result.qrClientData.name;
-            if(!initialData.surname) initialData.surname = result.qrClientData.surname;
+            initialData.name = result.qrClientData.name;
+            initialData.surname = result.qrClientData.surname;
             initialData.phone = result.qrClientData.phone;
             
-            // --- FIX ---
-            // Ensure `dob` is always a string when passed as initial data
             if (result.qrClientData.dob) {
               if (result.qrClientData.dob instanceof Timestamp) {
                   initialData.dob = result.qrClientData.dob.toDate().toISOString();
@@ -300,11 +270,9 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
 
         } else if (result.existsAsPlatformUser && result.platformUserData) {
             initialData.existingUserType = 'PlatformUser';
-            if (!initialData.name && !initialData.surname) { // only if API fails
-              const nameParts = result.platformUserData.name.split(' ');
-              initialData.name = nameParts.slice(1).join(' ');
-              initialData.surname = nameParts[0];
-            }
+            const nameParts = result.platformUserData.name.split(' ');
+            initialData.name = nameParts.slice(1).join(' ');
+            initialData.surname = nameParts[0];
             initialData.email = result.platformUserData.email;
         }
         setVerifiedSocioDniResult(initialData); 
@@ -720,3 +688,4 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     </div>
   );
 }
+

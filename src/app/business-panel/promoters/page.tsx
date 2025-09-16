@@ -142,18 +142,18 @@ function BusinessPromoterForm({
              <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="text-blue-700 dark:text-blue-300">Vinculando Promotor Existente</AlertTitle>
-                <AlertDialogDescription>
+                <UIDialogDescription>
                     Este promotor ya tiene una cuenta en la plataforma. Sus datos están pre-rellenados. Solo define la comisión para este vínculo.
-                </AlertDialogDescription>
+                </UIDialogDescription>
             </Alert>
         )}
         {isPrePopulatedFromOtherSource && !isEditingLink && (
              <Alert variant="default" className="bg-sky-50 border-sky-200 dark:bg-sky-900/30 dark:border-sky-700">
                 <Info className="h-4 w-4 text-sky-600 dark:text-sky-400" />
                 <AlertTitle className="text-sky-700 dark:text-sky-300">Creando Cuenta de Promotor</AlertTitle>
-                <AlertDialogDescription>
+                <UIDialogDescription>
                     Se creará una nueva cuenta de acceso para este promotor. Por favor, completa o confirma sus datos.
-                </AlertDialogDescription>
+                </UIDialogDescription>
             </Alert>
         )}
 
@@ -390,45 +390,9 @@ function BusinessPromoterForm({
       if (isSubmitting) return;
       
       const docNumberCleaned = values.docNumber.trim();
-      
       setIsSubmitting(true);
       
-      let fetchedNameFromApi: string | undefined = undefined;
-
-      if (values.docType === 'dni') {
-        try {
-          const response = await fetch('/api/admin/consult-dni', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dni: docNumberCleaned }),
-          });
-          const data = await response.json();
-          if (response.ok && data.nombreCompleto) {
-            fetchedNameFromApi = data.nombreCompleto;
-            toast({ title: "DNI Encontrado", description: `Nombre: ${fetchedNameFromApi}` });
-          } else if (!response.ok) {
-            toast({ title: "Consulta DNI", description: data.error || "No se pudo obtener el nombre para este DNI.", variant: "default" });
-          }
-        } catch (error) {
-          console.error("Error calling DNI consultation API route:", error);
-          toast({ title: "Error de Red", description: "No se pudo comunicar con el servicio de consulta de DNI.", variant: "destructive" });
-        }
-      }
-      
       const checkResult = await checkDniForPromoterAndLink(docNumberCleaned, currentBusinessId);
-      
-      if (fetchedNameFromApi) {
-          const nameParts = fetchedNameFromApi.split(' ');
-          const surname = nameParts.slice(0, 2).join(' ');
-          const name = nameParts.slice(2).join(' ');
-          if(checkResult.qrClientData) {
-              checkResult.qrClientData.name = name;
-              checkResult.qrClientData.surname = surname;
-          } else if (checkResult.socioVipData) {
-              checkResult.socioVipData.name = name;
-              checkResult.socioVipData.surname = surname;
-          }
-      }
       
       setIsSubmitting(false);
 
@@ -577,7 +541,7 @@ function BusinessPromoterForm({
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center space-y-2 sm:space-y-0">
+        <div className="flex justify-end items-center">
           <Button onClick={handleOpenAddPromoterFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
             <PlusCircle className="mr-2 h-4 w-4" /> Añadir/Vincular Promotor
           </Button>
@@ -666,10 +630,10 @@ function BusinessPromoterForm({
                                 </DropdownMenuItem>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
-                                <AlertDialogHeader><UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle><AlertDialogDescription>
+                                <AlertDialogHeader><UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle><UIDialogDescription>
                                   Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span> de tu negocio.
                                   No se eliminará su perfil global (si lo tiene).
-                                </AlertDialogDescription></AlertDialogHeader>
+                                </UIDialogDescription></AlertDialogHeader>
                                 <ShadcnAlertDialogFooter>
                                   <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                                   <AlertDialogAction onClick={() => handleDeletePromoterLink(link)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>
@@ -734,10 +698,10 @@ function BusinessPromoterForm({
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle>
-                                  <AlertDialogDescription>
+                                  <UIDialogDescription>
                                     Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span> de tu negocio.
                                     No se eliminará su perfil global (si lo tiene).
-                                  </AlertDialogDescription>
+                                  </UIDialogDescription>
                                 </AlertDialogHeader>
                                 <ShadcnAlertDialogFooter>
                                   <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
@@ -833,11 +797,11 @@ function BusinessPromoterForm({
               <UIAlertDialogTitle className="flex items-center">
                   <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Promotor ya Vinculado
               </UIAlertDialogTitle>
-              <AlertDialogDescription>
+              <UIDialogDescription>
                 El promotor con DNI/CE <span className="font-semibold">{promoterLinkToEditFromAlert?.promoterDni}</span> ({promoterLinkToEditFromAlert?.promoterName}) ya está vinculado a tu negocio.
                 <br/><br/>
                 ¿Desea editar la información de este vínculo (ej. tasa de comisión)?
-              </AlertDialogDescription>
+              </UIDialogDescription>
             </AlertDialogHeader>
             <ShadcnAlertDialogFooter>
               <AlertDialogCancel onClick={() => { setShowAlreadyLinkedAlert(false); setPromoterLinkToEditFromAlert(null); }}>No, Cancelar</AlertDialogCancel>
@@ -855,3 +819,4 @@ function BusinessPromoterForm({
 
 
     
+
