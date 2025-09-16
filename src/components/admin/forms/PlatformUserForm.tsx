@@ -24,6 +24,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ALL_PLATFORM_USER_ROLES, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 
 const platformUserFormSchema = z.object({
@@ -32,7 +33,7 @@ const platformUserFormSchema = z.object({
   dni: z.string().min(7, "El DNI/CE debe tener entre 7 y 15 caracteres.").max(15),
   email: z.string().email("Debe ser un email válido."),
   password: z.string().optional(),
-  roles: z.array(z.string()).refine((value) => value.some((item) => item), {
+  roles: z.array(z.string()).refine((value) => value.length > 0, {
     message: "Debes seleccionar al menos un rol.",
   }),
   businessId: z.string().optional().nullable(),
@@ -45,7 +46,7 @@ interface PlatformUserFormProps {
   user?: PlatformUser;
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
-  allowedRoles: PlatformUserRole[];
+  allowedRoles?: PlatformUserRole[]; // Now optional
   onSubmit: (data: PlatformUserFormData, isEditing: boolean) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -56,7 +57,7 @@ export function PlatformUserForm({
   user,
   initialDataForCreation,
   businesses,
-  allowedRoles,
+  allowedRoles = [], // Default to empty array
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -64,6 +65,9 @@ export function PlatformUserForm({
 }: PlatformUserFormProps) {
   const { userProfile: currentUserProfile } = useAuth();
   const isSuperAdminView = currentUserProfile?.roles.includes('superadmin') || false;
+
+  const rolesToDisplay = isSuperAdminView ? ALL_PLATFORM_USER_ROLES : allowedRoles;
+  const isSingleRoleSelection = !isSuperAdminView;
 
   const isEditing = !!user;
   const needsPassword = !isEditing;
@@ -143,35 +147,56 @@ export function PlatformUserForm({
         <FormField
           control={form.control}
           name="roles"
-          render={() => (
+          render={({ field }) => (
             <FormItem>
               <FormLabel>Roles <span className="text-destructive">*</span></FormLabel>
-              <div className="grid grid-cols-2 gap-2">
-                {allowedRoles.map((role) => (
-                  <FormField
-                    key={role}
-                    control={form.control}
-                    name="roles"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value?.includes(role)}
-                            onCheckedChange={(checked) => {
-                              return checked
-                                ? field.onChange([...(field.value || []), role])
-                                : field.onChange((field.value || []).filter((value) => value !== role))
-                            }}
-                          />
-                        </FormControl>
-                        <FormLabel className="font-normal">
-                          {PLATFORM_USER_ROLE_TRANSLATIONS[role]}
-                        </FormLabel>
-                      </FormItem>
-                    )}
-                  />
-                ))}
-              </div>
+                {isSingleRoleSelection ? (
+                    <FormControl>
+                        <RadioGroup
+                            onValueChange={(value) => field.onChange([value])}
+                            defaultValue={field.value?.[0]}
+                            className="grid grid-cols-2 gap-2"
+                        >
+                            {rolesToDisplay.map((role) => (
+                                <FormItem key={role} className="flex items-center space-x-3 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value={role} />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">
+                                        {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole]}
+                                    </FormLabel>
+                                </FormItem>
+                            ))}
+                        </RadioGroup>
+                    </FormControl>
+                ) : (
+                   <div className="grid grid-cols-2 gap-2">
+                    {rolesToDisplay.map((role) => (
+                      <FormField
+                        key={role}
+                        control={form.control}
+                        name="roles"
+                        render={({ field: multiSelectField }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={multiSelectField.value?.includes(role)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? multiSelectField.onChange([...(multiSelectField.value || []), role])
+                                    : multiSelectField.onChange((multiSelectField.value || []).filter((value) => value !== role))
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">
+                              {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole]}
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                )}
               <FormMessage />
             </FormItem>
           )}
