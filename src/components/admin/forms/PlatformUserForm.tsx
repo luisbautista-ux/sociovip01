@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,6 +45,7 @@ interface PlatformUserFormProps {
   user?: PlatformUser;
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
+  allowedRoles: PlatformUserRole[];
   onSubmit: (data: PlatformUserFormData, isEditing: boolean) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -54,6 +56,7 @@ export function PlatformUserForm({
   user,
   initialDataForCreation,
   businesses,
+  allowedRoles,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -77,7 +80,7 @@ export function PlatformUserForm({
         path: ["password"],
       }).refine((data) => {
         const hasRoleRequiringBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
-        if (hasRoleRequiringBusiness && !data.businessId) {
+        if (hasRoleRequiringBusiness && !data.businessId && isSuperAdminView) {
             return false;
         }
         return true;
@@ -106,8 +109,6 @@ export function PlatformUserForm({
     onSubmit(values, isEditing);
   };
   
-  const allowedRoles = isSuperAdminView ? ALL_PLATFORM_USER_ROLES : (['staff', 'host', 'lector_qr'] as PlatformUserRole[]);
-
 
   return (
     <Form {...form}>

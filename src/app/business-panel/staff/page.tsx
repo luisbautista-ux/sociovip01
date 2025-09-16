@@ -480,6 +480,7 @@ export default function BusinessStaffPage() {
             user={editingUser || undefined}
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
             businesses={[]}
+            allowedRoles={['staff', 'host', 'lector_qr']}
             onSubmit={(data) => handleCreateOrEditUser(data, !!editingUser)}
             onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}
@@ -499,5 +500,6 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
 
 
