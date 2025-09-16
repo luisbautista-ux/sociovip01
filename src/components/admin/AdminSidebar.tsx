@@ -20,7 +20,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/businesses", label: "Negocios", icon: Building },
@@ -30,12 +29,22 @@ const navItems = [
   { href: "/admin/analytics", label: "Analíticas", icon: BarChart3 },
 ];
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  closeSheet?: () => void;
+}
+
+export function AdminSidebar({ closeSheet }: AdminSidebarProps) {
   const pathname = usePathname();
   const { logout, currentUser } = useAuth();
 
+  const handleLinkClick = () => {
+    if (closeSheet) {
+      closeSheet();
+    }
+  };
+
   return (
-    <aside className="w-64 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
+    <aside className="w-full h-full bg-card text-card-foreground flex flex-col">
       <div className="p-4 border-b border-border flex items-center space-x-2">
         <SocioVipLogo className="h-8 w-8" />
         <h1 className="text-xl font-bold text-gradient">SocioVIP Admin</h1>
@@ -45,6 +54,7 @@ export function AdminSidebar() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={handleLinkClick}
             className={cn(
               "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
               pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
@@ -55,7 +65,7 @@ export function AdminSidebar() {
           </Link>
         ))}
       </nav>
-      <div className="p-4 border-t border-border space-y-2">
+      <div className="p-4 border-t border-border space-y-2 mt-auto">
         {currentUser && (
           <p className="text-xs text-muted-foreground truncate" title={currentUser.email || undefined}>
             Logueado como: {currentUser.email}
@@ -76,7 +86,7 @@ export function AdminSidebar() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">
+              <AlertDialogAction onClick={() => { logout(); handleLinkClick(); }} className="bg-destructive hover:bg-destructive/90">
                 Sí, Cerrar Sesión
               </AlertDialogAction>
             </AlertDialogFooter>

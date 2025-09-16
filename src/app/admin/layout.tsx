@@ -4,10 +4,11 @@
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Loader2, Menu } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function AdminLayout({
   children,
@@ -16,10 +17,9 @@ export default function AdminLayout({
 }) {
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
-    // This useEffect is primarily for redirecting if currentUser is not available after auth check.
-    // Further role-based protection is handled in the return statement.
     if (!loadingAuth && !currentUser) {
       router.push("/login");
     }
@@ -35,7 +35,6 @@ export default function AdminLayout({
   }
 
   if (!currentUser) {
-    // This state is briefly shown if the useEffect redirect hasn't kicked in yet.
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
          <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
@@ -43,7 +42,6 @@ export default function AdminLayout({
     );
   }
 
-  // At this point, currentUser exists. Now check for profile loading.
   if (loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -53,9 +51,7 @@ export default function AdminLayout({
     );
   }
 
-  // Profile loading is complete. Check if userProfile exists.
   if (!userProfile) {
-    // Profile not found in Firestore for this authenticated user.
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -76,7 +72,6 @@ export default function AdminLayout({
     );
   }
   
-  // At this point, userProfile exists. Now check for specific roles.
   if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('superadmin')) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -99,13 +94,29 @@ export default function AdminLayout({
     );
   }
 
-  // All checks passed, render the admin layout.
   return (
-    <div className="flex min-h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 p-6 overflow-auto">
-        {children}
-      </main>
+    <div className="flex min-h-screen bg-muted/40">
+      <div className="hidden md:flex">
+        <AdminSidebar />
+      </div>
+      <div className="flex flex-col flex-1">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2 md:hidden">
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+              <SheetTrigger asChild>
+                <Button size="icon" variant="outline">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Abrir menú</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
+                 <AdminSidebar closeSheet={() => setIsSheetOpen(false)} />
+              </SheetContent>
+            </Sheet>
+        </header>
+        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
