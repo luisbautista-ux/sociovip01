@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle, Briefcase, UserPlus, Sparkles, UserCheck, History, LogIn } from "lucide-react";
+import { Building, Users, Star, ScanLine, BarChart3, Info, Loader2, AlertTriangle, Briefcase, UserPlus, Sparkles, UserCheck, History, LogIn, LayoutDashboard } from "lucide-react";
 import type { AdminDashboardStats, BusinessManagedEntity, GeneratedCode, Business, PlatformUser, SocioVipMember, QrClient } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
@@ -178,7 +178,9 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient">Dashboard de Administración</h1>
+      <h1 className="text-3xl font-bold text-gradient flex items-center">
+        <LayoutDashboard className="h-8 w-8 mr-2" /> Dashboard
+      </h1>
       
       {configError && (
         <Card className="shadow-lg border-destructive">
