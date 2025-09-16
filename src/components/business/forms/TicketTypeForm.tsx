@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from "react";
@@ -70,7 +71,7 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Tipo de Entrada <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Entrada General, VIP, Preventa" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: Entrada General, VIP, Preventa" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}

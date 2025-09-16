@@ -78,7 +78,7 @@ export function SocioVipMemberForm({
         surname: member.surname || "",
         dni: member.dni || "",
         phone: member.phone || "",
-        dob: member.dob ? (typeof member.dob === 'string' ? parseISO(member.dob) : member.dob instanceof Date ? member.dob : undefined) : undefined,
+        dob: member.dob ? (typeof member.dob === 'string' ? parseISO(member.dob) : member.dob instanceof Date ? member.dob : new Date()) : new Date(),
         email: member.email || "",
         address: member.address || "",
         profession: member.profession || "",
@@ -137,7 +137,7 @@ export function SocioVipMemberForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>DNI / Carnet de Extranjería <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input placeholder="Ingrese el documento de identidad" {...field} maxLength={15} disabled={isSubmitting || shouldDisableDniField} /></FormControl>
+                <FormControl><Input placeholder="Ingrese el documento de identidad" {...field} value={field.value || ""} maxLength={15} disabled={isSubmitting || shouldDisableDniField} /></FormControl>
                 {shouldDisableDniField && !isEditing && <FormDescription className="text-xs">El DNI ha sido verificado y no puede cambiarse en este paso.</FormDescription>}
                 {isEditing && <FormDescription className="text-xs">El DNI no puede ser modificado para socios existentes.</FormDescription>}
                 <FormMessage />
@@ -151,7 +151,7 @@ export function SocioVipMemberForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Nombre(s) <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input placeholder="Ingrese los nombres del socio" {...field} disabled={isSubmitting} /></FormControl>
+                <FormControl><Input placeholder="Ingrese los nombres del socio" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -162,7 +162,7 @@ export function SocioVipMemberForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Apellido(s) <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input placeholder="Ingrese los apellidos del socio" {...field} disabled={isSubmitting} /></FormControl>
+                <FormControl><Input placeholder="Ingrese los apellidos del socio" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -175,7 +175,7 @@ export function SocioVipMemberForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Celular <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="tel" placeholder="Ingrese el número de celular" {...field} disabled={isSubmitting} /></FormControl>
+                <FormControl><Input type="tel" placeholder="Ingrese el número de celular" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -224,7 +224,7 @@ export function SocioVipMemberForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Email (para cuenta) <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input type="email" placeholder="Ingrese el correo electrónico" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input type="email" placeholder="Ingrese el correo electrónico" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}

@@ -114,7 +114,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Evento <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -125,7 +125,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           render={({ field }) => (
             <FormItem>
               <FormLabel>Descripción <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Textarea placeholder="Detalles del evento..." {...field} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del evento..." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}

@@ -68,7 +68,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       description: promotion?.description || "",
       startDate: promotion?.startDate ? new Date(promotion.startDate) : new Date(),
       endDate: promotion?.endDate ? new Date(promotion.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
-      usageLimit: promotion?.usageLimit === undefined || promotion?.usageLimit === null ? '' : promotion.usageLimit, // Initialize with '' if undefined/null
+      usageLimit: promotion?.usageLimit === undefined || promotion?.usageLimit === null ? undefined : promotion.usageLimit,
       isActive: promotion?.isActive === undefined ? true : promotion.isActive,
       imageUrl: promotion?.imageUrl || "",
       aiHint: promotion?.aiHint || "",
@@ -80,7 +80,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     // Ensure usageLimit is number or undefined before submitting
     const dataToSubmit: BusinessPromotionFormData = {
         ...values,
-        usageLimit: values.usageLimit === '' || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
+        usageLimit: values.usageLimit === undefined || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
     };
     onSubmit(dataToSubmit);
   };
@@ -116,7 +116,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           render={({ field }) => (
             <FormItem>
               <FormLabel>Términos y Condiciones</FormLabel>
-              <FormControl><Textarea placeholder="Condiciones de la promoción, ej: Válido solo para consumo en local." {...field} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones de la promoción, ej: Válido solo para consumo en local." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -180,13 +180,10 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
                   type="number" 
                   placeholder="Ej: 100 (0 o vacío para ilimitado)" 
                   {...field}
-                  value={field.value === null || field.value === undefined ? '' : String(field.value)} // Ensure input gets string
+                  value={field.value ?? ""}
                   onChange={e => {
                     const value = e.target.value;
-                    // If empty string, set form state to undefined (for optional Zod validation)
-                    // Otherwise, parse as integer. Invalid numbers become NaN, then undefined.
-                    const numValue = parseInt(value, 10);
-                    field.onChange(value === "" ? undefined : (isNaN(numValue) ? undefined : numValue));
+                    field.onChange(value === "" ? undefined : Number(value));
                   }} 
                   disabled={isSubmitting} 
                 />
@@ -205,7 +202,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
               <FormControl>
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="https://ejemplo.com/imagen.png" {...field} disabled={isSubmitting} />
+                  <Input placeholder="https://ejemplo.com/imagen.png" {...field} value={field.value || ""} disabled={isSubmitting} />
                 </div>
               </FormControl>
               <FormMessage />
@@ -218,7 +215,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           render={({ field }) => (
             <FormItem>
               <FormLabel>Palabras Clave para Imagen (si URL está vacía)</FormLabel>
-              <FormControl><Input placeholder="Ej: fiesta cocteles (máx 2 palabras)" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: fiesta cocteles (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
           )}
