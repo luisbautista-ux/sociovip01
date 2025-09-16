@@ -9,6 +9,7 @@ import { Loader2, Menu } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { DialogTitle } from "@/components/ui/dialog";
 
 export default function AdminLayout({
   children,
@@ -109,6 +110,7 @@ export default function AdminLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
+                 <DialogTitle className="sr-only">Menú de Navegación del Panel de Super Administrador</DialogTitle>
                  <AdminSidebar closeSheet={() => setIsSheetOpen(false)} />
               </SheetContent>
             </Sheet>
