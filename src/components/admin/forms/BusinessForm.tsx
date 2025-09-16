@@ -61,17 +61,9 @@ interface BusinessFormProps {
 }
 
 export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = false, existingCustomUrlPaths }: BusinessFormProps) {
-  const [selectedDepartment, setSelectedDepartment] = useState(business?.department || "");
-  const [provinces, setProvinces] = useState<string[]>([]);
-  const [selectedProvince, setSelectedProvince] = useState(business?.province || "");
-  const [districts, setDistricts] = useState<string[]>([]);
-  
-  const departments = Object.keys(PERU_LOCATIONS);
-
   const businessFormSchema = businessFormSchemaBase.refine(data => {
     if (data.customUrlPath && data.customUrlPath.trim() !== "") {
       const currentPath = data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      // If editing, allow the business's own current path
       const isEditingOwnPath = business && business.customUrlPath === currentPath;
       return isEditingOwnPath || !existingCustomUrlPaths.includes(currentPath);
     }
@@ -81,14 +73,9 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
     path: ["customUrlPath"],
   });
 
-
   const form = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
-    defaultValues: {},
-  });
-  
-  useEffect(() => {
-    const defaultVals = {
+    defaultValues: {
       name: business?.name || "",
       contactEmail: business?.contactEmail || "",
       ruc: business?.ruc || "",
@@ -99,7 +86,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       address: business?.address || "",
       managerName: business?.managerName || "",
       managerDni: business?.managerDni || "",
-      businessType: business?.businessType || '', // Changed from undefined
+      businessType: business?.businessType,
       logoUrl: business?.logoUrl || "",
       publicCoverImageUrl: business?.publicCoverImageUrl || "",
       slogan: business?.slogan || "",
@@ -107,68 +94,39 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       publicPhone: business?.publicPhone || "",
       publicAddress: business?.publicAddress || "",
       customUrlPath: business?.customUrlPath || "",
-    };
-    form.reset(defaultVals);
-    
-    // Manual state updates for dependent dropdowns
-    setSelectedDepartment(defaultVals.department);
-    if (defaultVals.department) {
-      const initialProvinces = Object.keys(PERU_LOCATIONS[defaultVals.department as keyof typeof PERU_LOCATIONS] || {});
-      setProvinces(initialProvinces);
-      setSelectedProvince(defaultVals.province);
-      
-      if (defaultVals.province) {
-        // @ts-ignore
-        const initialDistricts = PERU_LOCATIONS[defaultVals.department]?.[defaultVals.province] || [];
-        setDistricts(initialDistricts);
-      } else {
-        setDistricts([]);
-      }
-    } else {
-      setProvinces([]);
-      setDistricts([]);
-    }
+    },
+  });
+  
+  useEffect(() => {
+    form.reset({
+      name: business?.name || "",
+      contactEmail: business?.contactEmail || "",
+      ruc: business?.ruc || "",
+      razonSocial: business?.razonSocial || "",
+      department: business?.department || "",
+      province: business?.province || "",
+      district: business?.district || "",
+      address: business?.address || "",
+      managerName: business?.managerName || "",
+      managerDni: business?.managerDni || "",
+      businessType: business?.businessType,
+      logoUrl: business?.logoUrl || "",
+      publicCoverImageUrl: business?.publicCoverImageUrl || "",
+      slogan: business?.slogan || "",
+      publicContactEmail: business?.publicContactEmail || "",
+      publicPhone: business?.publicPhone || "",
+      publicAddress: business?.publicAddress || "",
+      customUrlPath: business?.customUrlPath || "",
+    });
   }, [business, form]);
-
-
-  useEffect(() => {
-    if (selectedDepartment && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]) {
-      const currentProvinces = Object.keys(PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]);
-      setProvinces(currentProvinces);
-      if (!currentProvinces.includes(form.getValues("province"))) {
-         form.setValue("province", "");
-         form.setValue("district", "");
-         setSelectedProvince("");
-         setDistricts([]);
-      }
-    } else {
-      setProvinces([]);
-      form.setValue("province", "");
-      form.setValue("district", "");
-      setSelectedProvince("");
-      setDistricts([]);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDepartment]); 
-
-  useEffect(() => {
-    if (selectedDepartment && selectedProvince && PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]]) {
-      const departmentKey = selectedDepartment as keyof typeof PERU_LOCATIONS;
-      const provinceKey = selectedProvince as keyof typeof PERU_LOCATIONS[typeof departmentKey];
-      // @ts-ignore
-      const currentDistricts = PERU_LOCATIONS[departmentKey][provinceKey] || [];
-      setDistricts(currentDistricts);
-      if (!currentDistricts.includes(form.getValues("district"))) {
-         form.setValue("district", "");
-      }
-    } else {
-      setDistricts([]);
-      form.setValue("district", "");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProvince, selectedDepartment]); 
-
-
+  
+  const selectedDepartment = form.watch("department");
+  const selectedProvince = form.watch("province");
+  
+  const departments = Object.keys(PERU_LOCATIONS);
+  const provinces = selectedDepartment ? Object.keys(PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS] || {}) : [];
+  const districts = selectedDepartment && selectedProvince ? PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || [] : [];
+  
   const processSubmit = async (values: BusinessFormValues) => {
     const dataToSubmit: BusinessFormData = {
       ...values,
@@ -207,15 +165,15 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
         
         <h3 className="text-lg font-semibold pt-4 border-t mt-6 pb-2 mb-3">Ubicación Principal</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <FormField control={form.control} name="department" render={({ field }) => (
-                <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedDepartment(value); }} value={field.value || ''} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona Dept." /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-            )}/>
-            <FormField control={form.control} name="province" render={({ field }) => (
-                <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedProvince(value); }} value={field.value || ''} disabled={isSubmittingForm || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona Prov.")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-            )}/>
-            <FormField control={form.control} name="district" render={({ field }) => (
-                <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona Dist.")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-            )}/>
+          <FormField control={form.control} name="department" render={({ field }) => (
+            <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); form.setValue("province", ""); form.setValue("district", ""); }} value={field.value || ''} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona Dept." /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+          )}/>
+          <FormField control={form.control} name="province" render={({ field }) => (
+            <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); form.setValue("district", ""); }} value={field.value || ''} disabled={isSubmittingForm || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona Prov.")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+          )}/>
+          <FormField control={form.control} name="district" render={({ field }) => (
+            <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona Dist.")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+          )}/>
         </div>
         <FormField control={form.control} name="address" render={({ field }) => (
           <FormItem><FormLabel>Dirección del Negocio</FormLabel><FormControl><Input placeholder="Ej: Av. Principal 123, Urb. Las Flores" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
