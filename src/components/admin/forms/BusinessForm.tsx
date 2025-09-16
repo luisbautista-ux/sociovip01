@@ -99,7 +99,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       address: business?.address || "",
       managerName: business?.managerName || "",
       managerDni: business?.managerDni || "",
-      businessType: business?.businessType || undefined,
+      businessType: business?.businessType || '', // Changed from undefined
       logoUrl: business?.logoUrl || "",
       publicCoverImageUrl: business?.publicCoverImageUrl || "",
       slogan: business?.slogan || "",
@@ -193,7 +193,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       <form onSubmit={form.handleSubmit(processSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-3 pl-1 py-1">
         <h3 className="text-lg font-semibold pt-2 border-b pb-2 mb-3">Información General</h3>
         <FormField control={form.control} name="name" render={({ field }) => (
-          <FormItem><FormLabel>Nombre Comercial <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Pandora Lounge Bar" {...field} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Nombre Comercial <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Pandora Lounge Bar" {...field} value={field.value || ''} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="razonSocial" render={({ field }) => (
           <FormItem><FormLabel>Razón Social</FormLabel><FormControl><Input placeholder="Nombre legal de la empresa" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
@@ -202,19 +202,19 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
           <FormItem><FormLabel>RUC</FormLabel><FormControl><Input placeholder="11 dígitos numéricos" {...field} value={field.value || ""} maxLength={11} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="businessType" render={({ field }) => (
-          <FormItem><FormLabel>Giro de Negocio <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un giro" /></SelectTrigger></FormControl><SelectContent>{BUSINESS_TYPES.map((type) => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>
+          <FormItem><FormLabel>Giro de Negocio <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un giro" /></SelectTrigger></FormControl><SelectContent>{BUSINESS_TYPES.map((type) => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>
         )}/>
         
         <h3 className="text-lg font-semibold pt-4 border-t mt-6 pb-2 mb-3">Ubicación Principal</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField control={form.control} name="department" render={({ field }) => (
-                <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedDepartment(value); }} value={field.value} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona Dept." /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedDepartment(value); }} value={field.value || ''} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona Dept." /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="province" render={({ field }) => (
-                <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedProvince(value); }} value={field.value} disabled={isSubmittingForm || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona Prov.")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); setSelectedProvince(value); }} value={field.value || ''} disabled={isSubmittingForm || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona Prov.")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
             <FormField control={form.control} name="district" render={({ field }) => (
-                <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmittingForm || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona Dist.")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona Dist.")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )}/>
         </div>
         <FormField control={form.control} name="address" render={({ field }) => (
@@ -223,7 +223,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
 
         <h3 className="text-lg font-semibold pt-4 border-t mt-6 pb-2 mb-3">Información de Contacto y Representante</h3>
         <FormField control={form.control} name="contactEmail" render={({ field }) => (
-          <FormItem><FormLabel>Email de Contacto del Negocio <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: contacto@negocio.com" {...field} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Email de Contacto del Negocio <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="Ej: contacto@negocio.com" {...field} value={field.value || ''} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="managerName" render={({ field }) => (
           <FormItem><FormLabel>Nombre del Gerente o Representante Legal</FormLabel><FormControl><Input placeholder="Nombre completo del gerente" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>

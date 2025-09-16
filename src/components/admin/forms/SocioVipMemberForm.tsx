@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect } from "react";
@@ -281,7 +280,7 @@ export function SocioVipMemberForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Estado de Membresía <span className="text-destructive">*</span></FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmitting}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecciona un estado" />
