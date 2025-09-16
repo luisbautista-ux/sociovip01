@@ -1,4 +1,3 @@
-
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
@@ -178,8 +177,10 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center">
-        <LayoutDashboard className="h-8 w-8 mr-2" /> Dashboard
+      {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
+      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+        <LayoutDashboard className="h-8 w-8 text-primary !block" />
+        Dashboard
       </h1>
       
       {configError && (
@@ -241,7 +242,8 @@ export default function AdminDashboardPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-       <Card className="shadow-lg">
+      
+      <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center">
             <History className="h-6 w-6 mr-2 text-primary" />
@@ -279,5 +281,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-    

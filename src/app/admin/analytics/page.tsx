@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -112,8 +111,10 @@ export default function AdminAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center">
-        <BarChart3 className="h-8 w-8 mr-2" /> Analíticas Generales
+      {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
+      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+        <BarChart3 className="h-8 w-8 text-primary !block" />
+        Analíticas 
       </h1>
 
       <Card className="shadow-lg">
