@@ -53,7 +53,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
         }
       } catch (err: any) {
         if (isComponentMounted) {
-          if (!err?.message?.includes("Cannot transition")) {
+          if (err && typeof err.message === 'string' && !err.message.includes("Cannot transition")) {
             console.error("Scanner start failed:", err);
           }
         }
@@ -66,7 +66,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
       isComponentMounted = false;
       if (html5Qrcode && html5Qrcode.isScanning) {
         html5Qrcode.stop().catch(err => {
-          if (!err?.message?.includes("Cannot transition")) {
+          if (err && typeof err.message === 'string' && !err.message.includes("Cannot transition")) {
              console.error("Failed to stop scanner cleanly on unmount:", err);
           }
         });
@@ -251,11 +251,8 @@ export default function LectorValidateQrPage() {
         </h1>
         <Button 
             onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} 
-            variant={isScannerActive ? "destructive" : "default"} 
+            variant={isScannerActive ? "destructive" : "gradient"} 
             className="w-full sm:w-auto"
-            style={!isScannerActive ? {
-                backgroundImage: 'linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)))'
-            } : {}}
         >
           <Camera className="mr-2 h-5 w-5" /> {isScannerActive ? "Detener Escáner" : "Activar Escáner"}
         </Button>
