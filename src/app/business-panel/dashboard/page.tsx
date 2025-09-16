@@ -206,7 +206,7 @@ export default function BusinessDashboardPage() {
   
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center">
+      <h1 className="text-3xl font-bold text-primary flex items-center">
         <LayoutDashboard className="h-8 w-8 mr-2" /> Dashboard
       </h1>
       
@@ -264,5 +264,3 @@ export default function BusinessDashboardPage() {
     </div>
   );
 }
-
-    
