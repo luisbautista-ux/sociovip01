@@ -1,11 +1,11 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog";
-import { Building, PlusCircle, Download, Search, Edit, Trash2, Loader2, ExternalLink } from "lucide-react";
+import { Building, PlusCircle, Download, Search, Edit, Trash2, Loader2, ExternalLink, MoreVertical } from "lucide-react";
 import type { Business, BusinessFormData } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit } from "firebase/firestore";
 import Link from "next/link";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 
 export default function AdminBusinessesPage() {
@@ -260,83 +261,142 @@ export default function AdminBusinessesPage() {
               No hay negocios registrados. Haz clic en "Crear Negocio" para empezar.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre Comercial</TableHead>
-                    <TableHead className="hidden xl:table-cell">Razón Social</TableHead>
-                    <TableHead className="hidden md:table-cell">RUC</TableHead>
-                    <TableHead className="hidden lg:table-cell">Giro</TableHead>
-                    <TableHead>URL Pública</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBusinesses.length > 0 ? (
-                    filteredBusinesses.map((biz) => {
-                      const publicLink = biz.customUrlPath && biz.customUrlPath.trim() !== ""
+            <>
+              {/* Mobile View */}
+              <div className="md:hidden space-y-4">
+                {filteredBusinesses.map(biz => {
+                   const publicLink = biz.customUrlPath && biz.customUrlPath.trim() !== ""
                         ? `/b/${biz.customUrlPath.trim()}`
                         : `/business/${biz.id}`;
-                      const displayUrl = biz.customUrlPath && biz.customUrlPath.trim() !== ""
-                        ? `sociosvip.app/b/${biz.customUrlPath.trim()}`
-                        : `sociosvip.app/business/${biz.id}`;
+                  
+                  return (
+                    <Card key={biz.id} className="overflow-hidden">
+                      <CardHeader className="p-4">
+                        <CardTitle>{biz.name}</CardTitle>
+                        <CardDescription>{biz.businessType || 'Sin Giro'}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">RUC</span>
+                          <span className="font-semibold">{biz.ruc || "N/A"}</span>
+                        </div>
+                        <div className="flex justify-between items-start">
+                          <span className="text-muted-foreground">URL Pública</span>
+                          <Link href={publicLink} target="_blank" className="font-semibold text-primary hover:underline text-xs flex items-center text-right break-all">
+                              {publicLink} <ExternalLink className="ml-1 h-3 w-3 flex-shrink-0" />
+                          </Link>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="p-2 bg-muted/50">
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="w-full justify-center">
+                                      Acciones <MoreVertical className="ml-2 h-4 w-4"/>
+                                  </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem onClick={() => handleOpenEditModal(biz)} disabled={isSubmitting}>
+                                  <Edit className="h-4 w-4 mr-2" /> Editar Negocio
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground">
+                                            <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><AlertDialogDescription>Se eliminará el negocio "{biz.name}" y toda su información. Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteBusiness(biz.id, biz.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                          </DropdownMenu>
+                      </CardFooter>
+                    </Card>
+                  )
+                })}
+              </div>
 
-                      return (
-                      <TableRow key={biz.id}>
-                        <TableCell className="font-medium">{biz.name}</TableCell>
-                        <TableCell className="hidden xl:table-cell">{biz.razonSocial || "N/A"}</TableCell>
-                        <TableCell className="hidden md:table-cell">{biz.ruc || "N/A"}</TableCell>
-                        <TableCell className="hidden lg:table-cell">{biz.businessType || "N/A"}</TableCell>
-                        <TableCell>
-                           <Link href={publicLink} target="_blank" className="text-primary hover:underline text-xs flex items-center">
-                              {displayUrl} <ExternalLink className="ml-1 h-3 w-3" />
-                            </Link>
-                        </TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEditModal(biz)} disabled={isSubmitting}>
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Editar</span>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Eliminar</span>
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. Esto eliminará permanentemente el negocio
-                                  <span className="font-semibold"> {biz.name}</span> y todas sus entidades asociadas (promociones, eventos, etc.).
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <ShadcnAlertDialogFooter>
-                                <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteBusiness(biz.id, biz.name)}
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  disabled={isSubmitting}
-                                >
-                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                  Eliminar
-                                </AlertDialogAction>
-                              </ShadcnAlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    )})
-                  ) : (
+              {/* Desktop View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
+                      <TableHead>Nombre Comercial</TableHead>
+                      <TableHead className="hidden xl:table-cell">Razón Social</TableHead>
+                      <TableHead className="hidden md:table-cell">RUC</TableHead>
+                      <TableHead className="hidden lg:table-cell">Giro</TableHead>
+                      <TableHead>URL Pública</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBusinesses.length > 0 ? (
+                      filteredBusinesses.map((biz) => {
+                        const publicLink = biz.customUrlPath && biz.customUrlPath.trim() !== ""
+                          ? `/b/${biz.customUrlPath.trim()}`
+                          : `/business/${biz.id}`;
+                        const displayUrl = biz.customUrlPath && biz.customUrlPath.trim() !== ""
+                          ? `sociosvip.app/b/${biz.customUrlPath.trim()}`
+                          : `.../${biz.id.substring(0, 10)}...`;
+
+                        return (
+                        <TableRow key={biz.id}>
+                          <TableCell className="font-medium">{biz.name}</TableCell>
+                          <TableCell className="hidden xl:table-cell">{biz.razonSocial || "N/A"}</TableCell>
+                          <TableCell className="hidden md:table-cell">{biz.ruc || "N/A"}</TableCell>
+                          <TableCell className="hidden lg:table-cell">{biz.businessType || "N/A"}</TableCell>
+                          <TableCell>
+                            <Link href={publicLink} target="_blank" className="text-primary hover:underline text-xs flex items-center">
+                                {displayUrl} <ExternalLink className="ml-1 h-3 w-3" />
+                              </Link>
+                          </TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEditModal(biz)} disabled={isSubmitting}>
+                              <Edit className="h-4 w-4" />
+                              <span className="sr-only">Editar</span>
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="sr-only">Eliminar</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. Esto eliminará permanentemente el negocio
+                                    <span className="font-semibold"> {biz.name}</span> y todas sus entidades asociadas (promociones, eventos, etc.).
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <ShadcnAlertDialogFooter>
+                                  <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteBusiness(biz.id, biz.name)}
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    disabled={isSubmitting}
+                                  >
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </ShadcnAlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </TableCell>
+                        </TableRow>
+                      )})
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center h-24">No se encontraron negocios con los filtros aplicados.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -364,5 +424,7 @@ export default function AdminBusinessesPage() {
     </div>
   );
 }
+
+    
 
     
