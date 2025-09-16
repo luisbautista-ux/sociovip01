@@ -2,7 +2,7 @@
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
-import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide, CheckCircle, TicketCheck, ScanSearch, History } from "lucide-react";
+import { Ticket, Calendar, ScanLine, Loader2, Info, QrCode as QrCodeLucide, CheckCircle, TicketCheck, ScanSearch, History, LayoutDashboard } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState, useCallback } from "react";
@@ -206,6 +206,9 @@ export default function BusinessDashboardPage() {
   
   return (
     <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gradient flex items-center">
+        <LayoutDashboard className="h-8 w-8 mr-2" /> Dashboard
+      </h1>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Promociones Activas" value={stats.activeEntities} icon={Ticket} />
@@ -261,3 +264,5 @@ export default function BusinessDashboardPage() {
     </div>
   );
 }
+
+    
