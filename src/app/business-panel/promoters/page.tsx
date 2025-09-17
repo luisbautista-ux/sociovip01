@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -527,10 +526,15 @@ function BusinessPromoterForm({
 
     return (
       <div className="space-y-6">
-        <div className="flex justify-end items-center">
-          <Button onClick={handleOpenAddPromoterFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Añadir/Vincular Promotor
-          </Button>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h1 className="text-3xl font-bold text-primary flex items-center self-start">
+            <UserPlus className="h-8 w-8 mr-2" /> Mis Promotores
+          </h1>
+          <div className="self-end sm:self-center">
+            <Button onClick={handleOpenAddPromoterFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Añadir/Vincular Promotor
+            </Button>
+          </div>
         </div>
         
         {!currentBusinessId && !isLoading && userProfile && (
@@ -797,15 +801,3 @@ function BusinessPromoterForm({
       </div>
     );
   }
-
-    
-
-
-    
-
-
-
-
-
-    
-
