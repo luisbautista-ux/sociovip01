@@ -209,8 +209,9 @@ export default function PromoterDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center">
-        <BarChart2 className="h-8 w-8 mr-2" /> Dashboard del Promotor
+      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+        <BarChart2 className="h-8 w-8 text-primary !block" />
+        Dashboard del Promotor
       </h1>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -143,7 +143,7 @@ function BusinessPromoterForm({
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="text-blue-700 dark:text-blue-300">Vinculando Promotor Existente</AlertTitle>
                 <UIDialogDescription>
-                    Este promotor ya tiene una cuenta en la plataforma. Sus datos están pre-rellenados. Solo define la comisión para este vínculo.
+                    Este promotor ya tiene una cuenta en la plataforma. Sus datos están pre-rellenados.
                 </UIDialogDescription>
             </Alert>
         )}
@@ -228,19 +228,7 @@ function BusinessPromoterForm({
               )}
             />
         )}
-
-        <FormField
-          control={form.control}
-          name="commissionRate"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tasa de Comisión para este Negocio (Ej: 10% o S/5 por código)</FormLabel>
-              <FormControl><Input placeholder="Definir comisión para este negocio" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-              <FormMessageHook />
-            </FormItem>
-          )}
-        />
-
+        
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
@@ -426,7 +414,7 @@ function BusinessPromoterForm({
         if (editingPromoterLink) { 
           const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
           const updatePayload: Partial<BusinessPromoterLink> = {
-              commissionRate: data.commissionRate,
+              commissionRate: data.commissionRate, // Although not in form, handle if it exists
           };
           await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload));
           toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
@@ -596,10 +584,6 @@ function BusinessPromoterForm({
                           <span className="text-muted-foreground">DNI/CE</span>
                           <span className="font-semibold">{link.promoterDni}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Comisión</span>
-                          <span className="font-semibold">{link.commissionRate || "No definida"}</span>
-                        </div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Estado</span>
                           <Button 
@@ -656,7 +640,6 @@ function BusinessPromoterForm({
                       <TableHead>Nombre Promotor</TableHead>
                       <TableHead>DNI/CE <span className="text-destructive">*</span></TableHead>
                       <TableHead className="hidden lg:table-cell">Email</TableHead>
-                      <TableHead><Percent className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Comisión</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="hidden xl:table-cell">Vinculado Desde</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
@@ -669,7 +652,6 @@ function BusinessPromoterForm({
                           <TableCell className="font-medium">{link.promoterName || "N/A"}</TableCell>
                           <TableCell>{link.promoterDni}</TableCell>
                           <TableCell className="hidden lg:table-cell">{link.promoterEmail || "N/A"}</TableCell>
-                          <TableCell>{link.commissionRate || "No definida"}</TableCell>
                           <TableCell>
                             <Button 
                               variant="ghost" 
@@ -768,9 +750,9 @@ function BusinessPromoterForm({
                             <UIDialogTitle>{editingPromoterLink ? "Editar Vínculo con Promotor" : "Paso 2: Completar Datos del Promotor/Vínculo"}</UIDialogTitle>
                             <UIDialogDescription>
                                 {editingPromoterLink 
-                                    ? `Actualiza la tasa de comisión para ${editingPromoterLink.promoterName}.`
+                                    ? `Actualiza la información para ${editingPromoterLink.promoterName}.`
                                     : (verifiedPromoterDniResult?.existingPlatformUserPromoter 
-                                        ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos se usarán. Define la comisión y vincúlalo."
+                                        ? "Este DNI pertenece a un Promotor de la plataforma. Sus datos se usarán para vincularlo."
                                         : (verifiedPromoterDniResult?.qrClientData || verifiedPromoterDniResult?.socioVipData 
                                             ? "Este DNI fue encontrado como Cliente. Completa los datos para crear su cuenta de promotor y vincularlo."
                                             : "Ingresa los detalles para crear un nuevo usuario promotor y vincularlo a tu negocio."
@@ -800,7 +782,7 @@ function BusinessPromoterForm({
               <UIDialogDescription>
                 El promotor con DNI/CE <span className="font-semibold">{promoterLinkToEditFromAlert?.promoterDni}</span> ({promoterLinkToEditFromAlert?.promoterName}) ya está vinculado a tu negocio.
                 <br/><br/>
-                ¿Desea editar la información de este vínculo (ej. tasa de comisión)?
+                ¿Desea editar la información de este vínculo?
               </UIDialogDescription>
             </AlertDialogHeader>
             <ShadcnAlertDialogFooter>
@@ -819,4 +801,5 @@ function BusinessPromoterForm({
 
 
     
+
 

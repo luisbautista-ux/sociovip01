@@ -397,9 +397,9 @@ export default function PromoterEntitiesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <h1 className="text-3xl font-bold text-gradient flex items-center">
-          <Gift className="h-8 w-8 mr-2" /> Promociones y Eventos
-        </h1>
+      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+  <Gift className="h-8 w-8 text-primary !block" /> Promociones y Eventos
+</h1>
       </div>
       
       <section>

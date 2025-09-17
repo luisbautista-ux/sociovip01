@@ -145,9 +145,9 @@ export default function PromoterCommissionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center">
-        <DollarSign className="h-8 w-8 mr-2" /> Mis Comisiones
-      </h1>
+      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+  <DollarSign className="h-8 w-8 text-primary !block" /> Mis Comisiones
+</h1>
 
       <Card className="shadow-lg">
         <CardHeader>
