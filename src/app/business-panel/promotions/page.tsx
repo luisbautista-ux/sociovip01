@@ -166,7 +166,7 @@ export default function BusinessPromotionsPage() {
       
       const sortedPromotions = fetchedPromotions.sort((a,b) => {
          if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-         if (a.startDate && b.startDate) return new Date(a.startDate).getTime() - new Date(a.startDate).getTime();
+         if (a.startDate && b.startDate) return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
          return 0;
       });
       setPromotions(sortedPromotions);
@@ -498,16 +498,15 @@ export default function BusinessPromotionsPage() {
   
   return (
     <div className="space-y-6">
-       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 items-start">
-        <h1 className="text-3xl font-bold text-primary flex items-center">
+       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <h1 className="text-3xl font-bold text-primary flex items-center self-start">
           <TicketIconLucide className="h-8 w-8 mr-2" /> Promociones
         </h1>
-        <div>
+        <div className="self-end sm:self-center">
           <Button 
               onClick={() => handleOpenCreateEditModal(null)} 
               variant="gradient"
               disabled={!currentBusinessId || isSubmitting || isLoadingPageData}
-              className="w-auto"
           >
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Promoción
           </Button>
@@ -843,4 +842,5 @@ export default function BusinessPromotionsPage() {
     
 
     
+
 
