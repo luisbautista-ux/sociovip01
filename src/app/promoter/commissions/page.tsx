@@ -130,12 +130,24 @@ export default function PromoterCommissionsPage() {
     }
     const headers = ["Periodo", "Negocio", "Promoción/Evento", "Códigos Usados", "Tasa Aplicada", "Comisión Ganada (S/)", "Estado"];
     const rows = dataToExport.map(c => [
-      c.period, c.businessName, c.entityName, c.promoterCodesRedeemed, c.commissionRateApplied, c.commissionEarned.toFixed(2), c.paymentStatus
-    ].map(cell => `"${String(cell).replace(/"/g, '""')}"`));
-    
-    let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
+      c.period,
+      c.businessName,
+      c.entityName,
+      c.promoterCodesRedeemed,
+      c.commissionRateApplied,
+      c.commissionEarned.toFixed(2),
+      c.paymentStatus
+    ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
+
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(';'),
+      ...rows.map(r => r.join(';'))
+    ].join('\n');
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
     link.setAttribute("download", `mis_comisiones_${userProfile?.name?.replace(/\s+/g, '_') || 'promotor'}.csv`);
     document.body.appendChild(link);
     link.click();
@@ -146,8 +158,8 @@ export default function PromoterCommissionsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-  <DollarSign className="h-8 w-8 text-primary !block" /> Mis Comisiones
-</h1>
+        <DollarSign className="h-8 w-8 text-primary !block" /> Mis Comisiones
+      </h1>
 
       <Card className="shadow-lg">
         <CardHeader>
