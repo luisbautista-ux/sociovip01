@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
@@ -9,18 +10,17 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Contact, Crown, Download, Search } from "lucide-react";
-import { format, parse } from "date-fns";
+import { Contact, Crown, Download, Search, Calendar as CalendarIcon } from "lucide-react";
+import { format, parse, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 /* ===================== Helpers de fecha (aceptan Timestamp/Date/string/number) ===================== */
 function anyToDate(value: any): Date | null {
@@ -84,7 +84,6 @@ const ClientSideFormattedDateTime = ({ value, fmt = "P p" }: { value: any; fmt?:
 };
 
 /* ===================== Tipos mínimos locales ===================== */
-type BusinessClientType = "qr" | "vip";
 
 type QrClient = {
   id: string;
@@ -96,37 +95,7 @@ type QrClient = {
   generatedForBusinessId: string;
 };
 
-type SocioVipMember = {
-  id: string;
-  name: string;
-  surname: string;
-  email?: string;
-  phone?: string | number;
-  dni: string;
-  joinDate: any; // Timestamp/Date/string/number
-  loyaltyPoints?: number;
-  membershipStatus?: "active" | "inactive" | "pending_payment" | "cancelled";
-  businessId?: string; // Es opcional y puede no estar
-};
-
-type BusinessClientView = {
-  id: string;
-  clientType: BusinessClientType;
-  name: string;
-  surname: string;
-  dni: string;
-  phone?: string | number;
-  email?: string;
-  relevantDate: any;
-  isVip: boolean;
-  loyaltyPoints?: number;
-  membershipStatus?: SocioVipMember["membershipStatus"];
-};
-
-const membershipStatusTranslations: Record<
-  NonNullable<SocioVipMember["membershipStatus"]>,
-  string
-> = {
+const membershipStatusTranslations: Record<string, string> = {
   active: "Activa",
   inactive: "Inactiva",
   pending_payment: "Pendiente Pago",
@@ -138,11 +107,10 @@ export default function AdminQrClientsPage() {
   const { toast } = useToast();
 
   const [qrClients, setQrClients] = useState<QrClient[]>([]);
-  const [vipMembers, setVipMembers] = useState<SocioVipMember[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<BusinessClientType | "all">("all");
+  const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
 
   const isSuperAdmin = !!userProfile?.roles?.includes?.("superadmin");
 
@@ -162,23 +130,9 @@ export default function AdminQrClientsPage() {
           return qrSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
         };
         
-        // Only superadmin can see VIP members for now to avoid permission errors
-        // since VIP members don't have businessId
-        const fetchVipMembers = async () => {
-          if (!isSuperAdmin) return [];
-
-          const vipRef = collection(db, "socioVipMembers");
-          const vipSnap = await getDocs(vipRef);
-          return vipSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as SocioVipMember[];
-        };
-        
-        const [qrData, vipData] = await Promise.all([
-          fetchQrClients(),
-          fetchVipMembers()
-        ]);
+        const qrData = await fetchQrClients();
 
         setQrClients(qrData);
-        setVipMembers(vipData);
 
       } catch (e: any) {
         console.error("Error cargando clientes:", e?.code, e?.message);
@@ -194,52 +148,31 @@ export default function AdminQrClientsPage() {
 
     load();
   }, [userProfile, isSuperAdmin, toast]);
-
-  const combinedClients = useMemo<BusinessClientView[]>(() => {
-    const qrViews: BusinessClientView[] = qrClients.map((qc) => ({
-      id: qc.id,
-      clientType: "qr",
-      name: qc.name ?? "",
-      surname: qc.surname ?? "",
-      dni: qc.dni ?? "",
-      phone: qc.phone,
-      email: undefined,
-      relevantDate: qc.registrationDate,
-      isVip: false,
-    }));
-
-    const vipViews: BusinessClientView[] = vipMembers.map((svm) => ({
-      id: svm.id,
-      clientType: "vip",
-      name: svm.name ?? "",
-      surname: svm.surname ?? "",
-      dni: svm.dni ?? "",
-      phone: svm.phone,
-      email: svm.email,
-      relevantDate: svm.joinDate,
-      isVip: true,
-      loyaltyPoints: svm.loyaltyPoints,
-      membershipStatus: svm.membershipStatus,
-    }));
-
-    return [...qrViews, ...vipViews].sort((a, b) => {
-      const ta = anyToDate(a.relevantDate)?.getTime() ?? 0;
-      const tb = anyToDate(b.relevantDate)?.getTime() ?? 0;
-      return tb - ta; // descendente
-    });
-  }, [qrClients, vipMembers]);
-
+  
   const filteredClients = useMemo(() => {
-    const searchLower = searchTerm.toLowerCase();
-    return combinedClients.filter((c) => {
-      const typeMatch = filterType === "all" || c.clientType === filterType;
+    return qrClients.filter((c) => {
+      const searchLower = searchTerm.toLowerCase();
       const nameMatch = `${c.name} ${c.surname}`.toLowerCase().includes(searchLower);
       const dniMatch = (c.dni ?? "").toLowerCase().includes(searchLower);
-      const emailMatch = (c.email ?? "").toLowerCase().includes(searchLower);
       const phoneMatch = String(c.phone ?? "").includes(searchTerm);
-      return typeMatch && (nameMatch || dniMatch || emailMatch || phoneMatch);
+      
+      const searchFilter = nameMatch || dniMatch || phoneMatch;
+
+      if (!filterDate) {
+        return searchFilter;
+      }
+      
+      const regDate = anyToDate(c.registrationDate);
+      if (!regDate) return false;
+
+      const interval = {
+        start: startOfDay(filterDate),
+        end: endOfDay(filterDate),
+      };
+
+      return searchFilter && isWithinInterval(regDate, interval);
     });
-  }, [searchTerm, filterType, combinedClients]);
+  }, [searchTerm, filterDate, qrClients]);
 
   const handleExportCsv = () => {
     if (filteredClients.length === 0) {
@@ -252,20 +185,16 @@ export default function AdminQrClientsPage() {
     }
   
     const headers = [
-      "ID", "Tipo Cliente", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Email", "Fecha Registro/Ingreso", "Puntos (VIP)", "Estado Membresía (VIP)",
+      "ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Registro",
     ];
   
     const rows = filteredClients.map((c) => [
       c.id,
-      c.clientType === "qr" ? "Cliente QR" : "Socio VIP",
       c.name,
       c.surname,
       `'${c.dni}`, // Precede con ' para tratar como texto
       `'${c.phone || "N/A"}`, // Precede con '
-      c.email || "N/A",
-      renderDate(c.relevantDate, "P p"),
-      c.isVip ? String(c.loyaltyPoints ?? 0) : "N/A",
-      c.isVip && c.membershipStatus ? membershipStatusTranslations[c.membershipStatus] : "N/A",
+      renderDate(c.registrationDate, "P p"),
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`)); // Quoting and escaping
   
     const csvContent = [
@@ -297,7 +226,7 @@ export default function AdminQrClientsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Listado de Clientes</CardTitle>
+          <CardTitle>Listado de Clientes QR</CardTitle>
           <CardDescription>
             {isSuperAdmin ? "Visualizando clientes de todos los negocios." : "Visualizando clientes de tu negocio asignado."}
           </CardDescription>
@@ -306,25 +235,38 @@ export default function AdminQrClientsPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar por nombre, DNI, email, teléfono..."
+                placeholder="Buscar por nombre, DNI, teléfono..."
                 className="pl-8 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select
-              value={filterType}
-              onValueChange={(v) => setFilterType(v as BusinessClientType | "all")}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Filtrar por tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="qr">Clientes QR</SelectItem>
-                {isSuperAdmin && <SelectItem value="vip">Socios VIP</SelectItem>}
-              </SelectContent>
-            </Select>
+             <div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !filterDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Filtrar por fecha de registro</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={filterDate}
+                    onSelect={setFilterDate}
+                    initialFocus
+                    locale={es}
+                  />
+                  {filterDate && <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => setFilterDate(undefined)}>Limpiar filtro</Button>}
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </CardHeader>
 
@@ -335,9 +277,8 @@ export default function AdminQrClientsPage() {
                 <TableHead>Nombre Completo</TableHead>
                 <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
                 <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
-                <TableHead className="hidden xl:table-cell">Email</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Fecha Reg./Ingreso</TableHead>
+                <TableHead>Fecha Registro</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -349,25 +290,20 @@ export default function AdminQrClientsPage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{c.dni}</TableCell>
                     <TableCell className="hidden lg:table-cell">{c.phone || "N/A"}</TableCell>
-                    <TableCell className="hidden xl:table-cell">{c.email || "N/A"}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={c.isVip ? "default" : "secondary"}
-                        className={c.isVip ? "bg-yellow-500 hover:bg-yellow-600 text-black" : ""}
-                      >
-                        {c.isVip && <Crown className="mr-1 h-3.5 w-3.5" />}
-                        {c.clientType === "qr" ? "Cliente QR" : "Socio VIP"}
+                      <Badge variant={"secondary"}>
+                        Cliente QR
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <ClientSideFormattedDateTime value={c.relevantDate} fmt="P p" />
+                      <ClientSideFormattedDateTime value={c.registrationDate} fmt="P p" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center h-24">
-                    No se encontraron clientes.
+                    No se encontraron clientes con los filtros aplicados.
                   </TableCell>
                 </TableRow>
               )}
@@ -378,3 +314,4 @@ export default function AdminQrClientsPage() {
     </div>
   );
 }
+
