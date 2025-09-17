@@ -70,7 +70,6 @@ const promoterFormSchemaBase = z.object({
     .regex(/^9\d{8}$/, "El celular debe empezar con 9 y tener 9 dígitos.")
     .optional()
     .or(z.literal('')),
-  commissionRate: z.string().optional(),
 });
 
 const promoterFormSchemaCreate = promoterFormSchemaBase.extend({
@@ -113,7 +112,6 @@ function BusinessPromoterForm({
         promoterName: promoterLinkToEdit?.promoterName || initialData?.existingPlatformUserPromoter?.name || `${initialData?.qrClientData?.name || initialData?.socioVipData?.name || ''} ${initialData?.qrClientData?.surname || initialData?.socioVipData?.surname || ''}`.trim() || "",
         promoterEmail: promoterLinkToEdit?.promoterEmail || initialData?.existingPlatformUserPromoter?.email || initialData?.socioVipData?.email || "",
         promoterPhone: promoterLinkToEdit?.promoterPhone || (initialData?.existingPlatformUserPromoter as any)?.phone || initialData?.qrClientData?.phone?.toString() || initialData?.socioVipData?.phone?.toString() || "",
-        commissionRate: promoterLinkToEdit?.commissionRate || "",
         password: initialData?.dni || "",
     },
   });
@@ -124,7 +122,6 @@ function BusinessPromoterForm({
       promoterName: promoterLinkToEdit?.promoterName || initialData?.existingPlatformUserPromoter?.name || `${initialData?.qrClientData?.name || initialData?.socioVipData?.name || ''} ${initialData?.qrClientData?.surname || initialData?.socioVipData?.surname || ''}`.trim() || "",
       promoterEmail: promoterLinkToEdit?.promoterEmail || initialData?.existingPlatformUserPromoter?.email || initialData?.socioVipData?.email || "",
       promoterPhone: promoterLinkToEdit?.promoterPhone || (initialData?.existingPlatformUserPromoter as any)?.phone || initialData?.qrClientData?.phone?.toString() || initialData?.socioVipData?.phone?.toString() || "",
-      commissionRate: promoterLinkToEdit?.commissionRate || "",
       password: initialData?.dni || "",
     });
   }, [promoterLinkToEdit, initialData, form]);
@@ -414,7 +411,7 @@ function BusinessPromoterForm({
         if (editingPromoterLink) { 
           const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
           const updatePayload: Partial<BusinessPromoterLink> = {
-              commissionRate: data.commissionRate, // Although not in form, handle if it exists
+              commissionRate: data.commissionRate, 
           };
           await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload));
           toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
@@ -614,10 +611,13 @@ function BusinessPromoterForm({
                                 </DropdownMenuItem>
                               </AlertDialogTrigger>
                               <AlertDialogContent>
-                                <AlertDialogHeader><UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle><UIDialogDescription>
-                                  Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span> de tu negocio.
-                                  No se eliminará su perfil global (si lo tiene).
-                                </UIDialogDescription></AlertDialogHeader>
+                                <AlertDialogHeader>
+                                  <UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span> de tu negocio.
+                                    No se eliminará su perfil global (si lo tiene).
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
                                 <ShadcnAlertDialogFooter>
                                   <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                                   <AlertDialogAction onClick={() => handleDeletePromoterLink(link)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>
@@ -680,10 +680,10 @@ function BusinessPromoterForm({
                               <AlertDialogContent>
                                 <AlertDialogHeader>
                                   <UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle>
-                                  <UIDialogDescription>
+                                  <AlertDialogDescription>
                                     Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span> de tu negocio.
                                     No se eliminará su perfil global (si lo tiene).
-                                  </UIDialogDescription>
+                                  </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <ShadcnAlertDialogFooter>
                                   <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
@@ -779,11 +779,11 @@ function BusinessPromoterForm({
               <UIAlertDialogTitle className="flex items-center">
                   <AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Promotor ya Vinculado
               </UIAlertDialogTitle>
-              <UIDialogDescription>
+              <AlertDialogDescription>
                 El promotor con DNI/CE <span className="font-semibold">{promoterLinkToEditFromAlert?.promoterDni}</span> ({promoterLinkToEditFromAlert?.promoterName}) ya está vinculado a tu negocio.
                 <br/><br/>
                 ¿Desea editar la información de este vínculo?
-              </UIDialogDescription>
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <ShadcnAlertDialogFooter>
               <AlertDialogCancel onClick={() => { setShowAlreadyLinkedAlert(false); setPromoterLinkToEditFromAlert(null); }}>No, Cancelar</AlertDialogCancel>
@@ -801,5 +801,6 @@ function BusinessPromoterForm({
 
 
     
+
 
 
