@@ -127,7 +127,12 @@ function BusinessPromoterForm({
   }, [promoterLinkToEdit, initialData, form]);
 
   const handleSubmit = (values: PromoterFormValues) => {
-    onSubmit(values);
+    const { password, ...rest } = values;
+    const finalData: BusinessPromoterFormData = rest;
+    if (needsPassword) {
+      finalData.password = password;
+    }
+    onSubmit(finalData);
   };
   
   const disableContactFields = isPrePopulatedFromPlatformUser;
@@ -410,10 +415,8 @@ function BusinessPromoterForm({
       try {
         if (editingPromoterLink) { 
           const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
-          const updatePayload: Partial<BusinessPromoterLink> = {
-              commissionRate: data.commissionRate, 
-          };
-          await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload));
+          const { promoterDni, ...updatePayload } = data; // DNI is not editable in link
+          await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload as any));
           toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
         } else if (verifiedPromoterDniResult?.existingPlatformUserPromoter) {
           // Link existing platform user
@@ -428,7 +431,6 @@ function BusinessPromoterForm({
               promoterName: verifiedPromoterDniResult.existingPlatformUserPromoter.name,
               promoterEmail: verifiedPromoterDniResult.existingPlatformUserPromoter.email,
               promoterPhone: verifiedPromoterDniResult.existingPlatformUserPromoter.phone || "",
-              commissionRate: data.commissionRate,
               isActive: true,
               isPlatformUser: true,
               platformUserUid: verifiedPromoterDniResult.existingPlatformUserPromoter.uid,
@@ -451,7 +453,7 @@ function BusinessPromoterForm({
             email: data.promoterEmail, password: data.password, displayName: data.promoterName,
             firestoreData: {
               dni: verifiedPromoterDniResult.dni, name: data.promoterName, email: data.promoterEmail,
-              phone: data.promoterPhone, commissionRate: data.commissionRate
+              phone: data.promoterPhone,
             }
           };
 
@@ -477,34 +479,29 @@ function BusinessPromoterForm({
     };
     
     const handleDeletePromoterLink = async (link: BusinessPromoterLink) => {
-      if (isSubmitting) return;
-      setIsSubmitting(true);
-      try {
-        const batch = writeBatch(db);
-        // Remove link
-        const linkRef = doc(db, "businessPromoterLinks", link.id);
-        batch.delete(linkRef);
-
-        // If user is a platform user, remove this businessId from their profile
-        if (link.isPlatformUser && link.platformUserUid && currentBusinessId) {
-          const userRef = doc(db, "platformUsers", link.platformUserUid);
-          const userDoc = await getDoc(userRef);
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as PlatformUser;
-            const updatedBusinessIds = (userData.businessIds || []).filter(id => id !== currentBusinessId);
-            batch.update(userRef, { businessIds: updatedBusinessIds });
-          }
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            // The business admin only has permission to delete the link,
+            // not to modify other user's profiles.
+            await deleteDoc(doc(db, "businessPromoterLinks", link.id));
+            
+            toast({
+                title: "Promotor Desvinculado",
+                description: `${link.promoterName || 'El promotor'} ha sido desvinculado de tu negocio.`,
+                variant: "destructive"
+            });
+            fetchPromoterLinks(); // Refresh the list
+        } catch (error: any) {
+            console.error("Promoters Page: Failed to delete promoter link:", error);
+            toast({
+                title: "Error al Desvincular",
+                description: `No se pudo desvincular el promotor. Error: ${error.message}`,
+                variant: "destructive"
+            });
+        } finally {
+            setIsSubmitting(false);
         }
-        await batch.commit();
-        
-        toast({ title: "Promotor Desvinculado", description: `${link.promoterName || 'El promotor'} ha sido desvinculado.`, variant: "destructive" });
-        fetchPromoterLinks();
-      } catch (error: any) {
-        console.error("Promoters Page: Failed to delete promoter link:", error);
-        toast({ title: "Error al Desvincular", description: `No se pudo desvincular el promotor. ${error.message}`, variant: "destructive"});
-      } finally {
-        setIsSubmitting(false);
-      }
     };
 
     const handleTogglePromoterLinkStatus = async (link: BusinessPromoterLink) => {
@@ -804,3 +801,6 @@ function BusinessPromoterForm({
 
 
 
+
+
+    
