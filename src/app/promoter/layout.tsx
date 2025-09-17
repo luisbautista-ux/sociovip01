@@ -209,9 +209,8 @@ export default function PromoterLayout({
               </SheetContent>
             </Sheet>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex-grow flex items-center gap-2">
             <SocioVipLogo className="h-7 w-7 text-gradient md:hidden" />
-            <h1 className="text-xl font-semibold text-gradient hidden md:block">Panel Promotor</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
