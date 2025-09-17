@@ -250,10 +250,15 @@ export default function BusinessPanelValidateQrPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4">
-        <Button onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} variant={isScannerActive ? "destructive" : "gradient"} className="w-full sm:w-auto">
-          <Camera className="mr-2 h-5 w-5" /> {isScannerActive ? "Detener Escáner" : "Activar Escáner"}
-        </Button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-bold text-primary flex items-center self-start">
+          <QrCodeIcon className="h-8 w-8 mr-2" /> Validación de Códigos QR
+        </h1>
+        <div className="self-end sm:self-center">
+            <Button onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} variant={isScannerActive ? "destructive" : "gradient"} className="w-full sm:w-auto">
+              <Camera className="mr-2 h-5 w-5" /> {isScannerActive ? "Detener Escáner" : "Activar Escáner"}
+            </Button>
+        </div>
       </div>
       
       {isScannerActive && (
