@@ -89,7 +89,7 @@ export default function AdminQrClientsPage() {
   });
 
   const handleExport = () => {
-     if (filteredClients.length === 0) {
+    if (filteredClients.length === 0) {
       toast({ title: "Sin Datos", description: "No hay clientes QR para exportar.", variant: "destructive" });
       return;
     }
@@ -98,19 +98,21 @@ export default function AdminQrClientsPage() {
       client.id,
       client.name,
       client.surname,
-      client.dni,
-      client.phone,
+      `'${client.dni}`, // Prepend with ' to treat as text
+      `'${client.phone}`, // Prepend with ' to treat as text
       client.dob && typeof client.dob === 'string' ? format(parseISO(client.dob), "dd/MM/yyyy", { locale: es }) : 'N/A',
       client.registrationDate && typeof client.registrationDate === 'string' ? format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm", { locale: es }) : 'N/A',
-    ]);
+    ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`)); // Quote and escape
 
-    let csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(",") + "\n"
-      + rows.map(e => e.join(",")).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(';'), // Use semicolon and quote headers
+      ...rows.map(r => r.join(';')) // Use semicolon
+    ].join('\n');
+    
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // Add BOM
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
     link.setAttribute("download", "sociovip_clientes_qr.csv");
     document.body.appendChild(link);
     link.click();
@@ -121,8 +123,10 @@ export default function AdminQrClientsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-gradient flex items-center">
-          <ListChecks className="h-8 w-8 mr-2" /> Clientes de Códigos Promocionales
+        {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
+        <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+          <ListChecks className="h-8 w-8 text-primary !block" />
+          Clientes QR
         </h1>
         <Button onClick={handleExport} variant="outline" disabled={isLoading || qrClients.length === 0}>
           <Download className="mr-2 h-4 w-4" /> Exportar CSV
@@ -229,4 +233,3 @@ export default function AdminQrClientsPage() {
     </div>
   );
 }
-    

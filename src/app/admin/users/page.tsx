@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -174,20 +175,24 @@ export default function AdminUsersPage() {
       return [
         user.id,
         user.uid || "N/A",
-        user.dni,
+        `'${user.dni}`,
         user.name,
         user.email,
         user.roles.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ') || "N/A",
         user.businessId ? (businessNameMap.get(user.businessId) || `ID: ${user.businessId}`) : "N/A",
         lastLoginDate ? format(lastLoginDate, "dd/MM/yyyy HH:mm", { locale: es }) : "N/A"
-      ];
+      ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`);
     });
-    let csvContent = "data:text/csv;charset=utf-8,"
-      + headers.join(",") + "\n"
-      + rows.map(e => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
+    
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(';'),
+      ...rows.map(r => r.join(';'))
+    ].join('\n');
+    
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
     link.setAttribute("download", "sociovip_usuarios_plataforma.csv");
     document.body.appendChild(link);
     link.click();
