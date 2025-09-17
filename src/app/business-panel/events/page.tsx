@@ -558,8 +558,8 @@ export default function BusinessEventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <h1 className="text-3xl font-bold text-gradient flex items-center self-start sm:self-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-bold text-primary flex items-center self-start">
             <Calendar className="h-8 w-8 mr-2" /> Eventos
         </h1>
         <div className="self-end sm:self-center">
