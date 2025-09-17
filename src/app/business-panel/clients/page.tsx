@@ -211,13 +211,15 @@ export default function BusinessClientsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-primary flex items-center gap-2">
-          <Contact className="h-8 w-8" /> Mis Clientes
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-bold text-primary flex items-center self-start">
+          <Contact className="h-8 w-8 mr-2" /> Mis Clientes
         </h1>
-        <Button onClick={handleExportCsv} variant="outline">
-          <Download className="mr-2 h-4 w-4" /> Exportar CSV
-        </Button>
+        <div className="self-end sm:self-center">
+            <Button onClick={handleExportCsv} variant="gradient">
+              <Download className="mr-2 h-4 w-4" /> Exportar CSV
+            </Button>
+        </div>
       </div>
 
       <Card className="shadow-lg">
