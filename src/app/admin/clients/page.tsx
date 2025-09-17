@@ -185,6 +185,9 @@ export default function AdminQrClientsPage() {
               </Select>
             </div>
           </div>
+          <div className="text-sm text-muted-foreground pt-4">
+            Mostrando <span className="font-semibold text-foreground">{filteredClients.length}</span> de <span className="font-semibold text-foreground">{qrClients.length}</span> clientes totales.
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
