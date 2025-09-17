@@ -128,7 +128,7 @@ function BusinessPromoterForm({
 
   const handleSubmit = (values: PromoterFormValues) => {
     const { password, ...rest } = values;
-    const finalData: BusinessPromoterFormData = rest;
+    const finalData: BusinessPromoterFormData = { ...rest, promoterDni: initialData?.dni || promoterLinkToEdit?.promoterDni || "" };
     if (needsPassword) {
       finalData.password = password;
     }
@@ -419,42 +419,42 @@ function BusinessPromoterForm({
       }
       setIsSubmitting(true);
       try {
+        const idToken = await currentUser.getIdToken();
+        
         if (editingPromoterLink) { 
           const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
-          const { promoterDni, ...updatePayload } = data; // DNI is not editable in link
+          const { password, promoterDni, ...updatePayload } = data; // DNI and password are not editable in an existing link
           await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload as any));
           toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
+        
         } else if (verifiedPromoterDniResult?.existingPlatformUserPromoter) {
-          // Link existing platform user
-          const batch = writeBatch(db);
-          const userRef = doc(db, "platformUsers", verifiedPromoterDniResult.existingPlatformUserPromoter.uid);
-          const newBusinessIds = [...(verifiedPromoterDniResult.existingPlatformUserPromoter.businessIds || []), currentBusinessId];
-          batch.update(userRef, { businessIds: newBusinessIds });
-          
-          const linkPayload = {
-              businessId: currentBusinessId,
-              promoterDni: verifiedPromoterDniResult.dni,
-              promoterName: verifiedPromoterDniResult.existingPlatformUserPromoter.name,
-              promoterEmail: verifiedPromoterDniResult.existingPlatformUserPromoter.email,
-              promoterPhone: (verifiedPromoterDniResult.existingPlatformUserPromoter as any).phone || "",
-              isActive: true,
-              isPlatformUser: true,
-              platformUserUid: verifiedPromoterDniResult.existingPlatformUserPromoter.uid,
-              joinDate: serverTimestamp(),
-          };
-          const linkDocRef = doc(collection(db, "businessPromoterLinks"));
-          batch.set(linkDocRef, sanitizeObjectForFirestore(linkPayload));
-          await batch.commit();
+          // Link existing platform user via API
+           const linkPayload = {
+              promoterUid: verifiedPromoterDniResult.existingPlatformUserPromoter.uid,
+              promoterData: {
+                  promoterDni: verifiedPromoterDniResult.dni,
+                  promoterName: data.promoterName,
+                  promoterEmail: data.promoterEmail,
+                  promoterPhone: data.promoterPhone || "",
+              }
+            };
+            const response = await fetch('/api/business-panel/link-promoter', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, 
+                body: JSON.stringify(linkPayload)
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Error al vincular promotor.');
+
           toast({ title: "Promotor Vinculado", description: `${data.promoterName} ha sido vinculado a tu negocio.` });
 
         } else if(verifiedPromoterDniResult) { 
-          // Create new platform user
+          // Create new platform user via API
           if(!data.password) {
               toast({ title: "Error de Validación", description: `La contraseña es requerida para un nuevo promotor.`, variant: "destructive"});
               setIsSubmitting(false);
               return;
           }
-          const idToken = await currentUser.getIdToken();
           const creationPayload = {
             email: data.promoterEmail, password: data.password, displayName: data.promoterName,
             firestoreData: {
@@ -488,8 +488,6 @@ function BusinessPromoterForm({
         if (isSubmitting) return;
         setIsSubmitting(true);
         try {
-            // The business admin only has permission to delete the link,
-            // not to modify other user's profiles.
             await deleteDoc(doc(db, "businessPromoterLinks", link.id));
             
             toast({
@@ -497,7 +495,7 @@ function BusinessPromoterForm({
                 description: `${link.promoterName || 'El promotor'} ha sido desvinculado de tu negocio.`,
                 variant: "destructive"
             });
-            fetchPromoterLinks(); // Refresh the list
+            fetchPromoterLinks();
         } catch (error: any) {
             console.error("Promoters Page: Failed to delete promoter link:", error);
             toast({
@@ -810,3 +808,4 @@ function BusinessPromoterForm({
 
 
     
+
