@@ -252,7 +252,7 @@ export default function BusinessPanelValidateQrPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-primary flex items-center self-start">
-          <QrCodeIcon className="h-8 w-8 mr-2" /> Validación de Códigos QR
+          <QrCodeIcon className="h-8 w-8 mr-2" /> Validación de QR
         </h1>
         <div className="self-end sm:self-center">
             <Button onClick={isScannerActive ? () => setIsScannerActive(false) : handleActivateScanner} variant={isScannerActive ? "destructive" : "gradient"} className="w-full sm:w-auto">

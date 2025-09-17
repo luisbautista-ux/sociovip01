@@ -107,8 +107,8 @@ export default function PromoterProfilePage() {
   return (
     <div className="space-y-6">
        <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-  <UserCircle className="h-8 w-8 text-primary !block" /> Mi Perfil de Promotor
-</h1>
+          <UserCircle className="h-8 w-8 text-primary !block" /> Mi Perfil
+        </h1>
 
       <Card className="shadow-lg max-w-2xl mx-auto">
         <CardHeader>
