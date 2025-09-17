@@ -1014,10 +1014,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           </Card>
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-            <Link href="/login" passHref>
+          <div className="max-w-7xl mx-auto flex flex-row justify-between items-center gap-4">
+            <Link href="/login" passHref className="flex-1">
                 <Button 
-                    className="text-white"
+                    className="text-white w-full"
                     style={{
                         backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                     }}
@@ -1026,9 +1026,9 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                     Iniciar Sesión
                 </Button>
             </Link>
-            <Link href="/" passHref>
+            <Link href="/" passHref className="flex-1">
                 <Button 
-                    className="text-white"
+                    className="text-white w-full"
                     style={{
                         backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                     }}
@@ -1532,6 +1532,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
 
 
 
