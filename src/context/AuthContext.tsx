@@ -9,6 +9,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut,
+  sendPasswordResetEmail,
   UserCredential
 } from "firebase/auth";
 import type { AuthError } from "firebase/auth"; 
@@ -26,6 +27,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<UserCredential | AuthError>;
   signup: (email: string, pass: string, name?: string, role?: PlatformUserRole) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -178,6 +180,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error as AuthError };
+    }
+  }, []);
+
   const value = useMemo(() => ({
     currentUser,
     userProfile,
@@ -186,7 +197,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     signup,
     logout,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout]);
+    sendPasswordReset,
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
