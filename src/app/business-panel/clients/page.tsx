@@ -261,6 +261,9 @@ export default function BusinessClientsPage() {
               </Popover>
             </div>
           </div>
+          <div className="text-sm text-muted-foreground pt-4">
+              Mostrando <span className="font-semibold text-foreground">{filteredClients.length}</span> de <span className="font-semibold text-foreground">{qrClients.length}</span> clientes totales.
+          </div>
         </CardHeader>
 
         <CardContent>
@@ -303,11 +306,6 @@ export default function BusinessClientsPage() {
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter className="border-t p-4">
-            <div className="text-sm text-muted-foreground">
-                <span className="font-semibold">{filteredClients.length}</span> de <span className="font-semibold">{qrClients.length}</span> clientes mostrados.
-            </div>
-        </CardFooter>
       </Card>
     </div>
   );
