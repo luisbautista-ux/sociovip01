@@ -29,7 +29,8 @@ import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import type { AuthError } from "firebase/auth";
-import { useRouter } from "next/navigation"; // Importar useRouter
+import { useRouter } from "next/navigation"; 
+import { ResetPasswordModal } from "./ResetPasswordModal"; 
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
@@ -45,9 +46,10 @@ interface LoginModalProps {
 
 export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
   const { toast } = useToast();
   const { login } = useAuth();
-  const router = useRouter(); // Instanciar el router
+  const router = useRouter(); 
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -66,9 +68,9 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
           title: "Inicio de Sesión Exitoso",
           description: "Bienvenido/a de nuevo. Redirigiendo...",
         });
-        onOpenChange(false); // Cierra el modal
-        form.reset(); // Limpia el formulario
-        router.push("/auth/dispatcher"); // <<<--- CORRECCIÓN: Redirigir al dispatcher
+        onOpenChange(false); 
+        form.reset(); 
+        router.push("/auth/dispatcher"); 
       } else { // AuthError
         const errorCode = (result as AuthError).code;
         let errorMessage = "Ocurrió un error al iniciar sesión.";
@@ -96,53 +98,66 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-2xl text-center">Iniciar Sesión</DialogTitle>
-          <DialogDescription className="text-center">
-            Accede a tu cuenta SocioVIP.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-6 py-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contraseña <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" variant="gradient" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Ingresar"}
-            </Button>
-          </form>
-        </Form>
-        <DialogFooter className="text-center text-sm flex-col items-center">
-          <DialogClose asChild>
-             <Button type="button" variant="ghost" className="mt-2 text-muted-foreground">Cancelar</Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-center">Iniciar Sesión</DialogTitle>
+            <DialogDescription className="text-center">
+              Accede a tu cuenta SocioVIP.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-6 py-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="text-right">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-primary h-auto p-0 text-sm font-medium"
+                  onClick={() => { onOpenChange(false); setShowResetModal(true); }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </Button>
+              </div>
+              <Button type="submit" className="w-full" variant="gradient" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Ingresar"}
+              </Button>
+            </form>
+          </Form>
+          <DialogFooter className="text-center text-sm flex-col items-center">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" className="mt-2 text-muted-foreground">Cancelar</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ResetPasswordModal open={showResetModal} onOpenChange={setShowResetModal} />
+    </>
   );
 }
