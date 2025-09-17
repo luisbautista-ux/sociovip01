@@ -250,52 +250,38 @@ export default function AdminQrClientsPage() {
       });
       return;
     }
-
-    const q = (s: string) => `"${String(s).replace(/"/g, '""')}"`; // escape seguro para CSV
-
+  
     const headers = [
-      "ID",
-      "Tipo Cliente",
-      "Nombres",
-      "Apellidos",
-      "DNI/CE",
-      "Teléfono",
-      "Email",
-      "Fecha Registro/Ingreso",
-      "Puntos (VIP)",
-      "Estado Membresía (VIP)",
+      "ID", "Tipo Cliente", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Email", "Fecha Registro/Ingreso", "Puntos (VIP)", "Estado Membresía (VIP)",
     ];
-
+  
     const rows = filteredClients.map((c) => [
       c.id,
       c.clientType === "qr" ? "Cliente QR" : "Socio VIP",
       c.name,
       c.surname,
-      c.dni,
-      c.phone || "N/A",
+      `'${c.dni}`, // Precede con ' para tratar como texto
+      `'${c.phone || "N/A"}`, // Precede con '
       c.email || "N/A",
       renderDate(c.relevantDate, "P p"),
       c.isVip ? String(c.loyaltyPoints ?? 0) : "N/A",
       c.isVip && c.membershipStatus ? membershipStatusTranslations[c.membershipStatus] : "N/A",
-    ].map(q));
-
-    const csv =
-      "data:text/csv;charset=utf-8," +
-      headers.map(q).join(",") +
-      "\n" +
-      rows.map((r) => r.join(",")).join("\n");
-
-    const encoded = encodeURI(csv);
+    ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`)); // Quoting and escaping
+  
+    const csvContent = [
+      headers.map(h => `"${h}"`).join(';'),
+      ...rows.map(r => r.join(';'))
+    ].join('\n');
+  
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    link.setAttribute("href", encoded);
-    link.setAttribute(
-      "download",
-      `clientes_${isSuperAdmin ? "todos_negocios" : userProfile?.businessId ?? "negocio"}.csv`
-    );
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `clientes_${isSuperAdmin ? "todos_negocios" : userProfile?.businessId ?? "negocio"}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
+  
     toast({ title: "Exportación Exitosa", description: `${filteredClients.length} clientes exportados.` });
   };
 
