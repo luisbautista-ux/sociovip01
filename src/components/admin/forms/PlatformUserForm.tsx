@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -67,7 +66,9 @@ export function PlatformUserForm({
   const isSuperAdminView = currentUserProfile?.roles.includes('superadmin') || false;
 
   const rolesToDisplay = isSuperAdminView ? ALL_PLATFORM_USER_ROLES : allowedRoles;
-  const isSingleRoleSelection = !isSuperAdminView;
+  
+  // En SuperAdminView, ahora se usa RadioGroup, que es single selection.
+  const isSingleRoleSelection = true; 
 
   const isEditing = !!user;
   const needsPassword = !isEditing;
@@ -124,7 +125,8 @@ export function PlatformUserForm({
                   DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation.preExistingUserType]}
                 </AlertTitle>
                 <AlertDescription className="text-blue-600 dark:text-blue-400">
-                  Algunos datos se han pre-rellenado. Completa el perfil para crear la cuenta de usuario.
+                  Este DNI pertenece a un {initialDataForCreation.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
+                  Se han pre-rellenado los datos conocidos. Completa el perfil para crear la cuenta de usuario.
                 </AlertDescription>
             </Alert>
          )}
@@ -149,54 +151,25 @@ export function PlatformUserForm({
           name="roles"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Roles <span className="text-destructive">*</span></FormLabel>
-                {isSingleRoleSelection ? (
-                    <FormControl>
-                        <RadioGroup
-                            onValueChange={(value) => field.onChange([value])}
-                            defaultValue={field.value?.[0]}
-                            className="grid grid-cols-2 gap-2"
-                        >
-                            {rolesToDisplay.map((role) => (
-                                <FormItem key={role} className="flex items-center space-x-3 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value={role} />
-                                    </FormControl>
-                                    <FormLabel className="font-normal">
-                                        {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole]}
-                                    </FormLabel>
-                                </FormItem>
-                            ))}
-                        </RadioGroup>
-                    </FormControl>
-                ) : (
-                   <div className="grid grid-cols-2 gap-2">
-                    {rolesToDisplay.map((role) => (
-                      <FormField
-                        key={role}
-                        control={form.control}
-                        name="roles"
-                        render={({ field: multiSelectField }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={multiSelectField.value?.includes(role)}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? multiSelectField.onChange([...(multiSelectField.value || []), role])
-                                    : multiSelectField.onChange((multiSelectField.value || []).filter((value) => value !== role))
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole]}
-                            </FormLabel>
-                          </FormItem>
-                        )}
-                      />
-                    ))}
-                  </div>
-                )}
+              <FormLabel>Rol <span className="text-destructive">*</span></FormLabel>
+                <FormControl>
+                    <RadioGroup
+                        onValueChange={(value) => field.onChange(value ? [value] : [])}
+                        value={field.value?.[0] || ""}
+                        className="grid grid-cols-2 gap-2"
+                    >
+                        {rolesToDisplay.map((role) => (
+                            <FormItem key={role} className="flex items-center space-x-3 space-y-0">
+                                <FormControl>
+                                    <RadioGroupItem value={role} />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                    {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole]}
+                                </FormLabel>
+                            </FormItem>
+                        ))}
+                    </RadioGroup>
+                </FormControl>
               <FormMessage />
             </FormItem>
           )}
