@@ -136,6 +136,13 @@ function BusinessPromoterForm({
   };
   
   const disableContactFields = isPrePopulatedFromPlatformUser;
+  
+  let buttonText = "Crear y Vincular Promotor";
+  if (isEditingLink) {
+    buttonText = "Guardar Cambios";
+  } else if (isPrePopulatedFromPlatformUser) {
+    buttonText = "Vincular Promotor";
+  }
 
   return (
     <Form {...form}>
@@ -237,7 +244,7 @@ function BusinessPromoterForm({
           </Button>
           <Button type="submit" variant="gradient" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditingLink ? "Guardar Cambios" : "Crear y Vincular Promotor"}
+            {buttonText}
           </Button>
         </DialogFooter>
       </form>
@@ -290,7 +297,6 @@ function BusinessPromoterForm({
             promoterName: data.promoterName,
             promoterEmail: data.promoterEmail,
             promoterPhone: data.promoterPhone,
-            commissionRate: data.commissionRate,
             isActive: data.isActive === undefined ? true : data.isActive,
             isPlatformUser: data.isPlatformUser || false,
             platformUserUid: data.platformUserUid,
@@ -430,7 +436,7 @@ function BusinessPromoterForm({
               promoterDni: verifiedPromoterDniResult.dni,
               promoterName: verifiedPromoterDniResult.existingPlatformUserPromoter.name,
               promoterEmail: verifiedPromoterDniResult.existingPlatformUserPromoter.email,
-              promoterPhone: verifiedPromoterDniResult.existingPlatformUserPromoter.phone || "",
+              promoterPhone: (verifiedPromoterDniResult.existingPlatformUserPromoter as any).phone || "",
               isActive: true,
               isPlatformUser: true,
               platformUserUid: verifiedPromoterDniResult.existingPlatformUserPromoter.uid,
