@@ -288,15 +288,20 @@ export default function BusinessStaffPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end items-center">
-        <Button onClick={handleOpenCreateUserFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Añadir Personal
-        </Button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-bold text-primary flex items-center self-start">
+          <Users className="h-8 w-8 mr-2" /> Mi Personal
+        </h1>
+        <div className="self-end sm:self-center">
+            <Button onClick={handleOpenCreateUserFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Personal
+            </Button>
+        </div>
       </div>
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Mi Personal</CardTitle>
+          <CardTitle>Miembros del Personal</CardTitle>
           <CardDescription>Administra los usuarios staff, anfitriones y lectores QR de tu negocio.</CardDescription>
            <div className="relative mt-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -493,6 +498,7 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
 
 
 
