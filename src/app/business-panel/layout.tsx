@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Menu, Building, Calendar, Ticket, LayoutDashboard, Contact, ClipboardList, UserPlus, Users, BarChart3, Settings, QrCode } from "lucide-react";
+import { Loader2, Menu, Building } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { doc, getDoc } from "firebase/firestore";
@@ -60,9 +60,6 @@ export default function BusinessPanelLayout({
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
-  const [currentBusinessName, setCurrentBusinessName] = useState<string | null>(null);
-  const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
-
   useEffect(() => {
     const applyBusinessColorsAndName = async () => {
       if (userProfile?.businessId) {
@@ -71,10 +68,6 @@ export default function BusinessPanelLayout({
           const businessSnap = await getDoc(businessDocRef);
           if (businessSnap.exists()) {
             const businessData = businessSnap.data() as Business;
-            
-            // Set name and logo for display
-            setCurrentBusinessName(businessData.name || null);
-            setCurrentLogoUrl(businessData.logoUrl || null);
             
             // Set colors for theme
             const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0');
@@ -89,12 +82,7 @@ export default function BusinessPanelLayout({
           }
         } catch (error) {
           console.error("Failed to load and apply business details:", error);
-          setCurrentBusinessName("Panel Negocio");
-          setCurrentLogoUrl(null);
         }
-      } else {
-        setCurrentBusinessName("Panel Negocio");
-        setCurrentLogoUrl(null);
       }
     };
 
@@ -195,19 +183,6 @@ export default function BusinessPanelLayout({
     );
   }
   
-  const navLinks = [
-    { href: "/business-panel/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/business-panel/promotions", label: "Promociones", icon: Ticket },
-    { href: "/business-panel/events", label: "Eventos", icon: Calendar },
-    { href: "/business-panel/clients", label: "Mis Clientes", icon: Contact },
-    { href: "/business-panel/surveys", label: "Encuestas", icon: ClipboardList },
-    { href: "/business-panel/promoters", label: "Mis Promotores", icon: UserPlus },
-    { href: "/business-panel/staff", label: "Mi Personal", icon: Users },
-    { href: "/business-panel/analytics", label: "Analíticas", icon: BarChart3 },
-    { href: "/business-panel/settings", label: "Configuración", icon: Settings },
-    { href: "/business-panel/validate-qr", label: "Validar QR", icon: QrCode },
-  ];
-
   return (
     <div className="flex min-h-screen bg-muted/40">
       <div className="hidden md:flex">
@@ -224,31 +199,9 @@ export default function BusinessPanelLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
-                <DialogTitle className="sr-only">Menú de Navegación del Panel de Negocio</DialogTitle>
-                <div className="p-4 border-b border-border flex items-center space-x-2">
-                   {currentLogoUrl ? (
-                    <NextImage src={currentLogoUrl} alt={`${currentBusinessName || 'Negocio'} Logo`} width={28} height={28} className="h-7 w-7 object-contain rounded-sm" />
-                   ) : (
-                    <Building className="h-7 w-7 text-primary" />
-                   )}
-                  <h1 className="text-lg font-semibold text-primary">{currentBusinessName || 'Panel Negocio'}</h1>
-                </div>
-                <nav className="flex-grow p-4 space-y-2">
-                  {navLinks.map(link => (
-                    <Link 
-                      key={link.href}
-                      href={link.href} 
-                      onClick={() => setIsSheetOpen(false)} 
-                      className="flex items-center space-x-2 text-muted-foreground hover:text-foreground"
-                    >
-                      <link.icon size={16} />
-                      <span>{link.label}</span>
-                    </Link>
-                  ))}
-                </nav>
-                 <div className="p-4 border-t border-border mt-auto">
-                    <Button onClick={() => { logout(); setIsSheetOpen(false); }} variant="outline" className="w-full">Cerrar Sesión</Button>
-                 </div>
+                 <DialogTitle className="sr-only">Menú de Navegación del Panel de Negocio</DialogTitle>
+                 {/* Utiliza el componente de la barra lateral directamente aquí */}
+                 <BusinessSidebar closeSheet={() => setIsSheetOpen(false)} />
               </SheetContent>
             </Sheet>
           </div>

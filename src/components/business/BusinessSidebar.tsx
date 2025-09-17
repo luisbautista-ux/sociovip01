@@ -51,7 +51,7 @@ const navItems = [
   { href: "/business-panel/validate-qr", label: "Validar QR", icon: QrCode },
 ];
 
-export function BusinessSidebar() {
+export function BusinessSidebar({ closeSheet }: { closeSheet?: () => void }) {
   const pathname = usePathname();
   const { currentUser, userProfile, logout } = useAuth();
   
@@ -89,7 +89,7 @@ export function BusinessSidebar() {
 
 
   return (
-    <aside className="w-64 bg-card text-card-foreground border-r border-border flex-col flex">
+    <aside className="w-full h-full bg-card text-card-foreground flex flex-col">
       <div className="p-4 border-b border-border flex items-center space-x-2">
         {businessDetails?.logoUrl ? (
           <NextImage src={businessDetails.logoUrl} alt={`${businessDisplay} Logo`} width={32} height={32} className="h-8 w-8 object-contain rounded-sm" data-ai-hint="logo"/>
@@ -108,6 +108,7 @@ export function BusinessSidebar() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={closeSheet}
             className={cn(
               "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
               isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -143,8 +144,8 @@ export function BusinessSidebar() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">
+              <AlertDialogCancel onClick={closeSheet}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { logout(); if(closeSheet) closeSheet(); }} className="bg-destructive hover:bg-destructive/90">
                 Sí, Cerrar Sesión
               </AlertDialogAction>
             </AlertDialogFooter>
