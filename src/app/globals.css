@@ -107,3 +107,22 @@
     -moz-appearance: textfield;
   }
 }
+
+/* Custom Animated Gradient Background for Loaders */
+@keyframes gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bg-gradient-loader {
+  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)), #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient-animation 15s ease infinite;
+}

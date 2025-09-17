@@ -77,10 +77,10 @@ export default function AuthDispatcherPage() {
   }, [currentUser, userProfile, loadingAuth, loadingProfile, router, toast, logout]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <Loader2 className="h-16 w-16 animate-spin text-primary" />
-      <p className="mt-6 text-xl text-muted-foreground">Verificando y redirigiendo...</p>
-      <p className="mt-2 text-sm text-muted-foreground">Serás dirigido a tu panel en unos momentos.</p>
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gradient-loader">
+      <Loader2 className="h-16 w-16 animate-spin text-white" />
+      <p className="mt-6 text-xl text-white/90">Verificando y redirigiendo...</p>
+      <p className="mt-2 text-sm text-white/70">Serás dirigido a tu panel en unos momentos.</p>
     </div>
   );
 }

@@ -105,17 +105,17 @@ export default function BusinessPanelLayout({
 
   if (loadingAuth || loadingProfile) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Verificando autenticación...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
+        <Loader2 className="h-12 w-12 animate-spin text-white" />
+        <p className="ml-4 text-lg text-white/90">Verificando y cargando...</p>
       </div>
     );
   }
 
   if (!currentUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-         <p className="text-lg text-muted-foreground">Redirigiendo a inicio de sesión...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
+         <p className="text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
       </div>
     );
   }

@@ -108,9 +108,9 @@ export default function LectorQrLayout({
 
   if (loadingAuth || loadingProfile) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-gradient" />
-        <p className="ml-4 text-lg text-muted-foreground">Verificando...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
+        <Loader2 className="h-12 w-12 animate-spin text-white" />
+        <p className="ml-4 text-lg text-white/90">Verificando...</p>
       </div>
     );
   }
