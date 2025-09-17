@@ -394,16 +394,49 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     }
   };
 
-  const handleDeleteUser = async (user: PlatformUser) => {
+  const handleDeleteUser = async (userToDelete: PlatformUser) => {
     if (isSubmitting) return;
+
+    if (currentUser?.uid === userToDelete.uid) {
+        toast({ title: "Acción no permitida", description: "No puedes eliminar tu propia cuenta.", variant: "destructive" });
+        return;
+    }
+    
     setIsSubmitting(true);
+    
     try {
-      await deleteDoc(doc(db, "platformUsers", user.uid)); // Asumimos que user.uid es el ID del documento
-      toast({ title: "Perfil de Usuario Eliminado", description: `El perfil del usuario "${user.name}" ha sido eliminado.`, variant: "destructive", duration: 7000 });
-      fetchInitialData();
-    } catch (error) {
+      const idToken = await currentUser?.getIdToken();
+      if (!idToken) {
+        throw new Error("No autenticado. Token no proporcionado.");
+      }
+
+      const response = await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ uidToDelete: userToDelete.uid })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al eliminar el usuario desde el servidor.');
+      }
+      
+      toast({ 
+        title: "Usuario Eliminado Exitosamente", 
+        description: `El usuario "${userToDelete.name}" ha sido eliminado de la plataforma.`,
+        variant: "destructive"
+      });
+      fetchInitialData(); 
+    } catch (error: any) {
       console.error("Failed to delete user:", error);
-      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el perfil del usuario.", variant: "destructive"});
+      toast({ 
+        title: "Error al Eliminar", 
+        description: `No se pudo eliminar el usuario. ${error.message}`, 
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -490,19 +523,19 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56">
                                 <DropdownMenuItem onClick={() => { setEditingUser(user); setShowCreateEditModal(true); }} disabled={isSubmitting}>
-                                  <Edit className="h-4 w-4 mr-2" /> Editar
+                                  <Edit className="h-4 w-4 mr-2" /> Editar Usuario
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
-                                      <Trash2 className="h-4 w-4 mr-2" /> Eliminar Perfil
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10" disabled={currentUser?.uid === user.uid}>
+                                      <Trash2 className="h-4 w-4 mr-2" /> Eliminar Usuario
                                     </DropdownMenuItem>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle>
-                                      <ShadcnAlertDialogDescription>Se eliminará el perfil de "{user.name}". Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription>
+                                      <ShadcnAlertDialogDescription>Eliminarás a "{user.name}" de forma permanente (perfil y cuenta de acceso).</ShadcnAlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -572,7 +605,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || currentUser?.uid === user.uid}>
                                   <Trash2 className="h-4 w-4" />
                                   <span className="sr-only">Eliminar</span>
                                 </Button>
@@ -581,8 +614,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                                 <AlertDialogHeader>
                                   <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
                                   <ShadcnAlertDialogDescription>
-                                    Esta acción no se puede deshacer. Esto eliminará permanentemente el perfil del usuario 
-                                    <span className="font-semibold"> {user.name}</span> (UID: {user.uid}) de Firestore. No elimina la cuenta de Firebase Authentication.
+                                    Esta acción no se puede deshacer. Esto eliminará permanentemente al usuario
+                                    <span className="font-semibold"> {user.name}</span> (perfil y cuenta de acceso).
                                   </ShadcnAlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -593,7 +626,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                                     disabled={isSubmitting}
                                   >
                                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    Eliminar Perfil
+                                    Eliminar Usuario
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
