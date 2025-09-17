@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter,
 } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Contact, Crown, Download, Search, Calendar as CalendarIcon } from "lucide-react";
+import { Contact, Crown, Download, Search, Calendar as CalendarIcon, Users } from "lucide-react";
 import { format, parse, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -95,14 +95,7 @@ type QrClient = {
   generatedForBusinessId: string;
 };
 
-const membershipStatusTranslations: Record<string, string> = {
-  active: "Activa",
-  inactive: "Inactiva",
-  pending_payment: "Pendiente Pago",
-  cancelled: "Cancelada",
-};
-
-export default function AdminQrClientsPage() {
+export default function BusinessClientsPage() {
   const { userProfile } = useAuth(); // debe proveer roles[] y businessId
   const { toast } = useToast();
 
@@ -310,8 +303,12 @@ export default function AdminQrClientsPage() {
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter className="border-t p-4">
+            <div className="text-sm text-muted-foreground">
+                <span className="font-semibold">{filteredClients.length}</span> de <span className="font-semibold">{qrClients.length}</span> clientes mostrados.
+            </div>
+        </CardFooter>
       </Card>
     </div>
   );
 }
-
