@@ -185,7 +185,7 @@ export default function BusinessPanelLayout({
   
   return (
     <div className="flex min-h-screen bg-muted/40">
-      <div className="hidden md:flex">
+      <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
         <BusinessSidebar />
       </div>
       <div className="flex flex-col flex-1">
