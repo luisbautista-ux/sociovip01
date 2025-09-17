@@ -498,17 +498,20 @@ export default function BusinessPromotionsPage() {
   
   return (
     <div className="space-y-6">
-       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-        <h1 className="text-3xl font-bold text-primary flex items-center mb-4 sm:mb-0">
+       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+        <h1 className="text-3xl font-bold text-primary flex items-center">
           <TicketIconLucide className="h-8 w-8 mr-2" /> Promociones
         </h1>
-        <Button 
-            onClick={() => handleOpenCreateEditModal(null)} 
-            variant="gradient"
-            disabled={!currentBusinessId || isSubmitting || isLoadingPageData}
-        >
-          <PlusCircle className="mr-2 h-4 w-4" /> Crear Promoción
-        </Button>
+        <div className="w-full sm:w-auto">
+          <Button 
+              onClick={() => handleOpenCreateEditModal(null)} 
+              variant="gradient"
+              disabled={!currentBusinessId || isSubmitting || isLoadingPageData}
+              className="w-full sm:w-auto"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear Promoción
+          </Button>
+        </div>
       </div>
       
       {!currentBusinessId && !isLoadingPageData && userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && (
