@@ -209,7 +209,7 @@ export default function PromoterDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary flex items-center">
+      <h1 className="text-3xl font-bold text-gradient flex items-center">
         <BarChart2 className="h-8 w-8 mr-2" /> Dashboard del Promotor
       </h1>
 
