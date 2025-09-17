@@ -498,7 +498,10 @@ export default function BusinessPromotionsPage() {
   
   return (
     <div className="space-y-6">
-      <div className="flex justify-end items-center">
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <h1 className="text-3xl font-bold text-primary flex items-center mb-4 sm:mb-0">
+          <TicketIconLucide className="h-8 w-8 mr-2" /> Promociones
+        </h1>
         <Button 
             onClick={() => handleOpenCreateEditModal(null)} 
             variant="gradient"
@@ -784,7 +787,7 @@ export default function BusinessPromotionsPage() {
           }}
           entity={selectedEntityForViewingCodes}
           onCodesUpdated={handleCodesUpdatedFromManageDialog}
-          onRequestCreateNewCodes={() => {
+          onRequestCreateNewCodes={() => { 
             const currentEntity = promotions.find(e => e.id === selectedEntityForViewingCodes?.id); 
             if(currentEntity) { 
                 if (isEntityCurrentlyActivatable(currentEntity)) {
