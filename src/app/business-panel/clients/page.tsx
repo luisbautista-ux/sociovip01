@@ -93,7 +93,8 @@ type QrClient = {
   phone?: string | number;
   dni: string;
   registrationDate: any; // Timestamp/Date/string/number
-  associatedBusinessIds: string[]; // Replaces generatedForBusinessId
+  associatedBusinessIds?: string[]; // Nuevo campo
+  generatedForBusinessId?: string; // Campo antiguo
 };
 
 export default function BusinessClientsPage() {
@@ -115,19 +116,50 @@ export default function BusinessClientsPage() {
 
       setLoading(true);
       try {
-        const fetchQrClients = async () => {
-          const qrRef = collection(db, "qrClients");
-          // Use 'array-contains' for business admins, or get all for superadmin
-          const qrQuery = userProfile.businessId && !isSuperAdmin
-            ? query(qrRef, where("associatedBusinessIds", "array-contains", userProfile.businessId))
-            : qrRef; // Superadmin gets all
-          const qrSnap = await getDocs(qrQuery);
-          return qrSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
-        };
+        const qrRef = collection(db, "qrClients");
         
-        const qrData = await fetchQrClients();
+        // Superadmin gets all clients without filtering
+        if (isSuperAdmin) {
+            const allClientsSnap = await getDocs(qrRef);
+            const allClients = allClientsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
+            setQrClients(allClients);
+            return; // Termina la función para superadmin
+        }
+        
+        // Business admin logic with two queries
+        const businessId = userProfile.businessId;
+        if (!businessId) {
+          setQrClients([]);
+          return;
+        }
 
-        setQrClients(qrData);
+        // Query 1: For new data model (array contains)
+        const newModelQuery = query(qrRef, where("associatedBusinessIds", "array-contains", businessId));
+        
+        // Query 2: For old data model (single ID)
+        const oldModelQuery = query(qrRef, where("generatedForBusinessId", "==", businessId));
+
+        const [newClientsSnap, oldClientsSnap] = await Promise.all([
+            getDocs(newModelQuery),
+            getDocs(oldModelQuery),
+        ]);
+        
+        const clientsMap = new Map<string, QrClient>();
+
+        newClientsSnap.forEach(d => {
+            if (!clientsMap.has(d.id)) {
+                clientsMap.set(d.id, { id: d.id, ...(d.data() as any) });
+            }
+        });
+        
+        oldClientsSnap.forEach(d => {
+            if (!clientsMap.has(d.id)) {
+                clientsMap.set(d.id, { id: d.id, ...(d.data() as any) });
+            }
+        });
+
+        const combinedClients = Array.from(clientsMap.values());
+        setQrClients(combinedClients);
 
       } catch (e: any) {
         console.error("Error cargando clientes:", e?.code, e?.message);
