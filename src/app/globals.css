@@ -97,6 +97,9 @@
   .text-gradient {
     @apply bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text;
   }
+  .hover-gradient {
+    @apply hover:bg-gradient-to-r from-primary to-accent hover:text-primary-foreground;
+  }
   /* Hide spinner buttons on number inputs */
   .no-spinner::-webkit-outer-spin-button,
   .no-spinner::-webkit-inner-spin-button {

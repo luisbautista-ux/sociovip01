@@ -1012,14 +1012,23 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
               <Button
                 onClick={handleSaveQrWithDetails}
                 variant="outline"
-                className="w-full sm:flex-1 font-bold border-2"
-                style={{
-                  color: businessDetails.primaryColor,
-                  borderColor: businessDetails.primaryColor,
-                }}
+                className="w-full sm:flex-1 font-bold border-2 p-0 text-primary hover-gradient"
                 disabled={!generatedQrDataUrl}
               >
-                <Download className="mr-2 h-4 w-4" /> Guardar QR
+                <div style={{
+                    border: '2px solid transparent',
+                    backgroundImage: `linear-gradient(white, white), linear-gradient(to right, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor})`,
+                    backgroundOrigin: 'border-box',
+                    backgroundClip: 'padding-box, border-box',
+                    borderRadius: 'inherit',
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}>
+                    <Download className="mr-2 h-4 w-4" /> Guardar QR
+                </div>
               </Button>
               <Button 
                 onClick={resetQrFlow} 
@@ -1035,13 +1044,13 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <Button asChild variant="outline" className="flex-1 max-w-xs">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover-gradient">
                 <Link href="/login">
                   <UserCircle className="mr-2 h-4 w-4" />
                   Iniciar Sesión
                 </Link>
             </Button>
-            <Button asChild variant="outline" className="flex-1 max-w-xs">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover-gradient">
                 <Link href="/">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Volver al Inicio
