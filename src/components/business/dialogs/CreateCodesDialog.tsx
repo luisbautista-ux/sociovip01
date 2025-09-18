@@ -11,7 +11,7 @@ import type { GeneratedCode } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Form, FormControl, FormField, FormMessage, FormDescription, FormItem, FormLabel } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormMessage, FormDescription, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 
 function generateAlphanumericCode(length: number): string {
@@ -185,7 +185,7 @@ export function CreateCodesDialog({
         {!showSuccess ? (
         <Form {...form}>
           <form className="space-y-4 py-4" onSubmit={(e) => { e.preventDefault(); handleCreateCodes(); }}>
-             {maxAttendance && maxAttendance > 0 && (
+             {(maxAttendance ?? 0) > 0 && (
                 <Alert variant={canCreateAnyCodes ? "default" : "destructive"}>
                     {canCreateAnyCodes ? <Info className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                     <AlertTitle>{canCreateAnyCodes ? "Información de Aforo" : "Aforo Completo"}</AlertTitle>
@@ -199,34 +199,35 @@ export function CreateCodesDialog({
               control={form.control}
               name="numCodes"
               render={() => (
-                  <FormItem>
-                       <FormLabel htmlFor="numCodesToGenerate">
-                          Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
-                       </FormLabel>
-                      <FormControl>
-                          <Input
-                              id="numCodesToGenerate"
-                              type="number"
-                              min="1"
-                              max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
-                              value={numCodes || ""}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setNumCodes(value === '' ? '' : parseInt(value, 10));
-                              }}
-                              className="mt-1 no-spinner"
-                              disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
-                            />
-                      </FormControl>
-                  </FormItem>
+                <FormItem>
+                  <Label htmlFor="numCodesToGenerate">
+                    Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+                  </Label>
+                  <FormControl>
+                    <Input
+                      id="numCodesToGenerate"
+                      type="number"
+                      min="1"
+                      max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
+                      value={numCodes || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setNumCodes(value === '' ? '' : parseInt(value, 10));
+                      }}
+                      className="mt-1 no-spinner"
+                      disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
+                    />
+                  </FormControl>
+                </FormItem>
               )}
             />
+            
             <FormField
               control={form.control}
               name="observation"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Observación (Opcional)</FormLabel>
+                  <Label>Observación (Opcional)</Label>
                   <FormControl>
                     <Textarea
                       id="observation"
