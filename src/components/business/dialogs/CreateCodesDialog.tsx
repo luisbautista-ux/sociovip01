@@ -12,7 +12,8 @@ import type { GeneratedCode } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
-import { FormDescription } from "@/components/ui/form";
+import { Form, FormDescription } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
 
 function generateAlphanumericCode(length: number): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -56,6 +57,7 @@ export function CreateCodesDialog({
   const [justCreatedCodes, setJustCreatedCodes] = useState<GeneratedCode[]>([]);
   const [isCreating, setIsCreating] = useState(false); 
   const { toast } = useToast();
+  const form = useForm(); // Create a dummy form context
 
   const maxCodesCanCreate = useMemo(() => {
     if (maxAttendance && maxAttendance > 0) {
@@ -182,6 +184,7 @@ export function CreateCodesDialog({
         </DialogHeader>
         
         {!showSuccess ? (
+        <Form {...form}>
           <div className="space-y-4 py-4">
              {maxAttendance && maxAttendance > 0 && (
                 <Alert variant={canCreateAnyCodes ? "default" : "destructive"}>
@@ -193,12 +196,12 @@ export function CreateCodesDialog({
                 </Alert>
              )}
             <div className="space-y-1.5">
-              <Input
+               <Input
                 id="numCodesToGenerate"
                 type="number"
                 min="1"
                 max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
-                value={numCodes}
+                value={numCodes || ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   setNumCodes(value === '' ? '' : parseInt(value, 10));
@@ -223,6 +226,7 @@ export function CreateCodesDialog({
               />
             </div>
           </div>
+          </Form>
         ) : (
           <div className="py-6 text-center space-y-4">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
