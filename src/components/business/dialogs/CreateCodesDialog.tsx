@@ -12,7 +12,7 @@ import type { GeneratedCode } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Form, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormMessage, FormDescription } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 
 function generateAlphanumericCode(length: number): string {
@@ -185,7 +185,7 @@ export function CreateCodesDialog({
         
         {!showSuccess ? (
         <Form {...form}>
-          <div className="space-y-4 py-4">
+          <form className="space-y-4 py-4" onSubmit={(e) => { e.preventDefault(); handleCreateCodes(); }}>
              {maxAttendance && maxAttendance > 0 && (
                 <Alert variant={canCreateAnyCodes ? "default" : "destructive"}>
                     {canCreateAnyCodes ? <Info className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
@@ -195,37 +195,55 @@ export function CreateCodesDialog({
                     </DialogDescription>
                 </Alert>
              )}
-            <div className="space-y-1.5">
-              <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">
-                Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="numCodesToGenerate"
-                type="number"
-                min="1"
-                max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
-                value={numCodes || ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setNumCodes(value === '' ? '' : parseInt(value, 10));
-                }}
-                className="mt-1 no-spinner"
-                disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
-              />
-            </div>
-            <div>
-              <Label htmlFor="observation" className="text-sm font-medium">Observación (Opcional)</Label>
-              <Textarea
-                id="observation"
-                placeholder="Ej: Para invitados VIP, promoción especial fin de semana..."
-                value={observation}
-                onChange={(e) => setObservation(e.target.value)}
-                className="mt-1"
-                rows={3}
-                disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
-              />
-            </div>
-          </div>
+            <FormField
+                control={form.control}
+                name="numCodes"
+                render={() => (
+                    <FormItem>
+                         <Label htmlFor="numCodesToGenerate">
+                            Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+                         </Label>
+                         <FormControl>
+                            <Input
+                                id="numCodesToGenerate"
+                                type="number"
+                                min="1"
+                                max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
+                                value={numCodes || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setNumCodes(value === '' ? '' : parseInt(value, 10));
+                                }}
+                                className="mt-1 no-spinner"
+                                disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
+                              />
+                         </FormControl>
+                         <FormMessage />
+                    </FormItem>
+                )}
+            />
+            <FormField
+                control={form.control}
+                name="observation"
+                render={() => (
+                    <FormItem>
+                      <Label htmlFor="observation">Observación (Opcional)</Label>
+                      <FormControl>
+                          <Textarea
+                            id="observation"
+                            placeholder="Ej: Para invitados VIP, promoción especial fin de semana..."
+                            value={observation}
+                            onChange={(e) => setObservation(e.target.value)}
+                            className="mt-1"
+                            rows={3}
+                            disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
+                          />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                )}
+            />
+          </form>
           </Form>
         ) : (
           <div className="py-6 text-center space-y-4">
