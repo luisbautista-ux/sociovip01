@@ -1002,7 +1002,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               <Button
                 onClick={handleSaveQrWithDetails}
                 variant="outline"
-                className="w-full sm:flex-1 font-bold border-2 p-0 hover:bg-gradient-to-r from-primary to-accent hover:text-primary-foreground"
+                className="w-full sm:flex-1 font-bold border-2 p-0 hover-gradient"
                 disabled={!generatedQrDataUrl}
               >
                 <div className="text-foreground" style={{
@@ -1034,13 +1034,13 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r from-primary to-accent hover:text-primary-foreground">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover-gradient">
                 <Link href="/login">
                   <UserCircle className="mr-2 h-4 w-4" />
                   Iniciar Sesión
                 </Link>
             </Button>
-            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r from-primary to-accent hover:text-primary-foreground">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover-gradient">
                 <Link href="/">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Volver al Inicio
@@ -1138,7 +1138,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       alt={promo.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-90"
+                      className="object-cover"
                       data-ai-hint={promo.aiHint || "discount offer"}
                     />
                   </div>
@@ -1177,7 +1177,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       alt={event.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-90"
+                      className="object-cover"
                       data-ai-hint={event.aiHint || "party concert"}
                     />
                   </div>
@@ -1545,6 +1545,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 
 
     
+
 
 
 
