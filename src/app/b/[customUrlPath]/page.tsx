@@ -310,61 +310,6 @@ export default function BusinessPublicPage() {
     }
   }, [customUrlPath, fetchBusinessDataByCustomUrl]);
 
-const markPromoterCodeAsRedeemed = async (
-  entityId: string,
-  codeId: string,
-  clientInfo: { dni: string; name: string; surname: string }
-): Promise<void> => {
-  const entityRef = doc(db, "businessEntities", entityId);
-  
-  try {
-    await runTransaction(db, async (transaction) => {
-      const entityDoc = await transaction.get(entityRef);
-      if (!entityDoc.exists()) {
-        throw new Error("La promoción o evento no fue encontrado.");
-      }
-
-      const entityData = entityDoc.data();
-      const codes = (entityData.generatedCodes || []) as any[];
-
-      let codeFound = false;
-      let codeAlreadyUsed = false;
-      
-      const newCodes = codes.map(c => {
-        if (c.id === codeId) {
-          codeFound = true;
-          if (isCodeAvailableForUse(c)) {
-            return {
-              ...c,
-              status: "redeemed",
-              redemptionDate: new Date().toISOString(),
-              redeemedByInfo: {
-                dni: clientInfo.dni,
-                name: `${clientInfo.name} ${clientInfo.surname}`,
-              },
-            };
-          } else {
-            codeAlreadyUsed = true;
-          }
-        }
-        return c;
-      });
-
-      if (!codeFound) {
-        throw new Error("El código del promotor no es válido para esta promoción.");
-      }
-      if (codeAlreadyUsed) {
-        throw new Error("Este código ya ha sido utilizado.");
-      }
-      
-      transaction.update(entityRef, { generatedCodes: newCodes });
-    });
-  } catch (error: any) {
-    console.error("Error in markPromoterCodeAsRedeemed transaction:", error);
-    // Re-throw the error to be caught by the calling function
-    throw error;
-  }
-};
 
 const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
   const codeToValidate = normalizeCode(codeInputValue);
@@ -437,46 +382,36 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     const docNumberCleaned = data.docNumber.trim();
     setEnteredDni(docNumberCleaned);
 
-    const dniYaRegistrado = activeEntityForQr.generatedCodes?.some(
-      code => code.redeemedByInfo?.dni === docNumberCleaned
-    );
-
-    if (dniYaRegistrado) {
-        toast({
-            title: "DNI ya registrado",
-            description: "Este DNI ya ha generado un código QR para esta promoción/evento.",
-            variant: "destructive"
-        });
-        setIsLoadingQrFlow(false);
-        return;
-    }
-
     try {
-        const qrClientsRef = collection(db, "qrClients");
-        const q = query(qrClientsRef, where("dni", "==", docNumberCleaned), limit(1));
-        const querySnapshot = await getDocs(q);
+        const response = await fetch('/api/redeem-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                entityId: activeEntityForQr.id,
+                codeId: validatedCodeObject.id,
+                dni: docNumberCleaned,
+                businessId: businessDetails.id
+            })
+        });
 
-        if (!querySnapshot.empty) {
-            const existingClientDoc = querySnapshot.docs[0];
-            const clientData = existingClientDoc.data();
-            const clientForQr: QrClient = {
-                id: existingClientDoc.id,
-                dni: clientData.dni,
-                name: clientData.name,
-                surname: clientData.surname,
-                phone: clientData.phone,
-                dob: anyToDate(clientData.dob)?.toISOString() || "",
-                registrationDate: anyToDate(clientData.registrationDate)?.toISOString() || "",
-            };
-            
-            await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedCodeObject.id, clientForQr);
-            // Atomically add the new businessId to the array
-            await updateDoc(existingClientDoc.ref, {
-              associatedBusinessIds: arrayUnion(businessDetails.id)
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Ocurrió un error en el servidor.');
+        }
+
+        if (result.action === 'newUser') {
+            newQrClientForm.reset({ 
+                name: "", 
+                surname: "", 
+                phone: "", 
+                dob: undefined, 
+                dni: docNumberCleaned,
             });
-            
-            toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
-            const qrCodeDetails: QrCodeData["promotion"] = {
+            setCurrentStepInModal("newUserForm");
+        } else if (result.action === 'userExists') {
+            const clientForQr: QrClient = result.clientData;
+             const qrCodeDetails: QrCodeData["promotion"] = {
                 id: activeEntityForQr.id,
                 title: activeEntityForQr.name,
                 description: activeEntityForQr.description,
@@ -491,81 +426,70 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
             setShowDniModal(false);
             setPageViewState("qrDisplay");
-        } else {
-            newQrClientForm.reset({ 
-                name: "", 
-                surname: "", 
-                phone: "", 
-                dob: undefined, 
-                dni: docNumberCleaned,
-            });
-            setCurrentStepInModal("newUserForm");
+             toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
         }
     } catch (e: any) {
-        toast({ title: "Error de Verificación de DNI", description: "No se pudo verificar el DNI. " + e.message, variant: "destructive" });
+        toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
         resetQrFlow();
     } finally {
         setIsLoadingQrFlow(false);
     }
 };
 
-  const processNewQrClientRegistration = async (formData: NewQrClientFormData) => {
+const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (formData) => {
     if (!activeEntityForQr || !validatedCodeObject || !enteredDni || !businessDetails) {
       toast({ title: "Error interno", description: "Falta información para registrar cliente.", variant: "destructive" });
       return;
     }
+    
+    if (formData.dni.trim() !== enteredDni.trim()) {
+      toast({ title: "Inconsistencia de DNI", description: "El DNI del formulario no coincide. Por favor, reinicia el proceso.", variant: "destructive" });
+      return;
+    }
+
     setIsLoadingQrFlow(true);
-  
-    const clientForRedeem = {
-      dni: enteredDni,
-      name: formData.name,
-      surname: formData.surname,
-    };
-  
     try {
-      await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedCodeObject.id, clientForRedeem);
-      
-      const newClientDataToSave = {
-        dni: enteredDni,
-        name: formData.name,
-        surname: formData.surname,
-        phone: formData.phone,
-        dob: Timestamp.fromDate(formData.dob),
-        registrationDate: serverTimestamp(),
-        generatedForBusinessId: businessDetails.id, // Legacy field
-        associatedBusinessIds: [businessDetails.id],
-        generatedForEntityId: activeEntityForQr.id,
-      };
-      
-      const docRef = await addDoc(collection(db, "qrClients"), sanitizeObjectForFirestore(newClientDataToSave));
-      
-      const clientForQr: QrClient = {
-        id: docRef.id,
-        dni: newClientDataToSave.dni,
-        name: newClientDataToSave.name,
-        surname: newClientDataToSave.surname,
-        phone: newClientDataToSave.phone,
-        dob: newClientDataToSave.dob.toDate().toISOString(),
-        registrationDate: new Date().toISOString(),
-      };
+        const response = await fetch('/api/redeem-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                entityId: activeEntityForQr.id,
+                codeId: validatedCodeObject.id,
+                dni: enteredDni,
+                businessId: businessDetails.id,
+                newClientData: {
+                    name: formData.name,
+                    surname: formData.surname,
+                    phone: formData.phone,
+                    dob: formData.dob.toISOString()
+                }
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Ocurrió un error al registrar el nuevo cliente.');
+        }
+
+        const clientForQr: QrClient = result.clientData;
+        const qrCodeDetails: QrCodeData["promotion"] = {
+            id: activeEntityForQr.id,
+            title: activeEntityForQr.name,
+            description: activeEntityForQr.description,
+            validUntil: activeEntityForQr.endDate,
+            imageUrl: activeEntityForQr.imageUrl || "",
+            promoCode: validatedCodeObject.value,
+            qrValue: validatedCodeObject.id,
+            aiHint: activeEntityForQr.aiHint || "",
+            type: activeEntityForQr.type,
+            termsAndConditions: activeEntityForQr.termsAndConditions,
+        };
   
-      const qrCodeDetails: QrCodeData["promotion"] = {
-        id: activeEntityForQr.id,
-        title: activeEntityForQr.name,
-        description: activeEntityForQr.description,
-        validUntil: activeEntityForQr.endDate,
-        imageUrl: activeEntityForQr.imageUrl || "",
-        promoCode: validatedCodeObject.value,
-        qrValue: validatedCodeObject.id,
-        aiHint: activeEntityForQr.aiHint || "",
-        type: activeEntityForQr.type,
-        termsAndConditions: activeEntityForQr.termsAndConditions,
-      };
-  
-      setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
-      setShowDniModal(false);
-      setPageViewState("qrDisplay");
-      toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
+        setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
+        setShowDniModal(false);
+        setPageViewState("qrDisplay");
+        toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
+
     } catch (e: any) {
       toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
       resetQrFlow();
@@ -574,54 +498,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     }
   };
 
-  const handleNewUserDniChangeDuringRegistration = async (
-    newDniValue: string,
-    currentFormData: NewQrClientFormData
-  ): Promise<boolean> => {
-    const newDniCleaned = newDniValue.trim();
-    if (newDniCleaned === enteredDni) return true;
-    if (newDniCleaned.length < 7 || newDniCleaned.length > 15) {
-      newQrClientForm.setError("dni", { type: "manual", message: "DNI/CE debe tener entre 7 y 15 caracteres." });
-      return false;
-    }
-    newQrClientForm.clearErrors("dni");
-
-    try {
-      setIsLoadingQrFlow(true);
-      const qrClientsRef = collection(db, "qrClients");
-      const q = query(qrClientsRef, where("dni", "==", newDniCleaned), limit(1));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        setFormDataForDniWarning(currentFormData);
-        setEnteredDni(newDniCleaned);
-        setShowDniExistsWarningDialog(true);
-        return false;
-      }
-      setEnteredDni(newDniCleaned);
-      return true;
-    } catch (e: any) {
-      toast({ title: "Error al verificar DNI", description: e.message, variant: "destructive" });
-      return false;
-    } finally {
-      setIsLoadingQrFlow(false);
-    }
-  };
-
-  const handleDniExistsWarningConfirm = async () => {
-    setShowDniExistsWarningDialog(false);
-    dniForm.setValue("docNumber", enteredDni);
-    await handleDniSubmitInModal({ docType: dniForm.getValues("docType"), docNumber: enteredDni });
-    setFormDataForDniWarning(null);
-  };
-
-  const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (data) => {
-    if (data.dni.trim() !== enteredDni.trim()) {
-      toast({ title: "Inconsistencia de DNI", description: "El DNI del formulario no coincide con el verificado. Por favor, reinicia el proceso.", variant: "destructive" });
-      return;
-    }
-    await processNewQrClientRegistration(data);
-  };
 
   useEffect(() => {
     const generateQrImage = async () => {
@@ -1125,7 +1001,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
               <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {promotions.map((promo) => (
                 <Card
                   key={promo.id}
@@ -1164,7 +1040,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
               <Calendar className="h-8 w-8 mr-3" /> Próximos Eventos
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {events.map((event) => (
                 <Card
                   key={event.id}
@@ -1511,32 +1387,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           )}
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={showDniExistsWarningDialog} onOpenChange={setShowDniExistsWarningDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <UIAlertDialogTitle className="font-semibold">DNI Ya Registrado</UIAlertDialogTitle>
-            <UIDialogDescription>
-              El DNI/CE <span className="font-semibold">{enteredDni}</span> ya está registrado como Cliente QR. ¿Deseas usar los
-              datos existentes para generar tu QR?
-            </UIDialogDescription>
-          </AlertDialogHeader>
-          <ShadcnAlertDialogFooterAliased>
-            <AlertDialogCancel
-              onClick={() => {
-                setShowDniExistsWarningDialog(false);
-                newQrClientForm.setValue("dni", "");
-              }}
-            >
-              No, corregir DNI
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDniExistsWarningConfirm} className="bg-primary hover:bg-primary/90">
-              Sí, usar datos existentes
-            </AlertDialogAction>
-          </ShadcnAlertDialogFooterAliased>
-        </AlertDialogContent>
-      </AlertDialog>
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
     </div>
   );
 }
+
