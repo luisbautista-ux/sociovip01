@@ -953,7 +953,7 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
             background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
           }}
         >
-          <div className="max-w-7xl mx-auto flex items-center justify-center sm:justify-start space-x-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-start space-x-4">
             {businessDetails.logoUrl && (
               <NextImage
                 src={businessDetails.logoUrl}
@@ -1030,10 +1030,10 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
           </Card>
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center sm:justify-between gap-4">
-              <Link href="/login" passHref>
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+              <Link href="/login" passHref className="w-full max-w-xs mx-auto sm:mx-0 sm:w-auto">
                   <Button
-                      className="text-white w-full sm:w-auto"
+                      className="text-white w-full"
                       style={{
                           backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                       }}
@@ -1042,9 +1042,9 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
                       Iniciar Sesión
                   </Button>
               </Link>
-              <Link href="/" passHref>
+              <Link href="/" passHref className="w-full max-w-xs mx-auto sm:mx-0 sm:w-auto">
                   <Button 
-                      className="text-white w-full sm:w-auto"
+                      className="text-white w-full"
                       style={{
                           backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                       }}
@@ -1548,3 +1548,4 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
+
