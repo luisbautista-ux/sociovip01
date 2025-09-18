@@ -192,7 +192,7 @@ export default function BusinessSettingsPage() {
             <Input id="businessPhone" type="tel" value={businessPublicPhone} onChange={(e) => setBusinessPublicPhone(e.target.value)} disabled={isSaving || isLoadingData}/>
           </div>
           <div>
-            <Label htmlFor="personalPhone" className="flex items-center">
+            <Label htmlFor="personalPhone" className="flex items-center mb-2">
                 <Smartphone className="h-4 w-4 mr-2 text-muted-foreground"/> Teléfono Personal
                 <span className="text-destructive ml-1">*</span>
             </Label>
