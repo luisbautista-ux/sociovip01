@@ -193,7 +193,7 @@ export default function BusinessSettingsPage() {
           </div>
           <div>
             <Label htmlFor="personalPhone" className="flex items-center">
-                <Smartphone className="h-4 w-4 mr-2 text-muted-foreground"/> Teléfono Personal (para WhatsApp)
+                <Smartphone className="h-4 w-4 mr-2 text-muted-foreground"/> Teléfono Personal
                 <span className="text-destructive ml-1">*</span>
             </Label>
             <Input 
@@ -205,8 +205,8 @@ export default function BusinessSettingsPage() {
                 placeholder="987654321"
                 maxLength={9}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-                Debe tener 9 dígitos y empezar con 9. Se usará para compartir códigos por WhatsApp.
+            <p className="text-xs text-muted-foreground mt-2">
+                Se usará para compartir códigos por WhatsApp.
             </p>
           </div>
         </CardContent>
