@@ -12,6 +12,7 @@ import type { GeneratedCode } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
+import { FormDescription } from "@/components/ui/form";
 
 function generateAlphanumericCode(length: number): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -191,28 +192,23 @@ export function CreateCodesDialog({
                     </DialogDescription>
                 </Alert>
              )}
-            <div>
-              <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span></Label>
+            <div className="space-y-1.5">
               <Input
                 id="numCodesToGenerate"
                 type="number"
                 min="1"
                 max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
-                value={numCodes || ""}
+                value={numCodes}
                 onChange={(e) => {
                   const value = e.target.value;
-                  // Allow empty string to clear the input, otherwise parse it.
-                  if (value === "") {
-                    setNumCodes("");
-                  } else {
-                    const numberValue = parseInt(value, 10);
-                    // Check for NaN and negative values, default to a sensible state if needed
-                    setNumCodes(isNaN(numberValue) || numberValue < 0 ? "" : numberValue);
-                  }
+                  setNumCodes(value === '' ? '' : parseInt(value, 10));
                 }}
                 className="mt-1 no-spinner"
                 disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
               />
+               <FormDescription className="text-sm text-muted-foreground px-1">
+                 Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+               </FormDescription>
             </div>
             <div>
               <Label htmlFor="observation" className="text-sm font-medium">Observación (Opcional)</Label>
