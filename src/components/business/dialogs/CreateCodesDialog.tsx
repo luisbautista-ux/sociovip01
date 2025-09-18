@@ -212,26 +212,26 @@ export function CreateCodesDialog({
                     disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
                   />
             </div>
-             <FormField
-                control={form.control}
-                name="observation"
-                render={() => (
-                    <FormItem>
-                      <FormLabel htmlFor="observation">Observación (Opcional)</FormLabel>
-                      <FormControl>
-                          <Textarea
-                            id="observation"
-                            placeholder="Ej: Para invitados VIP, promoción especial fin de semana..."
-                            value={observation}
-                            onChange={(e) => setObservation(e.target.value)}
-                            className="mt-1"
-                            rows={3}
-                            disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
-                          />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                )}
+            <FormField
+              control={form.control}
+              name="observation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Observación (Opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      id="observation"
+                      placeholder="Ej: Para invitados VIP, promoción especial fin de semana..."
+                      value={observation}
+                      onChange={(e) => setObservation(e.target.value)}
+                      className="mt-1"
+                      rows={3}
+                      disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </form>
           </Form>
