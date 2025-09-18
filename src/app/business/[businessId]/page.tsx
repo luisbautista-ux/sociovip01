@@ -447,6 +447,22 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
   const docNumberCleaned = data.docNumber.trim();
   setEnteredDni(docNumberCleaned);
 
+  // --- NUEVA VALIDACIÓN: VERIFICAR SI EL DNI YA GENERÓ UN QR PARA ESTA ENTIDAD ---
+  const dniYaRegistrado = activeEntityForQr.generatedCodes?.some(
+    code => code.redeemedByInfo?.dni === docNumberCleaned
+  );
+
+  if (dniYaRegistrado) {
+      toast({
+          title: "DNI ya registrado",
+          description: "Este DNI ya ha generado un código QR para esta promoción/evento.",
+          variant: "destructive"
+      });
+      setIsLoadingQrFlow(false);
+      return;
+  }
+  // --- FIN DE LA NUEVA VALIDACIÓN ---
+
   try {
       const qrClientsRef = collection(db, "qrClients");
       const q = query(qrClientsRef, where("dni", "==", docNumberCleaned), limit(1));
@@ -1532,18 +1548,3 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
