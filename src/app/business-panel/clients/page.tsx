@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
@@ -92,7 +93,7 @@ type QrClient = {
   phone?: string | number;
   dni: string;
   registrationDate: any; // Timestamp/Date/string/number
-  generatedForBusinessId: string;
+  associatedBusinessIds: string[]; // Replaces generatedForBusinessId
 };
 
 export default function BusinessClientsPage() {
@@ -116,8 +117,9 @@ export default function BusinessClientsPage() {
       try {
         const fetchQrClients = async () => {
           const qrRef = collection(db, "qrClients");
-          const qrQuery = userProfile.businessId
-            ? query(qrRef, where("generatedForBusinessId", "==", userProfile.businessId))
+          // Use 'array-contains' for business admins, or get all for superadmin
+          const qrQuery = userProfile.businessId && !isSuperAdmin
+            ? query(qrRef, where("associatedBusinessIds", "array-contains", userProfile.businessId))
             : qrRef; // Superadmin gets all
           const qrSnap = await getDocs(qrQuery);
           return qrSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
@@ -226,7 +228,7 @@ export default function BusinessClientsPage() {
         <CardHeader>
           <CardTitle>Listado de Clientes QR</CardTitle>
           <CardDescription>
-            {isSuperAdmin ? "Visualizando clientes de todos los negocios." : "Visualizando clientes de tu negocio asignado."}
+            {isSuperAdmin ? "Visualizando clientes de todos los negocios." : "Visualizando todos los clientes que han generado un QR para tu negocio."}
           </CardDescription>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
             <div className="relative">

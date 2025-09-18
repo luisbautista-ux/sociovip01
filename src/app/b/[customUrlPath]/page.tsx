@@ -28,7 +28,8 @@ import {
   serverTimestamp,
   limit,
   getDoc,
-  runTransaction
+  runTransaction,
+  arrayUnion
 } from "firebase/firestore";
 import type {
   BusinessManagedEntity,
@@ -428,15 +429,14 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
 };
 
 const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
-    if (!activeEntityForQr || !validatedCodeObject) {
-        toast({ title: "Error interno", description: "Falta información clave para continuar (entidad o código).", variant: "destructive" });
+    if (!activeEntityForQr || !validatedCodeObject || !businessDetails?.id) {
+        toast({ title: "Error interno", description: "Falta información clave para continuar (entidad, código o negocio).", variant: "destructive" });
         return;
     }
     setIsLoadingQrFlow(true);
     const docNumberCleaned = data.docNumber.trim();
     setEnteredDni(docNumberCleaned);
 
-    // --- NUEVA VALIDACIÓN: VERIFICAR SI EL DNI YA GENERÓ UN QR PARA ESTA ENTIDAD ---
     const dniYaRegistrado = activeEntityForQr.generatedCodes?.some(
       code => code.redeemedByInfo?.dni === docNumberCleaned
     );
@@ -450,7 +450,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         setIsLoadingQrFlow(false);
         return;
     }
-    // --- FIN DE LA NUEVA VALIDACIÓN ---
 
     try {
         const qrClientsRef = collection(db, "qrClients");
@@ -471,6 +470,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             };
             
             await markPromoterCodeAsRedeemed(activeEntityForQr.id, validatedCodeObject.id, clientForQr);
+            await updateDoc(existingClientDoc.ref, {
+              associatedBusinessIds: arrayUnion(businessDetails.id)
+            });
             
             toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
             const qrCodeDetails: QrCodeData["promotion"] = {
@@ -480,7 +482,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 validUntil: activeEntityForQr.endDate,
                 imageUrl: activeEntityForQr.imageUrl || "",
                 promoCode: validatedCodeObject.value,
-                qrValue: validatedCodeObject.id, // THE QR VALUE IS THE UNIQUE ID OF THE CODE
+                qrValue: validatedCodeObject.id,
                 aiHint: activeEntityForQr.aiHint || "",
                 type: activeEntityForQr.type,
                 termsAndConditions: activeEntityForQr.termsAndConditions,
@@ -529,7 +531,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         phone: formData.phone,
         dob: Timestamp.fromDate(formData.dob),
         registrationDate: serverTimestamp(),
-        generatedForBusinessId: businessDetails.id,
+        generatedForBusinessId: businessDetails.id, // Keep for backward compatibility/analytics
+        associatedBusinessIds: [businessDetails.id],
         generatedForEntityId: activeEntityForQr.id,
       };
       
@@ -552,7 +555,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         validUntil: activeEntityForQr.endDate,
         imageUrl: activeEntityForQr.imageUrl || "",
         promoCode: validatedCodeObject.value,
-        qrValue: validatedCodeObject.id, // THE QR VALUE IS THE UNIQUE ID OF THE CODE
+        qrValue: validatedCodeObject.id,
         aiHint: activeEntityForQr.aiHint || "",
         type: activeEntityForQr.type,
         termsAndConditions: activeEntityForQr.termsAndConditions,
@@ -943,24 +946,20 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
           }}
         >
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-start">
-              {businessDetails.logoUrl && (
-                <NextImage
-                  src={businessDetails.logoUrl}
-                  alt={`${businessDetails.name} logo`}
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
-                />
-              )}
-              <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-x-3">
-                <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
-                {businessDetails.slogan && (
-                  <p className="text-xs text-white/80">{businessDetails.slogan}</p>
-                )}
-              </div>
-            </div>
+          <div className="max-w-7xl mx-auto flex items-center justify-start">
+            {businessDetails.logoUrl && (
+              <NextImage
+                src={businessDetails.logoUrl}
+                alt={`${businessDetails.name} logo`}
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
+              />
+            )}
+            <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
+            {businessDetails.slogan && (
+              <p className="text-xs text-white/80 ml-3">{businessDetails.slogan}</p>
+            )}
           </div>
         </header>
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
@@ -1002,10 +1001,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               <Button
                 onClick={handleSaveQrWithDetails}
                 variant="outline"
-                className="w-full sm:flex-1 font-bold border-2 p-0 hover-gradient"
-                disabled={!generatedQrDataUrl}
+                className="w-full sm:flex-1 font-bold border-2 p-0 hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-primary-foreground"
               >
-                <div className="text-foreground" style={{
+                 <div className="text-foreground" style={{
                     border: '2px solid transparent',
                     backgroundImage: `linear-gradient(white, white), linear-gradient(to right, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor})`,
                     backgroundOrigin: 'border-box',
@@ -1034,13 +1032,13 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <Button asChild variant="outline" className="flex-1 max-w-xs hover-gradient">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-primary-foreground">
                 <Link href="/login">
                   <UserCircle className="mr-2 h-4 w-4" />
                   Iniciar Sesión
                 </Link>
             </Button>
-            <Button asChild variant="outline" className="flex-1 max-w-xs hover-gradient">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-primary-foreground">
                 <Link href="/">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Volver al Inicio
@@ -1541,13 +1539,4 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
     </div>
   );
 }
-
-
-
-    
-
-
-
-
-
 

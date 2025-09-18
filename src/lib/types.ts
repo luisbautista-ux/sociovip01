@@ -1,4 +1,5 @@
 
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -25,7 +26,9 @@ export interface QrClient {
   surname: string;
   phone: string;
   dob: Timestamp | string; 
-  registrationDate: Timestamp | string; 
+  registrationDate: Timestamp | string;
+  generatedForBusinessId?: string; // Legacy field
+  associatedBusinessIds?: string[]; // New field for multiple associations
 }
 
 export interface QrCodeData { 
