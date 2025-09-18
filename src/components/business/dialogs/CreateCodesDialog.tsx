@@ -198,7 +198,7 @@ export function CreateCodesDialog({
                 type="number"
                 min="1"
                 max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
-                value={numCodes}
+                value={numCodes || ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   // Allow empty string to clear the input, otherwise parse it.
