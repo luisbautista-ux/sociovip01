@@ -103,7 +103,7 @@ export function CreateCodesDialog({
     const currentAndNewCodes = new Set(existingCodesValues);
 
     for (let i = 0; i < numToCreate; i++) {
-      let newCodeValue = generateAlphanumericCode(9);
+      let newCodeValue = generateAlphanumericCode(9); 
       let attemptCount = 0;
       const maxAttempts = 100; 
 
