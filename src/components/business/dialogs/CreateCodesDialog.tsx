@@ -196,6 +196,9 @@ export function CreateCodesDialog({
                 </Alert>
              )}
             <div className="space-y-1.5">
+               <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">
+                 Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+               </Label>
                <Input
                 id="numCodesToGenerate"
                 type="number"
@@ -209,9 +212,6 @@ export function CreateCodesDialog({
                 className="mt-1 no-spinner"
                 disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
               />
-               <FormDescription className="text-sm text-muted-foreground px-1">
-                 Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
-               </FormDescription>
             </div>
             <div>
               <Label htmlFor="observation" className="text-sm font-medium">Observación (Opcional)</Label>
