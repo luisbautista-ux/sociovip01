@@ -1002,10 +1002,10 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               <Button
                 onClick={handleSaveQrWithDetails}
                 variant="outline"
-                className="w-full sm:flex-1 font-bold border-2 p-0 text-primary hover-gradient"
+                className="w-full sm:flex-1 font-bold border-2 p-0 hover-gradient"
                 disabled={!generatedQrDataUrl}
               >
-                <div style={{
+                <div className="text-foreground" style={{
                     border: '2px solid transparent',
                     backgroundImage: `linear-gradient(white, white), linear-gradient(to right, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor})`,
                     backgroundOrigin: 'border-box',
@@ -1545,3 +1545,4 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 
 
     
+
