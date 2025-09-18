@@ -142,7 +142,7 @@ export default function HomePage() {
             alt={entity.name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-95"
+            className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
             data-ai-hint={entity.aiHint || "discount offer"}
           />
         </div>

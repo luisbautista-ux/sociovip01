@@ -1138,7 +1138,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       alt={promo.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-95"
+                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={promo.aiHint || "discount offer"}
                     />
                   </div>
@@ -1177,7 +1177,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       alt={event.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-95"
+                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={event.aiHint || "party concert"}
                     />
                   </div>
@@ -1545,6 +1545,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 
 
     
+
 
 
 
