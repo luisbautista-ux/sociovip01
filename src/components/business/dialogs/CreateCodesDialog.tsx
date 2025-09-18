@@ -196,10 +196,10 @@ export function CreateCodesDialog({
                 </Alert>
              )}
             <div className="space-y-1.5">
-               <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">
-                 Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
-               </Label>
-               <Input
+              <Label htmlFor="numCodesToGenerate" className="text-sm font-medium">
+                Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+              </Label>
+              <Input
                 id="numCodesToGenerate"
                 type="number"
                 min="1"
