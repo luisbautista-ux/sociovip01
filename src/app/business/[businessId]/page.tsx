@@ -1044,13 +1044,13 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-primary-foreground">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r from-primary hover:to-accent hover:text-primary-foreground">
                 <Link href="/login">
                   <UserCircle className="mr-2 h-4 w-4" />
                   Iniciar Sesión
                 </Link>
             </Button>
-            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-primary-foreground">
+            <Button asChild variant="outline" className="flex-1 max-w-xs hover:bg-gradient-to-r from-primary hover:to-accent hover:text-primary-foreground">
                 <Link href="/">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Volver al Inicio
@@ -1551,4 +1551,3 @@ const processNewQrClientRegistration = async (formData: NewQrClientFormData) => 
     </div>
   );
 }
-

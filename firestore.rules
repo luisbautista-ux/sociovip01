@@ -2,72 +2,86 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+  
+    // Función para verificar si el usuario es un Super Administrador
+    function isSuperAdmin() {
+      return exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
+    }
 
-    // Reglas para la colección de Negocios
+    // Función para verificar si el usuario es un administrador o staff del negocio correcto
+    function isBusinessAdminOrStaff(businessId) {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff']);
+    }
+
+    // Función para verificar si el usuario es el promotor asignado
+    function isPromoterForEntity(entityId) {
+       let entity = get(/databases/$(database)/documents/businessEntities/$(entityId)).data;
+       return request.auth != null && 
+              (
+                entity.assignedPromoters.hasAny([request.auth.uid]) ||
+                (
+                  exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
+                  get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['promoter']) &&
+                  get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessIds.hasAny([entity.businessId])
+                )
+              );
+    }
+    
+    // Reglas para la colección 'businesses'
     match /businesses/{businessId} {
-      // Lectura: Cualquiera puede leer la información pública de un negocio.
-      allow read: if true;
-      
-      // Escritura (Crear, Actualizar, Eliminar): Solo los Super Administradores.
-      allow write: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
+      // Cualquiera puede leer la información pública de un negocio
+      allow read;
+      // Solo el Super Admin puede crear, actualizar o eliminar negocios
+      allow write: if isSuperAdmin();
     }
 
-    // Reglas para la colección de Usuarios de la Plataforma
+    // Reglas para la colección 'platformUsers'
     match /platformUsers/{userId} {
-      // Lectura: Solo un superadmin o el propio usuario pueden leer un perfil.
-      allow read: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']));
-      
-      // Actualización: El propio usuario puede actualizar su perfil. Los superadmins también pueden (cubierto por la regla de escritura general abajo).
-      allow update: if request.auth.uid == userId;
-      
-      // Creación/Eliminación: Solo los Super Administradores pueden crear o eliminar perfiles directamente.
-      // (La creación desde la app se gestiona por funciones de backend/API que usan credenciales de admin)
-      allow create, delete: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
+      // Solo el Super Admin puede leer todos los perfiles
+      // O un usuario puede leer su propio perfil
+      allow read: if isSuperAdmin() || request.auth.uid == userId;
+      // Solo el Super Admin puede crear o eliminar perfiles
+      allow create, delete: if isSuperAdmin();
+      // El Super Admin o el propio usuario pueden actualizar el perfil
+      allow update: if isSuperAdmin() || request.auth.uid == userId;
     }
 
-    // Reglas para Entidades de Negocio (Promociones, Eventos)
-    match /businessEntities/{entityId} {
-      // Lectura: Cualquiera puede leer las entidades (para páginas públicas).
-      allow read: if true;
-
-      // Creación/Actualización/Eliminación: Solo admins o staff del negocio correspondiente.
-      allow write: if request.auth != null && 
-                      (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff'])) &&
-                      (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == resource.data.businessId);
-    }
-
-    // Reglas para Clientes QR (los que se registran para un código)
-    match /qrClients/{clientId} {
-        // Lectura: Solo personal del negocio o superadmins.
-        allow read: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin', 'business_admin', 'staff']);
-        
-        // Creación: Permitida a cualquiera (público) que se registre para un QR.
-        allow create: if true;
-        
-        // Actualización/Eliminación: Solo superadmins.
-        allow update, delete: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
-    }
-    
-    // Reglas para Miembros SocioVIP
+    // Reglas para la colección 'socioVipMembers'
     match /socioVipMembers/{memberId} {
-        // Lectura: Solo superadmins.
-        allow read: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
-        
-        // Escritura: Solo superadmins.
-        allow write: if request.auth != null && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
+        // Cualquiera puede leer (si la app lo necesita) o restringir
+        allow read;
+        // Solo Super Admin puede escribir
+        allow write: if isSuperAdmin();
     }
     
-    // Reglas para los Vínculos Promotor-Negocio
+    // Reglas para la colección 'qrClients'
+    match /qrClients/{clientId} {
+      allow read; 
+      
+      // Permitir creación si el ID del negocio está en la lista de asociados
+      allow create: if request.resource.data.associatedBusinessIds[0] == request.resource.data.generatedForBusinessId;
+
+      // Permitir actualización si el usuario está añadiendo su businessId a la lista.
+      allow update: if request.auth != null &&
+                       exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
+                       request.resource.data.associatedBusinessIds.hasAny([get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId]);
+    }
+    
+    // Reglas para la colección 'businessEntities' (Promociones, Eventos)
+    match /businessEntities/{entityId} {
+      allow read;
+      // Solo admins/staff del negocio pueden crear/actualizar/eliminar
+      allow create, update, delete: if isBusinessAdminOrStaff(resource.data.businessId) || isBusinessAdminOrStaff(request.resource.data.businessId);
+    }
+
+    // Reglas para los businessPromoterLinks
     match /businessPromoterLinks/{linkId} {
-        // Lectura: Superadmins, o personal del negocio vinculado.
-        allow read: if request.auth != null && 
-                      (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']) || 
-                       (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == resource.data.businessId));
-                       
-        // Escritura: Superadmins, o personal del negocio vinculado.
-        allow write: if request.auth != null && 
-                       (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']) || 
-                       (get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == resource.data.businessId));
+        allow read: if request.auth != null;
+        allow write: if isSuperAdmin() || isBusinessAdminOrStaff(request.resource.data.businessId);
     }
   }
 }
