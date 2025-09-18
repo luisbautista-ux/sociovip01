@@ -194,34 +194,25 @@ export function CreateCodesDialog({
                     </DialogDescription>
                 </Alert>
              )}
-            <FormField
-                control={form.control}
-                name="numCodes"
-                render={() => (
-                    <FormItem>
-                         <FormLabel htmlFor="numCodesToGenerate">
-                            Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
-                         </FormLabel>
-                         <FormControl>
-                            <Input
-                                id="numCodesToGenerate"
-                                type="number"
-                                min="1"
-                                max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
-                                value={numCodes || ""}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  setNumCodes(value === '' ? '' : parseInt(value, 10));
-                                }}
-                                className="mt-1 no-spinner"
-                                disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
-                              />
-                         </FormControl>
-                         <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
+            <div className="space-y-2">
+                <Label htmlFor="numCodesToGenerate">
+                    Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                    id="numCodesToGenerate"
+                    type="number"
+                    min="1"
+                    max={Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}
+                    value={numCodes || ""}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNumCodes(value === '' ? '' : parseInt(value, 10));
+                    }}
+                    className="mt-1 no-spinner"
+                    disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}
+                  />
+            </div>
+             <FormField
                 control={form.control}
                 name="observation"
                 render={() => (
