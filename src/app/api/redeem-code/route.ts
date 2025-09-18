@@ -4,7 +4,6 @@ import {z} from 'zod';
 import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
 import {anyToDate, isEntityCurrentlyActivatable} from '@/lib/utils';
 import type {BusinessManagedEntity, GeneratedCode, QrClient} from '@/lib/types';
-import { query, where, limit } from 'firebase-admin/firestore';
 
 // Esquema para validar el cuerpo de la solicitud
 const RedeemCodeSchema = z.object({
@@ -41,7 +40,7 @@ export async function POST(request: Request) {
 
     // Verificar si el cliente ya existe por DNI
     const qrClientsRef = adminDb.collection('qrClients');
-    const clientQuery = query(qrClientsRef, where('dni', '==', dni), limit(1));
+    const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
     const clientSnapshot = await clientQuery.get();
 
     let clientDoc;
@@ -127,11 +126,11 @@ export async function POST(request: Request) {
         finalClientId = newClientRef.id;
       } else {
         // El cliente ya existe, solo se actualiza su lista de negocios asociados
-        transaction.update(clientDoc.ref, {
+        transaction.update(clientDoc!.ref, {
           associatedBusinessIds:
             admin.firestore.FieldValue.arrayUnion(businessId),
         });
-        finalClientId = clientDoc.id;
+        finalClientId = clientDoc!.id;
       }
 
       // Preparar los datos del cliente para devolverlos (convirtiendo Timestamps)
