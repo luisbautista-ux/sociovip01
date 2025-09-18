@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -12,7 +11,7 @@ import type { GeneratedCode } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Form, FormControl, FormField, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormMessage, FormDescription, FormItem, FormLabel } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 
 function generateAlphanumericCode(length: number): string {
@@ -200,9 +199,9 @@ export function CreateCodesDialog({
                 name="numCodes"
                 render={() => (
                     <FormItem>
-                         <Label htmlFor="numCodesToGenerate">
+                         <FormLabel htmlFor="numCodesToGenerate">
                             Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
-                         </Label>
+                         </FormLabel>
                          <FormControl>
                             <Input
                                 id="numCodesToGenerate"
@@ -227,7 +226,7 @@ export function CreateCodesDialog({
                 name="observation"
                 render={() => (
                     <FormItem>
-                      <Label htmlFor="observation">Observación (Opcional)</Label>
+                      <FormLabel htmlFor="observation">Observación (Opcional)</FormLabel>
                       <FormControl>
                           <Textarea
                             id="observation"
