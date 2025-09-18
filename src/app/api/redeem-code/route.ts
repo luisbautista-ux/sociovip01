@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
 import {anyToDate, isEntityCurrentlyActivatable} from '@/lib/utils';
 import type {BusinessManagedEntity, GeneratedCode, QrClient} from '@/lib/types';
+import { query, where, limit } from 'firebase-admin/firestore';
 
 // Esquema para validar el cuerpo de la solicitud
 const RedeemCodeSchema = z.object({
