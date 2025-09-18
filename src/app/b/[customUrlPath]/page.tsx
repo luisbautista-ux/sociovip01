@@ -1021,9 +1021,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-              <Link href="/login" passHref className="w-full max-w-xs mx-auto sm:mx-0 sm:w-auto">
+              <Link href="/login" passHref>
                   <Button
-                      className="text-white w-full"
+                      className="text-white flex-1"
                       style={{
                           backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                       }}
@@ -1032,9 +1032,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       Iniciar Sesión
                   </Button>
               </Link>
-              <Link href="/" passHref className="w-full max-w-xs mx-auto sm:mx-0 sm:w-auto">
+              <Link href="/" passHref>
                   <Button 
-                      className="text-white w-full"
+                      className="text-white flex-1"
                       style={{
                           backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                       }}
