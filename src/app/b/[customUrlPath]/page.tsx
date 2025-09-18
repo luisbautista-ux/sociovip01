@@ -1132,13 +1132,13 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   key={promo.id}
                   className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group"
                 >
-                  <div className="relative aspect-[16/9] w-full overflow-hidden">
+                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
                     <NextImage
                       src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"}
                       alt={promo.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover"
+                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-95"
                       data-ai-hint={promo.aiHint || "discount offer"}
                     />
                   </div>
@@ -1171,13 +1171,13 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   key={event.id}
                   className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group"
                 >
-                  <div className="relative aspect-[16/9] w-full overflow-hidden">
+                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
                     <NextImage
                       src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
                       alt={event.name}
                       fill
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover"
+                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-95"
                       data-ai-hint={event.aiHint || "party concert"}
                     />
                   </div>
@@ -1545,6 +1545,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
 
 
     
+
 
 
 

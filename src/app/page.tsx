@@ -136,13 +136,13 @@ export default function HomePage() {
 
     return (
       <Card key={entity.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group">
-        <div className="relative aspect-[16/9] w-full overflow-hidden">
+        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
           <NextImage
             src={entity.imageUrl || "https://placehold.co/600x400.png"}
             alt={entity.name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover"
+            className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-95"
             data-ai-hint={entity.aiHint || "discount offer"}
           />
         </div>
