@@ -943,7 +943,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
           }}
         >
-          <div className="max-w-7xl mx-auto flex items-center justify-start space-x-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-center sm:justify-start space-x-4">
             {businessDetails.logoUrl && (
               <NextImage
                 src={businessDetails.logoUrl}
@@ -1020,29 +1020,31 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           </Card>
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
-            <div className="max-w-7xl mx-auto flex flex-row justify-between items-center gap-4">
-                <Link href="/login" passHref className="flex-1">
-                    <Button
-                        className="text-white w-full"
-                        style={{
-                            backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
-                        }}
-                    >
-                        <UserCircle className="mr-2 h-4 w-4" />
-                        Iniciar Sesión
-                    </Button>
-                </Link>
-                <Link href="/" passHref className="flex-1">
-                    <Button 
-                        className="text-white w-full"
-                        style={{
-                            backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
-                        }}
-                    >
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Volver al Inicio
-                    </Button>
-                </Link>
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                    <Link href="/login" passHref className="flex-1">
+                        <Button
+                            className="text-white w-full"
+                            style={{
+                                backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                            }}
+                        >
+                            <UserCircle className="mr-2 h-4 w-4" />
+                            Iniciar Sesión
+                        </Button>
+                    </Link>
+                    <Link href="/" passHref className="flex-1">
+                        <Button 
+                            className="text-white w-full"
+                            style={{
+                                backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                            }}
+                        >
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Volver al Inicio
+                        </Button>
+                    </Link>
+                </div>
             </div>
         </footer>
       </div>
