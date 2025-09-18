@@ -943,21 +943,23 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
           }}
         >
-          <div className="max-w-7xl mx-auto flex items-center justify-start space-x-4">
-            {businessDetails.logoUrl && (
-              <NextImage
-                src={businessDetails.logoUrl}
-                alt={`${businessDetails.name} logo`}
-                width={40}
-                height={40}
-                className="h-10 w-10 object-contain rounded-md bg-white/20 p-1"
-              />
-            )}
-            <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-x-3">
-              <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
-              {businessDetails.slogan && (
-                <p className="text-xs text-white/80">{businessDetails.slogan}</p>
+          <div className="max-w-7xl mx-auto flex items-center justify-start">
+            <div className="flex items-center space-x-4">
+               {businessDetails.logoUrl && (
+                <NextImage
+                  src={businessDetails.logoUrl}
+                  alt={`${businessDetails.name} logo`}
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 object-contain rounded-md bg-white/20 p-1"
+                />
               )}
+              <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-x-3">
+                <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
+                {businessDetails.slogan && (
+                  <p className="text-xs text-white/80">{businessDetails.slogan}</p>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -999,13 +1001,15 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             <CardFooter className="flex flex-col sm:flex-row gap-2">
               <Button
                 onClick={handleSaveQrWithDetails}
-                className="w-full sm:flex-1 text-white"
+                variant="outline"
+                className="w-full sm:flex-1 font-bold border-2"
                 style={{
-                  backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`,
+                  color: businessDetails.primaryColor,
+                  borderColor: businessDetails.primaryColor,
                 }}
                 disabled={!generatedQrDataUrl}
               >
-                <Download className="mr-2 h-4 w-4" /> Guardar QR con Detalles
+                <Download className="mr-2 h-4 w-4" /> Guardar QR
               </Button>
               <Button 
                 onClick={resetQrFlow} 
@@ -1021,28 +1025,18 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         </main>
         <footer className="w-full mt-auto py-6 px-4 sm:px-6 lg:px-8 bg-muted/60 text-sm border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-              <Link href="/login" passHref>
-                  <Button
-                      className="text-white flex-1"
-                      style={{
-                          backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
-                      }}
-                  >
-                      <UserCircle className="mr-2 h-4 w-4" />
-                      Iniciar Sesión
-                  </Button>
-              </Link>
-              <Link href="/" passHref>
-                  <Button 
-                      className="text-white flex-1"
-                      style={{
-                          backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
-                      }}
-                  >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Volver al Inicio
-                  </Button>
-              </Link>
+            <Button asChild variant="outline" className="flex-1 max-w-xs">
+                <Link href="/login">
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  Iniciar Sesión
+                </Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1 max-w-xs">
+                <Link href="/">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver al Inicio
+                </Link>
+            </Button>
           </div>
         </footer>
       </div>
