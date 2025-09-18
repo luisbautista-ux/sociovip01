@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Palette, Image as ImageIconLucide, Type, QrCode, UploadCloud, Loader2, Link as LinkIcon } from "lucide-react"; 
+import { Settings, Palette, Image as ImageIconLucide, Type, QrCode, UploadCloud, Loader2, Link as LinkIcon, Smartphone } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function BusinessSettingsPage() {
   const [businessContactEmail, setBusinessContactEmail] = useState("");
   const [businessAddress, setBusinessAddress] = useState(""); 
   const [businessPublicPhone, setBusinessPublicPhone] = useState("");
+  const [personalPhone, setPersonalPhone] = useState(""); // Nuevo estado
 
   // State for branding info
   const [logoUrl, setLogoUrl] = useState("");
@@ -49,6 +51,7 @@ export default function BusinessSettingsPage() {
           setBusinessContactEmail(data.contactEmail || "");
           setBusinessAddress(data.publicAddress || data.address || ""); 
           setBusinessPublicPhone(data.publicPhone || "");
+          setPersonalPhone(data.personalPhone || ""); // Cargar nuevo campo
 
           setSlogan(data.slogan || "");
           setPrimaryColor(data.primaryColor || "#B080D0"); 
@@ -79,6 +82,18 @@ export default function BusinessSettingsPage() {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       return;
     }
+    
+    // Validación para el nuevo campo de teléfono personal
+    const personalPhoneRegex = /^9\d{8}$/;
+    if (personalPhone && !personalPhoneRegex.test(personalPhone)) {
+        toast({
+            title: "Teléfono Personal Inválido",
+            description: "El teléfono personal debe empezar con 9 y tener exactamente 9 dígitos.",
+            variant: "destructive"
+        });
+        return;
+    }
+    
     setIsSaving(true);
 
     const updateData: Partial<Business> = {
@@ -86,6 +101,7 @@ export default function BusinessSettingsPage() {
         contactEmail: businessContactEmail,
         publicAddress: businessAddress, 
         publicPhone: businessPublicPhone,
+        personalPhone: personalPhone, // Añadir nuevo campo al payload
         slogan,
         primaryColor,
         secondaryColor,
@@ -174,6 +190,24 @@ export default function BusinessSettingsPage() {
            <div>
             <Label htmlFor="businessPhone">Teléfono Público</Label>
             <Input id="businessPhone" type="tel" value={businessPublicPhone} onChange={(e) => setBusinessPublicPhone(e.target.value)} disabled={isSaving || isLoadingData}/>
+          </div>
+          <div>
+            <Label htmlFor="personalPhone" className="flex items-center">
+                <Smartphone className="h-4 w-4 mr-2 text-muted-foreground"/> Teléfono Personal (para WhatsApp)
+                <span className="text-destructive ml-1">*</span>
+            </Label>
+            <Input 
+                id="personalPhone" 
+                type="tel" 
+                value={personalPhone} 
+                onChange={(e) => setPersonalPhone(e.target.value)} 
+                disabled={isSaving || isLoadingData}
+                placeholder="987654321"
+                maxLength={9}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+                Debe tener 9 dígitos y empezar con 9. Se usará para compartir códigos por WhatsApp.
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -60,6 +60,7 @@ export interface Business {
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
+  personalPhone?: string; // Teléfono para uso interno/admin (ej: WhatsApp)
   publicAddress?: string;
   customUrlPath?: string | null; 
   primaryColor?: string;
