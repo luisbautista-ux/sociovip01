@@ -99,7 +99,8 @@ interface ManageCodesDialogProps {
   isPromoterView?: boolean; 
   currentUserProfileName?: string;
   currentUserProfileUid?: string;
-  currentUserProfilePhone?: string;
+  currentUserProfilePhone?: string; // For promoter view
+  businessPersonalPhone?: string; // For business admin view
 }
 
 export function ManageCodesDialog({
@@ -111,7 +112,8 @@ export function ManageCodesDialog({
     isPromoterView = false, 
     currentUserProfileName,
     currentUserProfileUid,
-    currentUserProfilePhone
+    currentUserProfilePhone,
+    businessPersonalPhone,
 }: ManageCodesDialogProps) {
   const [internalCodes, setInternalCodes] = useState<GeneratedCode[]>([]);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
@@ -232,23 +234,28 @@ export function ManageCodesDialog({
     }
   };
   
-    const openWhatsApp = (codes: string[]) => {
-        if (!currentUserProfilePhone) {
-            toast({ title: "Teléfono no encontrado", description: "No tienes un número de teléfono configurado en tu perfil.", variant: "destructive" });
-            return;
-        }
+  const openWhatsApp = (codes: string[]) => {
+      const phoneToUse = isPromoterView ? currentUserProfilePhone : businessPersonalPhone;
+      
+      if (!phoneToUse) {
+          const description = isPromoterView
+              ? "No tienes un número de teléfono configurado en tu perfil."
+              : "No hay un 'Teléfono Personal' configurado en los ajustes del negocio.";
+          toast({ title: "Teléfono no encontrado", description, variant: "destructive" });
+          return;
+      }
 
-        const businessUrl = businessDetails?.customUrlPath
-            ? `https://sociovip.app/b/${businessDetails.customUrlPath}`
-            : `https://sociovip.app/business/${entity?.businessId}`;
+      const businessUrl = businessDetails?.customUrlPath
+          ? `https://sociosvip.app/b/${businessDetails.customUrlPath}`
+          : `https://sociosvip.app/business/${entity?.businessId}`;
 
-        const codesText = codes.join('\n');
-        const message = `Genera tu entrada QR con tu código en:\n${businessUrl}\n\n${codesText}`;
-        const whatsappUrl = `https://wa.me/${currentUserProfilePhone}?text=${encodeURIComponent(message)}`;
-        
-        window.open(whatsappUrl, '_blank');
-        toast({ title: "Abriendo WhatsApp", description: "Se está abriendo una pestaña con tu mensaje." });
-    };
+      const codesText = codes.join('\n');
+      const message = `Genera tu entrada QR con tu código en:\n${businessUrl}\n\n${codesText}`;
+      const whatsappUrl = `https://wa.me/${phoneToUse}?text=${encodeURIComponent(message)}`;
+      
+      window.open(whatsappUrl, '_blank');
+      toast({ title: "Abriendo WhatsApp", description: "Se está abriendo una pestaña con tu mensaje." });
+  };
 
     const handleShareIndividualCode = (codeValue: string | undefined) => {
         if (!codeValue) return;

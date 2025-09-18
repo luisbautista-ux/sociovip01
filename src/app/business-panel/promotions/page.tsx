@@ -15,7 +15,7 @@ import {
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
 import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle, MoreVertical } from "lucide-react";
-import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode } from "@/lib/types";
+import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ export default function BusinessPromotionsPage() {
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   
   const [showCreateEditPromotionModal, setShowCreateEditPromotionModal] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<BusinessManagedEntity | null>(null);
@@ -68,84 +69,51 @@ export default function BusinessPromotionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
  useEffect(() => {
-    console.log("Promotions Page: Auth/Profile Effect. loadingAuth:", loadingAuth, "loadingProfile:", loadingProfile, "userProfile UID:", userProfile?.uid);
     if (loadingAuth || loadingProfile) {
       setIsLoadingPageData(true);
       return;
     }
 
-    if (userProfile) {
-      const fetchedBusinessId = userProfile.businessId;
-      if (fetchedBusinessId && typeof fetchedBusinessId === 'string' && fetchedBusinessId.trim() !== '') {
-        console.log("Promotions Page: UserProfile has businessId:", fetchedBusinessId.trim());
-        setCurrentBusinessId(fetchedBusinessId.trim());
-      } else {
-        console.warn("Promotions Page: UserProfile loaded but no valid businessId. Roles:", userProfile.roles);
-        setCurrentBusinessId(null);
-        setPromotions([]);
-        if (userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff')) {
-          toast({
-            title: "Error de Negocio",
-            description: "Tu perfil de usuario no está asociado a un negocio válido para cargar promociones.",
-            variant: "destructive",
-            duration: 7000,
-          });
-        }
-        setIsLoadingPageData(false);
-      }
+    if (userProfile?.businessId) {
+      setCurrentBusinessId(userProfile.businessId);
     } else {
-      console.log("Promotions Page: No userProfile. Clearing data, loading done.");
-      setCurrentBusinessId(null);
-      setPromotions([]);
       setIsLoadingPageData(false);
     }
-  }, [userProfile, loadingAuth, loadingProfile, toast]);
+  }, [userProfile, loadingAuth, loadingProfile]);
 
 
-  const fetchBusinessPromotions = useCallback(async (businessIdToFetch: string) => {
-    console.log("Promotions Page: UserProfile for query (inside fetch):", userProfile);
-    console.log("Promotions Page: Querying promotions with businessId:", businessIdToFetch);
+  const fetchBusinessData = useCallback(async (businessIdToFetch: string) => {
+    setIsLoadingPageData(true);
     try {
+      // Fetch Business Details
+      const businessDocRef = doc(db, "businesses", businessIdToFetch);
+      const businessSnap = await getDoc(businessDocRef);
+      if (businessSnap.exists()) {
+        setBusinessDetails({ id: businessSnap.id, ...businessSnap.data() } as Business);
+      } else {
+         toast({ title: "Error", description: "No se encontraron los datos del negocio.", variant: "destructive" });
+      }
+
+      // Fetch Promotions
       const q = query(
         collection(db, "businessEntities"),
         where("businessId", "==", businessIdToFetch),
         where("type", "==", "promotion")
       );
       const querySnapshot = await getDocs(q);
-      console.log("Promotions Page: Firestore query executed for promotions. Snapshot size:", querySnapshot.size);
 
       const fetchedPromotions: BusinessManagedEntity[] = querySnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         const nowISO = new Date().toISOString();
         
-        let startDateStr: string;
-        if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
-        else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
-        else { 
-          console.warn(`Promotions Page: Entity ${docSnap.id} for business ${data.businessId} missing or invalid startDate. Using fallback.`);
-          startDateStr = nowISO; 
-        }
-
-        let endDateStr: string;
-        if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
-        else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
-        else { 
-          console.warn(`Promotions Page: Entity ${docSnap.id} for business ${data.businessId} missing or invalid endDate. Using fallback.`);
-          endDateStr = nowISO; 
-        }
-        
-        let createdAtStr: string | undefined;
-        if (data.createdAt instanceof Timestamp) createdAtStr = data.createdAt.toDate().toISOString();
-        else if (typeof data.createdAt === 'string') createdAtStr = data.createdAt;
-        else if (data.createdAt instanceof Date) createdAtStr = data.createdAt.toISOString();
-        else createdAtStr = undefined;
+        let startDateStr: string = data.startDate?.toDate?.().toISOString() || data.startDate || nowISO;
+        let endDateStr: string = data.endDate?.toDate?.().toISOString() || data.endDate || nowISO;
+        let createdAtStr: string | undefined = data.createdAt?.toDate?.().toISOString() || data.createdAt;
 
         return {
           id: docSnap.id,
           businessId: data.businessId || businessIdToFetch,
-          type: "promotion" as "promotion",
+          type: "promotion",
           name: data.name || "Promoción sin nombre",
           description: data.description || "",
           termsAndConditions: data.termsAndConditions || "",
@@ -164,45 +132,27 @@ export default function BusinessPromotionsPage() {
         };
       });
       
-      const sortedPromotions = fetchedPromotions.sort((a,b) => {
-         if (a.createdAt && b.createdAt) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-         if (a.startDate && b.startDate) return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-         return 0;
-      });
+      const sortedPromotions = fetchedPromotions.sort((a,b) => (new Date(b.createdAt || 0)).getTime() - (new Date(a.createdAt || 0)).getTime());
       setPromotions(sortedPromotions);
-      console.log("Promotions Page: Fetched promotions successfully:", sortedPromotions.length);
+
     } catch (error: any) {
-        console.error("Promotions Page: Error fetching promotions:", error.code, error.message, error);
         toast({
-          title: "Error al Cargar Promociones",
-          description: `No se pudieron obtener las promociones. ${error.message}`,
+          title: "Error al Cargar Datos",
+          description: `No se pudieron obtener las promociones o datos del negocio. ${error.message}`,
           variant: "destructive",
           duration: 7000,
         });
       setPromotions([]); 
+    } finally {
+      setIsLoadingPageData(false);
     }
-  }, [toast, userProfile]);
+  }, [toast]);
 
   useEffect(() => {
-    console.log("Promotions Page: Data Fetching Effect. currentBusinessId:", currentBusinessId);
     if (currentBusinessId) {
-        setIsLoadingPageData(true);
-        fetchBusinessPromotions(currentBusinessId)
-            .catch(error => {
-                 console.error("Promotions Page: Error during fetchBusinessPromotions:", error);
-            })
-            .finally(() => {
-                console.log("Promotions Page: fetchBusinessPromotions finished. Setting isLoadingPageData to false.");
-                setIsLoadingPageData(false);
-            });
-    } else {
-        if (!loadingAuth && !loadingProfile) {
-            console.log("Promotions Page: Data Fetching Effect - currentBusinessId is null. Ensuring data is clear and loading is false.");
-            setPromotions([]);
-            setIsLoadingPageData(false);
-        }
+        fetchBusinessData(currentBusinessId);
     }
-  }, [currentBusinessId, fetchBusinessPromotions, loadingAuth, loadingProfile]);
+  }, [currentBusinessId, fetchBusinessData]);
 
 
   const filteredPromotions = useMemo(() => {
@@ -266,8 +216,6 @@ export default function BusinessPromotionsPage() {
       return;
     }
     setIsSubmitting(true);
-    console.log("Promotions Page: Submitting form with data:", data);
-    console.log("Promotions Page: Editing promotion ID:", editingPromotion?.id, "Is Duplicating:", isDuplicating);
 
     const promotionPayloadBase = {
       name: data.name,
@@ -295,33 +243,24 @@ export default function BusinessPromotionsPage() {
     };
     
     const promotionPayloadForFirestore = sanitizeObjectForFirestore(fullPayloadRaw);
-    console.log('Promotions Page: Saving promotion with payload:', promotionPayloadForFirestore);
     
     try {
       if (editingPromotion && !isDuplicating && editingPromotion.id) { 
         const { id, createdAt, ...updateData } = promotionPayloadForFirestore; 
-        console.log("Promotions Page: Updating promotion with ID", editingPromotion.id, "Payload:", updateData);
         await updateDoc(doc(db, "businessEntities", editingPromotion.id), updateData);
         toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
       } else { 
         const { id, ...createDataRaw } = promotionPayloadForFirestore;
         const createData = { ...createDataRaw, createdAt: serverTimestamp() };
-        console.log("Promotions Page: Creating promotion with payload:", createData);
         const docRef = await addDoc(collection(db, "businessEntities"), createData);
         toast({ title: isDuplicating ? "Promoción Duplicada" : "Promoción Creada", description: `La promoción "${data.name}" ha sido creada con ID: ${docRef.id}.` });
       }
       setShowCreateEditPromotionModal(false);
       setEditingPromotion(null);
       setIsDuplicating(false);
-      if (currentBusinessId) fetchBusinessPromotions(currentBusinessId); 
+      if (currentBusinessId) fetchBusinessData(currentBusinessId); 
     } catch (error: any) {
-      console.error("Promotions Page: Error saving promotion:", error.code, error.message, error);
-      let errorDesc = `No se pudo guardar la promoción. ${error.message}.`;
-      if (error.code === 'permission-denied') {
-        errorDesc = `Error de permisos al guardar promoción. (Negocio ID: ${currentBusinessId}, Usuario: ${userProfile?.email})`;
-      } else if (error.code === 'invalid-argument' && error.message.includes("Unsupported field value: undefined")) {
-        errorDesc = `Error al guardar: Uno de los campos tiene un valor indefinido no soportado. Revisa los datos del formulario. Detalle: ${error.message}`;
-      }
+      const errorDesc = `No se pudo guardar la promoción. ${error.message}.`;
       toast({ title: "Error al Guardar Promoción", description: errorDesc, variant: "destructive", duration: 10000});
     } finally {
       setIsSubmitting(false);
@@ -339,9 +278,8 @@ export default function BusinessPromotionsPage() {
     try {
       await deleteDoc(doc(db, "businessEntities", promotionId));
       toast({ title: "Promoción Eliminada", description: `La promoción "${promotionName || 'seleccionada'}" ha sido eliminada.`, variant: "destructive" });
-      if (currentBusinessId) fetchBusinessPromotions(currentBusinessId); 
+      if (currentBusinessId) fetchBusinessData(currentBusinessId); 
     } catch (error: any) {
-      console.error("Promotions Page: Error deleting promotion:", error.code, error.message, error);
       toast({ title: "Error al Eliminar", description: `No se pudo eliminar la promoción. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false);
@@ -390,7 +328,6 @@ export default function BusinessPromotionsPage() {
         toast({title: `${newCodes.length} Código(s) Creado(s)`, description: `Para: ${targetPromotionData.name}.`});
         
     } catch (error: any) {
-        console.error("Promotions Page: Error saving new codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive"});
         throw error; // Re-throw to be caught by the dialog
     }
@@ -419,7 +356,7 @@ export default function BusinessPromotionsPage() {
         await updateDoc(targetPromotionRef, { generatedCodes: updatedCodesForFirestore });
         toast({title: "Códigos Actualizados", description: `Los códigos para "${targetPromotionData.name}" han sido guardados en la base de datos.`});
         
-        if (currentBusinessId) fetchBusinessPromotions(currentBusinessId);
+        if (currentBusinessId) fetchBusinessData(currentBusinessId);
         if (editingPromotion && editingPromotion.id === entityId) {
              setEditingPromotion(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
         }
@@ -427,7 +364,6 @@ export default function BusinessPromotionsPage() {
             setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: updatedCodesForFirestore} : null);
         }
     } catch (error: any) {
-        console.error("Promotions Page: Error saving updated codes to Firestore:", error.code, error.message, error);
         toast({title: "Error al Guardar Códigos", description: `No se pudieron actualizar los códigos. ${error.message}`, variant: "destructive"});
     } finally {
         setIsSubmitting(false);
@@ -457,7 +393,6 @@ export default function BusinessPromotionsPage() {
         description: `La promoción "${promotionToToggle.name}" ahora está ${newStatus ? "Activa" : "Inactiva"}.`
       });
     } catch (error: any) {
-      console.error("Promotions Page: Error toggling status:", error);
       toast({ title: "Error", description: "No se pudo actualizar el estado de la promoción.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -808,6 +743,7 @@ export default function BusinessPromotionsPage() {
           isPromoterView={false} 
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
+          businessPersonalPhone={businessDetails?.personalPhone}
         />
       )}
 
@@ -842,5 +778,6 @@ export default function BusinessPromotionsPage() {
     
 
     
+
 
 

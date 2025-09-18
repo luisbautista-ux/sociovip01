@@ -20,7 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc } from "firebase/firestore";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, BusinessPromoterLink, CommissionRule } from "@/lib/types";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, BusinessPromoterLink, CommissionRule, Business } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -46,6 +46,7 @@ export default function BusinessEventsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
 
   const [isManageEventDialogOpen, setIsManageEventDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(null);
@@ -70,6 +71,7 @@ export default function BusinessEventsPage() {
   const fetchEventsAndPromoters = useCallback(async (businessId: string) => {
     setIsLoading(true);
     try {
+      const businessDocRef = doc(db, "businesses", businessId);
       const eventsQuery = query(
         collection(db, "businessEntities"),
         where("businessId", "==", businessId),
@@ -81,11 +83,18 @@ export default function BusinessEventsPage() {
         where("isActive", "==", true)
       );
 
-      const [eventsSnapshot, promotersSnapshot] = await Promise.all([
+      const [businessSnap, eventsSnapshot, promotersSnapshot] = await Promise.all([
+        getDoc(businessDocRef),
         getDocs(eventsQuery),
         getDocs(promotersQuery)
       ]);
       
+      if (businessSnap.exists()) {
+        setBusinessDetails({ id: businessSnap.id, ...businessSnap.data() } as Business);
+      } else {
+        toast({ title: "Error", description: "No se pudieron cargar los detalles del negocio.", variant: "destructive" });
+      }
+
       const fetchedEvents: BusinessManagedEntity[] = eventsSnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
@@ -737,6 +746,7 @@ export default function BusinessEventsPage() {
           }}
           isPromoterView={false} 
           currentUserProfileName={userProfile.name}
+          businessPersonalPhone={businessDetails?.personalPhone}
         />
       )}
 
