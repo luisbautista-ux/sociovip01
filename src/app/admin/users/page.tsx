@@ -45,10 +45,11 @@ const DniEntrySchema = z.object({
             });
         }
     } else if (data.docType === 'ce') {
-        if (!/^\d{10,20}$/.test(data.docNumber)) {
+        // This validation might need adjustment for real CE numbers
+        if (!/^\d{9,12}$/.test(data.docNumber)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
+                message: "El Carnet de Extranjería debe tener entre 9 y 12 dígitos.",
                 path: ['docNumber'],
             });
         }
@@ -193,7 +194,7 @@ export default function AdminUsersPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "sociovip_usuarios_plataforma.csv");
+    link.setAttribute("download", "sociosvip_usuarios_plataforma.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -290,6 +291,27 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         } else if (dbCheckResult.userType === 'QrClient' && dbCheckResult.qrClientData) {
             initialData.name = `${dbCheckResult.qrClientData.name} ${dbCheckResult.qrClientData.surname}`;
             initialData.preExistingUserType = 'QrClient';
+        }
+    } else {
+        // If DNI doesn't exist in our DB, consult the external API
+        if (values.docType === 'dni') {
+            try {
+                const response = await fetch('/api/admin/consult-dni', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dni: docNumberCleaned }),
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.nombreCompleto) {
+                        initialData.name = data.nombreCompleto;
+                    }
+                } else {
+                   console.warn("DNI consultation failed, proceeding with manual entry.");
+                }
+            } catch (error) {
+                console.error("Error calling DNI consultation API:", error);
+            }
         }
     }
     
@@ -715,9 +737,9 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                     <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
+                        placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "9-12 dígitos numéricos"} 
                         {...field} 
-                        maxLength={watchedDocType === 'dni' ? 8 : 20}
+                        maxLength={watchedDocType === 'dni' ? 8 : 12}
                         onChange={(e) => {
                             const numericValue = e.target.value.replace(/[^0-9]/g, '');
                             field.onChange(numericValue);
