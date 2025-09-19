@@ -38,6 +38,320 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 
+// Helper component extracted to the top level of the file
+const ManageEventDialog = ({
+    isManageEventDialogOpen,
+    setIsManageEventDialogOpen,
+    editingEvent,
+    isDuplicating,
+    isSubmitting,
+    availablePromoters,
+    handleSaveEvent,
+    setEditingEvent,
+}: {
+    isManageEventDialogOpen: boolean;
+    setIsManageEventDialogOpen: (isOpen: boolean) => void;
+    editingEvent: BusinessManagedEntity | null;
+    isDuplicating: boolean;
+    isSubmitting: boolean;
+    availablePromoters: BusinessPromoterLink[];
+    handleSaveEvent: (event: BusinessManagedEntity | null) => void;
+    setEditingEvent: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
+}) => {
+    const [activeTab, setActiveTab] = useState("details");
+    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
+    const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
+    const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
+
+    useEffect(() => {
+        if (isManageEventDialogOpen && editingEvent) {
+            setLocalEventState({ ...editingEvent });
+            // When a new event is opened for editing, reset to the details tab.
+            setActiveTab("details");
+        } else {
+            setLocalEventState(null);
+        }
+    }, [isManageEventDialogOpen, editingEvent]);
+
+    const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                name: values.name,
+                description: values.description,
+                termsAndConditions: values.termsAndConditions,
+                startDate: values.startDate.toISOString(),
+                endDate: values.endDate.toISOString(),
+                unlimitedAttendance: values.unlimitedAttendance,
+                maxAttendance: values.unlimitedAttendance ? 0 : values.maxAttendance,
+                isActive: values.isActive,
+                imageUrl: values.imageUrl,
+                aiHint: values.aiHint,
+            };
+        });
+    }, []);
+
+    const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            let updatedTicketTypes: TicketType[];
+            const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
+            const newOrUpdatedTicket: TicketType = {
+                ...ticketData,
+                id: ticketId,
+                eventId: prev.id,
+                businessId: prev.businessId,
+            };
+
+            if (editingTicket) {
+                updatedTicketTypes = (prev.ticketTypes || []).map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t);
+            } else {
+                updatedTicketTypes = [...(prev.ticketTypes || []), newOrUpdatedTicket];
+            }
+            return { ...prev, ticketTypes: updatedTicketTypes };
+        });
+        setIsTicketFormOpen(false);
+        setEditingTicket(null);
+    };
+    
+    const handleTicketDelete = (ticketId: string) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedTicketTypes = (prev.ticketTypes || []).filter(t => t.id !== ticketId);
+            return { ...prev, ticketTypes: updatedTicketTypes };
+        });
+    };
+
+    const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
+        const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
+        if (!promoterData) return;
+
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            
+            let updatedAssignments = [...(prev.assignedPromoters || [])];
+
+            if (isChecked) {
+                const isAlreadyAssigned = updatedAssignments.some(p => p.promoterProfileId === promoterId);
+                if (!isAlreadyAssigned) {
+                    const newAssignment: EventPromoterAssignment = {
+                        promoterProfileId: promoterData.platformUserUid!,
+                        promoterName: promoterData.promoterName,
+                        promoterEmail: promoterData.promoterEmail,
+                        commissionRules: [],
+                    };
+                    updatedAssignments.push(newAssignment);
+                }
+            } else {
+                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
+            }
+
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+
+
+    const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const updatedRules = [...p.commissionRules!];
+                    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
+                    return { ...p, commissionRules: updatedRules };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+
+    const handleAddCommissionRule = (promoterId: string) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const newRule: CommissionRule = {
+                        id: `rule_${Date.now()}`,
+                        appliesTo: 'event_general',
+                        commissionType: 'fixed',
+                        commissionValue: 0,
+                    };
+                    return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+    
+    const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
+         setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const updatedRules = (p.commissionRules || []).filter(r => r.id !== ruleId);
+                    return { ...p, commissionRules: updatedRules };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+
+    if (!isManageEventDialogOpen || !localEventState) return null;
+
+    return (
+        <>
+            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
+                    </DialogHeader>
+                    
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
+                        <TabsList className="w-full grid grid-cols-4">
+                            <TabsTrigger value="details">Detalles</TabsTrigger>
+                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
+                            <TabsTrigger value="boxes">Boxes</TabsTrigger>
+                            <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
+                        </TabsList>
+
+                        <div className="flex-grow overflow-y-auto mt-4 pr-2">
+                            <TabsContent value="details">
+                                <BusinessEventForm 
+                                    event={localEventState} 
+                                    onFormChange={handleDetailsChange} 
+                                    isSubmitting={isSubmitting}
+                                />
+                            </TabsContent>
+                            <TabsContent value="tickets">
+                               <Card>
+                                 <CardHeader>
+                                     <CardTitle>Gestión de Tipos de Entrada</CardTitle>
+                                     <CardDescription>Añade y configura las entradas para tu evento. El aforo total se calcula sumando las cantidades de cada tipo.</CardDescription>
+                                 </CardHeader>
+                                 <CardContent>
+                                     <Button onClick={() => { setEditingTicket(null); setIsTicketFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Tipo de Entrada</Button>
+                                     <Table className="mt-4">
+                                         <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                                         <TableBody>
+                                             {(localEventState.ticketTypes || []).map(ticket => (
+                                                 <TableRow key={ticket.id}>
+                                                     <TableCell>{ticket.name}</TableCell>
+                                                     <TableCell>{ticket.cost.toFixed(2)}</TableCell>
+                                                     <TableCell>{ticket.quantity || 'Ilimitadas'}</TableCell>
+                                                     <TableCell className="text-right">
+                                                         <Button variant="ghost" size="icon" onClick={() => { setEditingTicket(ticket); setIsTicketFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                         <AlertDialog>
+                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><UIDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                         </AlertDialog>
+                                                     </TableCell>
+                                                 </TableRow>
+                                             ))}
+                                         </TableBody>
+                                     </Table>
+                                      {(!localEventState.ticketTypes || localEventState.ticketTypes.length === 0) && (
+                                        <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
+                                      )}
+                                 </CardContent>
+                               </Card>
+                            </TabsContent>
+                            <TabsContent value="boxes">
+                                <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
+                            </TabsContent>
+                           <TabsContent value="promoters">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Asignar Promotores al Evento</CardTitle>
+                                        <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento y luego configura sus comisiones.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        <div>
+                                            <Label className="font-semibold">Promotores del Negocio</Label>
+                                            <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
+                                                {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
+                                                    const isChecked = (localEventState.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                    return (
+                                                        <div key={promoter.platformUserUid} className="flex items-center space-x-2">
+                                                            <Checkbox
+                                                                id={`promoter-${promoter.platformUserUid}`}
+                                                                checked={isChecked}
+                                                                onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter.platformUserUid!, Boolean(checked))}
+                                                            />
+                                                            <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
+                                                        </div>
+                                                    );
+                                                }) : <p className="text-sm text-muted-foreground">No hay promotores vinculados a tu negocio.</p>}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                          <h4 className="font-semibold">Promotores Asignados ({localEventState.assignedPromoters?.length || 0})</h4>
+                                          {(localEventState.assignedPromoters || []).map(assignment => (
+                                              <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
+                                                  <div className="flex justify-between items-center">
+                                                      <p className="font-medium">{assignment.promoterName}</p>
+                                                      {/* El promotor se desasigna desmarcando el checkbox de arriba */}
+                                                  </div>
+                                                  
+                                                  <div className="space-y-2">
+                                                      {(assignment.commissionRules || []).map((rule, index) => (
+                                                          <div key={rule.id} className="flex items-center gap-2 bg-background p-2 rounded-md border">
+                                                              <div className="flex-grow grid grid-cols-2 gap-2">
+                                                                  <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
+                                                                  <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
+                                                              </div>
+                                                              <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemoveCommissionRule(assignment.promoterProfileId, rule.id)}><Trash2 className="h-4 w-4"/></Button>
+                                                          </div>
+                                                      ))}
+                                                      <Button size="sm" variant="outline" onClick={() => handleAddCommissionRule(assignment.promoterProfileId)}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Regla de Comisión</Button>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                          {(!localEventState.assignedPromoters || localEventState.assignedPromoters.length === 0) && (
+                                              <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
+                                          )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+                    
+                    <DialogFooter className="pt-4 border-t mt-auto">
+                        <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                        <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Guardar Evento
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isTicketFormOpen} onOpenChange={setIsTicketFormOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingTicket ? 'Editar Tipo de Entrada' : 'Nuevo Tipo de Entrada'}</DialogTitle>
+                </DialogHeader>
+                <TicketTypeForm 
+                    ticketType={editingTicket || undefined} 
+                    onSubmit={handleTicketSubmit} 
+                    onCancel={() => setIsTicketFormOpen(false)}
+                    isSubmitting={isSubmitting}
+                />
+              </DialogContent>
+            </Dialog>
+        </>
+    );
+};
+
+
 export default function BusinessEventsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
   const { toast } = useToast();
@@ -283,301 +597,6 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const ManageEventDialog = () => {
-    const [activeTab, setActiveTab] = useState("details");
-    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
-    const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
-    const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
-
-    useEffect(() => {
-        if (isManageEventDialogOpen && editingEvent) {
-            setLocalEventState({ ...editingEvent });
-        } else {
-            setLocalEventState(null);
-        }
-    }, [isManageEventDialogOpen, editingEvent]);
-
-    const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            // This is where the bug was. The values object only contains fields from BusinessEventForm.
-            // We need to merge it with the existing state, not just spread it.
-            return {
-                ...prev,
-                name: values.name,
-                description: values.description,
-                termsAndConditions: values.termsAndConditions,
-                startDate: values.startDate.toISOString(),
-                endDate: values.endDate.toISOString(),
-                unlimitedAttendance: values.unlimitedAttendance,
-                maxAttendance: values.unlimitedAttendance ? 0 : values.maxAttendance,
-                isActive: values.isActive,
-                imageUrl: values.imageUrl,
-                aiHint: values.aiHint,
-            };
-        });
-    }, []);
-
-    const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            let updatedTicketTypes: TicketType[];
-            const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
-            const newOrUpdatedTicket: TicketType = {
-                ...ticketData,
-                id: ticketId,
-                eventId: prev.id,
-                businessId: prev.businessId,
-            };
-
-            if (editingTicket) {
-                updatedTicketTypes = (prev.ticketTypes || []).map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t);
-            } else {
-                updatedTicketTypes = [...(prev.ticketTypes || []), newOrUpdatedTicket];
-            }
-            return { ...prev, ticketTypes: updatedTicketTypes };
-        });
-        setIsTicketFormOpen(false);
-        setEditingTicket(null);
-    };
-    
-    const handleTicketDelete = (ticketId: string) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            const updatedTicketTypes = (prev.ticketTypes || []).filter(t => t.id !== ticketId);
-            return { ...prev, ticketTypes: updatedTicketTypes };
-        });
-    };
-
-    const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
-        const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
-        if (!promoterData) return;
-
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            
-            let updatedAssignments = [...(prev.assignedPromoters || [])];
-
-            if (isChecked) {
-                // Add promoter if not already assigned
-                const isAlreadyAssigned = updatedAssignments.some(p => p.promoterProfileId === promoterId);
-                if (!isAlreadyAssigned) {
-                    const newAssignment: EventPromoterAssignment = {
-                        promoterProfileId: promoterData.platformUserUid!,
-                        promoterName: promoterData.promoterName,
-                        promoterEmail: promoterData.promoterEmail,
-                        commissionRules: [],
-                    };
-                    updatedAssignments.push(newAssignment);
-                }
-            } else {
-                // Remove promoter
-                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
-            }
-
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
-    };
-
-
-    const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                if (p.promoterProfileId === promoterId) {
-                    const updatedRules = [...p.commissionRules!];
-                    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
-                    return { ...p, commissionRules: updatedRules };
-                }
-                return p;
-            });
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
-    };
-
-    const handleAddCommissionRule = (promoterId: string) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                if (p.promoterProfileId === promoterId) {
-                    const newRule: CommissionRule = {
-                        id: `rule_${Date.now()}`,
-                        appliesTo: 'event_general',
-                        commissionType: 'fixed',
-                        commissionValue: 0,
-                    };
-                    return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
-                }
-                return p;
-            });
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
-    };
-    
-    const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
-         setLocalEventState(prev => {
-            if (!prev) return null;
-            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                if (p.promoterProfileId === promoterId) {
-                    const updatedRules = (p.commissionRules || []).filter(r => r.id !== ruleId);
-                    return { ...p, commissionRules: updatedRules };
-                }
-                return p;
-            });
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
-    };
-
-    if (!isManageEventDialogOpen || !localEventState) return null;
-
-    return (
-        <>
-            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
-                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
-                        <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
-                    </DialogHeader>
-                    
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
-                        <TabsList className="w-full grid grid-cols-4">
-                            <TabsTrigger value="details">Detalles</TabsTrigger>
-                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                            <TabsTrigger value="boxes">Boxes</TabsTrigger>
-                            <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
-                        </TabsList>
-
-                        <div className="flex-grow overflow-y-auto mt-4 pr-2">
-                            <TabsContent value="details">
-                                <BusinessEventForm 
-                                    event={localEventState} 
-                                    onFormChange={handleDetailsChange} 
-                                    isSubmitting={isSubmitting}
-                                />
-                            </TabsContent>
-                            <TabsContent value="tickets">
-                               <Card>
-                                 <CardHeader>
-                                     <CardTitle>Gestión de Tipos de Entrada</CardTitle>
-                                     <CardDescription>Añade y configura las entradas para tu evento. El aforo total se calcula sumando las cantidades de cada tipo.</CardDescription>
-                                 </CardHeader>
-                                 <CardContent>
-                                     <Button onClick={() => { setEditingTicket(null); setIsTicketFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Tipo de Entrada</Button>
-                                     <Table className="mt-4">
-                                         <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-                                         <TableBody>
-                                             {(localEventState.ticketTypes || []).map(ticket => (
-                                                 <TableRow key={ticket.id}>
-                                                     <TableCell>{ticket.name}</TableCell>
-                                                     <TableCell>{ticket.cost.toFixed(2)}</TableCell>
-                                                     <TableCell>{ticket.quantity || 'Ilimitadas'}</TableCell>
-                                                     <TableCell className="text-right">
-                                                         <Button variant="ghost" size="icon" onClick={() => { setEditingTicket(ticket); setIsTicketFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                                         <AlertDialog>
-                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
-                                                            <AlertDialogContent>
-                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><UIDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIDialogDescription></AlertDialogHeader>
-                                                                <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                                                            </AlertDialogContent>
-                                                         </AlertDialog>
-                                                     </TableCell>
-                                                 </TableRow>
-                                             ))}
-                                         </TableBody>
-                                     </Table>
-                                      {(!localEventState.ticketTypes || localEventState.ticketTypes.length === 0) && (
-                                        <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
-                                      )}
-                                 </CardContent>
-                               </Card>
-                            </TabsContent>
-                            <TabsContent value="boxes">
-                                <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
-                            </TabsContent>
-                           <TabsContent value="promoters">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Asignar Promotores al Evento</CardTitle>
-                                        <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento y luego configura sus comisiones.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-6">
-                                        <div>
-                                            <Label className="font-semibold">Promotores del Negocio</Label>
-                                            <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
-                                                {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
-                                                    const isChecked = (localEventState.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
-                                                    return (
-                                                        <div key={promoter.platformUserUid} className="flex items-center space-x-2">
-                                                            <Checkbox
-                                                                id={`promoter-${promoter.platformUserUid}`}
-                                                                checked={isChecked}
-                                                                onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter.platformUserUid!, Boolean(checked))}
-                                                            />
-                                                            <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
-                                                        </div>
-                                                    );
-                                                }) : <p className="text-sm text-muted-foreground">No hay promotores vinculados a tu negocio.</p>}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                          <h4 className="font-semibold">Promotores Asignados ({localEventState.assignedPromoters?.length || 0})</h4>
-                                          {(localEventState.assignedPromoters || []).map(assignment => (
-                                              <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
-                                                  <div className="flex justify-between items-center">
-                                                      <p className="font-medium">{assignment.promoterName}</p>
-                                                      {/* El promotor se desasigna desmarcando el checkbox de arriba */}
-                                                  </div>
-                                                  
-                                                  <div className="space-y-2">
-                                                      {(assignment.commissionRules || []).map((rule, index) => (
-                                                          <div key={rule.id} className="flex items-center gap-2 bg-background p-2 rounded-md border">
-                                                              <div className="flex-grow grid grid-cols-2 gap-2">
-                                                                  <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
-                                                                  <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
-                                                              </div>
-                                                              <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemoveCommissionRule(assignment.promoterProfileId, rule.id)}><Trash2 className="h-4 w-4"/></Button>
-                                                          </div>
-                                                      ))}
-                                                      <Button size="sm" variant="outline" onClick={() => handleAddCommissionRule(assignment.promoterProfileId)}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Regla de Comisión</Button>
-                                                  </div>
-                                              </div>
-                                          ))}
-                                          {(!localEventState.assignedPromoters || localEventState.assignedPromoters.length === 0) && (
-                                              <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
-                                          )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        </div>
-                    </Tabs>
-                    
-                    <DialogFooter className="pt-4 border-t mt-auto">
-                        <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
-                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                            Guardar Evento
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            <Dialog open={isTicketFormOpen} onOpenChange={setIsTicketFormOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingTicket ? 'Editar Tipo de Entrada' : 'Nuevo Tipo de Entrada'}</DialogTitle>
-                </DialogHeader>
-                <TicketTypeForm 
-                    ticketType={editingTicket || undefined} 
-                    onSubmit={handleTicketSubmit} 
-                    onCancel={() => setIsTicketFormOpen(false)}
-                    isSubmitting={isSubmitting}
-                />
-              </DialogContent>
-            </Dialog>
-        </>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -718,7 +737,16 @@ export default function BusinessEventsPage() {
           </CardContent>
         </Card>
       )}
-      <ManageEventDialog />
+      <ManageEventDialog 
+        isManageEventDialogOpen={isManageEventDialogOpen}
+        setIsManageEventDialogOpen={setIsManageEventDialogOpen}
+        editingEvent={editingEvent}
+        isDuplicating={isDuplicating}
+        isSubmitting={isSubmitting}
+        availablePromoters={availablePromoters}
+        handleSaveEvent={handleSaveEvent}
+        setEditingEvent={setEditingEvent}
+      />
 
       {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
