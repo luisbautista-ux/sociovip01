@@ -293,26 +293,6 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         }
     }
     
-    // Si no existe o no es PlatformUser, consultar API externa
-    if (values.docType === 'dni' && values.docNumber.length === 8) {
-        try {
-            const response = await fetch('/api/admin/consult-dni', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dni: docNumberCleaned }),
-            });
-            if (response.ok) {
-                const apiData = await response.json();
-                initialData.name = apiData.nombreCompleto;
-                toast({ title: "DNI Encontrado", description: "El nombre ha sido pre-rellenado." });
-            } else {
-                toast({ title: "Consulta DNI", description: "No se encontró el DNI en el servicio externo.", variant: "default" });
-            }
-        } catch (error) {
-             toast({ title: "Consulta DNI", description: "El servicio externo de consulta no está disponible.", variant: "default" });
-        }
-    }
-
     setIsSubmitting(false);
     setVerifiedDniResult(initialData);
     setEditingUser(null); 

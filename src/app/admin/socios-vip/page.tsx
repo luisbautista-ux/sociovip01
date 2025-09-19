@@ -248,7 +248,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     setIsSubmitting(true);
     setDniForSocioVerification(docNumberCleaned);
 
-    // Primero, consulta si ya existe en la base de datos de la plataforma
     const dbCheckResult = await checkDniAcrossCollections(docNumberCleaned);
 
     if (dbCheckResult.existsAsSocioVip && dbCheckResult.socioVipData) {
@@ -261,7 +260,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
 
     let initialData: InitialDataForSocioVipCreation = { dni: docNumberCleaned };
     
-    // Si no existe como Socio VIP, intenta rellenar datos desde otras colecciones
     if (dbCheckResult.existsAsQrClient && dbCheckResult.qrClientData) {
         initialData.existingUserType = 'QrClient';
         initialData.name = dbCheckResult.qrClientData.name;
@@ -277,38 +275,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         initialData.surname = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
         initialData.name = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
         initialData.email = dbCheckResult.platformUserData.email;
-    }
-
-    // Ahora, si es un DNI de 8 dígitos, intenta consultar la API externa
-    if (values.docType === 'dni' && values.docNumber.length === 8) {
-        try {
-            const response = await fetch('/api/admin/consult-dni', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dni: docNumberCleaned }),
-            });
-            
-            if (response.ok) {
-                const apiData = await response.json();
-                if (apiData.nombreCompleto) {
-                    const nameParts = apiData.nombreCompleto.split(' ');
-                    // Simple logic: last two are surnames, rest are names
-                    if (nameParts.length > 2) {
-                        initialData.surname = `${nameParts[0]} ${nameParts[1]}`;
-                        initialData.name = nameParts.slice(2).join(' ');
-                    } else {
-                        initialData.surname = nameParts[0] || '';
-                        initialData.name = nameParts[1] || '';
-                    }
-                    toast({ title: "DNI Encontrado", description: "Nombres y apellidos han sido pre-rellenados." });
-                }
-            } else {
-                toast({ title: "Consulta DNI", description: "No se encontró el DNI en el servicio externo, puede ingresarlo manualmente.", variant: "default" });
-            }
-        } catch (error) {
-            console.warn("Error calling external DNI API:", error);
-            toast({ title: "Consulta DNI", description: "El servicio externo de consulta no está disponible en este momento.", variant: "default" });
-        }
     }
 
     setIsSubmitting(false);
