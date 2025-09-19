@@ -11,17 +11,22 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "i.ibb.co",               // Logo alojado en imgbb y ahora icono de WhatsApp
+        hostname: "i.ibb.co",
         pathname: "/**",
       },
       {
         protocol: "https",
-        hostname: "images.unsplash.com",    // Fondos de Unsplash (si los usas)
+        hostname: "ibb.co", // Added this to fix the error
         pathname: "/**",
       },
       {
         protocol: "https",
-        hostname: "placehold.co",           // Placeholders, SOLO si los usas
+        hostname: "images.unsplash.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
         pathname: "/**",
       },
     ],
