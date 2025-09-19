@@ -1283,7 +1283,14 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             <Form {...newQrClientForm}>
               <form onSubmit={newQrClientForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-1 max-h-[60vh] overflow-y-auto pr-2">
                 {isConsultingDni && (
-                    <div className="flex flex-col items-center justify-center p-6 bg-gradient-loader rounded-lg my-3 text-center text-white">
+                    <div 
+                        className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-center text-white"
+                        style={{
+                            backgroundSize: '400% 400%',
+                            animation: 'gradient-animation 15s ease infinite',
+                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
+                        }}
+                    >
                         <Loader2 className="h-8 w-8 animate-spin mb-3"/>
                         <p className="text-base font-semibold">Verificando identidad...</p>
                         <p className="text-sm opacity-90">Estamos consultando tus datos, un momento.</p>
@@ -1436,6 +1443,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
 
 
 
