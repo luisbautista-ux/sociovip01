@@ -300,7 +300,21 @@ export default function BusinessEventsPage() {
     const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
         setLocalEventState(prev => {
             if (!prev) return null;
-            return { ...prev, ...values };
+            // This is where the bug was. The values object only contains fields from BusinessEventForm.
+            // We need to merge it with the existing state, not just spread it.
+            return {
+                ...prev,
+                name: values.name,
+                description: values.description,
+                termsAndConditions: values.termsAndConditions,
+                startDate: values.startDate.toISOString(),
+                endDate: values.endDate.toISOString(),
+                unlimitedAttendance: values.unlimitedAttendance,
+                maxAttendance: values.unlimitedAttendance ? 0 : values.maxAttendance,
+                isActive: values.isActive,
+                imageUrl: values.imageUrl,
+                aiHint: values.aiHint,
+            };
         });
     }, []);
 
@@ -753,3 +767,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
