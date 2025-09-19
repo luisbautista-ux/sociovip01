@@ -187,6 +187,8 @@ export default function BusinessPublicPage() {
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
+  const [isConsultingDni, setIsConsultingDni] = useState(false);
+
 
   const dniForm = useForm<DniFormValues>({ 
     resolver: zodResolver(DniEntrySchema), 
@@ -417,6 +419,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           setCurrentStepInModal("newUserForm");
 
           if (data.docType === 'dni') {
+              setIsConsultingDni(true);
               try {
                   const dniApiResponse = await fetch('/api/admin/consult-dni', {
                       method: 'POST',
@@ -425,10 +428,24 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   });
                   if (dniApiResponse.ok) {
                       const dniData = await dniApiResponse.json();
-                      if (dniData.nombres && dniData.apellidoPaterno) {
-                          newQrClientForm.setValue('name', dniData.nombres);
-                          newQrClientForm.setValue('surname', `${dniData.apellidoPaterno} ${dniData.apellidoMaterno}`.trim());
+                      let fullName = dniData.nombreCompleto || "";
+                      let name = dniData.nombres || "";
+                      let surname = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
+
+                      if (!name && !surname && fullName) {
+                          const nameParts = fullName.split(' ');
+                          if (nameParts.length > 2) {
+                              surname = `${nameParts.pop()} ${nameParts.pop()}`.trim();
+                              name = nameParts.join(' ');
+                          } else {
+                              surname = nameParts.pop() || '';
+                              name = nameParts.join(' ');
+                          }
                       }
+                      
+                      newQrClientForm.setValue('name', name);
+                      newQrClientForm.setValue('surname', surname);
+
                       if (dniData.fechaNacimiento) {
                           const [day, month, year] = dniData.fechaNacimiento.split('/');
                           const dob = new Date(`${year}-${month}-${day}`);
@@ -439,6 +456,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   }
               } catch (e) {
                   console.warn("DNI consultation failed, user will fill manually.", e);
+              } finally {
+                  setIsConsultingDni(false);
               }
           }
       } else if (result.action === 'userExists') {
@@ -1274,6 +1293,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           ) : (
             <Form {...newQrClientForm}>
               <form onSubmit={newQrClientForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-1 max-h-[60vh] overflow-y-auto pr-2">
+                {isConsultingDni && (
+                    <div className="flex items-center justify-center p-4 bg-muted/50 rounded-md my-2">
+                        <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary"/>
+                        <p className="text-sm text-muted-foreground">Verificando identidad, un momento...</p>
+                    </div>
+                )}
                 <FormField
                   control={newQrClientForm.control}
                   name="dni"
@@ -1304,7 +1329,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         Apellido(s) <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Tus apellidos" {...field} value={field.value || ""} disabled={isLoadingQrFlow} />
+                        <Input placeholder="Tus apellidos" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1319,7 +1344,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         Nombre(s) <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Tus nombres" {...field} value={field.value || ""} disabled={isLoadingQrFlow} />
+                        <Input placeholder="Tus nombres" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1344,7 +1369,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                 const numericValue = e.target.value.replace(/[^0-9]/g, '');
                                 field.onChange(numericValue);
                             }}
-                            disabled={isLoadingQrFlow} />
+                            disabled={isLoadingQrFlow || isConsultingDni} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1364,7 +1389,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                             <Button
                               variant={"outline"}
                               className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                              disabled={isLoadingQrFlow}
+                              disabled={isLoadingQrFlow || isConsultingDni}
                             >
                               {field.value ? format(field.value, "d MMMM yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
                               <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
@@ -1400,7 +1425,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       newQrClientForm.reset({ dni: enteredDni });
                       dniForm.setValue("docNumber", enteredDni);
                     }}
-                    disabled={isLoadingQrFlow}
+                    disabled={isLoadingQrFlow || isConsultingDni}
                   >
                     Volver
                   </Button>
@@ -1408,7 +1433,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     style={{
                         backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                     }}
-                    disabled={isLoadingQrFlow}>
+                    disabled={isLoadingQrFlow || isConsultingDni}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar y Generar QR"}
                   </Button>
                 </ShadcnDialogFooter>
@@ -1421,5 +1446,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
 
 
