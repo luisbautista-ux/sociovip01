@@ -401,14 +401,34 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         }
 
         if (result.action === 'newUser') {
-            newQrClientForm.reset({ 
-                name: "", 
-                surname: "", 
-                phone: "", 
-                dob: undefined, 
-                dni: docNumberCleaned,
-            });
+            newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: docNumberCleaned });
             setCurrentStepInModal("newUserForm");
+
+            if (data.docType === 'dni') {
+                try {
+                    const dniApiResponse = await fetch('/api/admin/consult-dni', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dni: docNumberCleaned }),
+                    });
+                    if (dniApiResponse.ok) {
+                        const dniData = await dniApiResponse.json();
+                        if (dniData.nombres && dniData.apellidoPaterno) {
+                            newQrClientForm.setValue('name', dniData.nombres);
+                            newQrClientForm.setValue('surname', `${dniData.apellidoPaterno} ${dniData.apellidoMaterno}`.trim());
+                        }
+                        if (dniData.fechaNacimiento) {
+                            const [day, month, year] = dniData.fechaNacimiento.split('/');
+                            const dob = new Date(`${year}-${month}-${day}`);
+                            if (!isNaN(dob.getTime())) {
+                                newQrClientForm.setValue('dob', dob);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn("DNI consultation failed, user will fill manually.", e);
+                }
+            }
         } else if (result.action === 'userExists') {
             const clientForQr: QrClient = result.clientData;
              const qrCodeDetails: QrCodeData["promotion"] = {
@@ -878,7 +898,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               <Button
                 onClick={handleSaveQrWithDetails}
                 variant="outline"
-                className="w-full sm:flex-1 font-bold border-2 p-0 hover:bg-gradient-to-r hover:from-primary hover:to-accent hover:text-primary-foreground"
+                className="w-full sm:flex-1 font-bold border-2 p-0 hover:bg-gradient-to-r from-primary hover:to-accent hover:text-primary-foreground"
               >
                  <div className="text-foreground" style={{
                     border: '2px solid transparent',
@@ -1391,4 +1411,5 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
 
