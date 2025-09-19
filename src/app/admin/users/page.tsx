@@ -269,31 +269,51 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     setIsSubmitting(true); 
     setDniForVerification(docNumberCleaned); 
     
-    // --- Consulta a base de datos interna ---
-    const result = await checkDniExists(docNumberCleaned);
-    setIsSubmitting(false);
+    const dbCheckResult = await checkDniExists(docNumberCleaned);
     
     let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
     
-    if (result.exists) {
-        if (result.userType === 'PlatformUser' && result.platformUserData) {
-            setExistingPlatformUserToEdit(result.platformUserData);
-            setExistingPlatformUserRoles(result.platformUserRoles || []);
-            initialData.existingPlatformUser = result.platformUserData;
-            initialData.existingPlatformUserRoles = result.platformUserRoles || [];
+    if (dbCheckResult.exists) {
+        if (dbCheckResult.userType === 'PlatformUser' && dbCheckResult.platformUserData) {
+            setIsSubmitting(false);
+            setExistingPlatformUserToEdit(dbCheckResult.platformUserData);
+            setExistingPlatformUserRoles(dbCheckResult.platformUserRoles || []);
+            initialData.existingPlatformUser = dbCheckResult.platformUserData;
+            initialData.existingPlatformUserRoles = dbCheckResult.platformUserRoles || [];
             setShowDniIsPlatformUserAlert(true); 
             setShowDniEntryModal(false); 
             return; 
-        } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
-            initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
-            initialData.email = result.socioVipData.email;
+        } else if (dbCheckResult.userType === 'SocioVipMember' && dbCheckResult.socioVipData) {
+            initialData.name = `${dbCheckResult.socioVipData.name} ${dbCheckResult.socioVipData.surname}`;
+            initialData.email = dbCheckResult.socioVipData.email;
             initialData.preExistingUserType = 'SocioVipMember';
-        } else if (result.userType === 'QrClient' && result.qrClientData) {
-            initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
+        } else if (dbCheckResult.userType === 'QrClient' && dbCheckResult.qrClientData) {
+            initialData.name = `${dbCheckResult.qrClientData.name} ${dbCheckResult.qrClientData.surname}`;
             initialData.preExistingUserType = 'QrClient';
         }
     }
     
+    // Si no existe o no es PlatformUser, consultar API externa
+    if (values.docType === 'dni' && values.docNumber.length === 8) {
+        try {
+            const response = await fetch('/api/admin/consult-dni', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dni: docNumberCleaned }),
+            });
+            if (response.ok) {
+                const apiData = await response.json();
+                initialData.name = apiData.nombreCompleto;
+                toast({ title: "DNI Encontrado", description: "El nombre ha sido pre-rellenado." });
+            } else {
+                toast({ title: "Consulta DNI", description: "No se encontró el DNI en el servicio externo.", variant: "default" });
+            }
+        } catch (error) {
+             toast({ title: "Consulta DNI", description: "El servicio externo de consulta no está disponible.", variant: "default" });
+        }
+    }
+
+    setIsSubmitting(false);
     setVerifiedDniResult(initialData);
     setEditingUser(null); 
     setShowDniEntryModal(false); 
@@ -809,3 +829,5 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     </div>
   );
 }
+
+    
