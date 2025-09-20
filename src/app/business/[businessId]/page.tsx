@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -256,7 +257,6 @@ export default function BusinessPublicPage() {
         const entitiesQuery = query(
           collection(db, "businessEntities"),
           where("businessId", "==", fetchedBusiness.id),
-          where("isActive", "==", true)
         );
         const entitiesSnapshot = await getDocs(entitiesQuery);
 
