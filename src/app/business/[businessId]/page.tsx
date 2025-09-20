@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -603,7 +602,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             const lines: string[] = [];
             let currentLine = words[0] || '';
 
-            for (let i = 1; i < words.length; i++) {
+            for (let i = 1; i < words.length, i < words.length; i++) {
                 const word = words[i];
                 const width = ctx.measureText(currentLine + " " + word).width;
                 if (width < maxWidth) {
@@ -1354,7 +1353,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               <form onSubmit={newQrClientForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-1 max-h-[60vh] overflow-y-auto pr-2">
                 {isConsultingDni && (
                     <div 
-                        className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-center text-white"
+                        className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-white"
                         style={{
                             backgroundSize: '400% 400%',
                             animation: 'gradient-animation 15s ease infinite',
@@ -1513,11 +1512,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
-
-
-
-
-
-
-
