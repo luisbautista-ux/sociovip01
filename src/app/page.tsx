@@ -258,26 +258,6 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {showPromotions && (
-              <section>
-                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient mt-4 sm:mt-0">
-                  <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
-                </h2>
-                {filteredPromotions.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                    <p className="text-lg font-semibold">No se encontraron promociones</p>
-                    <p className="text-muted-foreground mt-1">
-                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
-            
             {showEvents && (
               <section>
                 <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
@@ -292,6 +272,26 @@ export default function HomePage() {
                     <p className="text-lg font-semibold">No se encontraron eventos</p>
                     <p className="text-muted-foreground mt-1">
                       {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevos eventos."}
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {showPromotions && (
+              <section>
+                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient mt-4 sm:mt-0">
+                  <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
+                </h2>
+                {filteredPromotions.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
+                    <p className="text-lg font-semibold">No se encontraron promociones</p>
+                    <p className="text-muted-foreground mt-1">
+                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
                     </p>
                   </div>
                 )}
