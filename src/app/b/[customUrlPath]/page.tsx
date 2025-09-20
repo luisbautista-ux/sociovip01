@@ -39,7 +39,7 @@ import type {
   NewQrClientFormData,
   GeneratedCode,
 } from "@/lib/types";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import {
@@ -55,6 +55,7 @@ import {
   Download,
   Calendar,
   ArrowLeft,
+  History,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -173,6 +174,7 @@ export default function BusinessPublicPage() {
 
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const [activeEntitiesForBusiness, setActiveEntitiesForBusiness] = useState<BusinessManagedEntity[]>([]);
+  const [pastEvents, setPastEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -223,6 +225,7 @@ export default function BusinessPublicPage() {
         setError("Negocio no encontrado. Verifica que la URL sea correcta.");
         setBusinessDetails(null);
         setActiveEntitiesForBusiness([]);
+        setPastEvents([]);
       } else {
         const businessDoc = businessSnap.docs[0];
         const bizData = businessDoc.data();
@@ -237,7 +240,6 @@ export default function BusinessPublicPage() {
           slogan: bizData.slogan || undefined,
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
-          publicAddress: bizData.publicAddress || undefined,
           primaryColor: bizData.primaryColor || '#B080D0',
           secondaryColor: bizData.secondaryColor || '#8E5EA2',
         };
@@ -250,7 +252,9 @@ export default function BusinessPublicPage() {
         );
         const entitiesSnapshot = await getDocs(entitiesQuery);
 
-        const allActiveAndCurrentEntities: BusinessManagedEntity[] = [];
+        const allCurrentEntities: BusinessManagedEntity[] = [];
+        const allPastEvents: BusinessManagedEntity[] = [];
+
         entitiesSnapshot.forEach((docSnap) => {
           const entityData = docSnap.data();
 
@@ -284,12 +288,20 @@ export default function BusinessPublicPage() {
           };
 
           if (isEntityCurrentlyActivatable(entityForCheck)) {
-            allActiveAndCurrentEntities.push(entityForCheck);
+            allCurrentEntities.push(entityForCheck);
+          } else if (entityForCheck.type === 'event' && isPast(new Date(entityForCheck.endDate))) {
+            allPastEvents.push(entityForCheck);
           }
         });
+        
         setActiveEntitiesForBusiness(
-          allActiveAndCurrentEntities.sort(
+          allCurrentEntities.sort(
             (a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()
+          )
+        );
+        setPastEvents(
+          allPastEvents.sort(
+            (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
           )
         );
       }
@@ -297,6 +309,7 @@ export default function BusinessPublicPage() {
       setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
       setBusinessDetails(null);
       setActiveEntitiesForBusiness([]);
+      setPastEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -805,6 +818,18 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     );
   };
 
+  const PastEventCardFooter = ({ entity }: { entity: BusinessManagedEntity }) => (
+    <CardFooter className="flex-col items-center justify-center p-4 border-t bg-muted/50">
+        <div className="flex items-center text-sm font-semibold text-muted-foreground">
+            <History className="h-4 w-4 mr-2" />
+            <span>Evento Finalizado</span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+            Finalizó el {format(new Date(entity.endDate), "dd MMMM, yyyy", { locale: es })}
+        </p>
+    </CardFooter>
+  );
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -1106,6 +1131,41 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   <CardFooter className="flex-col items-start p-4 border-t">
                     <SpecificCodeEntryForm entity={event} />
                   </CardFooter>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {pastEvents.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-muted-foreground">
+              <History className="h-8 w-8 mr-3" /> Eventos Pasados
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {pastEvents.map((event) => (
+                <Card
+                  key={event.id}
+                  className="shadow-lg flex flex-col overflow-hidden rounded-lg bg-card group opacity-80"
+                >
+                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                    <NextImage
+                      src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
+                      alt={event.name}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover"
+                      data-ai-hint={event.aiHint || "party concert"}
+                    />
+                     <div className="absolute inset-0 bg-black/30" />
+                  </div>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl">{event.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow space-y-1">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
+                  </CardContent>
+                  <PastEventCardFooter entity={event} />
                 </Card>
               ))}
             </div>
@@ -1443,6 +1503,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
 
 
 
