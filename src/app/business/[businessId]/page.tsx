@@ -215,6 +215,7 @@ export default function BusinessPublicPage() {
           setPageError(`Negocio no encontrado. ID: ${id}`);
           setBusinessDetails(null);
           setActiveEntitiesForBusiness([]);
+          setPastEvents([]);
           setIsLoadingPage(false);
           return;
         }
@@ -245,7 +246,6 @@ export default function BusinessPublicPage() {
           secondaryColor: bizData.secondaryColor || '#8E5EA2',
         };
 
-        // Si tiene customUrlPath, redirige a /b/[customUrlPath]
         if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
           router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
           return;
@@ -602,7 +602,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             const lines: string[] = [];
             let currentLine = words[0] || '';
 
-            for (let i = 1; i < words.length, i < words.length; i++) {
+            for (let i = 1; i < words.length; i++) {
                 const word = words[i];
                 const width = ctx.measureText(currentLine + " " + word).width;
                 if (width < maxWidth) {
@@ -1512,3 +1512,5 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
+    
