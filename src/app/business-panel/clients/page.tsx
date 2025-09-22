@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Contact, Crown, Download, Search, Calendar as CalendarIcon, Users } from "lucide-react";
+import { Contact, Crown, Download, Search, Calendar as CalendarIcon, Users, Cake } from "lucide-react";
 import { format, parse, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -93,6 +93,7 @@ type QrClient = {
   phone?: string | number;
   dni: string;
   registrationDate: any; // Timestamp/Date/string/number
+  dob: any; // Fecha de Nacimiento
   associatedBusinessIds?: string[]; // Nuevo campo
   generatedForBusinessId?: string; // Campo antiguo
 };
@@ -212,7 +213,7 @@ export default function BusinessClientsPage() {
     }
   
     const headers = [
-      "ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Registro",
+      "ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nacimiento", "Fecha Registro",
     ];
   
     const rows = filteredClients.map((c) => [
@@ -221,6 +222,7 @@ export default function BusinessClientsPage() {
       c.surname,
       `'${c.dni}`, // Precede con ' para tratar como texto
       `'${c.phone || "N/A"}`, // Precede con '
+      renderDate(c.dob, "P"),
       renderDate(c.registrationDate, "P p"),
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`)); // Quoting and escaping
   
@@ -312,6 +314,7 @@ export default function BusinessClientsPage() {
                 <TableHead>Nombre Completo</TableHead>
                 <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
                 <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
+                <TableHead><Cake className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Fecha Nac.</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Fecha Registro</TableHead>
               </TableRow>
@@ -325,6 +328,9 @@ export default function BusinessClientsPage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{c.dni}</TableCell>
                     <TableCell className="hidden lg:table-cell">{c.phone || "N/A"}</TableCell>
+                    <TableCell>
+                      <ClientSideFormattedDateTime value={c.dob} fmt="P" />
+                    </TableCell>
                     <TableCell>
                       <Badge variant={"secondary"}>
                         Cliente QR
