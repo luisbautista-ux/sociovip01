@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Contact, Crown, Download, Search, Calendar as CalendarIcon, Users, Cake } from "lucide-react";
+import { Contact, Crown, Download, Search, Calendar as CalendarIcon, Users, Cake, Phone, User as UserIcon } from "lucide-react";
 import { format, parse, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -308,48 +308,82 @@ export default function BusinessClientsPage() {
         </CardHeader>
 
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre Completo</TableHead>
-                <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
-                <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
-                <TableHead><Cake className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Fecha Nac.</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Fecha Registro</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredClients.length > 0 ? (
+          {/* Mobile View */}
+          <div className="md:hidden space-y-4">
+            {filteredClients.length > 0 ? (
                 filteredClients.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">
-                      {c.name} {c.surname}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{c.dni}</TableCell>
-                    <TableCell className="hidden lg:table-cell">{c.phone || "N/A"}</TableCell>
-                    <TableCell>
-                      <ClientSideFormattedDateTime value={c.dob} fmt="P" />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={"secondary"}>
-                        Cliente QR
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <ClientSideFormattedDateTime value={c.registrationDate} fmt="P p" />
+                  <Card key={c.id} className="overflow-hidden">
+                     <CardHeader className="p-4">
+                       <CardTitle className="text-lg">{c.name} {c.surname}</CardTitle>
+                     </CardHeader>
+                     <CardContent className="p-4 space-y-3 text-sm">
+                       <div className="flex justify-between">
+                         <span className="text-muted-foreground flex items-center"><Cake className="mr-1.5 h-4 w-4" /> Fecha Nac.</span>
+                         <span className="font-medium"><ClientSideFormattedDateTime value={c.dob} fmt="P" /></span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-muted-foreground flex items-center"><UserIcon className="mr-1.5 h-4 w-4" /> DNI/CE</span>
+                         <span className="font-semibold">{c.dni}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-muted-foreground flex items-center"><Phone className="mr-1.5 h-4 w-4" /> Celular</span>
+                         <span className="font-medium">{c.phone || "N/A"}</span>
+                       </div>
+                     </CardContent>
+                  </Card>
+                ))
+            ) : (
+                <div className="text-center h-24 flex items-center justify-center">
+                    <p>No se encontraron clientes.</p>
+                </div>
+            )}
+          </div>
+          
+          {/* Desktop View */}
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre Completo</TableHead>
+                  <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
+                  <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
+                  <TableHead><Cake className="inline-block h-4 w-4 mr-1 text-muted-foreground" />Fecha Nac.</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Fecha Registro</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredClients.length > 0 ? (
+                  filteredClients.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">
+                        {c.name} {c.surname}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{c.dni}</TableCell>
+                      <TableCell className="hidden lg:table-cell">{c.phone || "N/A"}</TableCell>
+                      <TableCell>
+                        <ClientSideFormattedDateTime value={c.dob} fmt="P" />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={"secondary"}>
+                          Cliente QR
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <ClientSideFormattedDateTime value={c.registrationDate} fmt="P p" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center h-24">
+                      No se encontraron clientes con los filtros aplicados.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
-                    No se encontraron clientes con los filtros aplicados.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
