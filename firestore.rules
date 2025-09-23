@@ -1,9 +1,10 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =============================== 
+    // ===============================
     //            Helpers
     // ===============================
     function isSignedIn() {
@@ -11,13 +12,14 @@ service cloud.firestore {
     }
 
     function getUserProfile() {
+      // Nota: get() en reglas puede leer sin depender de permisos de cliente
       return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
     }
 
     function isSuperAdmin() {
       return isSignedIn() && getUserProfile().roles.includes('superadmin');
     }
-    
+
     function isRoleForBusiness(role, businessId) {
       return isSignedIn()
         && getUserProfile().roles.includes(role)
@@ -48,71 +50,67 @@ service cloud.firestore {
     //          Collections
     // ===============================
 
+    // Negocios: lectura pública; solo superadmin escribe
     match /businesses/{businessId} {
       allow read: if true;
       allow create, delete: if isSuperAdmin();
       allow update: if isSuperAdmin() || 
-                      (isBusinessAdmin(businessId) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['personalPhone', 'publicPhone', 'slogan', 'logoUrl', 'publicCoverImageUrl', 'primaryColor', 'secondaryColor', 'publicAddress', 'publicContactEmail', 'name', 'contactEmail']));
+                      (isBusinessAdmin(businessId) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name', 'contactEmail', 'publicAddress', 'publicPhone', 'personalPhone', 'slogan', 'primaryColor', 'secondaryColor', 'logoUrl', 'publicCoverImageUrl']));
     }
 
+    // Entidades del negocio (promos/eventos):
     match /businessEntities/{entityId} {
-      allow get: if true; // Permite leer un documento si se conoce el ID
-      allow list: if isSignedIn(); // Permite listar (hacer queries) si está logueado
-      
+      // Lectura pública de documentos individuales
+      allow get: if true;
+      // Permite LISTAR (consultar) si eres SuperAdmin o si eres parte de un negocio
+      allow list: if isSignedIn() && (isSuperAdmin() || ((isBusinessAdmin(getUserProfile().businessId) || isStaff(getUserProfile().businessId)) && getUserProfile().businessId != null));
+
+      // Reglas de escritura
       allow create: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
       allow update: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
       allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
     }
 
+    // Clientes QR:
     match /qrClients/{clientId} {
-      allow get, list: if true;
-      allow create: if true;
-      allow update, delete: if isSuperAdmin();
+      allow get, list, create: if true; // Permite creación y consulta pública
+      allow update, delete: if false; // Nadie puede editar/borrar desde el cliente
     }
 
-    match /platformUsers/{userId} {
-      allow read: if isSignedIn();
-      
-      allow create: if isSuperAdmin() || (
-        isSignedIn() &&
-        getUserProfile().roles.includes('business_admin') &&
-        request.resource.data.businessId == getUserProfile().businessId &&
-        request.resource.data.roles.hasOnly(['staff', 'host', 'lector_qr'])
-      );
-
-      allow update: if isSuperAdmin() || (
-        isSignedIn() && (
-          (isPromoter() && isOwner(userId)) ||
-          (isBusinessAdmin(getUserProfile().businessId) && resource.data.businessId == getUserProfile().businessId)
-        )
-      );
-      
-      allow delete: if isSuperAdmin() || (
-        isSignedIn() &&
-        isBusinessAdmin(getUserProfile().businessId) &&
-        resource.data.businessId == getUserProfile().businessId &&
-        !resource.data.roles.includes('superadmin')
-      );
-    }
-
+    // Vínculos de promotores con negocios
     match /businessPromoterLinks/{linkId} {
-      allow get, list: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isPromoter();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && (isSuperAdmin() || ( (isBusinessAdmin(getUserProfile().businessId) || isStaff(getUserProfile().businessId)) && getUserProfile().businessId != null ));
       allow create, update: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
       allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
     }
-
-    match /socioVipMembers/{memberId} {
-      allow get, list: if isSuperAdmin() || (
-        isSignedIn() && (
-          getUserProfile().roles.includes('business_admin') || getUserProfile().roles.includes('staff')
-        )
-      );
-      allow create, update, delete: if isSuperAdmin();
+    
+    // Pagos a promotores
+    match /promoterPayments/{paymentId} {
+       allow get, list, create: if isSignedIn() && (isSuperAdmin() || ((isBusinessAdmin(getUserProfile().businessId) || isStaff(getUserProfile().businessId)) && getUserProfile().businessId != null));
+       allow update, delete: if isSuperAdmin();
     }
     
-    match /promoterPayments/{paymentId} {
-      allow get, list, create: if isSuperAdmin() || isBusinessAdmin(getUserProfile().businessId);
-      allow update, delete: if isSuperAdmin();
+    // Socios VIP: gestión por superadmin o staff de negocio
+    match /socioVipMembers/{memberId} {
+      allow get, list: if isSuperAdmin() || (isSignedIn() && (isBusinessAdmin(getUserProfile().businessId) || isStaff(getUserProfile().businessId)));
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // Usuarios de la plataforma
+    match /platformUsers/{userId} {
+      allow read: if isSignedIn();
+      
+      // SOLO SuperAdmin puede crear usuarios desde el panel de admin
+      allow create: if isSuperAdmin();
+      
+      // SuperAdmin puede actualizar cualquier cosa.
+      // Otros usuarios pueden actualizar su propio perfil (nombre, teléfono, foto).
+      allow update: if isSuperAdmin() || 
+                      (isOwner(userId) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['name', 'phone', 'photoURL', 'lastLogin']));
+      
+      // SOLO SuperAdmin puede borrar usuarios.
+      allow delete: if isSuperAdmin();
     }
   }
 }
