@@ -9,7 +9,7 @@ import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, Shiel
 import type { BusinessPromoterLink, PromoterProfile, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember, BusinessManagedEntity, PromoterPayment } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -27,7 +27,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 
-// Extiende el tipo para incluir los montos de comisión calculados
 interface BusinessPromoterLinkWithCommissions extends BusinessPromoterLink {
   pendingAmount: number;
   paidAmount: number;
@@ -281,58 +280,35 @@ function BusinessPromoterForm({
     });
     const watchedDocType = dniEntryForm.watch('docType');
 
-    const fetchPromoterLinks = useCallback(async () => {
-        if (!currentBusinessId) {
+    const fetchPromoterData = useCallback(async () => {
+        if (!currentBusinessId || !currentUser) {
             setPromoterLinks([]);
             setIsLoading(false);
             return;
         }
         setIsLoading(true);
         try {
-            // 1. Fetch all business entities
-            const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
-            const entitiesSnapshot = await getDocs(entitiesQuery);
-            const allEntities = entitiesSnapshot.docs.map(doc => doc.data() as BusinessManagedEntity);
-
-            // 2. Fetch all promoter payments
-            const paymentsQuery = query(collection(db, "promoterPayments"), where("businessId", "==", currentBusinessId));
-            const paymentsSnapshot = await getDocs(paymentsQuery);
-            const allPayments = paymentsSnapshot.docs.map(doc => doc.data() as PromoterPayment);
-
-            // 3. Fetch all promoter links
-            const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
-            const linksSnapshot = await getDocs(linksQuery);
-
-            const fetchedLinksWithCommissions: BusinessPromoterLinkWithCommissions[] = linksSnapshot.docs.map(docSnap => {
-                const link = { id: docSnap.id, ...docSnap.data() } as BusinessPromoterLink;
-
-                let pendingAmount = 0;
-                allEntities.forEach(entity => {
-                    (entity.generatedCodes || []).forEach(code => {
-                        if (code.generatedByUid === link.platformUserUid && code.commissionStatus === 'unpaid') {
-                            pendingAmount += code.commissionGenerated || 0;
-                        }
-                    });
-                });
-
-                const paidAmount = allPayments
-                    .filter(p => p.promoterUid === link.platformUserUid)
-                    .reduce((sum, p) => sum + p.amountPaid, 0);
-
-                return {
-                    ...link,
-                    joinDate: link.joinDate instanceof Timestamp ? link.joinDate.toDate().toISOString() : (link.joinDate || new Date().toISOString()),
-                    pendingAmount,
-                    paidAmount,
-                };
+            const idToken = await currentUser.getIdToken();
+            const response = await fetch('/api/business-panel/get-promoter-commissions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({ businessId: currentBusinessId }),
             });
 
-            setPromoterLinks(fetchedLinksWithCommissions.sort((a,b) => (a.promoterName || "").localeCompare(b.promoterName || "")));
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to fetch promoter data from server.');
+            }
 
+            const { data } = await response.json();
+            setPromoterLinks(data as BusinessPromoterLinkWithCommissions[]);
         } catch (error: any) {
-            console.error("Promoters Page: Failed to fetch promoter links:", error);
+            console.error("Error fetching promoter commission data:", error);
             toast({
-                title: "Error al Cargar Promotores",
+                title: "Error al cargar promotores",
                 description: `No se pudieron obtener los datos. ${error.message}`,
                 variant: "destructive",
             });
@@ -340,16 +316,15 @@ function BusinessPromoterForm({
         } finally {
             setIsLoading(false);
         }
-    }, [currentBusinessId, toast]);
+    }, [currentBusinessId, currentUser, toast]);
 
     useEffect(() => {
-      if (!currentBusinessId) {
-        setIsLoading(false);
-        setPromoterLinks([]);
-        return;
-      }
-      fetchPromoterLinks();
-    }, [currentBusinessId, fetchPromoterLinks]);
+        if (currentBusinessId && currentUser) {
+            fetchPromoterData();
+        } else if (!currentUser) {
+            setIsLoading(false);
+        }
+    }, [currentBusinessId, currentUser, fetchPromoterData]);
 
 
     const filteredPromoters = promoterLinks.filter(link =>
@@ -498,7 +473,7 @@ function BusinessPromoterForm({
         }
         
         closeModal();
-        fetchPromoterLinks();
+        fetchPromoterData();
       } catch (error: any) {
         console.error("Promoters Page: Failed to add/edit promoter link:", error);
         toast({ title: "Error al Guardar", description: `No se pudo procesar la solicitud. ${error.message}`, variant: "destructive"});
@@ -518,7 +493,7 @@ function BusinessPromoterForm({
                 description: `${link.promoterName || 'El promotor'} ha sido desvinculado de tu negocio.`,
                 variant: "destructive"
             });
-            fetchPromoterLinks();
+            fetchPromoterData();
         } catch (error: any) {
             console.error("Promoters Page: Failed to delete promoter link:", error);
             toast({
@@ -539,7 +514,7 @@ function BusinessPromoterForm({
       try {
         await updateDoc(doc(db, "businessPromoterLinks", link.id), { isActive: newStatus });
         toast({ title: `Estado Actualizado`, description: `El promotor ${link.promoterName} ahora está ${newStatus ? 'activo' : 'inactivo'}.` });
-        fetchPromoterLinks(); 
+        fetchPromoterData(); 
       } catch (error: any) {
         console.error("Promoters Page: Failed to toggle promoter link status:", error);
         toast({ title: "Error al Actualizar Estado", description: `No se pudo cambiar el estado del promotor. ${error.message}`, variant: "destructive"});
@@ -766,3 +741,4 @@ function BusinessPromoterForm({
       </div>
     );
   }
+
