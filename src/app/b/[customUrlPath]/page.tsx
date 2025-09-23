@@ -1058,7 +1058,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         </div>
       </div>
       
-      <div style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
+      <div className="sticky top-16 z-10" style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-start h-12 gap-6">
                 <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
@@ -1487,4 +1487,5 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
 
