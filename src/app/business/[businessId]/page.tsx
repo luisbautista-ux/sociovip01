@@ -838,6 +838,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   const showPromotions = (view === 'all' || view === 'promotions') && promotions.length > 0;
   const showEvents = (view === 'all' || view === 'events') && allEvents.length > 0;
+  const noContentToShow = !isLoadingPage && (
+    (view === 'all' && promotions.length === 0 && allEvents.length === 0) ||
+    (view === 'promotions' && promotions.length === 0) ||
+    (view === 'events' && allEvents.length === 0)
+  );
 
   if (isLoadingPage) {
     return (
@@ -1158,18 +1163,26 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           </section>
         )}
 
-        {!isLoadingPage && !pageError && promotions.length === 0 && allEvents.length === 0 && pageViewState === "entityList" && (
-          <Card className="col-span-full">
-            <CardHeader className="text-center">
-              <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-              <CardTitle className="mt-2">No hay Actividad por Ahora</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center">
-              <CardDescription>
-                Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!
-              </CardDescription>
-            </CardContent>
-          </Card>
+        {noContentToShow && (
+          <div className="py-12">
+            <Card className="col-span-full">
+              <CardHeader className="text-center">
+                <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                <CardTitle className="mt-2">
+                  {view === 'promotions' && 'No hay Promociones por Ahora'}
+                  {view === 'events' && 'No hay Eventos por Ahora'}
+                  {view === 'all' && 'No hay Promociones y Eventos por Ahora'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <CardDescription>
+                  {view === 'promotions' && 'Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!'}
+                  {view === 'events' && 'Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!'}
+                  {view === 'all' && 'Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!'}
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
@@ -1491,6 +1504,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
 
 
 
