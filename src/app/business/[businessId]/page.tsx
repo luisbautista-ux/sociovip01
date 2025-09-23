@@ -890,7 +890,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         <header
           className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full"
           style={{
-            background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+            backgroundColor: businessDetails.primaryColor || '#B080D0'
           }}
         >
           <div className="max-w-7xl mx-auto flex items-center justify-start">
@@ -1076,7 +1076,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         {showPromotions && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
-              <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
+              <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {promotions.map((promo) => (
@@ -1115,7 +1115,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         {showEvents && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
-              <Calendar className="h-8 w-8 mr-3" /> Eventos
+              <Calendar className="h-7 w-7 mr-3" /> Eventos
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {allEvents.map((event) => (
@@ -1491,5 +1491,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
 
 
