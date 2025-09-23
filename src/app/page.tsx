@@ -279,7 +279,7 @@ export default function HomePage() {
 
             {showPromotions && (
               <section>
-                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient mt-4 sm:mt-0">
+                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
                   <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
                 </h2>
                 {filteredPromotions.length > 0 ? (
