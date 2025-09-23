@@ -177,6 +177,7 @@ export default function BusinessPublicPage() {
   const [allEvents, setAllEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
 
   const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
   const [showDniModal, setShowDniModal] = useState(false);
@@ -286,7 +287,7 @@ export default function BusinessPublicPage() {
             createdAt: anyToDate(entityData.createdAt)?.toISOString() || "",
           };
 
-          if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
+          if (entity.type === 'promotion' && entity.isActive) {
             currentPromotions.push(entity);
           } else if (entity.type === 'event') {
             events.push(entity);
@@ -294,7 +295,7 @@ export default function BusinessPublicPage() {
         });
         
         setPromotions(
-          currentPromotions.sort(
+          currentPromotions.filter(p => isEntityCurrentlyActivatable(p)).sort(
             (a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()
           )
         );
@@ -829,6 +830,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </CardFooter>
   );
 
+  const showPromotions = (view === 'all' || view === 'promotions') && promotions.length > 0;
+  const showEvents = (view === 'all' || view === 'events') && allEvents.length > 0;
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -1053,9 +1057,19 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           </div>
         </div>
       </div>
+      
+      <div style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-start h-12 gap-6">
+                <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
+                <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
+                <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
+            </div>
+        </div>
+      </div>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
-        {promotions.length > 0 && (
+        {showPromotions && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
               <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
@@ -1094,7 +1108,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           </section>
         )}
         
-        {allEvents.length > 0 && (
+        {showEvents && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
               <Calendar className="h-8 w-8 mr-3" /> Eventos
@@ -1473,3 +1487,4 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
