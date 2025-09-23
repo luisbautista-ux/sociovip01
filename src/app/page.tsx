@@ -260,7 +260,7 @@ export default function HomePage() {
             {showEvents && (
               <section>
                 <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
-                  <Calendar className="h-7 w-7 mr-3" /> Próximos Eventos
+                  <Calendar className="h-7 w-7 mr-3 text-purple-800" /> Próximos Eventos
                 </h2>
                 {filteredEvents.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -280,7 +280,7 @@ export default function HomePage() {
             {showPromotions && (
               <section>
                 <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
-                  <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
+                  <Tag className="h-7 w-7 mr-3 text-purple-800" /> Promociones Vigentes
                 </h2>
                 {filteredPromotions.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
