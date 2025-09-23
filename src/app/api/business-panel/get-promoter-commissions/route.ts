@@ -114,8 +114,15 @@ export async function POST(request: Request) {
 
     const linksWithCommissions: BusinessPromoterLinkWithCommissions[] = promoterLinks.map(link => {
       let pendingAmount = 0;
+      
+      // Itera sobre todas las entidades del negocio
       allEntities.forEach(entity => {
+        // Itera sobre los códigos de cada entidad
         (entity.generatedCodes || []).forEach(code => {
+          // Condición corregida:
+          // 1. El código debe haber sido generado por el promotor del link actual (link.platformUserUid)
+          // 2. La comisión no debe haber sido pagada ('unpaid')
+          // 3. El código debe haber sido utilizado por un cliente en la puerta ('used')
           if (code.generatedByUid === link.platformUserUid && code.commissionStatus === 'unpaid' && code.status === 'used') {
             pendingAmount += code.commissionGenerated || 0;
           }
