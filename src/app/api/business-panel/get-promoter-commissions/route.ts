@@ -122,8 +122,12 @@ export async function POST(request: Request) {
           // Condición corregida:
           // 1. El código debe haber sido generado por el promotor del link actual (link.platformUserUid)
           // 2. La comisión no debe haber sido pagada ('unpaid')
-          // 3. El código debe haber sido utilizado por un cliente en la puerta ('used')
-          if (code.generatedByUid === link.platformUserUid && code.commissionStatus === 'unpaid' && code.status === 'used') {
+          // 3. El código debe haber sido canjeado (cliente tiene QR) o usado (cliente entró)
+          if (
+            code.generatedByUid === link.platformUserUid &&
+            code.commissionStatus === 'unpaid' &&
+            (code.status === 'redeemed' || code.status === 'used')
+          ) {
             pendingAmount += code.commissionGenerated || 0;
           }
         });
