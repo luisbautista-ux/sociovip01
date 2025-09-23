@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
 import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
-import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
+import { GENERATED_CODE_STATUS_TRANSLATIONS, DEFAULT_COMMISSION_PER_CODE } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -213,6 +213,12 @@ export default function LectorValidateQrPage() {
           codes[codeIndex].usedDate = new Date().toISOString();
           codes[codeIndex].usedByInfo = { uid: userProfile.uid, name: userProfile.name };
           codes[codeIndex].isVipCandidate = isVipCandidate;
+          
+          // --- Commission Logic ---
+          if (codes[codeIndex].generatedByUid) {
+            codes[codeIndex].commissionGenerated = DEFAULT_COMMISSION_PER_CODE;
+            codes[codeIndex].commissionStatus = 'unpaid';
+          }
 
           transaction.update(entityRef, { generatedCodes: codes });
           setFoundCode(codes[codeIndex]);
@@ -408,3 +414,5 @@ export default function LectorValidateQrPage() {
     </div>
   );
 }
+
+      

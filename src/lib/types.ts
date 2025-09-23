@@ -130,6 +130,8 @@ export interface RegisteredClient {
 
 export type BusinessEntityType = 'promotion' | 'event';
 
+export type CommissionStatus = 'unpaid' | 'paid';
+
 export interface GeneratedCode { 
   id: string; 
   entityId: string; 
@@ -151,6 +153,10 @@ export interface GeneratedCode {
   } | null;
   observation?: string | null;
   isVipCandidate?: boolean;
+  // New fields for commissions
+  commissionGenerated?: number;
+  commissionStatus?: CommissionStatus;
+  paymentId?: string | null; // Links to a document in promoterPayments
 }
 
 export type CommissionRuleType = 'fixed' | 'percentage';
@@ -439,3 +445,5 @@ export interface PromoterEntityView extends BusinessManagedEntity {
     promoterCodesCreated: number;
     promoterCodesUsed: number;
 }
+
+      
