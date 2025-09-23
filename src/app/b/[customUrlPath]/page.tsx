@@ -173,8 +173,8 @@ export default function BusinessPublicPage() {
   const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
 
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
-  const [activeEntitiesForBusiness, setActiveEntitiesForBusiness] = useState<BusinessManagedEntity[]>([]);
-  const [pastEvents, setPastEvents] = useState<BusinessManagedEntity[]>([]);
+  const [promotions, setPromotions] = useState<BusinessManagedEntity[]>([]);
+  const [allEvents, setAllEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -224,8 +224,8 @@ export default function BusinessPublicPage() {
       if (businessSnap.empty) {
         setError("Negocio no encontrado. Verifica que la URL sea correcta.");
         setBusinessDetails(null);
-        setActiveEntitiesForBusiness([]);
-        setPastEvents([]);
+        setPromotions([]);
+        setAllEvents([]);
       } else {
         const businessDoc = businessSnap.docs[0];
         const bizData = businessDoc.data();
@@ -251,13 +251,13 @@ export default function BusinessPublicPage() {
         );
         const entitiesSnapshot = await getDocs(entitiesQuery);
 
-        const allCurrentEntities: BusinessManagedEntity[] = [];
-        const allPastEvents: BusinessManagedEntity[] = [];
+        const currentPromotions: BusinessManagedEntity[] = [];
+        const events: BusinessManagedEntity[] = [];
 
         entitiesSnapshot.forEach((docSnap) => {
           const entityData = docSnap.data();
 
-          const entityForCheck: BusinessManagedEntity = {
+          const entity: BusinessManagedEntity = {
             id: docSnap.id,
             businessId: entityData.businessId,
             type: entityData.type,
@@ -286,20 +286,20 @@ export default function BusinessPublicPage() {
             createdAt: anyToDate(entityData.createdAt)?.toISOString() || "",
           };
 
-          if (isEntityCurrentlyActivatable(entityForCheck)) {
-            allCurrentEntities.push(entityForCheck);
-          } else if (entityForCheck.type === 'event' && isPast(new Date(entityForCheck.endDate))) {
-            allPastEvents.push(entityForCheck);
+          if (entity.type === 'promotion' && isEntityCurrentlyActivatable(entity)) {
+            currentPromotions.push(entity);
+          } else if (entity.type === 'event') {
+            events.push(entity);
           }
         });
         
-        setActiveEntitiesForBusiness(
-          allCurrentEntities.sort(
+        setPromotions(
+          currentPromotions.sort(
             (a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()
           )
         );
-        setPastEvents(
-          allPastEvents.sort(
+        setAllEvents(
+          events.sort(
             (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
           )
         );
@@ -307,8 +307,8 @@ export default function BusinessPublicPage() {
     } catch (err: any) {
       setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
       setBusinessDetails(null);
-      setActiveEntitiesForBusiness([]);
-      setPastEvents([]);
+      setPromotions([]);
+      setAllEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -991,9 +991,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   if (!businessDetails) return null;
 
-  const promotions = activeEntitiesForBusiness.filter((e) => e.type === "promotion");
-  const events = activeEntitiesForBusiness.filter((e) => e.type === "event");
-
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
        <header 
@@ -1097,13 +1094,13 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           </section>
         )}
         
-        {events.length > 0 && (
+        {allEvents.length > 0 && (
           <section className="mb-12">
             <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
-              <Calendar className="h-8 w-8 mr-3" /> Próximos Eventos
+              <Calendar className="h-8 w-8 mr-3" /> Eventos
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {events.map((event) => (
+              {allEvents.map((event) => (
                 <Card
                   key={event.id}
                   className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group"
@@ -1117,6 +1114,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={event.aiHint || "party concert"}
                     />
+                     {isPast(new Date(event.endDate)) && (
+                       <div className="absolute inset-0 bg-black/30" />
+                     )}
                   </div>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-xl">{event.name}</CardTitle>
@@ -1127,51 +1127,20 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}
                     </p>
                   </CardContent>
-                  <CardFooter className="flex-col items-start p-4 border-t">
-                    <SpecificCodeEntryForm entity={event} />
-                  </CardFooter>
+                  {isEntityCurrentlyActivatable(event) ? (
+                     <CardFooter className="flex-col items-start p-4 border-t">
+                       <SpecificCodeEntryForm entity={event} />
+                     </CardFooter>
+                  ) : (
+                    <PastEventCardFooter entity={event} />
+                  )}
                 </Card>
               ))}
             </div>
           </section>
         )}
 
-        {pastEvents.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-muted-foreground">
-              <History className="h-8 w-8 mr-3" /> Eventos Pasados
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {pastEvents.map((event) => (
-                <Card
-                  key={event.id}
-                  className="shadow-lg flex flex-col overflow-hidden rounded-lg bg-card group opacity-80"
-                >
-                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                    <NextImage
-                      src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
-                      alt={event.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover"
-                      data-ai-hint={event.aiHint || "party concert"}
-                    />
-                     <div className="absolute inset-0 bg-black/30" />
-                  </div>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xl">{event.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow space-y-1">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
-                  </CardContent>
-                  <PastEventCardFooter entity={event} />
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {!isLoading && !error && promotions.length === 0 && events.length === 0 && pageViewState === "entityList" && (
+        {!isLoading && !error && promotions.length === 0 && allEvents.length === 0 && pageViewState === "entityList" && (
           <Card className="col-span-full">
             <CardHeader className="text-center">
               <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
