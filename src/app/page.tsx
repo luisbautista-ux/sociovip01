@@ -136,7 +136,7 @@ export default function HomePage() {
 
     return (
       <Card key={entity.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group">
-        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+        <Link href={businessUrl} className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
           <NextImage
             src={entity.imageUrl || "https://placehold.co/600x400.png"}
             alt={entity.name}
@@ -145,7 +145,7 @@ export default function HomePage() {
             className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
             data-ai-hint={entity.aiHint || "discount offer"}
           />
-        </div>
+        </Link>
         <CardHeader className="pb-3">
           <CardTitle className="text-xl">
             <Link href={businessUrl}>
