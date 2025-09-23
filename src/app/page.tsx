@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -85,8 +84,8 @@ export default function HomePage() {
         }
       });
       
-      allPromotions.sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
       allEvents.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      allPromotions.sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
       
       setPromotions(allPromotions);
       setEvents(allEvents);
@@ -136,15 +135,17 @@ export default function HomePage() {
 
     return (
       <Card key={entity.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group">
-        <Link href={businessUrl} className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-          <NextImage
-            src={entity.imageUrl || "https://placehold.co/600x400.png"}
-            alt={entity.name}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-            data-ai-hint={entity.aiHint || "discount offer"}
-          />
+        <Link href={businessUrl} passHref>
+          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+            <NextImage
+              src={entity.imageUrl || "https://placehold.co/600x400.png"}
+              alt={entity.name}
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+              data-ai-hint={entity.aiHint || "discount offer"}
+            />
+          </div>
         </Link>
         <CardHeader className="pb-3">
           <CardTitle className="text-xl">
@@ -194,7 +195,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-muted/40 text-foreground">
       <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
-        {/* Barra superior con filtros */}
         <div className="bg-gradient-to-r from-purple-800 to-red-600">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-start h-12 gap-6">
@@ -205,7 +205,6 @@ export default function HomePage() {
             </div>
         </div>
         
-        {/* Barra principal con logo, búsqueda y login */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between sm:h-20 gap-4">
               <div className="flex items-center justify-between w-full sm:w-auto">
