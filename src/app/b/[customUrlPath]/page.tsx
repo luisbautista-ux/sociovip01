@@ -996,7 +996,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
        <header 
          className="sticky top-0 z-20 w-full"
          style={{ 
-           background: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})` 
+           backgroundColor: businessDetails.primaryColor || '#B080D0'
          }}
        >
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
