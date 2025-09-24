@@ -103,6 +103,7 @@ export async function POST(request: Request) {
     // --- Lógica principal con privilegios de admin ---
 
     const [entitiesSnap, paymentsSnap, linksSnap] = await Promise.all([
+      // 🔥 CORRECCIÓN: Se quita cualquier filtro de 'isActive' para incluir eventos pasados.
       adminDb.collection('businessEntities').where('businessId', '==', businessId).get(),
       adminDb.collection('promoterPayments').where('businessId', '==', businessId).get(),
       adminDb.collection('businessPromoterLinks').where('businessId', '==', businessId).get()
@@ -116,7 +117,10 @@ export async function POST(request: Request) {
       let pendingAmount = 0;
       
       allEntities.forEach(entity => {
+        // Itera sobre los códigos de cada entidad
         (entity.generatedCodes || []).forEach(code => {
+          // Suma la comisión si el código fue generado por este promotor, está pendiente de pago,
+          // y ya fue canjeado por un cliente (redeemed) o validado en puerta (used).
           if (
             code.generatedByUid === link.platformUserUid &&
             code.commissionStatus === 'unpaid' &&
