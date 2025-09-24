@@ -11,6 +11,7 @@ import type {
   BusinessPromoterLinkWithCommissions,
 } from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
+import { DEFAULT_COMMISSION_PER_CODE } from '@/lib/constants';
 
 async function getCallerProfile(
   authorizationHeader: string
@@ -104,11 +105,24 @@ export async function GET(request: Request) {
           if (!commissionsByPromoter[code.generatedByUid]) {
             commissionsByPromoter[code.generatedByUid] = {pending: 0, paid: 0};
           }
-          const commission = code.commissionGenerated || 0;
-          if (code.commissionStatus === 'paid') {
-            commissionsByPromoter[code.generatedByUid].paid += commission;
-          } else {
-            commissionsByPromoter[code.generatedByUid].pending += commission;
+          
+          // --- LÓGICA DE COMISIÓN CORREGIDA ---
+          // Si el código fue usado (asistencia confirmada), se calcula la comisión.
+          let commission = 0;
+          if (code.status === 'used') {
+              // Si ya tiene una comisión generada, se usa. Si no (caso de datos antiguos), se usa el valor por defecto.
+              commission = code.commissionGenerated && code.commissionGenerated > 0 
+                  ? code.commissionGenerated 
+                  : DEFAULT_COMMISSION_PER_CODE;
+          }
+          
+          // Solo se suma si hay comisión que procesar
+          if (commission > 0) {
+            if (code.commissionStatus === 'paid') {
+              commissionsByPromoter[code.generatedByUid].paid += commission;
+            } else { // Si es 'unpaid' o si el campo no existe (datos antiguos)
+              commissionsByPromoter[code.generatedByUid].pending += commission;
+            }
           }
         }
       });
@@ -139,5 +153,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
-    
