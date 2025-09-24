@@ -115,14 +115,8 @@ export async function POST(request: Request) {
     const linksWithCommissions: BusinessPromoterLinkWithCommissions[] = promoterLinks.map(link => {
       let pendingAmount = 0;
       
-      // Itera sobre todas las entidades del negocio
       allEntities.forEach(entity => {
-        // Itera sobre los códigos de cada entidad
         (entity.generatedCodes || []).forEach(code => {
-          // Condición corregida:
-          // 1. El código debe haber sido generado por el promotor del link actual (link.platformUserUid)
-          // 2. La comisión no debe haber sido pagada ('unpaid')
-          // 3. El código debe haber sido canjeado (cliente tiene QR) o usado (cliente entró)
           if (
             code.generatedByUid === link.platformUserUid &&
             code.commissionStatus === 'unpaid' &&
@@ -137,7 +131,6 @@ export async function POST(request: Request) {
         .filter(p => p.promoterUid === link.platformUserUid)
         .reduce((sum, p) => sum + p.amountPaid, 0);
 
-      // Convertir Timestamps a ISO strings para serialización JSON segura
       const joinDateISO = link.joinDate instanceof admin.firestore.Timestamp
             ? (link.joinDate as admin.firestore.Timestamp).toDate().toISOString()
             : String(link.joinDate);
