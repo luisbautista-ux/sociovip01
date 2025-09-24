@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
+import { cn, sanitizeObjectForFirestore, anyToDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch, getDoc } from "firebase/firestore";
@@ -281,30 +281,50 @@ function BusinessPromoterForm({
     const watchedDocType = dniEntryForm.watch('docType');
 
     const fetchPromoterData = useCallback(async () => {
-        if (!currentBusinessId || !currentUser) {
-            setPromoterLinks([]);
-            setIsLoading(false);
-            return;
+        if (!currentBusinessId) {
+          setIsLoading(false);
+          return;
         }
         setIsLoading(true);
         try {
-            const idToken = await currentUser.getIdToken();
-            const response = await fetch('/api/business-panel/get-promoter-commissions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`,
-                },
-                body: JSON.stringify({ businessId: currentBusinessId }),
+          const [linksSnap, entitiesSnap, paymentsSnap] = await Promise.all([
+            getDocs(query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId))),
+            getDocs(query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId))),
+            getDocs(query(collection(db, "promoterPayments"), where("businessId", "==", currentBusinessId)))
+          ]);
+    
+          const allEntities = entitiesSnap.docs.map(doc => doc.data() as BusinessManagedEntity);
+          const allPayments = paymentsSnap.docs.map(doc => doc.data() as PromoterPayment);
+          const promoterLinks = linksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessPromoterLink);
+    
+          const linksWithCommissions: BusinessPromoterLinkWithCommissions[] = promoterLinks.map(link => {
+            let pendingAmount = 0;
+            
+            allEntities.forEach(entity => {
+              (entity.generatedCodes || []).forEach(code => {
+                if (
+                  code.generatedByUid === link.platformUserUid &&
+                  code.commissionStatus === 'unpaid' &&
+                  (code.status === 'redeemed' || code.status === 'used')
+                ) {
+                  pendingAmount += code.commissionGenerated || 0;
+                }
+              });
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to fetch promoter data from server.');
-            }
-
-            const { data } = await response.json();
-            setPromoterLinks(data as BusinessPromoterLinkWithCommissions[]);
+    
+            const paidAmount = allPayments
+              .filter(p => p.promoterUid === link.platformUserUid)
+              .reduce((sum, p) => sum + p.amountPaid, 0);
+    
+            return {
+              ...link,
+              joinDate: anyToDate(link.joinDate)?.toISOString() || new Date().toISOString(),
+              pendingAmount,
+              paidAmount,
+            };
+          });
+    
+          setPromoterLinks(linksWithCommissions.sort((a,b) => (a.promoterName || "").localeCompare(b.promoterName || "")));
         } catch (error: any) {
             console.error("Error fetching promoter commission data:", error);
             toast({
@@ -312,19 +332,18 @@ function BusinessPromoterForm({
                 description: `No se pudieron obtener los datos. ${error.message}`,
                 variant: "destructive",
             });
-            setPromoterLinks([]);
         } finally {
             setIsLoading(false);
         }
-    }, [currentBusinessId, currentUser, toast]);
+      }, [currentBusinessId, toast]);
 
     useEffect(() => {
-        if (currentBusinessId && currentUser) {
+        if (currentBusinessId) {
             fetchPromoterData();
-        } else if (!currentUser) {
+        } else if (!userProfile?.businessId) {
             setIsLoading(false);
         }
-    }, [currentBusinessId, currentUser, fetchPromoterData]);
+    }, [currentBusinessId, userProfile, fetchPromoterData]);
 
 
     const filteredPromoters = promoterLinks.filter(link =>
