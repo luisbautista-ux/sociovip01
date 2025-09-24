@@ -11,17 +11,20 @@ service cloud.firestore {
     }
 
     function getUserData() {
+      // Use the 'exists' function to safely access data that might not exist yet.
       return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
     }
     
+    function userHasRole(role) {
+        return isSignedIn() && getUserData().roles.includes(role);
+    }
+    
     function isSuperAdmin() {
-      return isSignedIn() && getUserData().roles.includes('superadmin');
+      return userHasRole('superadmin');
     }
 
     function isRoleForBusiness(role, businessId) {
-      return isSignedIn()
-        && getUserData().roles.includes(role)
-        && getUserData().businessId == businessId;
+      return userHasRole(role) && getUserData().businessId == businessId;
     }
 
     function isBusinessAdmin(businessId) {
@@ -31,7 +34,7 @@ service cloud.firestore {
     function isStaff(businessId) {
       return isRoleForBusiness('staff', businessId);
     }
-
+    
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -47,24 +50,39 @@ service cloud.firestore {
 
     match /businessEntities/{entityId} {
       allow get: if true; 
-      allow list: if isSuperAdmin() || (isSignedIn() && getUserData().businessId == request.query.resource.data.businessId);
+      
+      // A business user can list entities IF they are querying for their own businessId.
+      allow list: if isSuperAdmin() || 
+                     (isSignedIn() && request.query.businessId == getUserData().businessId);
+      
       allow create: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
       allow update: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
       allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
     }
 
     match /businessPromoterLinks/{linkId} {
-        allow get: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
-        allow list: if isSuperAdmin() || (isSignedIn() && getUserData().businessId == request.query.resource.data.businessId);
-        allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+        allow get: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
+        
+        // A business user can list links IF they are querying for their own businessId.
+        allow list: if isSuperAdmin() || 
+                     (isSignedIn() && request.query.businessId == getUserData().businessId);
+
+        allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
     }
 
     match /promoterPayments/{paymentId} {
-        allow get, list, create, update, delete: if isSuperAdmin() || (isSignedIn() && getUserData().businessId == request.query.resource.data.businessId);
+        // A business user can manage payments for their own business.
+        allow read, write: if isSuperAdmin() || 
+                             (isSignedIn() && (
+                               (request.method in ['get', 'list'] && request.query.businessId == getUserData().businessId) ||
+                               (request.method in ['create', 'update', 'delete'] && request.resource.data.businessId == getUserData().businessId)
+                             ));
     }
 
     match /qrClients/{clientId} {
-      allow read, list, create, update, delete: if true;
+      allow read, list: if true; // Allow wide read access for now
+      allow create: if true;
+      allow update, delete: if isSuperAdmin();
     }
 
     match /socioVipMembers/{memberId} {
