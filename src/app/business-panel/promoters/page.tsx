@@ -282,49 +282,64 @@ function BusinessPromoterForm({
 
     const fetchPromoterData = useCallback(async () => {
         if (!currentBusinessId) {
-          setIsLoading(false);
-          return;
+            setIsLoading(false);
+            return;
         }
         setIsLoading(true);
         try {
-          const [linksSnap, entitiesSnap, paymentsSnap] = await Promise.all([
-            getDocs(query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId))),
-            getDocs(query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId))),
-            getDocs(query(collection(db, "promoterPayments"), where("businessId", "==", currentBusinessId)))
-          ]);
-    
-          const allEntities = entitiesSnap.docs.map(doc => doc.data() as BusinessManagedEntity);
-          const allPayments = paymentsSnap.docs.map(doc => doc.data() as PromoterPayment);
-          const promoterLinks = linksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessPromoterLink);
-    
-          const linksWithCommissions: BusinessPromoterLinkWithCommissions[] = promoterLinks.map(link => {
-            let pendingAmount = 0;
-            
-            allEntities.forEach(entity => {
-              (entity.generatedCodes || []).forEach(code => {
-                if (
-                  code.generatedByUid === link.platformUserUid &&
-                  code.commissionStatus === 'unpaid' &&
-                  (code.status === 'redeemed' || code.status === 'used')
-                ) {
-                  pendingAmount += code.commissionGenerated || 0;
+            const [linksSnap, entitiesSnap, paymentsSnap] = await Promise.all([
+                getDocs(query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId))),
+                getDocs(query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId))),
+                getDocs(query(collection(db, "promoterPayments"), where("businessId", "==", currentBusinessId)))
+            ]);
+
+            const allEntities = entitiesSnap.docs.map(doc => doc.data() as BusinessManagedEntity);
+            const allPayments = paymentsSnap.docs.map(doc => doc.data() as PromoterPayment);
+            const promoterLinks = linksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessPromoterLink);
+
+            // 1. Pre-calculate commissions and payments for each promoter UID
+            const commissionByPromoter: Record<string, { pending: number; paid: number }> = {};
+
+            // Initialize for all linked promoters
+            promoterLinks.forEach(link => {
+                if(link.platformUserUid) {
+                    commissionByPromoter[link.platformUserUid] = { pending: 0, paid: 0 };
                 }
-              });
             });
-    
-            const paidAmount = allPayments
-              .filter(p => p.promoterUid === link.platformUserUid)
-              .reduce((sum, p) => sum + p.amountPaid, 0);
-    
-            return {
-              ...link,
-              joinDate: anyToDate(link.joinDate)?.toISOString() || new Date().toISOString(),
-              pendingAmount,
-              paidAmount,
-            };
-          });
-    
-          setPromoterLinks(linksWithCommissions.sort((a,b) => (a.promoterName || "").localeCompare(b.promoterName || "")));
+
+            // Calculate pending commissions
+            allEntities.forEach(entity => {
+                (entity.generatedCodes || []).forEach(code => {
+                    if (code.generatedByUid && (code.status === 'redeemed' || code.status === 'used')) {
+                        if (commissionByPromoter[code.generatedByUid]) {
+                            if (code.commissionStatus === 'unpaid') {
+                                commissionByPromoter[code.generatedByUid].pending += code.commissionGenerated || 0;
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Calculate paid commissions
+            allPayments.forEach(payment => {
+                if (payment.promoterUid && commissionByPromoter[payment.promoterUid]) {
+                    commissionByPromoter[payment.promoterUid].paid += payment.amountPaid;
+                }
+            });
+            
+            // 2. Map calculated data to promoter links
+            const linksWithCommissions: BusinessPromoterLinkWithCommissions[] = promoterLinks.map(link => {
+                const promoterCommissions = link.platformUserUid ? commissionByPromoter[link.platformUserUid] : { pending: 0, paid: 0 };
+                return {
+                    ...link,
+                    joinDate: anyToDate(link.joinDate)?.toISOString() || new Date().toISOString(),
+                    pendingAmount: promoterCommissions?.pending || 0,
+                    paidAmount: promoterCommissions?.paid || 0,
+                };
+            });
+
+            setPromoterLinks(linksWithCommissions.sort((a,b) => (a.promoterName || "").localeCompare(b.promoterName || "")));
+
         } catch (error: any) {
             console.error("Error fetching promoter commission data:", error);
             toast({
@@ -335,7 +350,7 @@ function BusinessPromoterForm({
         } finally {
             setIsLoading(false);
         }
-      }, [currentBusinessId, toast]);
+    }, [currentBusinessId, toast]);
 
     useEffect(() => {
         if (currentBusinessId) {
@@ -760,5 +775,7 @@ function BusinessPromoterForm({
       </div>
     );
   }
+
+    
 
     
