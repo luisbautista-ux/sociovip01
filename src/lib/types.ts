@@ -251,17 +251,6 @@ export interface BusinessPromoterLink {
   joinDate: Timestamp | string; 
 }
 
-export interface PromoterPayment {
-    id: string;
-    businessId: string;
-    promoterUid: string;
-    paymentDate: Timestamp | string;
-    amountPaid: number;
-    periodCovered: string;
-    paidCommissionIds: string[];
-    notes?: string;
-}
-
 
 export type BusinessClientType = 'qr' | 'vip';
 
@@ -361,7 +350,6 @@ export interface BusinessEventFormData {
 }
 
 export interface BusinessPromoterFormData { 
-  promoterDni: string;
   promoterName: string;
   promoterEmail: string;
   promoterPhone?: string;
