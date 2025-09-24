@@ -103,7 +103,6 @@ export async function POST(request: Request) {
     // --- Lógica principal con privilegios de admin ---
 
     const [entitiesSnap, paymentsSnap, linksSnap] = await Promise.all([
-      // 🔥 CORRECCIÓN: Se quita cualquier filtro de 'isActive' para incluir eventos pasados.
       adminDb.collection('businessEntities').where('businessId', '==', businessId).get(),
       adminDb.collection('promoterPayments').where('businessId', '==', businessId).get(),
       adminDb.collection('businessPromoterLinks').where('businessId', '==', businessId).get()
