@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
 import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical, HandCoins, PiggyBank, CircleDollarSign } from "lucide-react";
-import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember, BusinessManagedEntity, BusinessPromoterLinkWithCommissions } from "@/lib/types";
+import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember, BusinessManagedEntity, GeneratedCode, BusinessPromoterLinkWithCommissions, PromoterPayment } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
+import { cn, sanitizeObjectForFirestore, anyToDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, writeBatch, getDoc } from "firebase/firestore";
@@ -28,6 +28,7 @@ import { z } from "zod";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 
 
 const DniEntrySchema = z.object({
@@ -253,6 +254,89 @@ function BusinessPromoterForm({
   );
 }
 
+const paymentFormSchema = z.object({
+  amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
+  notes: z.string().optional(),
+});
+type PaymentFormValues = z.infer<typeof paymentFormSchema>;
+
+interface PaymentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  promoter: BusinessPromoterLinkWithCommissions | null;
+  onConfirmPayment: (promoterUid: string, amount: number, notes?: string) => Promise<void>;
+  isSubmitting: boolean;
+}
+
+function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmitting }: PaymentDialogProps) {
+  const form = useForm<PaymentFormValues>({
+    resolver: zodResolver(paymentFormSchema),
+  });
+
+  useEffect(() => {
+    if (promoter) {
+      form.reset({
+        amount: promoter.pendingAmount,
+        notes: `Pago de comisiones a ${promoter.promoterName}.`,
+      });
+    }
+  }, [promoter, form]);
+
+  const handleSubmit = (values: PaymentFormValues) => {
+    if (promoter?.platformUserUid) {
+      onConfirmPayment(promoter.platformUserUid, values.amount, values.notes);
+    }
+  };
+  
+  if (!promoter) return null;
+
+  return (
+    <UIDialog open={open} onOpenChange={onOpenChange}>
+      <UIDialogContent>
+        <UIDialogHeader>
+          <UIDialogTitle>Registrar Pago a {promoter.promoterName}</UIDialogTitle>
+          <UIDialogDescription>
+            El monto pendiente actual es de S/ {promoter.pendingAmount.toFixed(2)}. Puedes registrar un pago parcial o total.
+          </UIDialogDescription>
+        </UIDialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monto a Pagar (S/)</FormLabel>
+                  <FormControl><Input type="number" step="0.01" {...field} disabled={isSubmitting} /></FormControl>
+                  <FormMessageHook />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notas (Opcional)</FormLabel>
+                  <FormControl><Textarea placeholder="Ej: Pago por Yape, transferencia BCP..." {...field} disabled={isSubmitting} /></FormControl>
+                  <FormMessageHook />
+                </FormItem>
+              )}
+            />
+             <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
+                <Button type="submit" variant="gradient" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CircleDollarSign className="mr-2 h-4 w-4"/>}
+                  Confirmar Pago
+                </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </UIDialogContent>
+    </UIDialog>
+  );
+}
+
 
   export default function BusinessPromotersPage() {
     const { userProfile, currentUser } = useAuth();
@@ -290,18 +374,21 @@ function BusinessPromoterForm({
         try {
             const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
             const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
-            
-            const [linksSnapshot, entitiesSnapshot] = await Promise.all([
+            const paymentsQuery = query(collection(db, "promoterPayments"), where("businessId", "==", currentBusinessId));
+
+            const [linksSnapshot, entitiesSnapshot, paymentsSnapshot] = await Promise.all([
                 getDocs(linksQuery),
-                getDocs(entitiesSnapshot),
+                getDocs(entitiesQuery),
+                getDocs(paymentsQuery),
             ]);
 
             const allEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessManagedEntity);
             const allLinks = linksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessPromoterLink);
+            const allPayments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as PromoterPayment);
 
             const commissionsByPromoter: Record<string, { pending: number; paid: number }> = {};
-
-            // Pre-calculate all commissions
+            
+            // Pre-calculate all commissions from entities
             allEntities.forEach(entity => {
                 (entity.generatedCodes || []).forEach(code => {
                     if (code.generatedByUid && (code.status === 'redeemed' || code.status === 'used')) {
@@ -312,7 +399,6 @@ function BusinessPromoterForm({
                         if (code.commissionStatus === 'paid') {
                             commissionsByPromoter[code.generatedByUid].paid += commission;
                         } else {
-                            // Treat as 'unpaid' if status is missing or set to 'unpaid'
                             commissionsByPromoter[code.generatedByUid].pending += commission;
                         }
                     }
@@ -502,6 +588,70 @@ function BusinessPromoterForm({
       } finally {
         setIsSubmitting(false);
       }
+    };
+
+    const handleConfirmPayment = async (promoterUid: string, amount: number, notes?: string) => {
+        if (!currentBusinessId) return;
+        setIsSubmitting(true);
+        const batch = writeBatch(db);
+
+        try {
+            // 1. Find all unpaid codes for this promoter in this business
+            const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
+            const entitiesSnap = await getDocs(entitiesQuery);
+            const codesToUpdate: {entityId: string, codeId: string}[] = [];
+            let totalCommissionToSettle = 0;
+
+            for (const entityDoc of entitiesSnap.docs) {
+                const entity = { id: entityDoc.id, ...entityDoc.data() } as BusinessManagedEntity;
+                const promoterCodes = (entity.generatedCodes || []).filter(
+                    c => c.generatedByUid === promoterUid &&
+                         c.commissionStatus !== 'paid' &&
+                         (c.status === 'redeemed' || c.status === 'used')
+                );
+                promoterCodes.forEach(code => {
+                    codesToUpdate.push({ entityId: entity.id, codeId: code.id });
+                    totalCommissionToSettle += code.commissionGenerated || 0;
+                });
+            }
+
+            // 2. Create a payment record
+            const paymentRef = doc(collection(db, "promoterPayments"));
+            batch.set(paymentRef, {
+                businessId: currentBusinessId,
+                promoterUid: promoterUid,
+                amountPaid: amount,
+                paymentDate: serverTimestamp(),
+                notes: notes || "",
+                settledCodeIds: codesToUpdate.map(c => c.codeId),
+            });
+
+            // 3. Update the status of each settled code inside its entity
+            for (const { entityId, codeId } of codesToUpdate) {
+                const entityRef = doc(db, "businessEntities", entityId);
+                const entitySnap = await getDoc(entityRef); // Re-get inside transaction/batch logic
+                if (entitySnap.exists()) {
+                    const entityData = entitySnap.data() as BusinessManagedEntity;
+                    const updatedCodes = (entityData.generatedCodes || []).map(c => {
+                        if (c.id === codeId) {
+                            return { ...c, commissionStatus: 'paid', paymentId: paymentRef.id };
+                        }
+                        return c;
+                    });
+                    batch.update(entityRef, { generatedCodes: updatedCodes });
+                }
+            }
+
+            await batch.commit();
+            toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)}.` });
+            fetchPromoterData();
+            closeModal();
+        } catch (error: any) {
+            console.error("Error confirming payment:", error);
+            toast({ title: "Error al Registrar Pago", description: error.message, variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
     
     const handleDeletePromoterLink = async (link: BusinessPromoterLink) => {
@@ -730,6 +880,15 @@ function BusinessPromoterForm({
                         />
                     </>
                 )}
+                 {modalStep === 'payment_form' && (
+                    <PaymentDialog
+                        open={modalStep === 'payment_form'}
+                        onOpenChange={(isOpen) => !isOpen && closeModal()}
+                        promoter={promoterForPayment}
+                        onConfirmPayment={handleConfirmPayment}
+                        isSubmitting={isSubmitting}
+                    />
+                 )}
             </UIDialogContent>
         </UIDialog>
 
@@ -756,5 +915,3 @@ function BusinessPromoterForm({
       </div>
     );
   }
-
-    
