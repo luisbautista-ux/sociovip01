@@ -1,6 +1,4 @@
 
-      
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -365,65 +363,36 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     const watchedDocType = dniEntryForm.watch('docType');
 
     const fetchPromoterData = useCallback(async () => {
-        if (!currentBusinessId) {
+        if (!currentBusinessId || !currentUser) {
             setPromoterLinks([]);
             setIsLoading(false);
             return;
         }
         setIsLoading(true);
         try {
-            const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
-            const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
-            const paymentsQuery = query(collection(db, "promoterPayments"), where("businessId", "==", currentBusinessId));
-
-            const [linksSnapshot, entitiesSnapshot, paymentsSnapshot] = await Promise.all([
-                getDocs(linksQuery),
-                getDocs(entitiesQuery),
-                getDocs(paymentsQuery),
-            ]);
-
-            const allEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessManagedEntity);
-            const allLinks = linksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessPromoterLink);
-            const allPayments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as PromoterPayment);
-
-            const commissionsByPromoter: Record<string, { pending: number; paid: number }> = {};
-            
-            // Pre-calculate all commissions from entities
-            allEntities.forEach(entity => {
-                (entity.generatedCodes || []).forEach(code => {
-                    if (code.generatedByUid && (code.status === 'redeemed' || code.status === 'used')) {
-                        if (!commissionsByPromoter[code.generatedByUid]) {
-                            commissionsByPromoter[code.generatedByUid] = { pending: 0, paid: 0 };
-                        }
-                        const commission = code.commissionGenerated || 0;
-                        if (code.commissionStatus === 'paid') {
-                            commissionsByPromoter[code.generatedByUid].paid += commission;
-                        } else {
-                            commissionsByPromoter[code.generatedByUid].pending += commission;
-                        }
-                    }
-                });
+            const idToken = await currentUser.getIdToken();
+            const response = await fetch('/api/business-panel/get-commissions-summary', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                },
             });
 
-            const linksWithCommissions = allLinks.map(link => {
-                const promoterUid = link.platformUserUid;
-                const commissions = promoterUid ? commissionsByPromoter[promoterUid] : { pending: 0, paid: 0 };
-                return {
-                    ...link,
-                    pendingAmount: commissions?.pending || 0,
-                    paidAmount: commissions?.paid || 0,
-                };
-            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Error al obtener los datos de comisiones.');
+            }
 
-            setPromoterLinks(linksWithCommissions.sort((a,b) => a.promoterName.localeCompare(b.promoterName)));
+            const data: BusinessPromoterLinkWithCommissions[] = await response.json();
+            setPromoterLinks(data.sort((a,b) => a.promoterName.localeCompare(b.promoterName)));
 
         } catch (error: any) {
-            console.error("Promoters Page: Failed to fetch promoter data:", error);
+            console.error("Promoters Page: Failed to fetch promoter data from API:", error);
             toast({ title: "Error al Cargar Promotores", description: `No se pudieron obtener los datos. ${error.message}`, variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
-    }, [currentBusinessId, toast]);
+    }, [currentBusinessId, currentUser, toast]);
 
     useEffect(() => {
       fetchPromoterData();
@@ -915,3 +884,5 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
       </div>
     );
   }
+
+    
