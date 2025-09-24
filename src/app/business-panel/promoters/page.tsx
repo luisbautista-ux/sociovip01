@@ -185,7 +185,7 @@ function BusinessPromoterForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Promotor <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Juan Pérez" {...field} disabled={isSubmitting || disableContactFields} className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""} /></FormControl>
+              <FormControl><Input placeholder="Ej: Juan Pérez" {...field} value={field.value || ""} disabled={isSubmitting || disableContactFields} className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""} /></FormControl>
               <FormMessageHook />
             </FormItem>
           )}
@@ -196,7 +196,7 @@ function BusinessPromoterForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Email del Promotor <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input type="email" placeholder="Ej: juan.promotor@example.com" {...field} disabled={isSubmitting || disableContactFields} className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""} /></FormControl>
+              <FormControl><Input type="email" placeholder="Ej: juan.promotor@example.com" {...field} value={field.value || ""} disabled={isSubmitting || disableContactFields} className={(isSubmitting || disableContactFields) ? "disabled:bg-muted/50 disabled:text-muted-foreground/80" : ""} /></FormControl>
               <FormMessageHook />
             </FormItem>
           )}
@@ -761,3 +761,4 @@ function BusinessPromoterForm({
     );
   }
 
+    
