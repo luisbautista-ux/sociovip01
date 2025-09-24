@@ -348,7 +348,8 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     const { toast } = useToast();
     
     // State for modal visibility control
-    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form' | 'payment_form'>('closed');
+    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showAlreadyLinkedAlert, setShowAlreadyLinkedAlert] = useState(false);
     
     const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
@@ -446,6 +447,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
         setEditingPromoterLink(null);
         setVerifiedPromoterDniResult(null);
         setPromoterForPayment(null);
+        setShowPaymentModal(false);
     }
 
     const handleOpenAddPromoterFlow = () => {
@@ -744,7 +746,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                             </Button>
                           </TableCell>
                           <TableCell className="text-right space-x-1">
-                             <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" onClick={() => { setPromoterForPayment(link); setModalStep('payment_form'); }} disabled={isSubmitting || link.pendingAmount <= 0}>
+                             <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" onClick={() => { setPromoterForPayment(link); setShowPaymentModal(true); }} disabled={isSubmitting || link.pendingAmount <= 0}>
                                <HandCoins className="mr-1 h-3 w-3" /> Registrar Pago
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
@@ -850,17 +852,22 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                         />
                     </>
                 )}
-                 {modalStep === 'payment_form' && (
-                    <PaymentDialog
-                        open={modalStep === 'payment_form'}
-                        onOpenChange={(isOpen) => !isOpen && closeModal()}
-                        promoter={promoterForPayment}
-                        onConfirmPayment={handleConfirmPayment}
-                        isSubmitting={isSubmitting}
-                    />
-                 )}
             </UIDialogContent>
         </UIDialog>
+        
+        {promoterForPayment && (
+            <PaymentDialog
+                open={showPaymentModal}
+                onOpenChange={(isOpen) => {
+                    setShowPaymentModal(isOpen);
+                    if (!isOpen) setPromoterForPayment(null);
+                }}
+                promoter={promoterForPayment}
+                onConfirmPayment={handleConfirmPayment}
+                isSubmitting={isSubmitting}
+            />
+        )}
+
 
         <AlertDialog open={showAlreadyLinkedAlert} onOpenChange={setShowAlreadyLinkedAlert}>
           <AlertDialogContent>
@@ -887,3 +894,4 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
   }
 
     
+
