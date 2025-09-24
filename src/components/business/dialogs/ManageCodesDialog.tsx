@@ -312,6 +312,11 @@ export function ManageCodesDialog({
       <TableCell className="py-1.5 px-2 text-center">
           <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status] || 'outline'} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status] || code.status}</Badge>
       </TableCell>
+      {!isPromoterView && (
+        <TableCell className="py-1.5 px-2 text-center text-muted-foreground">
+          {code.generatedByName || 'N/A'}
+        </TableCell>
+      )}
       <TableCell className="py-1.5 px-2 text-center">
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
       </TableCell>
@@ -322,9 +327,12 @@ export function ManageCodesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl"> 
         <DialogHeader>
-          <DialogTitle>Mis Códigos para: {entity.name}</DialogTitle>
+          <DialogTitle>{isPromoterView ? 'Mis Códigos para:' : 'Códigos para:'} {entity.name}</DialogTitle>
           <DialogDescription>
-            Visualiza los códigos que has generado para esta campaña. Se agrupan si se crearon juntos.
+            {isPromoterView 
+              ? "Visualiza los códigos que has generado para esta campaña. Se agrupan si se crearon juntos."
+              : "Visualiza todos los códigos generados para esta campaña, agrupados por lote de creación."
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -344,22 +352,24 @@ export function ManageCodesDialog({
         {isLoadingCodes ? (
           <div className="flex justify-center items-center h-[50vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-3 text-muted-foreground">Cargando mis códigos...</p>
+            <p className="ml-3 text-muted-foreground">Cargando códigos...</p>
           </div>
         ) : processedAndGroupedCodes.length > 0 ? (
           <ScrollArea className="h-[50vh] border rounded-md">
             <Table>
               <TableHeader>
                 <TableRow className="text-sm">
-                  <TableHead className="w-1/3 px-2 py-2 text-center">Código</TableHead>
-                  <TableHead className="w-1/3 px-2 py-2 text-center">Estado</TableHead>
-                  <TableHead className="w-1/3 px-2 py-2 text-center">Fecha Canje</TableHead>
+                  <TableHead className="w-[140px] px-2 py-2">Código</TableHead>
+                  <TableHead className="w-[110px] px-2 py-2 text-center">Estado</TableHead>
+                  {!isPromoterView && <TableHead className="w-[120px] px-2 py-2 text-center">Creado por</TableHead>}
+                  <TableHead className="w-[120px] px-2 py-2 text-center">Fecha Canje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {processedAndGroupedCodes.map((item) => {
                   if (item.isBatch && item.codesInBatch && item.batchId) {
                     const isExpanded = !!expandedBatches[item.batchId];
+                    const nonAvailableCount = item.codesInBatch.filter(c => c.status !== 'available').length;
                     
                     return (
                       <React.Fragment key={item.id}>
@@ -368,11 +378,14 @@ export function ManageCodesDialog({
                             onClick={() => toggleBatchExpansion(item.batchId!)}
                             data-state={isExpanded ? "open" : "closed"}
                         >
-                          <TableCell colSpan={3} className="py-2 px-3 text-xs">
+                          <TableCell colSpan={isPromoterView ? 3 : 4} className="py-2 px-3 text-xs">
                              <div className="flex items-center justify-between group w-full">
                               <div className="flex items-center">
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
-                                <span>Lote de {item.codesInBatch.length} códigos</span>
+                                <div className="flex flex-col">
+                                    <span className="font-semibold">Lote de {item.codesInBatch.length} códigos</span>
+                                    {!isPromoterView && <span className="text-muted-foreground text-[11px]">Creado por: {item.generatedByName}</span>}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
                                 <Button
