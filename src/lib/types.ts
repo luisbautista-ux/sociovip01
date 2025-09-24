@@ -1,4 +1,5 @@
 
+      
 
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
@@ -251,6 +252,12 @@ export interface BusinessPromoterLink {
   joinDate: Timestamp | string; 
 }
 
+// New type for view model in promoters page
+export interface BusinessPromoterLinkWithCommissions extends BusinessPromoterLink {
+  pendingAmount: number;
+  paidAmount: number;
+}
+
 
 export type BusinessClientType = 'qr' | 'vip';
 
@@ -446,4 +453,4 @@ export interface PromoterEntityView extends BusinessManagedEntity {
     promoterCodesUsed: number;
 }
 
-      
+    

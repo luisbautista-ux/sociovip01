@@ -1,15 +1,17 @@
 
+      
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
-import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical } from "lucide-react";
-import type { BusinessPromoterLink, PromoterProfile, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember } from "@/lib/types";
+import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical, HandCoins, PiggyBank, CircleDollarSign } from "lucide-react";
+import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember, BusinessManagedEntity, BusinessPromoterLinkWithCommissions } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -257,18 +259,19 @@ function BusinessPromoterForm({
     const currentBusinessId = userProfile?.businessId;
 
     const [searchTerm, setSearchTerm] = useState("");
-    const [promoterLinks, setPromoterLinks] = useState<BusinessPromoterLink[]>([]);
+    const [promoterLinks, setPromoterLinks] = useState<BusinessPromoterLinkWithCommissions[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
     
     // State for modal visibility control
-    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
+    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form' | 'payment_form'>('closed');
     const [showAlreadyLinkedAlert, setShowAlreadyLinkedAlert] = useState(false);
     
     const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     const [promoterLinkToEditFromAlert, setPromoterLinkToEditFromAlert] = useState<BusinessPromoterLink | null>(null);
+    const [promoterForPayment, setPromoterForPayment] = useState<BusinessPromoterLinkWithCommissions | null>(null);
 
 
     const dniEntryForm = useForm<DniEntryValues>({
@@ -277,60 +280,77 @@ function BusinessPromoterForm({
     });
     const watchedDocType = dniEntryForm.watch('docType');
 
-    const fetchPromoterLinks = useCallback(async () => {
-      if (!currentBusinessId) {
-        setPromoterLinks([]);
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const q = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
-        const querySnapshot = await getDocs(q);
-        const fetchedLinks: BusinessPromoterLink[] = querySnapshot.docs.map(docSnap => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            businessId: data.businessId,
-            promoterDni: data.promoterDni,
-            promoterName: data.promoterName,
-            promoterEmail: data.promoterEmail,
-            promoterPhone: data.promoterPhone,
-            isActive: data.isActive === undefined ? true : data.isActive,
-            isPlatformUser: data.isPlatformUser || false,
-            platformUserUid: data.platformUserUid,
-            joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate || new Date().toISOString()),
-          };
-        });
-        setPromoterLinks(fetchedLinks.sort((a,b) => (a.promoterName || "").localeCompare(b.promoterName || "")));
-      } catch (error: any) {
-        console.error("Promoters Page: Failed to fetch promoter links:", error);
-        toast({
-          title: "Error al Cargar Promotores",
-          description: `No se pudieron obtener los promotores. ${error.message}`,
-          variant: "destructive",
-        });
-        setPromoterLinks([]);
-      } finally {
-        setIsLoading(false);
-      }
+    const fetchPromoterData = useCallback(async () => {
+        if (!currentBusinessId) {
+            setPromoterLinks([]);
+            setIsLoading(false);
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
+            const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
+            
+            const [linksSnapshot, entitiesSnapshot] = await Promise.all([
+                getDocs(linksQuery),
+                getDocs(entitiesSnapshot),
+            ]);
+
+            const allEntities = entitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessManagedEntity);
+            const allLinks = linksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessPromoterLink);
+
+            const commissionsByPromoter: Record<string, { pending: number; paid: number }> = {};
+
+            // Pre-calculate all commissions
+            allEntities.forEach(entity => {
+                (entity.generatedCodes || []).forEach(code => {
+                    if (code.generatedByUid && (code.status === 'redeemed' || code.status === 'used')) {
+                        if (!commissionsByPromoter[code.generatedByUid]) {
+                            commissionsByPromoter[code.generatedByUid] = { pending: 0, paid: 0 };
+                        }
+                        const commission = code.commissionGenerated || 0;
+                        if (code.commissionStatus === 'paid') {
+                            commissionsByPromoter[code.generatedByUid].paid += commission;
+                        } else {
+                            // Treat as 'unpaid' if status is missing or set to 'unpaid'
+                            commissionsByPromoter[code.generatedByUid].pending += commission;
+                        }
+                    }
+                });
+            });
+
+            const linksWithCommissions = allLinks.map(link => {
+                const promoterUid = link.platformUserUid;
+                const commissions = promoterUid ? commissionsByPromoter[promoterUid] : { pending: 0, paid: 0 };
+                return {
+                    ...link,
+                    pendingAmount: commissions?.pending || 0,
+                    paidAmount: commissions?.paid || 0,
+                };
+            });
+
+            setPromoterLinks(linksWithCommissions.sort((a,b) => a.promoterName.localeCompare(b.promoterName)));
+
+        } catch (error: any) {
+            console.error("Promoters Page: Failed to fetch promoter data:", error);
+            toast({ title: "Error al Cargar Promotores", description: `No se pudieron obtener los datos. ${error.message}`, variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
     }, [currentBusinessId, toast]);
 
     useEffect(() => {
-      if (!currentBusinessId) {
-        setIsLoading(false);
-        setPromoterLinks([]);
-        return;
-      }
-      fetchPromoterLinks();
-    }, [currentBusinessId, fetchPromoterLinks]);
+      fetchPromoterData();
+    }, [fetchPromoterData]);
 
 
-    const filteredPromoters = promoterLinks.filter(link =>
-      (link.promoterName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (link.promoterEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (link.promoterDni?.includes(searchTerm))
-    );
+    const filteredPromoters = useMemo(() => {
+      return promoterLinks.filter(link =>
+        (link.promoterName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (link.promoterEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (link.promoterDni?.includes(searchTerm))
+      );
+    }, [promoterLinks, searchTerm]);
 
     const checkDniForPromoterAndLink = async (dni: string, businessIdToCheck: string): Promise<InitialDataForPromoterLink> => {
       let result: InitialDataForPromoterLink = { dni };
@@ -369,6 +389,7 @@ function BusinessPromoterForm({
         setModalStep('closed');
         setEditingPromoterLink(null);
         setVerifiedPromoterDniResult(null);
+        setPromoterForPayment(null);
     }
 
     const handleOpenAddPromoterFlow = () => {
@@ -474,7 +495,7 @@ function BusinessPromoterForm({
         }
         
         closeModal();
-        fetchPromoterLinks();
+        fetchPromoterData();
       } catch (error: any) {
         console.error("Promoters Page: Failed to add/edit promoter link:", error);
         toast({ title: "Error al Guardar", description: `No se pudo procesar la solicitud. ${error.message}`, variant: "destructive"});
@@ -494,7 +515,7 @@ function BusinessPromoterForm({
                 description: `${link.promoterName || 'El promotor'} ha sido desvinculado de tu negocio.`,
                 variant: "destructive"
             });
-            fetchPromoterLinks();
+            fetchPromoterData();
         } catch (error: any) {
             console.error("Promoters Page: Failed to delete promoter link:", error);
             toast({
@@ -515,7 +536,7 @@ function BusinessPromoterForm({
       try {
         await updateDoc(doc(db, "businessPromoterLinks", link.id), { isActive: newStatus });
         toast({ title: `Estado Actualizado`, description: `El promotor ${link.promoterName} ahora está ${newStatus ? 'activo' : 'inactivo'}.` });
-        fetchPromoterLinks(); 
+        fetchPromoterData(); 
       } catch (error: any) {
         console.error("Promoters Page: Failed to toggle promoter link status:", error);
         toast({ title: "Error al Actualizar Estado", description: `No se pudo cambiar el estado del promotor. ${error.message}`, variant: "destructive"});
@@ -548,7 +569,7 @@ function BusinessPromoterForm({
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>Mis Promotores Vinculados</CardTitle>
-              <CardDescription>Personas que ayudan a promocionar tu negocio. El DNI es el identificador único.</CardDescription>
+              <CardDescription>Gestiona tus promotores y sus comisiones pendientes y pagadas.</CardDescription>
               <div className="relative mt-4">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -572,81 +593,14 @@ function BusinessPromoterForm({
                   No hay promotores vinculados. Haz clic en "Añadir/Vincular Promotor" para empezar.
                 </p>
               ) : (
-                <>
-                {/* Mobile View */}
-                <div className="md:hidden space-y-4">
-                  {filteredPromoters.map((link) => (
-                    <Card key={link.id} className="overflow-hidden">
-                      <CardHeader className="p-4">
-                        <CardTitle>{link.promoterName}</CardTitle>
-                        <CardDescription>{link.promoterEmail}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-4 space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">DNI/CE</span>
-                          <span className="font-semibold">{link.promoterDni}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Estado</span>
-                          <Button 
-                            variant="ghost" size="sm" 
-                            onClick={() => handleTogglePromoterLinkStatus(link)}
-                            className={cn("text-xs px-2 py-1 h-auto", link.isActive ? "text-green-600 hover:text-green-700" : "text-red-600 hover:text-red-700")}
-                            disabled={isSubmitting}
-                          >
-                            {link.isActive ? <ShieldCheck className="mr-1 h-4 w-4"/> : <ShieldX className="mr-1 h-4 w-4"/>}
-                            {link.isActive ? "Activo" : "Inactivo"}
-                          </Button>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="p-2 bg-muted/50">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="w-full justify-center">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
-                              <Edit className="h-4 w-4 mr-2" /> Editar Vínculo
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                             <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
-                                  <Trash2 className="h-4 w-4 mr-2" /> Desvincular Promotor
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span> de tu negocio.
-                                    No se eliminará su perfil global (si lo tiene).
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <ShadcnAlertDialogFooter>
-                                  <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeletePromoterLink(link)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Desvincular
-                                  </AlertDialogAction>
-                                </ShadcnAlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-                {/* Desktop View */}
-                <div className="hidden md:block overflow-x-auto">
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nombre Promotor</TableHead>
-                      <TableHead>DNI/CE <span className="text-destructive">*</span></TableHead>
-                      <TableHead className="hidden lg:table-cell">Email</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead className="hidden xl:table-cell">Vinculado Desde</TableHead>
+                      <TableHead>Monto Pendiente</TableHead>
+                      <TableHead>Monto Pagado</TableHead>
+                      <TableHead className="text-center">Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -655,9 +609,9 @@ function BusinessPromoterForm({
                       filteredPromoters.map((link) => (
                         <TableRow key={link.id}>
                           <TableCell className="font-medium">{link.promoterName || "N/A"}</TableCell>
-                          <TableCell>{link.promoterDni}</TableCell>
-                          <TableCell className="hidden lg:table-cell">{link.promoterEmail || "N/A"}</TableCell>
-                          <TableCell>
+                          <TableCell className="font-semibold text-destructive">S/ {link.pendingAmount.toFixed(2)}</TableCell>
+                          <TableCell className="text-green-600">S/ {link.paidAmount.toFixed(2)}</TableCell>
+                          <TableCell className="text-center">
                             <Button 
                               variant="ghost" 
                               size="sm" 
@@ -669,8 +623,10 @@ function BusinessPromoterForm({
                               {link.isActive ? "Activo" : "Inactivo"}
                             </Button>
                           </TableCell>
-                          <TableCell className="hidden xl:table-cell">{link.joinDate ? format(parseISO(link.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-right space-x-1">
+                             <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" onClick={() => { setPromoterForPayment(link); setModalStep('payment_form'); }} disabled={isSubmitting || link.pendingAmount <= 0}>
+                               <HandCoins className="mr-1 h-3 w-3" /> Registrar Pago
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Editar</span>
@@ -714,7 +670,6 @@ function BusinessPromoterForm({
                   </TableBody>
                 </Table>
                 </div>
-                </>
               )}
             </CardContent>
           </Card>
@@ -801,3 +756,5 @@ function BusinessPromoterForm({
       </div>
     );
   }
+
+    
