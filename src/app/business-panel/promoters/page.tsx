@@ -715,7 +715,87 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                   No hay promotores vinculados. Haz clic en "Añadir/Vincular Promotor" para empezar.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                  {filteredPromoters.length > 0 ? (
+                    filteredPromoters.map((link) => (
+                      <Card key={link.id} className="overflow-hidden">
+                         <CardHeader className="p-4">
+                            <CardTitle className="text-lg">{link.promoterName}</CardTitle>
+                            <CardDescription>{link.promoterEmail}</CardDescription>
+                         </CardHeader>
+                         <CardContent className="p-4 space-y-3 text-sm">
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Monto Pendiente</span>
+                                <span className="font-semibold text-lg text-destructive">S/ {link.pendingAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Monto Pagado</span>
+                                <span className="font-semibold text-lg text-green-600">S/ {link.paidAmount.toFixed(2)}</span>
+                            </div>
+                         </CardContent>
+                         <CardFooter className="p-2 bg-muted/50">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="w-full justify-center">
+                                    Acciones <MoreVertical className="ml-2 h-4 w-4"/>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  <DropdownMenuItem 
+                                    onClick={() => { setPromoterForPayment(link); setShowPaymentModal(true); }}
+                                    disabled={isSubmitting || link.pendingAmount <= 0}
+                                  >
+                                    <HandCoins className="mr-2 h-4 w-4" /> Registrar Pago
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleTogglePromoterLinkStatus(link)} 
+                                    disabled={isSubmitting}
+                                    className={cn(link.isActive ? "text-yellow-600 focus:text-yellow-700" : "text-green-600 focus:text-green-700")}
+                                   >
+                                    {link.isActive ? <ShieldX className="mr-2 h-4 w-4"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}
+                                    {link.isActive ? "Desactivar" : "Activar"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} 
+                                    disabled={isSubmitting}
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" /> Editar Vínculo
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator/>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground">
+                                          <Trash2 className="h-4 w-4 mr-2" /> Desvincular Promotor
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <UIAlertDialogTitle>¿Confirmar desvinculación?</UIAlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Se desvinculará a "{link.promoterName}" de tu negocio. Esto no eliminará su perfil de la plataforma.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <ShadcnAlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeletePromoterLink(link)} className="bg-destructive hover:bg-destructive/90">Desvincular</AlertDialogAction>
+                                      </ShadcnAlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                         </CardFooter>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="text-center h-24 flex items-center justify-center">
+                      <p>No se encontraron promotores con los filtros aplicados.</p>
+                    </div>
+                  )}
+                </div>
+                {/* Desktop View */}
+                <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -792,6 +872,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                   </TableBody>
                 </Table>
                 </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -894,4 +975,5 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
   }
 
     
+
 
