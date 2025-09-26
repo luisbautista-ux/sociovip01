@@ -5,7 +5,7 @@ import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
 import {z} from 'zod';
 import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
-import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/types';
+import type {PlatformUser, BusinessManagedEntity} from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue} from 'firebase-admin/firestore';
 
@@ -67,9 +67,6 @@ export async function POST(request: Request) {
     const paymentRef = adminDb.collection('promoterPayments').doc();
     const entityRef = adminDb.collection('businessEntities').doc(entityId);
     
-    let settledCodeIds: string[] = [];
-    let totalSettledAmount = 0;
-
     const finalMessage = await adminDb.runTransaction(async (transaction) => {
         const entityDoc = await transaction.get(entityRef);
         if (!entityDoc.exists) {
@@ -82,15 +79,29 @@ export async function POST(request: Request) {
         }
         
         let remainingAmountToSettle = paymentAmount;
+        const settledCodeIds: string[] = [];
+        let totalSettledAmount = 0;
+
         const originalCodes = entityData.generatedCodes || [];
 
+        const hasAnyPending = originalCodes.some(c => 
+            c.entityId === entityId &&
+            c.generatedByUid === promoterUid &&
+            (c.status === 'redeemed' || c.status === 'used') &&
+            c.commissionStatus === 'unpaid' &&
+            Number(c.commissionGenerated ?? 0) > 0);
+
+        if (!hasAnyPending) {
+             throw new Error("No se encontraron comisiones pendientes de pago para esta campaña y promotor.");
+        }
+        
         const updatedCodes = originalCodes.map(code => {
             const commissionValue = Number(code.commissionGenerated ?? 0);
             
-            // This is the code to be settled, so its status is 'unpaid'
             if (
                 code.entityId === entityId &&
                 code.generatedByUid === promoterUid &&
+                (code.status === 'redeemed' || code.status === 'used') &&
                 code.commissionStatus === 'unpaid' &&
                 commissionValue > 0 &&
                 remainingAmountToSettle >= commissionValue
@@ -108,21 +119,9 @@ export async function POST(request: Request) {
         });
         
         if (settledCodeIds.length === 0) {
-            // Check if there are any pending commissions at all for this entity/promoter
-            const hasAnyPending = originalCodes.some(c => 
-                c.entityId === entityId &&
-                c.generatedByUid === promoterUid &&
-                c.commissionStatus === 'unpaid' &&
-                Number(c.commissionGenerated ?? 0) > 0);
-            
-            if (!hasAnyPending) {
-                 throw new Error("No se encontraron comisiones pendientes de pago para esta campaña y promotor.");
-            } else {
-                 throw new Error("El monto del pago no es suficiente para cubrir al menos una comisión pendiente.");
-            }
+             throw new Error("El monto del pago no es suficiente para cubrir al menos una comisión pendiente.");
         }
 
-        // Create the payment document
         transaction.set(paymentRef, {
             businessId,
             promoterUid,
@@ -135,7 +134,6 @@ export async function POST(request: Request) {
             settledCodeIds: settledCodeIds,
         });
         
-        // Update the entity with the modified codes
         transaction.update(entityRef, { generatedCodes: updatedCodes });
 
         return `Pago registrado exitosamente. Se liquidaron ${settledCodeIds.length} comisiones por un total de S/ ${totalSettledAmount.toFixed(2)}.`;

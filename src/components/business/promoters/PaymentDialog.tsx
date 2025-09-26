@@ -124,7 +124,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                         type="number"
                         step="0.01"
                         {...field}
-                        disabled={true} // Campo deshabilitado para evitar errores
+                        disabled={true} 
                         className="disabled:bg-muted/30 font-semibold"
                       />
                     </FormControl>
@@ -155,4 +155,3 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
     </Dialog>
   );
 }
-
