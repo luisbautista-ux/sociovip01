@@ -85,7 +85,7 @@ export default function PromoterCommissionsPage() {
       toast({ title: "Sin Datos", description: "No hay comisiones para exportar con el filtro actual." });
       return;
     }
-    const headers = ["Negocio", "Campaña", "QRs Usados", "Comisión Aplicada", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
+    const headers = ["Negocio", "Campaña", "QRs Validados", "Tarifa Comisión", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
     const rows = filteredCommissions.map(c => [
       c.businessName,
       c.entityName,
@@ -150,7 +150,8 @@ export default function PromoterCommissionsPage() {
                   <TableRow>
                     <TableHead>Campaña</TableHead>
                     <TableHead>Negocio</TableHead>
-                    <TableHead className="text-center">QRs Usados</TableHead>
+                    <TableHead className="text-center">QRs Validados</TableHead>
+                    <TableHead className="text-center">Tarifa Comisión</TableHead>
                     <TableHead className="text-right">Monto Pendiente</TableHead>
                     <TableHead className="text-right">Monto Pagado</TableHead>
                   </TableRow>
@@ -164,9 +165,9 @@ export default function PromoterCommissionsPage() {
                       </TableCell>
                       <TableCell>{comm.businessName}</TableCell>
                       <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
+                      <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
                       <TableCell className="text-right font-semibold text-destructive">
                           S/ {comm.commissionPending.toFixed(2)}
-                          <p className="text-xs text-muted-foreground font-normal">({comm.commissionRateApplied})</p>
                       </TableCell>
                       <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
                     </TableRow>
@@ -197,3 +198,4 @@ export default function PromoterCommissionsPage() {
     </div>
   );
 }
+

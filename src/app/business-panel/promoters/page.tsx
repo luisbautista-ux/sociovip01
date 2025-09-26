@@ -5,7 +5,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
-import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical, HandCoins, PiggyBank, CircleDollarSign, Ticket, Calendar } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical, HandCoins, PiggyBank, CircleDollarSign, Ticket, Calendar, BadgeCent } from "lucide-react";
 import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember, BusinessManagedEntity, GeneratedCode, BusinessPromoterLinkWithCommissions, PromoterPayment, PromoterCommissionEntry } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -380,12 +380,15 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
             if (!response.ok) throw new Error('Error al obtener los datos de comisiones.');
             
             const commissions: PromoterCommissionEntry[] = await response.json();
-            setCommissionData(commissions);
-
-            const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
-            const linksSnap = await getDocs(linksQuery);
-            const links = linksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
-            setLinksData(links);
+            
+            // Filter commissions to only include actual promoters from businessPromoterLinks
+            const promoterLinksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
+            const promoterLinksSnap = await getDocs(promoterLinksQuery);
+            const promoterLinks = promoterLinksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
+            const promoterUids = new Set(promoterLinks.map(link => link.platformUserUid));
+            
+            setLinksData(promoterLinks);
+            setCommissionData(commissions.filter(comm => promoterUids.has(comm.promoterId)));
 
         } catch (error: any) {
             console.error("Promoters Page: Failed to fetch data:", error);
@@ -721,7 +724,8 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                             <TableRow>
                                 <TableHead>Promotor</TableHead>
                                 <TableHead>Campaña</TableHead>
-                                <TableHead className="text-center">QRs Usados</TableHead>
+                                <TableHead className="text-center">QRs Validados</TableHead>
+                                <TableHead className="text-center">Tarifa Comisión</TableHead>
                                 <TableHead className="text-right">Monto Pendiente</TableHead>
                                 <TableHead className="text-right">Monto Pagado</TableHead>
                                 <TableHead className="text-center">Estado de Vínculo</TableHead>
@@ -740,9 +744,9 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                                             {comm.entityName}
                                         </TableCell>
                                         <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
+                                        <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
                                         <TableCell className="text-right font-semibold text-destructive">
                                           S/ {comm.commissionPending.toFixed(2)}
-                                          <p className="text-xs text-muted-foreground font-normal">({comm.commissionRateApplied})</p>
                                         </TableCell>
                                         <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
                                         <TableCell className="text-center">
@@ -787,7 +791,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                                     </TableRow>
                                 )})
                             ) : (
-                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No se encontraron promotores con comisiones para los filtros aplicados.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={8} className="h-24 text-center">No se encontraron promotores con comisiones para los filtros aplicados.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
@@ -886,5 +890,6 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
       </div>
     );
   }
+
 
 
