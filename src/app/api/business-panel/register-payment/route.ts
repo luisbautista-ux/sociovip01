@@ -65,115 +65,94 @@ export async function POST(request: Request) {
     const {promoterUid, amount: paymentAmount, notes} = validation.data;
     const businessId = callerProfile.businessId;
 
-    const batch = adminDb.batch();
+    const paymentRef = adminDb.collection('promoterPayments').doc();
 
-    const entitiesQuery = adminDb.collection('businessEntities').where('businessId', '==', businessId);
-    const entitiesSnap = await entitiesQuery.get();
+    await adminDb.runTransaction(async (transaction) => {
+      const entitiesQuery = adminDb.collection('businessEntities')
+          .where('businessId', '==', businessId)
+          .where('generatedCodes', '!=', null);
+          
+      const entitiesSnap = await transaction.get(entitiesQuery);
 
-    const unpaidCodes: { entityId: string; code: GeneratedCode, commission: number}[] = [];
-    let totalCommissionFound = 0;
+      const unpaidCodes: { entityId: string; entityRef: admin.firestore.DocumentReference; code: GeneratedCode, commission: number}[] = [];
+      let totalCommissionFound = 0;
 
-    for (const entityDoc of entitiesSnap.docs) {
-      const entity = {id: entityDoc.id, ...entityDoc.data()} as BusinessManagedEntity;
-      (entity.generatedCodes || []).forEach(code => {
-        if (
-          code.generatedByUid === promoterUid &&
-          code.status === 'used' &&
-          code.commissionStatus !== 'paid'
-        ) {
-          let commission = code.commissionGenerated || 0;
-           if (commission === 0) {
-              const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
+      for (const entityDocSnap of entitiesSnap.docs) {
+        const entityData = entityDocSnap.data() as BusinessManagedEntity;
+        (entityData.generatedCodes || []).forEach(code => {
+          if (code.generatedByUid === promoterUid && code.status === 'used' && code.commissionStatus !== 'paid') {
+            let commission = code.commissionGenerated || 0;
+            if (commission === 0) {
+              const promoterAssignment = (entityData.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
               const firstRule = promoterAssignment?.commissionRules?.[0];
               if (firstRule && firstRule.commissionType === 'fixed' && firstRule.commissionValue > 0) {
                 commission = firstRule.commissionValue;
               } else {
                 commission = DEFAULT_COMMISSION_PER_CODE;
               }
-           }
-           if (commission > 0) {
-              unpaidCodes.push({ entityId: entity.id, code, commission });
+            }
+            if (commission > 0) {
+              unpaidCodes.push({ entityId: entityDocSnap.id, entityRef: entityDocSnap.ref, code, commission });
               totalCommissionFound += commission;
-           }
-        }
-      });
-    }
-
-    if (totalCommissionFound < paymentAmount) {
-       console.warn(`Payment amount ${paymentAmount} is greater than pending commission ${totalCommissionFound} for promoter ${promoterUid}. Only paying what's due.`);
-    }
-    
-    if (unpaidCodes.length === 0) {
-        return NextResponse.json({error: 'No hay comisiones pendientes de pago para este promotor.'}, {status: 404});
-    }
-    
-    // Sort unpaid codes by date to pay the oldest first
-    unpaidCodes.sort((a,b) => {
+            }
+          }
+        });
+      }
+      
+      if (unpaidCodes.length === 0) {
+          throw new Error('No hay comisiones pendientes de pago para este promotor.');
+      }
+      
+      unpaidCodes.sort((a, b) => {
         const dateA = anyToDate(a.code.usedDate)?.getTime() || 0;
         const dateB = anyToDate(b.code.usedDate)?.getTime() || 0;
         return dateA - dateB;
-    });
+      });
 
-    let remainingAmountToSettle = paymentAmount;
-    const settledCodeIds: string[] = [];
+      let remainingAmountToSettle = paymentAmount;
+      const settledCodeIds: string[] = [];
+      const entityUpdates: Map<string, {ref: admin.firestore.DocumentReference, codesToUpdate: string[]}> = new Map();
 
-    for (const { entityId, code, commission } of unpaidCodes) {
-      if (remainingAmountToSettle >= commission) {
-        // Mark this code as paid
-        settledCodeIds.push(code.id);
-        remainingAmountToSettle -= commission;
-      } else {
-        // Stop when the payment amount is not enough to cover the next commission
-        break;
-      }
-    }
-    
-    if (settledCodeIds.length === 0) {
-        return NextResponse.json({error: `El monto S/ ${paymentAmount.toFixed(2)} es insuficiente para cubrir la comisión más antigua de S/ ${unpaidCodes[0].commission.toFixed(2)}.`}, {status: 400});
-    }
-
-    // Create Payment Record
-    const paymentRef = adminDb.collection('promoterPayments').doc();
-    batch.set(paymentRef, {
-      businessId,
-      promoterUid,
-      amountPaid: paymentAmount,
-      paymentDate: FieldValue.serverTimestamp(),
-      paidByUid: callerProfile.uid,
-      paidByName: callerProfile.name,
-      notes: notes || null,
-      settledCodeIds: settledCodeIds,
-    });
-
-    // Update Codes that have been settled
-    // Group codes by entity to reduce document reads/writes
-    const codesToUpdateByEntity: Record<string, string[]> = {};
-    settledCodeIds.forEach(codeId => {
-      const unpaidEntry = unpaidCodes.find(uc => uc.code.id === codeId);
-      if (unpaidEntry) {
-          if (!codesToUpdateByEntity[unpaidEntry.entityId]) {
-              codesToUpdateByEntity[unpaidEntry.entityId] = [];
+      for (const { entityId, entityRef, code, commission } of unpaidCodes) {
+        if (remainingAmountToSettle >= commission) {
+          settledCodeIds.push(code.id);
+          remainingAmountToSettle -= commission;
+          
+          if (!entityUpdates.has(entityId)) {
+            entityUpdates.set(entityId, { ref: entityRef, codesToUpdate: [] });
           }
-          codesToUpdateByEntity[unpaidEntry.entityId].push(codeId);
-      }
-    });
+          entityUpdates.get(entityId)!.codesToUpdate.push(code.id);
 
-    for (const entityId of Object.keys(codesToUpdateByEntity)) {
-        const entityRef = adminDb.collection('businessEntities').doc(entityId);
-        const entityDoc = await entityRef.get(); // Read the latest version
-        if (entityDoc.exists()) {
-            const entityData = entityDoc.data() as BusinessManagedEntity;
+        } else {
+          break;
+        }
+      }
+      
+      if (settledCodeIds.length === 0) {
+        throw new Error(`El monto S/ ${paymentAmount.toFixed(2)} es insuficiente para cubrir la comisión más antigua de S/ ${unpaidCodes[0].commission.toFixed(2)}.`);
+      }
+
+      transaction.set(paymentRef, {
+        businessId, promoterUid, amountPaid: paymentAmount,
+        paymentDate: FieldValue.serverTimestamp(),
+        paidByUid: callerProfile.uid, paidByName: callerProfile.name,
+        notes: notes || null, settledCodeIds: settledCodeIds,
+      });
+
+      for (const [entityId, updateInfo] of entityUpdates.entries()) {
+        const entityDocSnap = await transaction.get(updateInfo.ref);
+        if (entityDocSnap.exists) {
+            const entityData = entityDocSnap.data() as BusinessManagedEntity;
             const updatedCodes = (entityData.generatedCodes || []).map(c => {
-                if (codesToUpdateByEntity[entityId].includes(c.id)) {
+                if (updateInfo.codesToUpdate.includes(c.id)) {
                     return {...c, commissionStatus: 'paid', paymentId: paymentRef.id};
                 }
                 return c;
             });
-            batch.update(entityRef, { generatedCodes: updatedCodes });
+            transaction.update(updateInfo.ref, { generatedCodes: updatedCodes });
         }
-    }
-
-    await batch.commit();
+      }
+    });
 
     return NextResponse.json({
       success: true,
