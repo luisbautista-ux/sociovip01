@@ -68,19 +68,15 @@ export async function POST(request: Request) {
     const paymentRef = adminDb.collection('promoterPayments').doc();
 
     await adminDb.runTransaction(async (transaction) => {
-      // Simplified query to avoid composite index requirement
-      const entitiesQuery = adminDb.collection('businessEntities')
-          .where('businessId', '==', businessId);
-          
+      // 1. ALL READS FIRST
+      const entitiesQuery = adminDb.collection('businessEntities').where('businessId', '==', businessId);
       const entitiesSnap = await transaction.get(entitiesQuery);
 
       const unpaidCodes: { entityId: string; entityRef: admin.firestore.DocumentReference; code: GeneratedCode, commission: number}[] = [];
-      let totalCommissionFound = 0;
-
+      
       for (const entityDocSnap of entitiesSnap.docs) {
         const entityData = entityDocSnap.data() as BusinessManagedEntity;
         
-        // Manual check for generatedCodes existence
         if (!entityData.generatedCodes || entityData.generatedCodes.length === 0) {
             continue;
         }
@@ -99,7 +95,6 @@ export async function POST(request: Request) {
             }
             if (commission > 0) {
               unpaidCodes.push({ entityId: entityDocSnap.id, entityRef: entityDocSnap.ref, code, commission });
-              totalCommissionFound += commission;
             }
           }
         });
@@ -138,26 +133,33 @@ export async function POST(request: Request) {
         throw new Error(`El monto S/ ${paymentAmount.toFixed(2)} es insuficiente para cubrir la comisión más antigua de S/ ${unpaidCodes[0].commission.toFixed(2)}.`);
       }
 
+      // 2. ALL WRITES LAST
+
+      // Write the payment document
       transaction.set(paymentRef, {
         businessId, promoterUid, amountPaid: paymentAmount,
         paymentDate: FieldValue.serverTimestamp(),
         paidByUid: callerProfile.uid, paidByName: callerProfile.name,
         notes: notes || null, settledCodeIds: settledCodeIds,
       });
+      
+      // Update all affected entities
+      entitiesSnap.docs.forEach(docSnap => {
+          const entityId = docSnap.id;
+          if (entityUpdates.has(entityId)) {
+              const updateInfo = entityUpdates.get(entityId)!;
+              const entityData = docSnap.data() as BusinessManagedEntity;
+              
+              const updatedCodes = (entityData.generatedCodes || []).map(c => {
+                  if (updateInfo.codesToUpdate.includes(c.id)) {
+                      return {...c, commissionStatus: 'paid', paymentId: paymentRef.id};
+                  }
+                  return c;
+              });
 
-      for (const [entityId, updateInfo] of entityUpdates.entries()) {
-        const entityDocSnap = await transaction.get(updateInfo.ref);
-        if (entityDocSnap.exists()) {
-            const entityData = entityDocSnap.data() as BusinessManagedEntity;
-            const updatedCodes = (entityData.generatedCodes || []).map(c => {
-                if (updateInfo.codesToUpdate.includes(c.id)) {
-                    return {...c, commissionStatus: 'paid', paymentId: paymentRef.id};
-                }
-                return c;
-            });
-            transaction.update(updateInfo.ref, { generatedCodes: updatedCodes });
-        }
-      }
+              transaction.update(docSnap.ref, { generatedCodes: updatedCodes });
+          }
+      });
     });
 
     return NextResponse.json({
