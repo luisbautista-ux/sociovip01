@@ -14,6 +14,7 @@ import { useEffect, useMemo } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 const paymentFormSchema = z.object({
     notes: z.string().optional(),
