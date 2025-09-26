@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
     await adminDb.runTransaction(async (transaction) => {
         const entityDoc = await transaction.get(entityRef);
-        if (!entityDoc.exists) { // Corrected: changed from exists() to exists
+        if (!entityDoc.exists) {
             throw new Error("La entidad (promoción/evento) no fue encontrada.");
         }
         
@@ -83,7 +83,8 @@ export async function POST(request: Request) {
         let remainingAmountToSettle = paymentAmount;
         const updatedCodes = (entityData.generatedCodes || []).map(code => {
             if (remainingAmountToSettle > 0 && code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid' && (code.commissionGenerated ?? 0) > 0) {
-                // For simplicity, we only settle full commission amounts.
+                // Settle this commission if the payment amount covers it.
+                // We only settle full commission amounts for simplicity.
                 if (remainingAmountToSettle >= (code.commissionGenerated!)) {
                     remainingAmountToSettle -= code.commissionGenerated!;
                     settledCodeIds.push(code.id);
