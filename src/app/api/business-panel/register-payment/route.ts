@@ -7,7 +7,7 @@ import {z} from 'zod';
 import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
-import {FieldValue} from 'firebase-admin/firestore';
+import {FieldValue, getDocs} from 'firebase-admin/firestore';
 import { DEFAULT_COMMISSION_PER_CODE } from '@/lib/constants';
 
 const RegisterPaymentSchema = z.object({
