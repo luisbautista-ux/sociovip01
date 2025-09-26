@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
     await adminDb.runTransaction(async (transaction) => {
         const entityDoc = await transaction.get(entityRef);
-        if (!entityDoc.exists()) {
+        if (!entityDoc.exists) { // Corrected: changed from exists() to exists
             throw new Error("La entidad (promoción/evento) no fue encontrada.");
         }
         
