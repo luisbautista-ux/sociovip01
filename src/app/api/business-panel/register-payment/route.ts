@@ -81,22 +81,41 @@ export async function POST(request: Request) {
         }
         
         let remainingAmountToSettle = paymentAmount;
-        const updatedCodes = (entityData.generatedCodes || []).map(code => {
+        const originalCodes = entityData.generatedCodes || [];
+        const updatedCodes: GeneratedCode[] = [];
+        let totalPendingForEntity = 0;
+
+        for (const code of originalCodes) {
+            if (code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid' && (code.commissionGenerated ?? 0) > 0) {
+                totalPendingForEntity += code.commissionGenerated!;
+            }
+        }
+        
+        if (paymentAmount > totalPendingForEntity) {
+            throw new Error(`El monto de pago (S/ ${paymentAmount.toFixed(2)}) excede la deuda pendiente (S/ ${totalPendingForEntity.toFixed(2)}) para esta campaña.`);
+        }
+
+        for (const code of originalCodes) {
             if (remainingAmountToSettle > 0 && code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid' && (code.commissionGenerated ?? 0) > 0) {
-                // Settle this commission if the payment amount covers it.
-                // We only settle full commission amounts for simplicity.
                 if (remainingAmountToSettle >= (code.commissionGenerated!)) {
                     remainingAmountToSettle -= code.commissionGenerated!;
                     settledCodeIds.push(code.id);
-                    return {
+                    updatedCodes.push({
                         ...code,
                         commissionStatus: 'paid' as const,
                         paymentId: paymentRef.id,
-                    };
+                    });
+                } else {
+                    updatedCodes.push(code);
                 }
+            } else {
+                updatedCodes.push(code);
             }
-            return code;
-        });
+        }
+
+        if (settledCodeIds.length === 0) {
+            throw new Error("No se encontraron comisiones pendientes para liquidar con el monto especificado.");
+        }
 
         // Create the payment document
         transaction.set(paymentRef, {

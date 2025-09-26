@@ -206,7 +206,7 @@ export default function BusinessPromotersPage() {
 
             toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)}.` });
             setShowPaymentModal(false);
-            fetchData();
+            fetchData(); // Vuelve a cargar todos los datos
         } catch (error: any) {
             toast({ title: "Error al Registrar Pago", description: error.message, variant: "destructive" });
         } finally {
@@ -332,7 +332,7 @@ export default function BusinessPromotersPage() {
             />
         )}
         
-        {showPaymentModal && (
+        {showPaymentModal && promoterForPayment && (
             <PaymentDialog
                 open={showPaymentModal}
                 onOpenChange={setShowPaymentModal}

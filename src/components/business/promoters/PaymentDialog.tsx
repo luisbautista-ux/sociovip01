@@ -11,10 +11,10 @@ import { Loader2, CircleDollarSign, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription as UIDescription } from "@/components/ui/alert"; // Renamed to avoid conflict
+import { Alert, AlertDescription as UIDescription } from "@/components/ui/alert";
 
 const paymentFormSchema = z.object({
     entityId: z.string().min(1, "Debes seleccionar una campaña."),
@@ -61,24 +61,14 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
   }, [selectedEntityId, pendingCommissionsByEntity]);
 
   useEffect(() => {
-    if (open) {
+    if (open && promoter) {
       form.reset({
         entityId: "",
-        notes: `Pago de comisiones para ${promoter?.name || ""}.`,
+        notes: `Pago de comisiones para ${promoter.name}.`,
         amount: 0,
       });
     }
   }, [open, promoter, form]);
-
-  useEffect(() => {
-    // Add validation rule dynamically based on selected entity
-    form.register("amount", {
-      max: {
-        value: maxAmountForSelectedEntity,
-        message: `El monto no puede exceder la deuda pendiente de S/ ${maxAmountForSelectedEntity.toFixed(2)}.`
-      }
-    });
-  }, [maxAmountForSelectedEntity, form]);
 
 
   const handleSubmit = (values: PaymentFormValues) => {
@@ -151,7 +141,6 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                         step="0.01"
                         {...field}
                         disabled={isSubmitting}
-                        max={maxAmountForSelectedEntity}
                       />
                     </FormControl>
                     <FormDescription>
