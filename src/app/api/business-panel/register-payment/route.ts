@@ -68,6 +68,7 @@ export async function POST(request: Request) {
     const entityRef = adminDb.collection('businessEntities').doc(entityId);
     
     let settledCodeIds: string[] = [];
+    let totalSettledAmount = 0;
 
     await adminDb.runTransaction(async (transaction) => {
         const entityDoc = await transaction.get(entityRef);
@@ -82,18 +83,19 @@ export async function POST(request: Request) {
         
         let remainingAmountToSettle = paymentAmount;
         const originalCodes = entityData.generatedCodes || [];
-
+        
         const updatedCodes = originalCodes.map(code => {
             const commissionValue = Number(code.commissionGenerated ?? 0);
 
             if (
-                remainingAmountToSettle > 0 &&
+                code.entityId === entityId && // Correctly check the entityId
                 code.generatedByUid === promoterUid &&
                 code.commissionStatus === 'unpaid' &&
                 commissionValue > 0 &&
                 remainingAmountToSettle >= commissionValue
             ) {
                 remainingAmountToSettle -= commissionValue;
+                totalSettledAmount += commissionValue;
                 settledCodeIds.push(code.id);
                 return {
                     ...code,
@@ -101,11 +103,11 @@ export async function POST(request: Request) {
                     paymentId: paymentRef.id,
                 };
             }
-            return code; // Return the code unmodified if conditions are not met
+            return code; 
         });
         
         if (settledCodeIds.length === 0) {
-            throw new Error("No se encontraron comisiones pendientes que coincidan con los criterios de pago.");
+            throw new Error("No se encontraron comisiones pendientes que coincidan con los criterios de pago para esta campaña.");
         }
 
         // Create the payment document
@@ -113,7 +115,7 @@ export async function POST(request: Request) {
             businessId,
             promoterUid,
             entityId,
-            amountPaid: paymentAmount,
+            amountPaid: totalSettledAmount,
             paymentDate: FieldValue.serverTimestamp(),
             paidByUid: callerProfile.uid,
             paidByName: callerProfile.name,
@@ -128,7 +130,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       paymentId: paymentRef.id,
-      message: `Pago registrado exitosamente. Se liquidaron ${settledCodeIds.length} comisiones.`,
+      message: `Pago registrado exitosamente. Se liquidaron ${settledCodeIds.length} comisiones por un total de S/ ${totalSettledAmount.toFixed(2)}.`,
     });
 
   } catch (error: any) {
