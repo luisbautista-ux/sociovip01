@@ -9,6 +9,7 @@ import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/typ
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue} from 'firebase-admin/firestore';
 import { DEFAULT_COMMISSION_PER_CODE } from '@/lib/constants';
+import { anyToDate } from '@/lib/utils';
 
 const RegisterPaymentSchema = z.object({
   promoterUid: z.string().min(1, 'El UID del promotor es requerido.'),
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       return NextResponse.json({error: 'Datos inválidos.', details: validation.error.flatten()}, {status: 400});
     }
 
-    const {promoterUid, amount, notes} = validation.data;
+    const {promoterUid, amount: paymentAmount, notes} = validation.data;
     const businessId = callerProfile.businessId;
 
     const batch = adminDb.batch();
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
     const entitiesQuery = adminDb.collection('businessEntities').where('businessId', '==', businessId);
     const entitiesSnap = await entitiesQuery.get();
 
-    const codesToUpdate: { entityId: string; codeId: string }[] = [];
+    const unpaidCodes: { entityId: string; code: GeneratedCode, commission: number}[] = [];
     let totalCommissionFound = 0;
 
     for (const entityDoc of entitiesSnap.docs) {
@@ -80,7 +81,6 @@ export async function POST(request: Request) {
           code.status === 'used' &&
           code.commissionStatus !== 'paid'
         ) {
-          codesToUpdate.push({entityId: entity.id, codeId: code.id});
           let commission = code.commissionGenerated || 0;
            if (commission === 0) {
               const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
@@ -91,19 +91,45 @@ export async function POST(request: Request) {
                 commission = DEFAULT_COMMISSION_PER_CODE;
               }
            }
-           totalCommissionFound += commission;
+           if (commission > 0) {
+              unpaidCodes.push({ entityId: entity.id, code, commission });
+              totalCommissionFound += commission;
+           }
         }
       });
     }
 
-    if (totalCommissionFound < amount) {
-       // Optional: Decide if you want to throw an error or just pay what's due.
-       // For now, let's allow it but maybe log it.
-       console.warn(`Payment amount ${amount} is greater than pending commission ${totalCommissionFound} for promoter ${promoterUid}`);
+    if (totalCommissionFound < paymentAmount) {
+       console.warn(`Payment amount ${paymentAmount} is greater than pending commission ${totalCommissionFound} for promoter ${promoterUid}. Only paying what's due.`);
     }
     
-    if (codesToUpdate.length === 0) {
+    if (unpaidCodes.length === 0) {
         return NextResponse.json({error: 'No hay comisiones pendientes de pago para este promotor.'}, {status: 404});
+    }
+    
+    // Sort unpaid codes by date to pay the oldest first
+    unpaidCodes.sort((a,b) => {
+        const dateA = anyToDate(a.code.usedDate)?.getTime() || 0;
+        const dateB = anyToDate(b.code.usedDate)?.getTime() || 0;
+        return dateA - dateB;
+    });
+
+    let remainingAmountToSettle = paymentAmount;
+    const settledCodeIds: string[] = [];
+
+    for (const { entityId, code, commission } of unpaidCodes) {
+      if (remainingAmountToSettle >= commission) {
+        // Mark this code as paid
+        settledCodeIds.push(code.id);
+        remainingAmountToSettle -= commission;
+      } else {
+        // Stop when the payment amount is not enough to cover the next commission
+        break;
+      }
+    }
+    
+    if (settledCodeIds.length === 0) {
+        return NextResponse.json({error: `El monto S/ ${paymentAmount.toFixed(2)} es insuficiente para cubrir la comisión más antigua de S/ ${unpaidCodes[0].commission.toFixed(2)}.`}, {status: 400});
     }
 
     // Create Payment Record
@@ -111,30 +137,40 @@ export async function POST(request: Request) {
     batch.set(paymentRef, {
       businessId,
       promoterUid,
-      amountPaid: amount,
+      amountPaid: paymentAmount,
       paymentDate: FieldValue.serverTimestamp(),
       paidByUid: callerProfile.uid,
       paidByName: callerProfile.name,
       notes: notes || null,
-      settledCodeIds: codesToUpdate.map(c => c.codeId),
+      settledCodeIds: settledCodeIds,
     });
 
-    // Update Codes
-    const uniqueEntityIds = [...new Set(codesToUpdate.map(c => c.entityId))];
-    for (const entityId of uniqueEntityIds) {
-      const entityRef = adminDb.collection('businessEntities').doc(entityId);
-      // We need to read the document inside the transaction if we were using one.
-      // With a batch, we must be careful about read-then-write patterns.
-      // A safer but slower approach is to get each doc. A more complex approach is to use a transaction.
-      // For simplicity here, we assume the data hasn't changed since we queried it.
-      const entityData = entitiesSnap.docs.find(d => d.id === entityId)?.data() as BusinessManagedEntity;
-      const updatedCodes = (entityData.generatedCodes || []).map(c => {
-        if (codesToUpdate.some(u => u.codeId === c.id)) {
-          return {...c, commissionStatus: 'paid', paymentId: paymentRef.id};
+    // Update Codes that have been settled
+    // Group codes by entity to reduce document reads/writes
+    const codesToUpdateByEntity: Record<string, string[]> = {};
+    settledCodeIds.forEach(codeId => {
+      const unpaidEntry = unpaidCodes.find(uc => uc.code.id === codeId);
+      if (unpaidEntry) {
+          if (!codesToUpdateByEntity[unpaidEntry.entityId]) {
+              codesToUpdateByEntity[unpaidEntry.entityId] = [];
+          }
+          codesToUpdateByEntity[unpaidEntry.entityId].push(codeId);
+      }
+    });
+
+    for (const entityId of Object.keys(codesToUpdateByEntity)) {
+        const entityRef = adminDb.collection('businessEntities').doc(entityId);
+        const entityDoc = await entityRef.get(); // Read the latest version
+        if (entityDoc.exists()) {
+            const entityData = entityDoc.data() as BusinessManagedEntity;
+            const updatedCodes = (entityData.generatedCodes || []).map(c => {
+                if (codesToUpdateByEntity[entityId].includes(c.id)) {
+                    return {...c, commissionStatus: 'paid', paymentId: paymentRef.id};
+                }
+                return c;
+            });
+            batch.update(entityRef, { generatedCodes: updatedCodes });
         }
-        return c;
-      });
-      batch.update(entityRef, {generatedCodes: updatedCodes});
     }
 
     await batch.commit();
