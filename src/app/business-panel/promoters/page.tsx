@@ -1,9 +1,7 @@
 
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
 import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical, HandCoins, PiggyBank, CircleDollarSign } from "lucide-react";
@@ -563,58 +561,31 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     };
 
     const handleConfirmPayment = async (promoterUid: string, amount: number, notes?: string) => {
-        if (!currentBusinessId) return;
+        if (!currentBusinessId || !currentUser) {
+            toast({ title: "Error", description: "No se puede registrar el pago. Sesión o negocio no válido.", variant: "destructive" });
+            return;
+        }
         setIsSubmitting(true);
-        const batch = writeBatch(db);
 
         try {
-            // 1. Find all unpaid codes for this promoter in this business
-            const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId));
-            const entitiesSnap = await getDocs(entitiesQuery);
-            const codesToUpdate: {entityId: string, codeId: string}[] = [];
-            let totalCommissionToSettle = 0;
-
-            for (const entityDoc of entitiesSnap.docs) {
-                const entity = { id: entityDoc.id, ...entityDoc.data() } as BusinessManagedEntity;
-                const promoterCodes = (entity.generatedCodes || []).filter(
-                    c => c.generatedByUid === promoterUid &&
-                         c.commissionStatus !== 'paid' &&
-                         (c.status === 'redeemed' || c.status === 'used')
-                );
-                promoterCodes.forEach(code => {
-                    codesToUpdate.push({ entityId: entity.id, codeId: code.id });
-                    totalCommissionToSettle += code.commissionGenerated || 0;
-                });
-            }
-
-            // 2. Create a payment record
-            const paymentRef = doc(collection(db, "promoterPayments"));
-            batch.set(paymentRef, {
-                businessId: currentBusinessId,
-                promoterUid: promoterUid,
-                amountPaid: amount,
-                paymentDate: serverTimestamp(),
-                notes: notes || "",
-                settledCodeIds: codesToUpdate.map(c => c.codeId),
+            const idToken = await currentUser.getIdToken();
+            const response = await fetch('/api/business-panel/register-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    promoterUid,
+                    amount,
+                    notes,
+                }),
             });
-
-            // 3. Update the status of each settled code inside its entity
-            for (const { entityId, codeId } of codesToUpdate) {
-                const entityRef = doc(db, "businessEntities", entityId);
-                const entitySnap = await getDoc(entityRef); // Re-get inside transaction/batch logic
-                if (entitySnap.exists()) {
-                    const entityData = entitySnap.data() as BusinessManagedEntity;
-                    const updatedCodes = (entityData.generatedCodes || []).map(c => {
-                        if (c.id === codeId) {
-                            return { ...c, commissionStatus: 'paid', paymentId: paymentRef.id };
-                        }
-                        return c;
-                    });
-                    batch.update(entityRef, { generatedCodes: updatedCodes });
-                }
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Error en el servidor al registrar el pago.');
             }
 
-            await batch.commit();
             toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)}.` });
             fetchPromoterData();
             closeModal();
@@ -973,8 +944,3 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
       </div>
     );
   }
-
-    
-
-
-
