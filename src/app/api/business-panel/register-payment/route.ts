@@ -72,6 +72,10 @@ export async function POST(request: Request) {
       const entitiesQuery = adminDb.collection('businessEntities').where('businessId', '==', businessId);
       const entitiesSnap = await transaction.get(entitiesQuery);
 
+      if (entitiesSnap.empty) {
+        throw new Error('No se encontraron campañas para este negocio.');
+      }
+
       const unpaidCodes: { entityId: string; entityRef: admin.firestore.DocumentReference; code: GeneratedCode, commission: number}[] = [];
       
       for (const entityDocSnap of entitiesSnap.docs) {
@@ -112,7 +116,7 @@ export async function POST(request: Request) {
 
       let remainingAmountToSettle = paymentAmount;
       const settledCodeIds: string[] = [];
-      const entityUpdates: Map<string, {ref: admin.firestore.DocumentReference, codesToUpdate: string[]}> = new Map();
+      const entityUpdates: Map<string, {ref: admin.firestore.DocumentReference, originalData: BusinessManagedEntity, codesToUpdate: string[]}> = new Map();
 
       for (const { entityId, entityRef, code, commission } of unpaidCodes) {
         if (remainingAmountToSettle >= commission) {
@@ -120,7 +124,14 @@ export async function POST(request: Request) {
           remainingAmountToSettle -= commission;
           
           if (!entityUpdates.has(entityId)) {
-            entityUpdates.set(entityId, { ref: entityRef, codesToUpdate: [] });
+             const originalEntityDoc = entitiesSnap.docs.find(d => d.id === entityId);
+             if (originalEntityDoc) {
+                entityUpdates.set(entityId, { 
+                    ref: entityRef, 
+                    originalData: originalEntityDoc.data() as BusinessManagedEntity, 
+                    codesToUpdate: [] 
+                });
+             }
           }
           entityUpdates.get(entityId)!.codesToUpdate.push(code.id);
 
@@ -144,21 +155,14 @@ export async function POST(request: Request) {
       });
       
       // Update all affected entities
-      for (const docSnap of entitiesSnap.docs) {
-          const entityId = docSnap.id;
-          if (entityUpdates.has(entityId)) {
-              const updateInfo = entityUpdates.get(entityId)!;
-              const entityData = docSnap.data() as BusinessManagedEntity;
-              
-              const updatedCodes = (entityData.generatedCodes || []).map(c => {
-                  if (updateInfo.codesToUpdate.includes(c.id)) {
-                      return {...c, commissionStatus: 'paid', paymentId: paymentRef.id};
-                  }
-                  return c;
-              });
-
-              transaction.update(docSnap.ref, { generatedCodes: updatedCodes });
-          }
+      for (const [entityId, updateInfo] of entityUpdates.entries()) {
+          const updatedCodes = (updateInfo.originalData.generatedCodes || []).map(c => {
+              if (updateInfo.codesToUpdate.includes(c.id)) {
+                  return {...c, commissionStatus: 'paid', paymentId: paymentRef.id};
+              }
+              return c;
+          });
+          transaction.update(updateInfo.ref, { generatedCodes: updatedCodes });
       }
     });
 
