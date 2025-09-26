@@ -77,24 +77,7 @@ export default function BusinessPromotersPage() {
     }, [fetchData]);
 
     const filteredCommissionsDetails = useMemo(() => {
-        const promoterCommissionTotals = commissionData.reduce((acc, comm) => {
-            if (!acc[comm.promoterId]) {
-                acc[comm.promoterId] = {
-                    ...comm,
-                    commissionPending: 0,
-                    commissionPaid: 0,
-                    promoterCodesRedeemed: 0,
-                    entityName: 'Todas',
-                    entityType: 'promotion'
-                };
-            }
-            acc[comm.promoterId].commissionPending += comm.commissionPending;
-            acc[comm.promoterId].commissionPaid += comm.commissionPaid;
-            acc[comm.promoterId].promoterCodesRedeemed += comm.promoterCodesRedeemed;
-            return acc;
-        }, {} as Record<string, PromoterCommissionEntry>);
-
-        return Object.values(promoterCommissionTotals).filter(comm => 
+        return commissionData.filter(comm => 
             comm.promoterName.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [commissionData, searchTerm]);
@@ -334,3 +317,4 @@ export default function BusinessPromotersPage() {
       </div>
     );
   }
+
