@@ -143,46 +143,82 @@ export default function PromoterCommissionsPage() {
             <div className="min-h-[200px] flex items-center justify-center p-6">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
-          ) : filteredCommissions.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Campaña</TableHead>
-                    <TableHead>Negocio</TableHead>
-                    <TableHead className="text-center">QRs Validados</TableHead>
-                    <TableHead className="text-center">Tarifa Comisión</TableHead>
-                    <TableHead className="text-right">Monto Pendiente</TableHead>
-                    <TableHead className="text-right">Monto Pagado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCommissions.map((comm) => (
-                    <TableRow key={comm.id}>
-                      <TableCell className="font-medium flex items-center">
-                        {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
-                        {comm.entityName}
-                      </TableCell>
-                      <TableCell>{comm.businessName}</TableCell>
-                      <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
-                      <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
-                      <TableCell className="text-right font-semibold text-destructive">
-                          S/ {comm.commissionPending.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
           ) : (
-            <div className="min-h-[200px] flex flex-col items-center justify-center text-center p-6">
-              <Info className="h-16 w-16 text-primary/70 mb-4" />
-              <p className="font-semibold">No se encontraron comisiones.</p>
-              <p className="text-muted-foreground mt-2 max-w-md">
-                Puede que no estés asignado a ningún negocio o que aún no hayas generado comisiones.
-              </p>
-            </div>
+            <>
+              {/* Mobile View */}
+              <div className="md:hidden space-y-4">
+                {filteredCommissions.length > 0 ? (
+                  filteredCommissions.map((comm) => (
+                    <Card key={comm.id} className="overflow-hidden">
+                      <CardHeader className="p-4">
+                        <CardTitle className="text-base flex items-center">
+                            {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
+                            {comm.entityName}
+                        </CardTitle>
+                        <CardDescription className="text-xs">{comm.businessName}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <div className="font-semibold text-muted-foreground">QRs Validados</div>
+                        <div className="text-right">{comm.promoterCodesRedeemed}</div>
+                        <div className="font-semibold text-muted-foreground">Tarifa</div>
+                        <div className="text-right">{comm.commissionRateApplied}</div>
+                        <div className="font-semibold text-muted-foreground">Pendiente</div>
+                        <div className="text-right font-bold text-destructive">S/ {comm.commissionPending.toFixed(2)}</div>
+                        <div className="font-semibold text-muted-foreground">Pagado</div>
+                        <div className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="min-h-[200px] flex flex-col items-center justify-center text-center p-6">
+                    <Info className="h-16 w-16 text-primary/70 mb-4" />
+                    <p className="font-semibold">No se encontraron comisiones.</p>
+                    <p className="text-muted-foreground mt-2 max-w-md">No hay comisiones para el negocio seleccionado o aún no has generado ninguna.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Campaña</TableHead>
+                      <TableHead>Negocio</TableHead>
+                      <TableHead className="text-center">QRs Validados</TableHead>
+                      <TableHead className="text-center">Tarifa Comisión</TableHead>
+                      <TableHead className="text-right">Monto Pendiente</TableHead>
+                      <TableHead className="text-right">Monto Pagado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCommissions.length > 0 ? (
+                      filteredCommissions.map((comm) => (
+                        <TableRow key={comm.id}>
+                          <TableCell className="font-medium flex items-center">
+                            {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
+                            {comm.entityName}
+                          </TableCell>
+                          <TableCell>{comm.businessName}</TableCell>
+                          <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
+                          <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
+                          <TableCell className="text-right font-semibold text-destructive">
+                              S/ {comm.commissionPending.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="h-24 text-center">
+                          No se encontraron comisiones para los filtros aplicados.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
          <CardFooter className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t gap-4">
@@ -199,3 +235,6 @@ export default function PromoterCommissionsPage() {
   );
 }
 
+
+
+    

@@ -381,7 +381,6 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
             
             const commissions: PromoterCommissionEntry[] = await response.json();
             
-            // Filter commissions to only include actual promoters from businessPromoterLinks
             const promoterLinksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
             const promoterLinksSnap = await getDocs(promoterLinksQuery);
             const promoterLinks = promoterLinksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
@@ -718,7 +717,78 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                   No hay comisiones generadas por tus promotores.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                  {/* Mobile View */}
+                  <div className="md:hidden space-y-4">
+                    {filteredCommissionsDetails.length > 0 ? (
+                      filteredCommissionsDetails.map((comm) => {
+                        const link = linksData.find(l => l.platformUserUid === comm.promoterId);
+                        return (
+                          <Card key={comm.id} className="overflow-hidden">
+                            <CardHeader className="p-4">
+                              <CardTitle className="text-lg">{comm.promoterName}</CardTitle>
+                              <CardDescription className="flex items-center text-sm">
+                                {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
+                                {comm.entityName}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3 text-sm">
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Estado Vínculo</span>
+                                {link && (
+                                  <button onClick={() => handleTogglePromoterLinkStatus(link)} disabled={isSubmitting} className="p-0 m-0 h-auto bg-transparent">
+                                      <Badge variant={link.isActive ? "default" : "destructive"} className={cn(link.isActive ? 'bg-green-500' : '')}>
+                                        {link.isActive ? "Activo" : "Inactivo"}
+                                      </Badge>
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">QRs Validados</span>
+                                <span className="font-semibold">{comm.promoterCodesRedeemed}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Tarifa</span>
+                                <span className="font-medium">{comm.commissionRateApplied}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Pendiente</span>
+                                <span className="font-bold text-destructive">S/ {comm.commissionPending.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Pagado</span>
+                                <span className="font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</span>
+                              </div>
+                            </CardContent>
+                            <CardFooter className="p-2 bg-muted/50">
+                               <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" className="w-full">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem onClick={() => { setShowPaymentModal(true); setPromoterForPayment({ uid: comm.promoterId, name: comm.promoterName, pendingAmount: comm.commissionPending });}} disabled={isSubmitting || comm.commissionPending <= 0}><HandCoins className="mr-2 h-4 w-4"/>Registrar Pago</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => { setEditingPromoterLink(link || null); setModalStep('promoter_form');}} disabled={!link}><Edit className="mr-2 h-4 w-4"/>Editar Vínculo</DropdownMenuItem>
+                                    <DropdownMenuSeparator/>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground" disabled={!link}><Trash2 className="mr-2 h-4 w-4"/>Desvincular</DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar?</UIAlertDialogTitle><AlertDialogDescription>Se desvinculará a {link?.promoterName} de tu negocio.</AlertDialogDescription></AlertDialogHeader>
+                                            <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePromoterLink(link!)} className="bg-destructive hover:bg-destructive/90">Desvincular</AlertDialogAction></ShadcnAlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </DropdownMenuContent>
+                               </DropdownMenu>
+                            </CardFooter>
+                          </Card>
+                        )
+                      })
+                    ) : (
+                      <p className="text-center text-muted-foreground h-24 flex items-center justify-center">No se encontraron comisiones.</p>
+                    )}
+                  </div>
+
+                  {/* Desktop View */}
+                  <div className="hidden md:block overflow-x-auto">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -796,6 +866,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                         </TableBody>
                     </Table>
                 </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -893,3 +964,6 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
 
 
 
+
+
+    
