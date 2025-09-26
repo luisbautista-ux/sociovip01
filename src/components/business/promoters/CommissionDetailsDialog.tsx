@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Ticket, Loader2, Info, History } from "lucide-react";
+import { Calendar, Ticket, Loader2, Info, History, HandCoins } from "lucide-react";
 import type { PromoterCommissionEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +17,16 @@ interface CommissionDetailsDialogProps {
   promoterName: string;
   promoterUid: string;
   commissionEntries: PromoterCommissionEntry[];
+  onRegisterPaymentClick: () => void;
 }
 
-export function CommissionDetailsDialog({ open, onOpenChange, promoterName, promoterUid, commissionEntries }: CommissionDetailsDialogProps) {
+export function CommissionDetailsDialog({ open, onOpenChange, promoterName, promoterUid, commissionEntries, onRegisterPaymentClick }: CommissionDetailsDialogProps) {
 
-  const totalPending = commissionEntries.reduce((sum, c) => sum + c.commissionPending, 0);
-  const totalPaid = commissionEntries.reduce((sum, c) => sum + c.commissionPaid, 0);
+  const { totalPending, totalPaid } = useMemo(() => {
+      const pending = commissionEntries.reduce((sum, c) => sum + c.commissionPending, 0);
+      const paid = commissionEntries.reduce((sum, c) => sum + c.commissionPaid, 0);
+      return { totalPending: pending, totalPaid: paid };
+  }, [commissionEntries]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -58,46 +62,48 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
                     }) : <p className="text-center text-sm text-muted-foreground p-4">No hay comisiones.</p>}
                 </div>
                 {/* Desktop View for Commissions */}
-                <Table className="hidden md:table">
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Campaña</TableHead>
-                            <TableHead className="text-center">QRs Validados</TableHead>
-                            <TableHead className="text-center">Tarifa</TableHead>
-                            <TableHead className="text-right">Pendiente</TableHead>
-                            <TableHead className="text-right">Pagado</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {commissionEntries.length > 0 ? (
-                            commissionEntries.map((comm) => {
-                                return(
-                                <TableRow key={comm.id}>
-                                    <TableCell className="font-medium">
-                                        <div className="flex items-center">
-                                            {comm.entityType === 'event' ? <Calendar size={14} className="mr-2 text-muted-foreground"/> : <Ticket size={14} className="mr-2 text-muted-foreground"/>}
-                                            {comm.entityName}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-center">{comm.promoterCodesRedeemed}</TableCell>
-                                    <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
-                                    <TableCell className="text-right font-semibold text-destructive">
-                                        S/ {comm.commissionPending.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-semibold text-green-600">
-                                        S/ {comm.commissionPaid.toFixed(2)}
-                                    </TableCell>
-                                </TableRow>
-                            )})
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
-                                    No hay datos de comisión para este promotor.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+                <div className="hidden md:block">
+                  <Table>
+                      <TableHeader>
+                          <TableRow>
+                              <TableHead>Campaña</TableHead>
+                              <TableHead className="text-center">QRs Validados</TableHead>
+                              <TableHead className="text-center">Tarifa</TableHead>
+                              <TableHead className="text-right">Pendiente</TableHead>
+                              <TableHead className="text-right">Pagado</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {commissionEntries.length > 0 ? (
+                              commissionEntries.map((comm) => {
+                                  return(
+                                  <TableRow key={comm.id}>
+                                      <TableCell className="font-medium">
+                                          <div className="flex items-center">
+                                              {comm.entityType === 'event' ? <Calendar size={14} className="mr-2 text-muted-foreground"/> : <Ticket size={14} className="mr-2 text-muted-foreground"/>}
+                                              {comm.entityName}
+                                          </div>
+                                      </TableCell>
+                                      <TableCell className="text-center">{comm.promoterCodesRedeemed}</TableCell>
+                                      <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
+                                      <TableCell className="text-right font-semibold text-destructive">
+                                          S/ {comm.commissionPending.toFixed(2)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-semibold text-green-600">
+                                          S/ {comm.commissionPaid.toFixed(2)}
+                                      </TableCell>
+                                  </TableRow>
+                              )})
+                          ) : (
+                              <TableRow>
+                                  <TableCell colSpan={5} className="h-24 text-center">
+                                      No hay datos de comisión para este promotor.
+                                  </TableCell>
+                              </TableRow>
+                          )}
+                      </TableBody>
+                  </Table>
+                </div>
             </ScrollArea>
         </div>
 
@@ -106,11 +112,13 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
             <p>Total Pagado: <span className="text-green-600">S/ {totalPaid.toFixed(2)}</span></p>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+        <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+            <Button onClick={onRegisterPaymentClick} disabled={totalPending <= 0} variant="gradient">
+                <HandCoins className="mr-2 h-4 w-4"/> Registrar Pago
+            </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

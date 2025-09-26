@@ -190,74 +190,27 @@ export default function BusinessPromotersPage() {
     };
 
     const handleConfirmPayment = async (promoterUid: string, amount: number, notes: string | undefined, settledCommissionIds: string[]) => {
-      if (!currentUser || !currentBusinessId) return;
-      setIsSubmitting(true);
-      
-      const entitiesToUpdate: Map<string, { ref: any, codesToUpdate: string[] }> = new Map();
-      const allEntitiesSnap = await getDocs(query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId)));
-      const allEntities = allEntitiesSnap.docs.map(d => ({id: d.id, ...d.data()}) as any);
+        setIsSubmitting(true);
+        try {
+            if (!currentUser) throw new Error("No autenticado.");
 
-      // This logic is getting complex client-side. The API should handle it.
-      // Refactoring to send minimal info to API.
-      // API will receive amount and list of commission entries to settle.
-      
-      try {
-        const idToken = await currentUser.getIdToken();
-        // The API now needs to know which codes to update.
-        // The 'settledCommissionIds' is not granular enough.
-        // Let's pass the actual `GeneratedCode` IDs that are covered by the payment.
-        
-        const pendingCodesToSettle: string[] = [];
-        let tempAmount = amount;
-
-        // Get all pending codes for this promoter, sorted by date.
-        const allPendingCodes: (GeneratedCode & {entityId: string})[] = [];
-        for (const entity of allEntities) {
-            (entity.generatedCodes || []).forEach((code: GeneratedCode) => {
-                if (code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid' && code.usedDate) {
-                    allPendingCodes.push({...code, entityId: entity.id});
-                }
+            const response = await fetch('/api/business-panel/register-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await currentUser.getIdToken()}` },
+                body: JSON.stringify({ promoterUid, amount, notes, settledCommissionIds }),
             });
+            const result = await response.json();
+
+            if (!response.ok) throw new Error(result.error || 'Ocurrió un error en el servidor.');
+
+            toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)}.` });
+            setShowPaymentModal(false);
+            fetchData();
+        } catch (error: any) {
+            toast({ title: "Error al Registrar Pago", description: error.message, variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
         }
-        allPendingCodes.sort((a,b) => new Date(a.usedDate!).getTime() - new Date(b.usedDate!).getTime());
-
-        for (const code of allPendingCodes) {
-            const commission = code.commissionGenerated ?? DEFAULT_COMMISSION_PER_CODE;
-            if (tempAmount >= commission) {
-                pendingCodesToSettle.push(code.id);
-                tempAmount -= commission;
-            } else {
-                break;
-            }
-        }
-
-        if (pendingCodesToSettle.length === 0) {
-            throw new Error("El monto es insuficiente para cubrir cualquier comisión pendiente.");
-        }
-
-        const response = await fetch('/api/business-panel/register-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-          body: JSON.stringify({
-            promoterUid,
-            amount,
-            notes,
-            settledCodeIds: pendingCodesToSettle,
-          }),
-        });
-
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Error en el servidor al registrar el pago.');
-        
-        toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)} y se liquidaron ${pendingCodesToSettle.length} comisiones.` });
-        setShowPaymentModal(false);
-        fetchData();
-
-      } catch (error: any) {
-        toast({ title: "Error al Registrar Pago", description: error.message, variant: "destructive" });
-      } finally {
-        setIsSubmitting(false);
-      }
     };
     
     const handleDeletePromoterLink = async (link: BusinessPromoterLink) => {
@@ -331,7 +284,6 @@ export default function BusinessPromotersPage() {
                 <PromoterMobileCards
                   promoters={filteredPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
-                  onRegisterPayment={handleOpenPaymentDialog}
                   onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
                   onDeleteLink={handleDeletePromoterLink}
@@ -340,7 +292,6 @@ export default function BusinessPromotersPage() {
                 <PromotersTable
                   promoters={filteredPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
-                  onRegisterPayment={handleOpenPaymentDialog}
                   onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
                   onDeleteLink={handleDeletePromoterLink}
@@ -392,14 +343,27 @@ export default function BusinessPromotersPage() {
         {showDetailsModal && promoterForDetails && (
             <CommissionDetailsDialog
                 open={showDetailsModal}
-                onOpenChange={setShowDetailsModal}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) setPromoterForDetails(null);
+                    setShowDetailsModal(isOpen);
+                }}
                 promoterName={promoterForDetails.name}
                 promoterUid={promoterForDetails.uid}
                 commissionEntries={promoterForDetails.commissions}
+                onRegisterPaymentClick={() => {
+                    const promoterLink = consolidatedPromotersData.find(p => p.platformUserUid === promoterForDetails.uid);
+                    if (promoterLink) {
+                        setShowDetailsModal(false);
+                        handleOpenPaymentDialog({
+                            uid: promoterLink.platformUserUid!,
+                            name: promoterLink.promoterName,
+                            pendingAmount: promoterLink.pendingAmount
+                        });
+                    }
+                }}
             />
         )}
 
       </div>
     );
   }
-

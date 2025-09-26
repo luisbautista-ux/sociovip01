@@ -11,14 +11,13 @@ import { cn } from "@/lib/utils";
 interface PromotersTableProps {
   promoters: BusinessPromoterLinkWithCommissions[];
   onToggleStatus: (link: BusinessPromoterLinkWithCommissions) => void;
-  onRegisterPayment: (promoter: { uid: string, name: string, pendingAmount: number }) => void;
   onViewDetails: (promoter: BusinessPromoterLinkWithCommissions) => void;
   onEditLink: (link: BusinessPromoterLinkWithCommissions) => void;
   onDeleteLink: (link: BusinessPromoterLinkWithCommissions) => void;
   isSubmitting: boolean;
 }
 
-export function PromotersTable({ promoters, onToggleStatus, onRegisterPayment, onViewDetails, onEditLink, onDeleteLink, isSubmitting }: PromotersTableProps) {
+export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEditLink, onDeleteLink, isSubmitting }: PromotersTableProps) {
   if (promoters.length === 0) {
     return (
         <div className="hidden md:block text-center h-24 md:flex md:items-center md:justify-center">
@@ -69,12 +68,6 @@ export function PromotersTable({ promoters, onToggleStatus, onRegisterPayment, o
                           <>
                           <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" onClick={() => onViewDetails(promoter)} disabled={isSubmitting}>
                               <ListChecks className="mr-1 h-3 w-3" /> Detalles
-                          </Button>
-                          <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" 
-                              onClick={() => onRegisterPayment({ uid: promoter.platformUserUid!, name: promoter.promoterName, pendingAmount: promoter.pendingAmount })}
-                              disabled={isSubmitting || promoter.pendingAmount <= 0}
-                          >
-                              <HandCoins className="mr-1 h-3 w-3" /> Pagar
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => onEditLink(promoter)} disabled={isSubmitting}>
                             <Edit className="h-4 w-4" />

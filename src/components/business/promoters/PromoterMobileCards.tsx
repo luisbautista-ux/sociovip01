@@ -12,14 +12,13 @@ import type { BusinessPromoterLinkWithCommissions } from "@/lib/types";
 interface PromoterMobileCardsProps {
   promoters: BusinessPromoterLinkWithCommissions[];
   onToggleStatus: (link: BusinessPromoterLinkWithCommissions) => void;
-  onRegisterPayment: (promoter: { uid: string, name: string, pendingAmount: number }) => void;
   onViewDetails: (promoter: BusinessPromoterLinkWithCommissions) => void;
   onEditLink: (link: BusinessPromoterLinkWithCommissions) => void;
   onDeleteLink: (link: BusinessPromoterLinkWithCommissions) => void;
   isSubmitting: boolean;
 }
 
-export function PromoterMobileCards({ promoters, onToggleStatus, onRegisterPayment, onViewDetails, onEditLink, onDeleteLink, isSubmitting }: PromoterMobileCardsProps) {
+export function PromoterMobileCards({ promoters, onToggleStatus, onViewDetails, onEditLink, onDeleteLink, isSubmitting }: PromoterMobileCardsProps) {
   if (promoters.length === 0) {
     return (
       <div className="md:hidden text-center h-24 flex items-center justify-center">
@@ -53,8 +52,7 @@ export function PromoterMobileCards({ promoters, onToggleStatus, onRegisterPayme
                <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="ghost" className="w-full">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => onViewDetails(promoter)} disabled={isSubmitting}><ListChecks className="mr-2 h-4 w-4"/>Ver Detalles</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onRegisterPayment({ uid: promoter.platformUserUid!, name: promoter.promoterName, pendingAmount: promoter.pendingAmount })} disabled={isSubmitting || promoter.pendingAmount <= 0}><HandCoins className="mr-2 h-4 w-4"/>Registrar Pago</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onViewDetails(promoter)} disabled={isSubmitting}><ListChecks className="mr-2 h-4 w-4"/>Ver Detalles de Comisión</DropdownMenuItem>
                     <DropdownMenuSeparator/>
                     <DropdownMenuItem onClick={() => onEditLink(promoter)}><Edit className="mr-2 h-4 w-4"/>Editar Vínculo</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onToggleStatus(promoter)}>{promoter.isActive ? <ShieldX className="mr-2 h-4 w-4 text-destructive" /> : <ShieldCheck className="mr-2 h-4 w-4 text-green-600" />} {promoter.isActive ? 'Desactivar Vínculo' : 'Activar Vínculo'}</DropdownMenuItem>
