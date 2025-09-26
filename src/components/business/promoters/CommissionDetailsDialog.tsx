@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -22,7 +21,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, comm
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Detalle de Comisiones para: {promoterName}</DialogTitle>
           <DialogDescription>
@@ -36,6 +35,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, comm
                     <TableRow>
                         <TableHead>Campaña</TableHead>
                         <TableHead className="text-center">QRs Validados</TableHead>
+                        <TableHead className="text-center">Tarifa Comisión</TableHead>
                         <TableHead className="text-right">Monto Pendiente</TableHead>
                         <TableHead className="text-right">Monto Pagado</TableHead>
                     </TableRow>
@@ -51,6 +51,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, comm
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-center">{comm.promoterCodesRedeemed}</TableCell>
+                                <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
                                 <TableCell className="text-right font-semibold text-destructive">
                                     S/ {comm.commissionPending.toFixed(2)}
                                 </TableCell>
@@ -61,7 +62,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, comm
                         ))
                     ) : (
                         <TableRow>
-                            <TableCell colSpan={4} className="h-24 text-center">
+                            <TableCell colSpan={5} className="h-24 text-center">
                                 No hay datos de comisión para este promotor.
                             </TableCell>
                         </TableRow>
