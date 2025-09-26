@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter } from "@/components/ui/dialog"; 
-import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical, HandCoins, PiggyBank, CircleDollarSign } from "lucide-react";
-import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember, BusinessManagedEntity, GeneratedCode, BusinessPromoterLinkWithCommissions, PromoterPayment } from "@/lib/types";
+import { PlusCircle, Edit, Trash2, Search, UserPlus, Percent, ShieldCheck, ShieldX, Loader2, AlertTriangle, Info, MoreVertical, HandCoins, PiggyBank, CircleDollarSign, Ticket, Calendar } from "lucide-react";
+import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PlatformUser, QrClient, SocioVipMember, BusinessManagedEntity, GeneratedCode, BusinessPromoterLinkWithCommissions, PromoterPayment, PromoterCommissionEntry } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -261,7 +262,7 @@ type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  promoter: BusinessPromoterLinkWithCommissions | null;
+  promoter: { name: string; uid: string; pendingAmount: number } | null;
   onConfirmPayment: (promoterUid: string, amount: number, notes?: string) => Promise<void>;
   isSubmitting: boolean;
 }
@@ -275,14 +276,14 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     if (promoter) {
       form.reset({
         amount: promoter.pendingAmount,
-        notes: `Pago de comisiones a ${promoter.promoterName}.`,
+        notes: `Pago de comisiones a ${promoter.name}.`,
       });
     }
   }, [promoter, form]);
 
   const handleSubmit = (values: PaymentFormValues) => {
-    if (promoter?.platformUserUid) {
-      onConfirmPayment(promoter.platformUserUid, values.amount, values.notes);
+    if (promoter?.uid) {
+      onConfirmPayment(promoter.uid, values.amount, values.notes);
     }
   };
   
@@ -292,7 +293,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     <UIDialog open={open} onOpenChange={onOpenChange}>
       <UIDialogContent>
         <UIDialogHeader>
-          <UIDialogTitle>Registrar Pago a {promoter.promoterName}</UIDialogTitle>
+          <UIDialogTitle>Registrar Pago a {promoter.name}</UIDialogTitle>
           <UIDialogDescription>
             El monto pendiente actual es de S/ {promoter.pendingAmount.toFixed(2)}. Puedes registrar un pago parcial o total.
           </UIDialogDescription>
@@ -341,7 +342,8 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     const currentBusinessId = userProfile?.businessId;
 
     const [searchTerm, setSearchTerm] = useState("");
-    const [promoterLinks, setPromoterLinks] = useState<BusinessPromoterLinkWithCommissions[]>([]);
+    const [commissionData, setCommissionData] = useState<PromoterCommissionEntry[]>([]);
+    const [linksData, setLinksData] = useState<BusinessPromoterLink[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
@@ -354,7 +356,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     const [promoterLinkToEditFromAlert, setPromoterLinkToEditFromAlert] = useState<BusinessPromoterLink | null>(null);
-    const [promoterForPayment, setPromoterForPayment] = useState<BusinessPromoterLinkWithCommissions | null>(null);
+    const [promoterForPayment, setPromoterForPayment] = useState<{ name: string; uid: string; pendingAmount: number } | null>(null);
 
 
     const dniEntryForm = useForm<DniEntryValues>({
@@ -363,9 +365,8 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
     });
     const watchedDocType = dniEntryForm.watch('docType');
 
-    const fetchPromoterData = useCallback(async () => {
+    const fetchData = useCallback(async () => {
         if (!currentBusinessId || !currentUser) {
-            setPromoterLinks([]);
             setIsLoading(false);
             return;
         }
@@ -374,39 +375,66 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
             const idToken = await currentUser.getIdToken();
             const response = await fetch('/api/business-panel/get-commissions-summary', {
                 method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${idToken}`,
-                },
+                headers: { 'Authorization': `Bearer ${idToken}` },
             });
+            if (!response.ok) throw new Error('Error al obtener los datos de comisiones.');
+            
+            const commissions: PromoterCommissionEntry[] = await response.json();
+            setCommissionData(commissions);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Error al obtener los datos de comisiones.');
-            }
-
-            const data: BusinessPromoterLinkWithCommissions[] = await response.json();
-            setPromoterLinks(data.sort((a,b) => a.promoterName.localeCompare(b.promoterName)));
+            const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
+            const linksSnap = await getDocs(linksQuery);
+            const links = linksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
+            setLinksData(links);
 
         } catch (error: any) {
-            console.error("Promoters Page: Failed to fetch promoter data from API:", error);
-            toast({ title: "Error al Cargar Promotores", description: `No se pudieron obtener los datos. ${error.message}`, variant: "destructive" });
+            console.error("Promoters Page: Failed to fetch data:", error);
+            toast({ title: "Error al Cargar Datos", description: `No se pudieron obtener los datos. ${error.message}`, variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
     }, [currentBusinessId, currentUser, toast]);
 
     useEffect(() => {
-      fetchPromoterData();
-    }, [fetchPromoterData]);
+      fetchData();
+    }, [fetchData]);
 
 
-    const filteredPromoters = useMemo(() => {
-      return promoterLinks.filter(link =>
-        (link.promoterName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (link.promoterEmail?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (link.promoterDni?.includes(searchTerm))
-      );
-    }, [promoterLinks, searchTerm]);
+    const aggregatedCommissions = useMemo(() => {
+      const promoterMap = new Map<string, { promoterName: string; pending: number; paid: number; links: BusinessPromoterLink[] }>();
+
+      linksData.forEach(link => {
+          if (link.platformUserUid) {
+              if (!promoterMap.has(link.platformUserUid)) {
+                  promoterMap.set(link.platformUserUid, {
+                      promoterName: link.promoterName,
+                      pending: 0,
+                      paid: 0,
+                      links: []
+                  });
+              }
+              promoterMap.get(link.platformUserUid)!.links.push(link);
+          }
+      });
+      
+      commissionData.forEach(entry => {
+        if (promoterMap.has(entry.promoterId)) {
+          const promoter = promoterMap.get(entry.promoterId)!;
+          promoter.pending += entry.commissionPending;
+          promoter.paid += entry.commissionPaid;
+        }
+      });
+      
+      return Array.from(promoterMap.entries()).map(([uid, data]) => ({ uid, ...data }));
+    }, [commissionData, linksData]);
+    
+    const filteredCommissionsDetails = useMemo(() => {
+        return commissionData.filter(comm => 
+            comm.promoterName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            comm.entityName.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [commissionData, searchTerm]);
+
 
     const checkDniForPromoterAndLink = async (dni: string, businessIdToCheck: string): Promise<InitialDataForPromoterLink> => {
       let result: InitialDataForPromoterLink = { dni };
@@ -552,7 +580,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
         }
         
         closeModal();
-        fetchPromoterData();
+        fetchData();
       } catch (error: any) {
         console.error("Promoters Page: Failed to add/edit promoter link:", error);
         toast({ title: "Error al Guardar", description: `No se pudo procesar la solicitud. ${error.message}`, variant: "destructive"});
@@ -588,7 +616,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
             }
 
             toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)}.` });
-            fetchPromoterData();
+            fetchData();
             closeModal();
         } catch (error: any) {
             console.error("Error confirming payment:", error);
@@ -609,7 +637,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                 description: `${link.promoterName || 'El promotor'} ha sido desvinculado de tu negocio.`,
                 variant: "destructive"
             });
-            fetchPromoterData();
+            fetchData();
         } catch (error: any) {
             console.error("Promoters Page: Failed to delete promoter link:", error);
             toast({
@@ -630,7 +658,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
       try {
         await updateDoc(doc(db, "businessPromoterLinks", link.id), { isActive: newStatus });
         toast({ title: `Estado Actualizado`, description: `El promotor ${link.promoterName} ahora está ${newStatus ? 'activo' : 'inactivo'}.` });
-        fetchPromoterData(); 
+        fetchData(); 
       } catch (error: any) {
         console.error("Promoters Page: Failed to toggle promoter link status:", error);
         toast({ title: "Error al Actualizar Estado", description: `No se pudo cambiar el estado del promotor. ${error.message}`, variant: "destructive"});
@@ -662,13 +690,13 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
         {currentBusinessId && (
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Mis Promotores Vinculados</CardTitle>
-              <CardDescription>Gestiona tus promotores y sus comisiones pendientes y pagadas.</CardDescription>
+              <CardTitle>Detalle de Comisiones por Promotor y Campaña</CardTitle>
+              <CardDescription>Gestiona tus promotores y sus comisiones pendientes y pagadas por cada campaña.</CardDescription>
               <div className="relative mt-4">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Buscar por nombre, email o DNI del promotor..."
+                  placeholder="Buscar por nombre de promotor o campaña..."
                   className="pl-8 w-full sm:w-[300px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -682,169 +710,83 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
                   <p className="ml-4 text-lg text-muted-foreground">Cargando promotores...</p>
                 </div>
-              ) : promoterLinks.length === 0 && !searchTerm ? (
+              ) : commissionData.length === 0 && !searchTerm ? (
                 <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
-                  No hay promotores vinculados. Haz clic en "Añadir/Vincular Promotor" para empezar.
+                  No hay comisiones generadas por tus promotores.
                 </p>
               ) : (
-                <>
-                {/* Mobile View */}
-                <div className="md:hidden space-y-4">
-                  {filteredPromoters.length > 0 ? (
-                    filteredPromoters.map((link) => (
-                      <Card key={link.id} className="overflow-hidden">
-                         <CardHeader className="p-4">
-                            <CardTitle className="text-lg">{link.promoterName}</CardTitle>
-                            <CardDescription>{link.promoterEmail}</CardDescription>
-                         </CardHeader>
-                         <CardContent className="p-4 space-y-3 text-sm">
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground">Monto Pendiente</span>
-                                <span className="font-semibold text-lg text-destructive">S/ {link.pendingAmount.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-muted-foreground">Monto Pagado</span>
-                                <span className="font-semibold text-lg text-green-600">S/ {link.paidAmount.toFixed(2)}</span>
-                            </div>
-                         </CardContent>
-                         <CardFooter className="p-2 bg-muted/50">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="w-full justify-center">
-                                    Acciones <MoreVertical className="ml-2 h-4 w-4"/>
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                  <DropdownMenuItem 
-                                    onClick={() => { setPromoterForPayment(link); setShowPaymentModal(true); }}
-                                    disabled={isSubmitting || link.pendingAmount <= 0}
-                                  >
-                                    <HandCoins className="mr-2 h-4 w-4" /> Registrar Pago
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => handleTogglePromoterLinkStatus(link)} 
-                                    disabled={isSubmitting}
-                                    className={cn(link.isActive ? "text-yellow-600 focus:text-yellow-700" : "text-green-600 focus:text-green-700")}
-                                   >
-                                    {link.isActive ? <ShieldX className="mr-2 h-4 w-4"/> : <ShieldCheck className="mr-2 h-4 w-4"/>}
-                                    {link.isActive ? "Desactivar" : "Activar"}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} 
-                                    disabled={isSubmitting}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" /> Editar Vínculo
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator/>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground">
-                                          <Trash2 className="h-4 w-4 mr-2" /> Desvincular Promotor
-                                      </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <UIAlertDialogTitle>¿Confirmar desvinculación?</UIAlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Se desvinculará a "{link.promoterName}" de tu negocio. Esto no eliminará su perfil de la plataforma.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <ShadcnAlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeletePromoterLink(link)} className="bg-destructive hover:bg-destructive/90">Desvincular</AlertDialogAction>
-                                      </ShadcnAlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                         </CardFooter>
-                      </Card>
-                    ))
-                  ) : (
-                    <div className="text-center h-24 flex items-center justify-center">
-                      <p>No se encontraron promotores con los filtros aplicados.</p>
-                    </div>
-                  )}
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Promotor</TableHead>
+                                <TableHead>Campaña</TableHead>
+                                <TableHead className="text-right">Monto Pendiente</TableHead>
+                                <TableHead className="text-right">Monto Pagado</TableHead>
+                                <TableHead className="text-center">Estado de Vínculo</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredCommissionsDetails.length > 0 ? (
+                                filteredCommissionsDetails.map((comm) => {
+                                    const link = linksData.find(l => l.platformUserUid === comm.promoterId);
+                                    return (
+                                    <TableRow key={comm.id}>
+                                        <TableCell className="font-medium">{comm.promoterName}</TableCell>
+                                        <TableCell className="text-sm text-muted-foreground flex items-center">
+                                            {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
+                                            {comm.entityName}
+                                        </TableCell>
+                                        <TableCell className="text-right font-semibold text-destructive">S/ {comm.commissionPending.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
+                                        <TableCell className="text-center">
+                                            {link && (
+                                                <Button 
+                                                  variant="ghost" 
+                                                  size="sm" 
+                                                  onClick={() => handleTogglePromoterLinkStatus(link)}
+                                                  className={cn("text-xs px-2 py-1 h-auto", link.isActive ? "text-green-600 hover:text-green-700" : "text-red-600 hover:text-red-700")}
+                                                  disabled={isSubmitting}
+                                                >
+                                                  {link.isActive ? <ShieldCheck className="mr-1 h-4 w-4"/> : <ShieldX className="mr-1 h-4 w-4"/>}
+                                                  {link.isActive ? "Activo" : "Inactivo"}
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right space-x-1">
+                                            {link && (
+                                                <>
+                                                <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" 
+                                                    onClick={() => setPromoterForPayment({ uid: comm.promoterId, name: comm.promoterName, pendingAmount: comm.commissionPending })}
+                                                    disabled={isSubmitting || comm.commissionPending <= 0}
+                                                >
+                                                    <HandCoins className="mr-1 h-3 w-3" /> Pagar
+                                                </Button>
+                                                <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
+                                                  <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <AlertDialog>
+                                                  <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                                  <AlertDialogContent>
+                                                    <AlertDialogHeader><UIAlertDialogTitle>¿Seguro?</UIAlertDialogTitle><AlertDialogDescription>Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span>.</AlertDialogDescription></AlertDialogHeader>
+                                                    <ShadcnAlertDialogFooter>
+                                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                      <AlertDialogAction onClick={() => handleDeletePromoterLink(link)} className="bg-destructive hover:bg-destructive/90">Desvincular</AlertDialogAction>
+                                                    </ShadcnAlertDialogFooter>
+                                                  </AlertDialogContent>
+                                                </AlertDialog>
+                                                </>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                )})
+                            ) : (
+                                <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron promotores con comisiones para los filtros aplicados.</TableCell></TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
                 </div>
-                {/* Desktop View */}
-                <div className="hidden md:block overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nombre Promotor</TableHead>
-                      <TableHead>Monto Pendiente</TableHead>
-                      <TableHead>Monto Pagado</TableHead>
-                      <TableHead className="text-center">Estado</TableHead>
-                      <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPromoters.length > 0 ? (
-                      filteredPromoters.map((link) => (
-                        <TableRow key={link.id}>
-                          <TableCell className="font-medium">{link.promoterName || "N/A"}</TableCell>
-                          <TableCell className="font-semibold text-destructive">S/ {link.pendingAmount.toFixed(2)}</TableCell>
-                          <TableCell className="text-green-600">S/ {link.paidAmount.toFixed(2)}</TableCell>
-                          <TableCell className="text-center">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleTogglePromoterLinkStatus(link)}
-                              className={cn("text-xs px-2 py-1 h-auto", link.isActive ? "text-green-600 hover:text-green-700" : "text-red-600 hover:text-red-700")}
-                              disabled={isSubmitting}
-                            >
-                              {link.isActive ? <ShieldCheck className="mr-1 h-4 w-4"/> : <ShieldX className="mr-1 h-4 w-4"/>}
-                              {link.isActive ? "Activo" : "Inactivo"}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="text-right space-x-1">
-                             <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" onClick={() => { setPromoterForPayment(link); setShowPaymentModal(true); }} disabled={isSubmitting || link.pendingAmount <= 0}>
-                               <HandCoins className="mr-1 h-3 w-3" /> Registrar Pago
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => { setEditingPromoterLink(link); setModalStep('promoter_form'); }} disabled={isSubmitting}>
-                              <Edit className="h-4 w-4" />
-                              <span className="sr-only">Editar</span>
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
-                                  <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Desvincular</span>
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <UIAlertDialogTitle>¿Seguro que quieres desvincular?</UIAlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta acción desvinculará al promotor <span className="font-semibold">{link.promoterName}</span> de tu negocio.
-                                    No se eliminará su perfil global (si lo tiene).
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <ShadcnAlertDialogFooter>
-                                  <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeletePromoterLink(link)}
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    disabled={isSubmitting}
-                                  >
-                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                    Desvincular
-                                  </AlertDialogAction>
-                                </ShadcnAlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center h-24">No se encontraron promotores con los filtros aplicados.</TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-                </div>
-                </>
               )}
             </CardContent>
           </Card>
@@ -945,5 +887,3 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
       </div>
     );
   }
-
-    

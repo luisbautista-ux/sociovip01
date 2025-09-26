@@ -3,27 +3,25 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, Download, Info, Loader2, Calendar, Briefcase, Hash, BadgeCent } from "lucide-react";
+import { DollarSign, Download, Info, Loader2, Calendar, Briefcase, Hash, BadgeCent, Ticket } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { BusinessPromoterLinkWithCommissions, Business } from "@/lib/types";
+import type { PromoterCommissionEntry, Business } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { anyToDate } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 
 export default function PromoterCommissionsPage() {
   const { toast } = useToast();
   const { userProfile, currentUser } = useAuth();
   
-  const [commissionData, setCommissionData] = useState<BusinessPromoterLinkWithCommissions[]>([]);
+  const [commissionData, setCommissionData] = useState<PromoterCommissionEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>('all');
@@ -44,16 +42,15 @@ export default function PromoterCommissionsPage() {
         const errorData = await response.json();
         throw new Error(errorData.error || 'No se pudieron obtener las comisiones.');
       }
-      const data: BusinessPromoterLinkWithCommissions[] = await response.json();
+      const data: PromoterCommissionEntry[] = await response.json();
       setCommissionData(data);
 
       if (data.length > 0) {
-        const businessIds = [...new Set(data.map(link => link.businessId))];
+        const businessIds = [...new Set(data.map(comm => comm.businessId))];
         if (businessIds.length > 0) {
           const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
           const businessesSnap = await getDocs(businessesQuery);
-          const businessesData = businessesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business));
-          setBusinesses(businessesData);
+          setBusinesses(businessesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business)));
         }
       }
 
@@ -70,31 +67,29 @@ export default function PromoterCommissionsPage() {
   }, [fetchCommissions]);
 
   const filteredCommissions = useMemo(() => {
-    if (selectedBusinessId === 'all') {
-      return commissionData;
-    }
+    if (selectedBusinessId === 'all') return commissionData;
     return commissionData.filter(comm => comm.businessId === selectedBusinessId);
   }, [commissionData, selectedBusinessId]);
 
   const totalPending = useMemo(() => {
-    return filteredCommissions.reduce((sum, comm) => sum + comm.pendingAmount, 0);
+    return filteredCommissions.reduce((sum, comm) => sum + comm.commissionPending, 0);
   }, [filteredCommissions]);
 
   const totalPaid = useMemo(() => {
-    return filteredCommissions.reduce((sum, comm) => sum + comm.paidAmount, 0);
+    return filteredCommissions.reduce((sum, comm) => sum + comm.commissionPaid, 0);
   }, [filteredCommissions]);
 
   const handleExport = () => {
-    const dataToExport = filteredCommissions;
-    if (dataToExport.length === 0) {
-      toast({ title: "Sin Datos", description: "No hay comisiones para exportar con el filtro actual.", variant: "default" });
+    if (filteredCommissions.length === 0) {
+      toast({ title: "Sin Datos", description: "No hay comisiones para exportar con el filtro actual." });
       return;
     }
-    const headers = ["Negocio", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
-    const rows = dataToExport.map(c => [
-      c.promoterName, // Corregido para mostrar el nombre del promotor
-      c.pendingAmount.toFixed(2),
-      c.paidAmount.toFixed(2)
+    const headers = ["Negocio", "Campaña", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
+    const rows = filteredCommissions.map(c => [
+      c.businessName,
+      c.entityName,
+      c.commissionPending.toFixed(2),
+      c.commissionPaid.toFixed(2)
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
 
     const csvContent = [
@@ -121,9 +116,9 @@ export default function PromoterCommissionsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Resumen de Comisiones por Negocio</CardTitle>
+          <CardTitle>Detalle de Comisiones</CardTitle>
           <CardDescription>
-             Aquí se listan tus comisiones pendientes y pagadas por cada negocio al que estás vinculado.
+             Aquí se listan tus comisiones pendientes y pagadas por cada campaña en la que participaste.
           </CardDescription>
           <div className="pt-4">
               <Label htmlFor="business-filter">Filtrar por Negocio</Label>
@@ -142,58 +137,37 @@ export default function PromoterCommissionsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="min-h-[200px] flex flex-col items-center justify-center text-center p-6">
+            <div className="min-h-[200px] flex items-center justify-center p-6">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground mt-4">Calculando tus comisiones...</p>
             </div>
           ) : filteredCommissions.length > 0 ? (
-            <>
-              {/* Vista para pantallas grandes (tabla) */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Negocio</TableHead>
-                      <TableHead className="text-right">Monto Pendiente</TableHead>
-                      <TableHead className="text-right">Monto Pagado</TableHead>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">Campaña</TableHead>
+                    <TableHead className="min-w-[150px]">Negocio</TableHead>
+                    <TableHead className="text-center">QRs Usados</TableHead>
+                    <TableHead className="text-right">Monto Pendiente</TableHead>
+                    <TableHead className="text-right">Monto Pagado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCommissions.map((comm) => (
+                    <TableRow key={comm.id}>
+                      <TableCell className="font-medium flex items-center">
+                        {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
+                        {comm.entityName}
+                      </TableCell>
+                      <TableCell>{comm.businessName}</TableCell>
+                      <TableCell className="text-center">{comm.promoterCodesRedeemed}</TableCell>
+                      <TableCell className="text-right font-semibold text-destructive">S/ {comm.commissionPending.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCommissions.map((comm) => (
-                      <TableRow key={comm.id}>
-                        <TableCell className="font-medium">{businesses.find(b => b.id === comm.businessId)?.name || 'Negocio Desconocido'}</TableCell>
-                        <TableCell className="text-right font-semibold text-destructive">S/ {comm.pendingAmount.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-semibold text-green-600">S/ {comm.paidAmount.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {/* Vista para pantallas pequeñas (tarjetas) */}
-              <div className="md:hidden space-y-4">
-                {filteredCommissions.map((comm) => (
-                  <Card key={comm.id} className="overflow-hidden">
-                    <CardHeader className="p-4">
-                      <CardTitle className="text-base flex items-center">
-                        <Briefcase size={16} className="mr-2"/>
-                        {businesses.find(b => b.id === comm.businessId)?.name || 'Negocio Desconocido'}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-3">
-                       <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">Pendiente de Pago</span>
-                          <span className="font-semibold text-lg text-destructive">S/ {comm.pendingAmount.toFixed(2)}</span>
-                       </div>
-                       <Separator />
-                       <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground">Total Pagado</span>
-                          <span className="font-semibold text-lg text-green-600">S/ {comm.paidAmount.toFixed(2)}</span>
-                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
             <div className="min-h-[200px] flex flex-col items-center justify-center text-center p-6">
               <Info className="h-16 w-16 text-primary/70 mb-4" />
@@ -210,7 +184,7 @@ export default function PromoterCommissionsPage() {
                 <p>Total Pagado: <span className="text-green-600">S/ {totalPaid.toFixed(2)}</span></p>
              </div>
              <Button variant="outline" onClick={handleExport} disabled={filteredCommissions.length === 0}>
-                <Download className="mr-2 h-4 w-4" /> Exportar Resumen
+                <Download className="mr-2 h-4 w-4" /> Exportar Detalle
             </Button>
         </CardFooter>
       </Card>

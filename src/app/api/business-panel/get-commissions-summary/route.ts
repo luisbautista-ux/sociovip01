@@ -8,10 +8,11 @@ import type {
   PlatformUser,
   BusinessManagedEntity,
   BusinessPromoterLink,
-  BusinessPromoterLinkWithCommissions,
+  PromoterCommissionEntry,
+  Business,
 } from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
-import { DEFAULT_COMMISSION_PER_CODE } from '@/lib/constants';
+import {DEFAULT_COMMISSION_PER_CODE} from '@/lib/constants';
 
 async function getCallerProfile(
   authorizationHeader: string
@@ -62,99 +63,93 @@ export async function GET(request: Request) {
       callerProfile.roles.includes('staff');
     const isPromoter = callerProfile.roles.includes('promoter');
     
-    let businessId: string | undefined;
+    let businessIds: string[] | undefined;
 
-    if (isBusinessAdminOrStaff) {
-        businessId = callerProfile.businessId;
+    if (isBusinessAdminOrStaff && callerProfile.businessId) {
+        businessIds = [callerProfile.businessId];
+    } else if (isPromoter) {
+        businessIds = callerProfile.businessIds;
     }
 
-    if (!businessId && !isPromoter) {
-        return NextResponse.json(
-            {error: 'Permiso denegado. Rol no autorizado para esta consulta.'},
-            {status: 403}
-        );
+    if (!businessIds || businessIds.length === 0) {
+        return NextResponse.json([]); // Return empty array if no businesses to check
     }
 
-    // Determine query parameters based on role
-    const linksQuery = isPromoter 
-      ? adminDb.collection('businessPromoterLinks').where('platformUserUid', '==', callerProfile.uid)
-      : adminDb.collection('businessPromoterLinks').where('businessId', '==', businessId);
-      
-    const businessIdsForEntities = isPromoter ? callerProfile.businessIds : [businessId];
-    
-    const entitiesQuery = businessIdsForEntities && businessIdsForEntities.length > 0
-        ? adminDb.collection('businessEntities').where('businessId', 'in', businessIdsForEntities)
-        : null;
-
-
-    const [linksSnapshot, entitiesSnapshot] = await Promise.all([
-      linksQuery.get(),
-      entitiesQuery ? entitiesQuery.get() : Promise.resolve({ docs: [] }),
+    const [businessesSnapshot, entitiesSnapshot] = await Promise.all([
+        adminDb.collection('businesses').where('__name__', 'in', businessIds).get(),
+        adminDb.collection('businessEntities').where('businessId', 'in', businessIds).get(),
     ]);
 
-    const allEntities = entitiesSnapshot.docs.map(
-      doc => ({id: doc.id, ...doc.data()}) as BusinessManagedEntity
-    );
-    const allLinks = linksSnapshot.docs.map(
-      doc => ({id: doc.id, ...doc.data()}) as BusinessPromoterLink
-    );
-
-    const commissionsByPromoter: Record<
-      string,
-      {pending: number; paid: number}
-    > = {};
+    const businessesMap = new Map(businessesSnapshot.docs.map(doc => [doc.id, doc.data() as Business]));
+    const allEntities = entitiesSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as BusinessManagedEntity);
+    
+    const commissionEntries: PromoterCommissionEntry[] = [];
 
     allEntities.forEach(entity => {
+      const promoterCommissionsForEntity: Record<string, { promoterName: string, pending: number, paid: number, codesRedeemed: number }> = {};
+
       (entity.generatedCodes || []).forEach(code => {
-        if (!code.generatedByUid) return;
+        if (!code.generatedByUid || code.status !== 'used') return;
 
-        if (!commissionsByPromoter[code.generatedByUid]) {
-          commissionsByPromoter[code.generatedByUid] = {pending: 0, paid: 0};
+        if (!promoterCommissionsForEntity[code.generatedByUid]) {
+          promoterCommissionsForEntity[code.generatedByUid] = { 
+            promoterName: code.generatedByName,
+            pending: 0, 
+            paid: 0,
+            codesRedeemed: 0
+          };
         }
-
+        
         let commission = 0;
-        if (code.status === 'used') {
-          if (code.commissionGenerated && code.commissionGenerated > 0) {
+        if (code.commissionGenerated && code.commissionGenerated > 0) {
             commission = code.commissionGenerated;
-          } else {
+        } else {
             const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
             const firstRule = promoterAssignment?.commissionRules?.[0];
-            
             if (firstRule && firstRule.commissionType === 'fixed' && firstRule.commissionValue > 0) {
               commission = firstRule.commissionValue;
             } else {
               commission = DEFAULT_COMMISSION_PER_CODE;
             }
-          }
         }
         
         if (commission > 0) {
+          promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
           if (code.commissionStatus === 'paid') {
-            commissionsByPromoter[code.generatedByUid].paid += commission;
+            promoterCommissionsForEntity[code.generatedByUid].paid += commission;
           } else {
-            commissionsByPromoter[code.generatedByUid].pending += commission;
+            promoterCommissionsForEntity[code.generatedByUid].pending += commission;
           }
         }
       });
+
+      for (const promoterId in promoterCommissionsForEntity) {
+        const comm = promoterCommissionsForEntity[promoterId];
+        // Only create an entry if there's commission to show
+        if (comm.pending > 0 || comm.paid > 0) {
+            if (isPromoter && promoterId !== callerProfile.uid) continue; // Promoters only see their own commissions
+
+            commissionEntries.push({
+                id: `${entity.id}-${promoterId}`,
+                businessId: entity.businessId,
+                businessName: businessesMap.get(entity.businessId)?.name || 'N/A',
+                entityId: entity.id,
+                entityName: entity.name,
+                entityType: entity.type,
+                promoterId: promoterId,
+                promoterName: comm.promoterName,
+                commissionPending: comm.pending,
+                commissionPaid: comm.paid,
+                promoterCodesRedeemed: comm.codesRedeemed,
+                commissionRateApplied: 'Variable', // Placeholder, can be enhanced later
+                paymentStatus: comm.pending > 0 ? 'Pendiente' : 'Pagado',
+                period: new Date(entity.startDate).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+            });
+        }
+      }
     });
 
-    const linksWithCommissions: BusinessPromoterLinkWithCommissions[] =
-      allLinks.map(link => {
-        const promoterUid = link.platformUserUid;
-        const commissions = promoterUid
-          ? commissionsByPromoter[promoterUid]
-          : {pending: 0, paid: 0};
-        return {
-          ...link,
-          joinDate:
-            (link.joinDate as any).toDate?.().toISOString() ||
-            new Date().toISOString(),
-          pendingAmount: commissions?.pending || 0,
-          paidAmount: commissions?.paid || 0,
-        };
-      });
-
-    return NextResponse.json(linksWithCommissions);
+    return NextResponse.json(commissionEntries);
   } catch (error: any) {
     console.error('API Route (get-commissions): Error:', error);
     return NextResponse.json(
