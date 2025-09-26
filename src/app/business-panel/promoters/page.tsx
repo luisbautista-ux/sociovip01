@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Search, Loader2, UserPlus } from "lucide-react";
-import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry } from "@/lib/types";
+import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry, BusinessPromoterLinkWithCommissions } from "@/lib/types";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -26,13 +26,11 @@ export default function BusinessPromotersPage() {
     const currentBusinessId = userProfile?.businessId;
 
     const [searchTerm, setSearchTerm] = useState("");
-    const [commissionData, setCommissionData] = useState<PromoterCommissionEntry[]>([]);
-    const [linksData, setLinksData] = useState<BusinessPromoterLink[]>([]);
+    const [promoterData, setPromoterData] = useState<BusinessPromoterLinkWithCommissions[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
     
-    // State for modal visibility control
     const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     
@@ -48,6 +46,13 @@ export default function BusinessPromotersPage() {
         setIsLoading(true);
         try {
             const idToken = await currentUser.getIdToken();
+            
+            // 1. Fetch all promoter links for the business
+            const promoterLinksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
+            const promoterLinksSnap = await getDocs(promoterLinksQuery);
+            const links = promoterLinksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
+
+            // 2. Fetch all commission data for the business
             const response = await fetch('/api/business-panel/get-commissions-summary', {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${idToken}` },
@@ -55,14 +60,21 @@ export default function BusinessPromotersPage() {
             if (!response.ok) throw new Error('Error al obtener los datos de comisiones.');
             
             const commissions: PromoterCommissionEntry[] = await response.json();
+
+            // 3. Consolidate data
+            const consolidatedData = links.map(link => {
+                const promoterCommissions = commissions.filter(c => c.promoterId === link.platformUserUid);
+                const pendingAmount = promoterCommissions.reduce((sum, c) => sum + c.commissionPending, 0);
+                const paidAmount = promoterCommissions.reduce((sum, c) => sum + c.commissionPaid, 0);
+
+                return {
+                    ...link,
+                    pendingAmount,
+                    paidAmount,
+                };
+            });
             
-            const promoterLinksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
-            const promoterLinksSnap = await getDocs(promoterLinksQuery);
-            const promoterLinks = promoterLinksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
-            const promoterUids = new Set(promoterLinks.map(link => link.platformUserUid));
-            
-            setLinksData(promoterLinks);
-            setCommissionData(commissions.filter(comm => promoterUids.has(comm.promoterId)));
+            setPromoterData(consolidatedData);
 
         } catch (error: any) {
             console.error("Promoters Page: Failed to fetch data:", error);
@@ -76,11 +88,12 @@ export default function BusinessPromotersPage() {
       fetchData();
     }, [fetchData]);
 
-    const filteredCommissionsDetails = useMemo(() => {
-        return commissionData.filter(comm => 
-            comm.promoterName.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredPromoters = useMemo(() => {
+        return promoterData.filter(promoter => 
+            promoter.promoterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            promoter.promoterDni.includes(searchTerm)
         );
-    }, [commissionData, searchTerm]);
+    }, [promoterData, searchTerm]);
 
     const handleOpenAddPromoterFlow = () => {
         setModalStep('dni_entry');
@@ -110,7 +123,7 @@ export default function BusinessPromotersPage() {
         
         if (editingPromoterLink) { 
           const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
-          const { password, ...updatePayload } = data; // password is not part of link
+          const { password, ...updatePayload } = data;
           await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload as any));
           toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
         
@@ -140,7 +153,7 @@ export default function BusinessPromotersPage() {
             firestoreData: {
               dni: verifiedPromoterDniResult.dni, name: data.promoterName, email: data.promoterEmail,
               phone: data.promoterPhone,
-              commissionRate: '' // Commission rate is on the link, not the user
+              commissionRate: '' 
             }
           };
           const response = await fetch('/api/business-panel/create-promoter', {
@@ -235,7 +248,7 @@ export default function BusinessPromotersPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar por nombre de promotor..."
+                placeholder="Buscar por nombre de promotor o DNI..."
                 className="pl-8 w-full sm:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -249,15 +262,14 @@ export default function BusinessPromotersPage() {
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="ml-4 text-lg text-muted-foreground">Cargando promotores...</p>
               </div>
-            ) : linksData.length === 0 && !searchTerm ? (
+            ) : promoterData.length === 0 && !searchTerm ? (
               <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
                 Aún no has vinculado ningún promotor a tu negocio.
               </p>
             ) : (
               <>
                 <PromoterMobileCards
-                  commissions={filteredCommissionsDetails}
-                  links={linksData}
+                  promoters={filteredPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onRegisterPayment={handleOpenPaymentDialog}
                   onEditLink={handleOpenEditLink}
@@ -265,8 +277,7 @@ export default function BusinessPromotersPage() {
                   isSubmitting={isSubmitting}
                 />
                 <PromotersTable
-                  commissions={filteredCommissionsDetails}
-                  links={linksData}
+                  promoters={filteredPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onRegisterPayment={handleOpenPaymentDialog}
                   onEditLink={handleOpenEditLink}

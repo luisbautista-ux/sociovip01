@@ -1,7 +1,4 @@
 
-
-      
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -468,4 +465,3 @@ export interface PromoterPayment {
     notes?: string;
     settledCodeIds: string[];
 }
-    
