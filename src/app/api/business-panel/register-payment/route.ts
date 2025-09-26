@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     let settledCodeIds: string[] = [];
     let totalSettledAmount = 0;
 
-    await adminDb.runTransaction(async (transaction) => {
+    const finalMessage = await adminDb.runTransaction(async (transaction) => {
         const entityDoc = await transaction.get(entityRef);
         if (!entityDoc.exists) {
             throw new Error("La entidad (promoción/evento) no fue encontrada.");
@@ -83,12 +83,13 @@ export async function POST(request: Request) {
         
         let remainingAmountToSettle = paymentAmount;
         const originalCodes = entityData.generatedCodes || [];
-        
+
         const updatedCodes = originalCodes.map(code => {
             const commissionValue = Number(code.commissionGenerated ?? 0);
-
+            
+            // This is the code to be settled, so its status is 'unpaid'
             if (
-                code.entityId === entityId && // Correctly check the entityId
+                code.entityId === entityId &&
                 code.generatedByUid === promoterUid &&
                 code.commissionStatus === 'unpaid' &&
                 commissionValue > 0 &&
@@ -107,7 +108,18 @@ export async function POST(request: Request) {
         });
         
         if (settledCodeIds.length === 0) {
-            throw new Error("No se encontraron comisiones pendientes que coincidan con los criterios de pago para esta campaña.");
+            // Check if there are any pending commissions at all for this entity/promoter
+            const hasAnyPending = originalCodes.some(c => 
+                c.entityId === entityId &&
+                c.generatedByUid === promoterUid &&
+                c.commissionStatus === 'unpaid' &&
+                Number(c.commissionGenerated ?? 0) > 0);
+            
+            if (!hasAnyPending) {
+                 throw new Error("No se encontraron comisiones pendientes de pago para esta campaña y promotor.");
+            } else {
+                 throw new Error("El monto del pago no es suficiente para cubrir al menos una comisión pendiente.");
+            }
         }
 
         // Create the payment document
@@ -125,12 +137,14 @@ export async function POST(request: Request) {
         
         // Update the entity with the modified codes
         transaction.update(entityRef, { generatedCodes: updatedCodes });
+
+        return `Pago registrado exitosamente. Se liquidaron ${settledCodeIds.length} comisiones por un total de S/ ${totalSettledAmount.toFixed(2)}.`;
     });
 
     return NextResponse.json({
       success: true,
       paymentId: paymentRef.id,
-      message: `Pago registrado exitosamente. Se liquidaron ${settledCodeIds.length} comisiones por un total de S/ ${totalSettledAmount.toFixed(2)}.`,
+      message: finalMessage,
     });
 
   } catch (error: any) {

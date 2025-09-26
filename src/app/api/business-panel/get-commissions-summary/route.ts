@@ -93,7 +93,8 @@ export async function GET(request: Request) {
       const promoterCommissionsForEntity: Record<string, { promoterName: string, pending: number, paid: number, codesRedeemed: number, commissionRate: string }> = {};
 
       (entity.generatedCodes || []).forEach(code => {
-        if (!code.generatedByUid || code.status !== 'used' || !validPromoterUids.has(code.generatedByUid)) return;
+        // CORRECTION: Commission is generated when 'redeemed' OR 'used'
+        if (!code.generatedByUid || (code.status !== 'redeemed' && code.status !== 'used') || !validPromoterUids.has(code.generatedByUid)) return;
 
         if (!promoterCommissionsForEntity[code.generatedByUid]) {
           promoterCommissionsForEntity[code.generatedByUid] = { 
@@ -125,10 +126,12 @@ export async function GET(request: Request) {
         promoterCommissionsForEntity[code.generatedByUid].commissionRate = commissionDesc;
         
         if (commission > 0) {
+          // A code that is "used" was previously "redeemed", so we count it here
           promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
+          
           if (code.commissionStatus === 'paid') {
             promoterCommissionsForEntity[code.generatedByUid].paid += commission;
-          } else {
+          } else { // 'unpaid' or undefined
             promoterCommissionsForEntity[code.generatedByUid].pending += commission;
           }
         }
