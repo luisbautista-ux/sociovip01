@@ -86,7 +86,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
       replace([]);
       form.reset({ notes: "", commissions: [] });
     }
-  }, [open, promoter, allCommissions, form, replace]);
+  }, [open, promoter, allCommissions, form.reset, replace]);
 
 
   const handleSubmit = (values: PaymentFormValues) => {
