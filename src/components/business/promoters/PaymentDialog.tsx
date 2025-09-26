@@ -3,7 +3,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import { z } from "zod";
 import { useEffect, useMemo } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription as UIDescription } from "@/components/ui/alert"; // Renamed to avoid conflict
 
 const paymentFormSchema = z.object({
     entityId: z.string().min(1, "Debes seleccionar una campaña."),
@@ -44,7 +44,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
 
   const pendingCommissionsByEntity = useMemo(() => {
     if (!promoter) return [];
-    const entityMap = new Map<string, { name: string, totalPending: number }>();
+    const entityMap = new Map<string, { name: string; totalPending: number }>();
     allCommissions.forEach(comm => {
       if (comm.promoterId === promoter.uid && comm.commissionPending > 0) {
         const current = entityMap.get(comm.entityId) || { name: comm.entityName, totalPending: 0 };
@@ -184,4 +184,3 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
     </Dialog>
   );
 }
-
