@@ -137,7 +137,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
                 <Button type="submit" variant="gradient" disabled={isSubmitting || totalToSettle <= 0}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CircleDollarSign className="mr-2 h-4 w-4"/>}
-                  Confirmar Pago de S/ {form.getValues('amount').toFixed(2)}
+                  Confirmar Pago de S/ {Number(form.getValues('amount') || 0).toFixed(2)}
                 </Button>
             </DialogFooter>
           </form>
