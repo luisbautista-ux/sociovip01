@@ -144,7 +144,7 @@ export async function POST(request: Request) {
       });
       
       // Update all affected entities
-      entitiesSnap.docs.forEach(docSnap => {
+      for (const docSnap of entitiesSnap.docs) {
           const entityId = docSnap.id;
           if (entityUpdates.has(entityId)) {
               const updateInfo = entityUpdates.get(entityId)!;
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
 
               transaction.update(docSnap.ref, { generatedCodes: updatedCodes });
           }
-      });
+      }
     });
 
     return NextResponse.json({

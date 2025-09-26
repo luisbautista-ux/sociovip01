@@ -39,7 +39,8 @@ export default function BusinessPromotersPage() {
     const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     const [promoterForPayment, setPromoterForPayment] = useState<{ name: string; uid: string; pendingAmount: number } | null>(null);
-    const [promoterForDetails, setPromoterForDetails] = useState<{ name: string; commissions: PromoterCommissionEntry[] } | null>(null);
+    const [promoterForDetails, setPromoterForDetails] = useState<{ name: string; uid: string; commissions: PromoterCommissionEntry[] } | null>(null);
+
 
     const fetchData = useCallback(async () => {
         if (!currentBusinessId || !currentUser) {
@@ -117,10 +118,12 @@ export default function BusinessPromotersPage() {
     };
 
     const handleOpenDetailsDialog = (promoter: BusinessPromoterLinkWithCommissions) => {
+        if (!promoter.platformUserUid) return;
         const promoterCommissions = allCommissions.filter(c => c.promoterId === promoter.platformUserUid);
-        setPromoterForDetails({ name: promoter.promoterName, commissions: promoterCommissions });
+        setPromoterForDetails({ name: promoter.promoterName, uid: promoter.platformUserUid, commissions: promoterCommissions });
         setShowDetailsModal(true);
     };
+
 
     const handleAddOrEditPromoterLink = async (data: BusinessPromoterFormData) => {
       if (!currentBusinessId || !currentUser) {
@@ -338,14 +341,16 @@ export default function BusinessPromotersPage() {
             />
         )}
 
-        {showDetailsModal && (
+        {showDetailsModal && promoterForDetails && (
             <CommissionDetailsDialog
                 open={showDetailsModal}
                 onOpenChange={setShowDetailsModal}
-                promoterName={promoterForDetails?.name || ''}
-                commissionEntries={promoterForDetails?.commissions || []}
+                promoterName={promoterForDetails.name}
+                promoterUid={promoterForDetails.uid}
+                commissionEntries={promoterForDetails.commissions}
             />
         )}
+
       </div>
     );
   }

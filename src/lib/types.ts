@@ -385,7 +385,8 @@ export interface PromoterCommissionEntry {
     commissionPending: number;
     commissionPaid: number;
     paymentStatus: 'Pendiente' | 'Pagado';
-    period: string; 
+    period: string;
+    paymentId?: string | null;
 }
 
 export interface TicketTypeFormData {
