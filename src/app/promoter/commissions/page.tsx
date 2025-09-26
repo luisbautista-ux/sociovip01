@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -84,10 +85,12 @@ export default function PromoterCommissionsPage() {
       toast({ title: "Sin Datos", description: "No hay comisiones para exportar con el filtro actual." });
       return;
     }
-    const headers = ["Negocio", "Campaña", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
+    const headers = ["Negocio", "Campaña", "QRs Usados", "Comisión Aplicada", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
     const rows = filteredCommissions.map(c => [
       c.businessName,
       c.entityName,
+      c.promoterCodesRedeemed,
+      c.commissionRateApplied,
       c.commissionPending.toFixed(2),
       c.commissionPaid.toFixed(2)
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
@@ -145,8 +148,8 @@ export default function PromoterCommissionsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[200px]">Campaña</TableHead>
-                    <TableHead className="min-w-[150px]">Negocio</TableHead>
+                    <TableHead>Campaña</TableHead>
+                    <TableHead>Negocio</TableHead>
                     <TableHead className="text-center">QRs Usados</TableHead>
                     <TableHead className="text-right">Monto Pendiente</TableHead>
                     <TableHead className="text-right">Monto Pagado</TableHead>
@@ -160,8 +163,11 @@ export default function PromoterCommissionsPage() {
                         {comm.entityName}
                       </TableCell>
                       <TableCell>{comm.businessName}</TableCell>
-                      <TableCell className="text-center">{comm.promoterCodesRedeemed}</TableCell>
-                      <TableCell className="text-right font-semibold text-destructive">S/ {comm.commissionPending.toFixed(2)}</TableCell>
+                      <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
+                      <TableCell className="text-right font-semibold text-destructive">
+                          S/ {comm.commissionPending.toFixed(2)}
+                          <p className="text-xs text-muted-foreground font-normal">({comm.commissionRateApplied})</p>
+                      </TableCell>
                       <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
                     </TableRow>
                   ))}

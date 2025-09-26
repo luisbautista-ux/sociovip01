@@ -690,7 +690,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
         {currentBusinessId && (
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Resumen de Comisiones por Promotor</CardTitle>
+              <CardTitle>Detalle de Comisiones por Promotor y Campaña</CardTitle>
               <CardDescription>Gestiona tus promotores y sus comisiones pendientes y pagadas por cada campaña.</CardDescription>
               <div className="relative mt-4">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -721,6 +721,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                             <TableRow>
                                 <TableHead>Promotor</TableHead>
                                 <TableHead>Campaña</TableHead>
+                                <TableHead className="text-center">QRs Usados</TableHead>
                                 <TableHead className="text-right">Monto Pendiente</TableHead>
                                 <TableHead className="text-right">Monto Pagado</TableHead>
                                 <TableHead className="text-center">Estado de Vínculo</TableHead>
@@ -738,7 +739,11 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                                             {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
                                             {comm.entityName}
                                         </TableCell>
-                                        <TableCell className="text-right font-semibold text-destructive">S/ {comm.commissionPending.toFixed(2)}</TableCell>
+                                        <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
+                                        <TableCell className="text-right font-semibold text-destructive">
+                                          S/ {comm.commissionPending.toFixed(2)}
+                                          <p className="text-xs text-muted-foreground font-normal">({comm.commissionRateApplied})</p>
+                                        </TableCell>
                                         <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
                                         <TableCell className="text-center">
                                             {link && (
@@ -758,7 +763,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                                             {link && (
                                                 <>
                                                 <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" 
-                                                    onClick={() => setPromoterForPayment({ uid: comm.promoterId, name: comm.promoterName, pendingAmount: comm.commissionPending })}
+                                                    onClick={() => { setShowPaymentModal(true); setPromoterForPayment({ uid: comm.promoterId, name: comm.promoterName, pendingAmount: comm.commissionPending });}}
                                                     disabled={isSubmitting || comm.commissionPending <= 0}
                                                 >
                                                     <HandCoins className="mr-1 h-3 w-3" /> Pagar
@@ -782,7 +787,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                                     </TableRow>
                                 )})
                             ) : (
-                                <TableRow><TableCell colSpan={6} className="h-24 text-center">No se encontraron promotores con comisiones para los filtros aplicados.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No se encontraron promotores con comisiones para los filtros aplicados.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
@@ -850,19 +855,13 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
             </UIDialogContent>
         </UIDialog>
         
-        {promoterForPayment && (
-            <PaymentDialog
-                open={showPaymentModal}
-                onOpenChange={(isOpen) => {
-                    setShowPaymentModal(isOpen);
-                    if (!isOpen) setPromoterForPayment(null);
-                }}
-                promoter={promoterForPayment}
-                onConfirmPayment={handleConfirmPayment}
-                isSubmitting={isSubmitting}
-            />
-        )}
-
+        <PaymentDialog
+            open={showPaymentModal}
+            onOpenChange={setShowPaymentModal}
+            promoter={promoterForPayment}
+            onConfirmPayment={handleConfirmPayment}
+            isSubmitting={isSubmitting}
+        />
 
         <AlertDialog open={showAlreadyLinkedAlert} onOpenChange={setShowAlreadyLinkedAlert}>
           <AlertDialogContent>
@@ -887,4 +886,5 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
       </div>
     );
   }
+
 

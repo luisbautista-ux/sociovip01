@@ -1,4 +1,5 @@
 
+
       
 
 // src/lib/types.ts
@@ -359,6 +360,7 @@ export interface BusinessEventFormData {
 export interface BusinessPromoterFormData { 
   promoterName: string;
   promoterEmail: string;
+  promoterDni: string;
   promoterPhone?: string;
   commissionRate?: string; 
   password?: string;
@@ -374,17 +376,19 @@ export interface DniEntryValues { // Para el input de DNI en varios flujos
 
 export interface PromoterCommissionEntry { 
     id: string;
+    businessId: string;
     businessName: string;
+    entityId: string;
     entityName: string;
     entityType: 'promotion' | 'event';
-    promoterCodesRedeemed: number; 
-    commissionRateApplied: string; // Ej: "10%" o "S/ 5.00 por código"
-    commissionEarned: number;
-    paymentStatus: 'Pendiente' | 'Pagado';
-    period: string; // Ej: "Mayo 2025"
-    entityId: string;
     promoterId: string;
-    businessId?: string; // Added for filtering
+    promoterName: string;
+    promoterCodesRedeemed: number; 
+    commissionRateApplied: string;
+    commissionPending: number;
+    commissionPaid: number;
+    paymentStatus: 'Pendiente' | 'Pagado';
+    period: string; 
 }
 
 export interface TicketTypeFormData {
@@ -453,4 +457,15 @@ export interface PromoterEntityView extends BusinessManagedEntity {
     promoterCodesUsed: number;
 }
 
+export interface PromoterPayment {
+    id: string;
+    businessId: string;
+    promoterUid: string;
+    amountPaid: number;
+    paymentDate: Timestamp | string;
+    paidByUid: string;
+    paidByName: string;
+    notes?: string;
+    settledCodeIds: string[];
+}
     

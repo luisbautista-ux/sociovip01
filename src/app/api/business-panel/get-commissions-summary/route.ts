@@ -90,7 +90,7 @@ export async function GET(request: Request) {
     const commissionEntries: PromoterCommissionEntry[] = [];
 
     allEntities.forEach(entity => {
-      const promoterCommissionsForEntity: Record<string, { promoterName: string, pending: number, paid: number, codesRedeemed: number }> = {};
+      const promoterCommissionsForEntity: Record<string, { promoterName: string, pending: number, paid: number, codesRedeemed: number, commissionRate: string }> = {};
 
       (entity.generatedCodes || []).forEach(code => {
         if (!code.generatedByUid || code.status !== 'used' || !validPromoterUids.has(code.generatedByUid)) return;
@@ -100,22 +100,29 @@ export async function GET(request: Request) {
             promoterName: code.generatedByName,
             pending: 0, 
             paid: 0,
-            codesRedeemed: 0
+            codesRedeemed: 0,
+            commissionRate: `S/ ${DEFAULT_COMMISSION_PER_CODE.toFixed(2)}`
           };
         }
         
         let commission = 0;
+        let commissionDesc = `S/ ${DEFAULT_COMMISSION_PER_CODE.toFixed(2)}`;
+
         if (code.commissionGenerated && code.commissionGenerated > 0) {
             commission = code.commissionGenerated;
+            commissionDesc = `S/ ${commission.toFixed(2)}`;
         } else {
             const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
             const firstRule = promoterAssignment?.commissionRules?.[0];
             if (firstRule && firstRule.commissionType === 'fixed' && firstRule.commissionValue > 0) {
               commission = firstRule.commissionValue;
+              commissionDesc = `S/ ${commission.toFixed(2)}`;
             } else {
               commission = DEFAULT_COMMISSION_PER_CODE;
             }
         }
+        
+        promoterCommissionsForEntity[code.generatedByUid].commissionRate = commissionDesc;
         
         if (commission > 0) {
           promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
@@ -129,9 +136,8 @@ export async function GET(request: Request) {
 
       for (const promoterId in promoterCommissionsForEntity) {
         const comm = promoterCommissionsForEntity[promoterId];
-        // Only create an entry if there's commission to show
         if (comm.pending > 0 || comm.paid > 0) {
-            if (isPromoter && promoterId !== callerProfile.uid) continue; // Promoters only see their own commissions
+            if (isPromoter && promoterId !== callerProfile.uid) continue; 
 
             commissionEntries.push({
                 id: `${entity.id}-${promoterId}`,
@@ -145,7 +151,7 @@ export async function GET(request: Request) {
                 commissionPending: comm.pending,
                 commissionPaid: comm.paid,
                 promoterCodesRedeemed: comm.codesRedeemed,
-                commissionRateApplied: 'Variable', // Placeholder, can be enhanced later
+                commissionRateApplied: comm.commissionRate,
                 paymentStatus: comm.pending > 0 ? 'Pendiente' : 'Pagado',
                 period: new Date(entity.startDate).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
             });
