@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { PromoterCommissionEntry, BusinessManagedEntity, Business, GeneratedCode } from "@/lib/types";
+import type { BusinessPromoterLinkWithCommissions, Business } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -21,95 +21,53 @@ import { Separator } from "@/components/ui/separator";
 
 export default function PromoterCommissionsPage() {
   const { toast } = useToast();
-  const { userProfile } = useAuth();
+  const { userProfile, currentUser } = useAuth();
   
-  const [commissionData, setCommissionData] = useState<PromoterCommissionEntry[]>([]);
+  const [commissionData, setCommissionData] = useState<BusinessPromoterLinkWithCommissions[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>('all');
 
-  const calculateCommissions = useCallback(async () => {
-    if (!userProfile?.uid || !userProfile.businessIds || userProfile.businessIds.length === 0) {
+  const fetchCommissions = useCallback(async () => {
+    if (!userProfile?.uid || !currentUser) {
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
 
     try {
-        const businessIds = userProfile.businessIds;
-        
-        const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
-        const businessesSnap = await getDocs(businessesQuery);
-        const businessesMap = new Map(businessesSnap.docs.map(doc => [doc.id, doc.data() as Business]));
-        const businessesData = Array.from(businessesMap.values()).map(b => ({...b, id: Array.from(businessesMap.keys())[Array.from(businessesMap.values()).indexOf(b)]}));
-        setBusinesses(businessesData);
+      const idToken = await currentUser.getIdToken();
+      const response = await fetch('/api/business-panel/get-commissions-summary', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'No se pudieron obtener las comisiones.');
+      }
+      const data: BusinessPromoterLinkWithCommissions[] = await response.json();
+      setCommissionData(data);
 
-        const entitiesQuery = query(
-            collection(db, "businessEntities"),
-            where("businessId", "in", businessIds)
-        );
-        const entitiesSnap = await getDocs(entitiesQuery);
+      if (data.length > 0) {
+        const businessIds = [...new Set(data.map(link => link.businessId))];
+        if (businessIds.length > 0) {
+          const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
+          const businessesSnap = await getDocs(businessesQuery);
+          const businessesData = businessesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Business));
+          setBusinesses(businessesData);
+        }
+      }
 
-        const calculatedCommissions: PromoterCommissionEntry[] = [];
-        
-        entitiesSnap.docs.forEach(doc => {
-            const entity = { id: doc.id, ...doc.data() } as BusinessManagedEntity;
-            const businessName = businessesMap.get(entity.businessId)?.name || "Negocio Desconocido";
-            
-            const promoterAssignment = entity.assignedPromoters?.find(p => p.promoterProfileId === userProfile.uid);
-            
-            // Un promotor ahora puede generar códigos para CUALQUIER entidad del negocio al que está asignado,
-            // no necesariamente tiene que estar en "assignedPromoters" de la entidad
-            const promoterGeneratedCodes = (entity.generatedCodes || []).filter(c => c.generatedByUid === userProfile.uid);
-            const promoterUsedCodes = promoterGeneratedCodes.filter(c => c.status === 'used');
-
-            if (promoterUsedCodes.length === 0) return;
-
-            let totalEarned = 0;
-            let appliedRateDescription = "Regla general del negocio"; // Default
-
-            if (promoterAssignment && promoterAssignment.commissionRules && promoterAssignment.commissionRules.length > 0) {
-                const firstRule = promoterAssignment.commissionRules[0];
-                appliedRateDescription = firstRule.commissionType === 'fixed'
-                    ? `S/ ${firstRule.commissionValue.toFixed(2)} por uso`
-                    : `${firstRule.commissionValue}% por uso`;
-                
-                promoterUsedCodes.forEach(code => {
-                    if (firstRule.commissionType === 'fixed') {
-                        totalEarned += firstRule.commissionValue;
-                    }
-                    // Percentage logic is complex without sale value, placeholder
-                });
-            }
-            
-            calculatedCommissions.push({
-                id: `${entity.id}-${userProfile.uid}`,
-                businessName: businessName,
-                businessId: entity.businessId,
-                entityName: entity.name,
-                entityType: entity.type,
-                promoterCodesRedeemed: promoterUsedCodes.length,
-                commissionRateApplied: appliedRateDescription,
-                commissionEarned: totalEarned,
-                paymentStatus: "Pendiente",
-                period: format(anyToDate(entity.endDate)!, "MMMM yyyy", { locale: es }),
-                entityId: entity.id,
-                promoterId: userProfile.uid,
-            });
-        });
-        
-        setCommissionData(calculatedCommissions);
     } catch (error: any) {
-        console.error("Error calculating commissions:", error);
-        toast({ title: "Error", description: `No se pudieron calcular las comisiones: ${error.message}`, variant: "destructive" });
+        console.error("Error fetching commissions for promoter:", error);
+        toast({ title: "Error", description: `No se pudieron cargar tus comisiones: ${error.message}`, variant: "destructive" });
     } finally {
         setIsLoading(false);
     }
-  }, [userProfile, toast]);
+  }, [userProfile, currentUser, toast]);
 
   useEffect(() => {
-    calculateCommissions();
-  }, [calculateCommissions]);
+    fetchCommissions();
+  }, [fetchCommissions]);
 
   const filteredCommissions = useMemo(() => {
     if (selectedBusinessId === 'all') {
@@ -118,8 +76,12 @@ export default function PromoterCommissionsPage() {
     return commissionData.filter(comm => comm.businessId === selectedBusinessId);
   }, [commissionData, selectedBusinessId]);
 
-  const totalCommissions = useMemo(() => {
-    return filteredCommissions.reduce((sum, comm) => sum + comm.commissionEarned, 0);
+  const totalPending = useMemo(() => {
+    return filteredCommissions.reduce((sum, comm) => sum + comm.pendingAmount, 0);
+  }, [filteredCommissions]);
+
+  const totalPaid = useMemo(() => {
+    return filteredCommissions.reduce((sum, comm) => sum + comm.paidAmount, 0);
   }, [filteredCommissions]);
 
   const handleExport = () => {
@@ -128,15 +90,11 @@ export default function PromoterCommissionsPage() {
       toast({ title: "Sin Datos", description: "No hay comisiones para exportar con el filtro actual.", variant: "default" });
       return;
     }
-    const headers = ["Periodo", "Negocio", "Promoción/Evento", "Códigos Usados", "Tasa Aplicada", "Comisión Ganada (S/)", "Estado"];
+    const headers = ["Negocio", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
     const rows = dataToExport.map(c => [
-      c.period,
-      c.businessName,
-      c.entityName,
-      c.promoterCodesRedeemed,
-      c.commissionRateApplied,
-      c.commissionEarned.toFixed(2),
-      c.paymentStatus
+      c.promoterName, // Corregido para mostrar el nombre del promotor
+      c.pendingAmount.toFixed(2),
+      c.paidAmount.toFixed(2)
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
 
     const csvContent = [
@@ -163,18 +121,18 @@ export default function PromoterCommissionsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Detalle de Comisiones Ganadas</CardTitle>
+          <CardTitle>Resumen de Comisiones por Negocio</CardTitle>
           <CardDescription>
-             Aquí se listan las comisiones generadas por los códigos que creaste y que los clientes utilizaron en la puerta.
+             Aquí se listan tus comisiones pendientes y pagadas por cada negocio al que estás vinculado.
           </CardDescription>
           <div className="pt-4">
               <Label htmlFor="business-filter">Filtrar por Negocio</Label>
-              <Select value={selectedBusinessId} onValueChange={setSelectedBusinessId}>
+              <Select value={selectedBusinessId} onValueChange={setSelectedBusinessId} disabled={isLoading}>
                   <SelectTrigger id="business-filter" className="w-full sm:w-[300px]">
                       <SelectValue placeholder="Selecciona un negocio" />
                   </SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="all">Todos los Negocios</SelectItem>
+                      <SelectItem value="all">Todos mis Negocios</SelectItem>
                       {businesses.map(biz => (
                           <SelectItem key={biz.id} value={biz.id}>{biz.name}</SelectItem>
                       ))}
@@ -186,7 +144,7 @@ export default function PromoterCommissionsPage() {
           {isLoading ? (
             <div className="min-h-[200px] flex flex-col items-center justify-center text-center p-6">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground mt-4">Calculando comisiones...</p>
+              <p className="text-muted-foreground mt-4">Calculando tus comisiones...</p>
             </div>
           ) : filteredCommissions.length > 0 ? (
             <>
@@ -195,27 +153,17 @@ export default function PromoterCommissionsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Período</TableHead>
                       <TableHead>Negocio</TableHead>
-                      <TableHead>Promoción/Evento</TableHead>
-                      <TableHead className="text-center">Códigos Usados</TableHead>
-                      <TableHead className="text-right">Comisión (S/)</TableHead>
-                      <TableHead className="text-center">Estado</TableHead>
+                      <TableHead className="text-right">Monto Pendiente</TableHead>
+                      <TableHead className="text-right">Monto Pagado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredCommissions.map((comm) => (
                       <TableRow key={comm.id}>
-                        <TableCell>{comm.period}</TableCell>
-                        <TableCell className="font-medium">{comm.businessName}</TableCell>
-                        <TableCell>{comm.entityName}</TableCell>
-                        <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
-                        <TableCell className="text-right font-semibold text-green-600">{comm.commissionEarned.toFixed(2)}</TableCell>
-                        <TableCell className="text-center">
-                            <Badge variant={comm.paymentStatus === 'Pagado' ? 'default' : 'secondary'}>
-                                {comm.paymentStatus}
-                            </Badge>
-                        </TableCell>
+                        <TableCell className="font-medium">{businesses.find(b => b.id === comm.businessId)?.name || 'Negocio Desconocido'}</TableCell>
+                        <TableCell className="text-right font-semibold text-destructive">S/ {comm.pendingAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">S/ {comm.paidAmount.toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -226,33 +174,22 @@ export default function PromoterCommissionsPage() {
                 {filteredCommissions.map((comm) => (
                   <Card key={comm.id} className="overflow-hidden">
                     <CardHeader className="p-4">
-                      <CardTitle className="text-base">{comm.entityName}</CardTitle>
-                      <CardDescription className="text-xs text-muted-foreground flex items-center pt-1">
-                        <Briefcase size={14} className="mr-1.5"/>{comm.businessName}
-                      </CardDescription>
+                      <CardTitle className="text-base flex items-center">
+                        <Briefcase size={16} className="mr-2"/>
+                        {businesses.find(b => b.id === comm.businessId)?.name || 'Negocio Desconocido'}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 space-y-3">
                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground flex items-center"><Calendar size={14} className="mr-1.5"/> Período</span>
-                          <span className="font-medium">{comm.period}</span>
-                       </div>
-                       <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground flex items-center"><Hash size={14} className="mr-1.5"/> Códigos Usados</span>
-                          <span className="font-semibold text-lg text-primary">{comm.promoterCodesRedeemed}</span>
+                          <span className="text-muted-foreground">Pendiente de Pago</span>
+                          <span className="font-semibold text-lg text-destructive">S/ {comm.pendingAmount.toFixed(2)}</span>
                        </div>
                        <Separator />
                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-muted-foreground flex items-center"><BadgeCent size={14} className="mr-1.5"/> Comisión Ganada</span>
-                          <span className="font-semibold text-lg text-green-600">S/ {comm.commissionEarned.toFixed(2)}</span>
+                          <span className="text-muted-foreground">Total Pagado</span>
+                          <span className="font-semibold text-lg text-green-600">S/ {comm.paidAmount.toFixed(2)}</span>
                        </div>
                     </CardContent>
-                     <CardFooter className="p-4 bg-muted/50">
-                        <div className="w-full flex justify-center">
-                          <Badge variant={comm.paymentStatus === 'Pagado' ? 'default' : 'secondary'}>
-                            Estado: {comm.paymentStatus}
-                          </Badge>
-                        </div>
-                    </CardFooter>
                   </Card>
                 ))}
               </div>
@@ -260,19 +197,20 @@ export default function PromoterCommissionsPage() {
           ) : (
             <div className="min-h-[200px] flex flex-col items-center justify-center text-center p-6">
               <Info className="h-16 w-16 text-primary/70 mb-4" />
-              <p className="font-semibold">{selectedBusinessId === 'all' ? 'Aún no has generado comisiones.' : 'No hay comisiones para este negocio.'}</p>
+              <p className="font-semibold">No se encontraron comisiones.</p>
               <p className="text-muted-foreground mt-2 max-w-md">
-                Tus comisiones aparecerán aquí cuando los clientes usen los códigos QR generados con tus códigos de promotor.
+                Puede que no estés asignado a ningún negocio o que aún no hayas generado comisiones.
               </p>
             </div>
           )}
         </CardContent>
          <CardFooter className="flex flex-col sm:flex-row items-center justify-between pt-4 border-t gap-4">
-             <div className="text-lg font-bold">
-                Total Ganado (filtrado): <span className="text-gradient">S/ {totalCommissions.toFixed(2)}</span>
+             <div className="text-lg font-bold text-center sm:text-left">
+                <p>Total Pendiente: <span className="text-destructive">S/ {totalPending.toFixed(2)}</span></p>
+                <p>Total Pagado: <span className="text-green-600">S/ {totalPaid.toFixed(2)}</span></p>
              </div>
              <Button variant="outline" onClick={handleExport} disabled={filteredCommissions.length === 0}>
-                <Download className="mr-2 h-4 w-4" /> Exportar a CSV
+                <Download className="mr-2 h-4 w-4" /> Exportar Resumen
             </Button>
         </CardFooter>
       </Card>

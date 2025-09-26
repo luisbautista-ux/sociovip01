@@ -60,28 +60,36 @@ export async function GET(request: Request) {
     const isBusinessAdminOrStaff =
       callerProfile.roles.includes('business_admin') ||
       callerProfile.roles.includes('staff');
+    const isPromoter = callerProfile.roles.includes('promoter');
+    
+    let businessId: string | undefined;
 
-    if (!isBusinessAdminOrStaff || !callerProfile.businessId) {
-      return NextResponse.json(
-        {
-          error:
-            'Permiso denegado. No eres admin/staff de un negocio o no tienes un negocio asociado.',
-        },
-        {status: 403}
-      );
+    if (isBusinessAdminOrStaff) {
+        businessId = callerProfile.businessId;
     }
-    const businessId = callerProfile.businessId;
 
-    const linksQuery = adminDb
-      .collection('businessPromoterLinks')
-      .where('businessId', '==', businessId);
-    const entitiesQuery = adminDb
-      .collection('businessEntities')
-      .where('businessId', '==', businessId);
+    if (!businessId && !isPromoter) {
+        return NextResponse.json(
+            {error: 'Permiso denegado. Rol no autorizado para esta consulta.'},
+            {status: 403}
+        );
+    }
+
+    // Determine query parameters based on role
+    const linksQuery = isPromoter 
+      ? adminDb.collection('businessPromoterLinks').where('platformUserUid', '==', callerProfile.uid)
+      : adminDb.collection('businessPromoterLinks').where('businessId', '==', businessId);
+      
+    const businessIdsForEntities = isPromoter ? callerProfile.businessIds : [businessId];
+    
+    const entitiesQuery = businessIdsForEntities && businessIdsForEntities.length > 0
+        ? adminDb.collection('businessEntities').where('businessId', 'in', businessIdsForEntities)
+        : null;
+
 
     const [linksSnapshot, entitiesSnapshot] = await Promise.all([
       linksQuery.get(),
-      entitiesQuery.get(),
+      entitiesQuery ? entitiesQuery.get() : Promise.resolve({ docs: [] }),
     ]);
 
     const allEntities = entitiesSnapshot.docs.map(
@@ -109,14 +117,12 @@ export async function GET(request: Request) {
           if (code.commissionGenerated && code.commissionGenerated > 0) {
             commission = code.commissionGenerated;
           } else {
-            // Logic to apply custom rule or default
             const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
             const firstRule = promoterAssignment?.commissionRules?.[0];
             
             if (firstRule && firstRule.commissionType === 'fixed' && firstRule.commissionValue > 0) {
               commission = firstRule.commissionValue;
             } else {
-              // Fallback for old events without defined rules
               commission = DEFAULT_COMMISSION_PER_CODE;
             }
           }
@@ -125,7 +131,7 @@ export async function GET(request: Request) {
         if (commission > 0) {
           if (code.commissionStatus === 'paid') {
             commissionsByPromoter[code.generatedByUid].paid += commission;
-          } else { // 'unpaid' or undefined
+          } else {
             commissionsByPromoter[code.generatedByUid].pending += commission;
           }
         }
