@@ -1,9 +1,9 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Search, Loader2 } from "lucide-react";
+import { PlusCircle, Search, Loader2, UserPlus } from "lucide-react";
 import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry } from "@/lib/types";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
 
 import { DniEntryDialog } from "@/components/business/promoters/DniEntryDialog";
 import { PromoterFormDialog } from "@/components/business/promoters/PromoterFormDialog";
@@ -76,11 +76,27 @@ export default function BusinessPromotersPage() {
     }, [fetchData]);
 
     const filteredCommissionsDetails = useMemo(() => {
-        return commissionData.filter(comm => 
-            comm.promoterName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            comm.entityName.toLowerCase().includes(searchTerm.toLowerCase())
+        const promoterCommissionTotals = commissions.reduce((acc, comm) => {
+            if (!acc[comm.promoterId]) {
+                acc[comm.promoterId] = {
+                    ...comm,
+                    commissionPending: 0,
+                    commissionPaid: 0,
+                    promoterCodesRedeemed: 0,
+                    entityName: 'Todas',
+                    entityType: 'promotion'
+                };
+            }
+            acc[comm.promoterId].commissionPending += comm.commissionPending;
+            acc[comm.promoterId].commissionPaid += comm.commissionPaid;
+            acc[comm.promoterId].promoterCodesRedeemed += comm.promoterCodesRedeemed;
+            return acc;
+        }, {} as Record<string, PromoterCommissionEntry>);
+
+        return Object.values(promoterCommissionTotals).filter(comm => 
+            comm.promoterName.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [commissionData, searchTerm]);
+    }, [commissions, searchTerm]);
 
     const handleOpenAddPromoterFlow = () => {
         setModalStep('dni_entry');
@@ -110,7 +126,7 @@ export default function BusinessPromotersPage() {
         
         if (editingPromoterLink) { 
           const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
-          const { password, promoterDni, ...updatePayload } = data;
+          const { password, ...updatePayload } = data; // password is not part of link
           await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload as any));
           toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
         
@@ -140,6 +156,7 @@ export default function BusinessPromotersPage() {
             firestoreData: {
               dni: verifiedPromoterDniResult.dni, name: data.promoterName, email: data.promoterEmail,
               phone: data.promoterPhone,
+              commissionRate: '' // Commission rate is on the link, not the user
             }
           };
           const response = await fetch('/api/business-panel/create-promoter', {
@@ -228,13 +245,13 @@ export default function BusinessPromotersPage() {
         
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Detalle de Comisiones por Promotor y Campaña</CardTitle>
-            <CardDescription>Gestiona tus promotores y sus comisiones.</CardDescription>
+            <CardTitle>Resumen de Comisiones por Promotor</CardTitle>
+            <CardDescription>Gestiona tus promotores y sus comisiones acumuladas.</CardDescription>
             <div className="relative mt-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar por nombre de promotor o campaña..."
+                placeholder="Buscar por nombre de promotor..."
                 className="pl-8 w-full sm:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -248,9 +265,9 @@ export default function BusinessPromotersPage() {
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="ml-4 text-lg text-muted-foreground">Cargando promotores...</p>
               </div>
-            ) : commissionData.length === 0 && !searchTerm ? (
+            ) : linksData.length === 0 && !searchTerm ? (
               <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
-                No hay comisiones generadas por tus promotores.
+                Aún no has vinculado ningún promotor a tu negocio.
               </p>
             ) : (
               <>
@@ -316,3 +333,7 @@ export default function BusinessPromotersPage() {
       </div>
     );
   }
+
+    
+
+    
