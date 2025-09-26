@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -8,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, CircleDollarSign, Ticket, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect, useMemo, useState } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
@@ -34,8 +34,9 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
   });
 
   const pendingCommissions = useMemo(() => {
+    if (!promoter?.uid) return [];
     return allCommissions
-      .filter(c => c.promoterId === promoter?.uid && c.commissionPending > 0)
+      .filter(c => c.promoterId === promoter.uid && c.commissionPending > 0)
       .sort((a,b) => new Date(a.period).getTime() - new Date(b.period).getTime());
   }, [allCommissions, promoter?.uid]);
 
@@ -46,13 +47,15 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
   }, [selectedCommissionIds, pendingCommissions]);
 
   useEffect(() => {
-    if (open && promoter) {
+    if (open) {
+      // Reset state only when the dialog is newly opened
       setSelectedCommissionIds(new Set());
       form.reset({
-        notes: `Pago de comisiones a ${promoter.name}.`
+        notes: promoter ? `Pago de comisiones a ${promoter.name}.` : ""
       });
     }
-  }, [promoter, open, form]);
+  }, [open, promoter, form]); // form is stable, promoter changes trigger reset
+
 
   const handleToggleCommission = (commissionId: string) => {
     setSelectedCommissionIds(prev => {
