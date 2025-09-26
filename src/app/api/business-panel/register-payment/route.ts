@@ -82,22 +82,12 @@ export async function POST(request: Request) {
         
         const originalCodes = entityData.generatedCodes || [];
         
-        // Correctly calculate total pending amount for this specific promoter and entity
-        const totalPendingForEntity = originalCodes
-            .filter(code => code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid')
-            .reduce((sum, code) => sum + Number(code.commissionGenerated ?? 0), 0);
-
-        // Use a small tolerance for floating point comparisons
-        if (paymentAmount > totalPendingForEntity + 0.001) {
-            throw new Error(`El monto de pago (S/ ${paymentAmount.toFixed(2)}) excede la deuda pendiente (S/ ${totalPendingForEntity.toFixed(2)}) para esta campaña.`);
-        }
-
         let remainingAmountToSettle = paymentAmount;
         const updatedCodes: GeneratedCode[] = [];
 
         for (const code of originalCodes) {
             const commissionValue = Number(code.commissionGenerated ?? 0);
-            // Check if the code belongs to the promoter, is unpaid, and there's still an amount to settle
+            
             if (
               remainingAmountToSettle > 0 &&
               code.generatedByUid === promoterUid &&
@@ -113,15 +103,17 @@ export async function POST(request: Request) {
                   paymentId: paymentRef.id,
                 });
               } else {
-                 updatedCodes.push(code); // Not enough money to settle this one, push as is
+                 // Not enough money left to settle this specific commission, push as is.
+                 updatedCodes.push(code);
               }
             } else {
-              updatedCodes.push(code); // Push other codes without changes
+              // Push all other codes without changes.
+              updatedCodes.push(code);
             }
         }
 
         if (settledCodeIds.length === 0) {
-            throw new Error("No se encontraron comisiones pendientes para liquidar con el monto especificado.");
+            throw new Error("No se encontraron comisiones pendientes que coincidan con el monto a pagar o el promotor especificado.");
         }
 
         // Create the payment document
