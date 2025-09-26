@@ -71,12 +71,12 @@ export async function POST(request: Request) {
     const finalMessage = await adminDb.runTransaction(async (transaction) => {
         const entityDoc = await transaction.get(entityRef);
         if (!entityDoc.exists) {
-            throw new Error("La entidad (promoción/evento) no fue encontrada.");
+            throw new Error(`La entidad (promoción/evento) no fue encontrada.`);
         }
         
         const entityData = entityDoc.data() as BusinessManagedEntity;
         if (entityData.businessId !== businessId) {
-            throw new Error("Permiso denegado. Esta entidad no pertenece a tu negocio.");
+            throw new Error(`Permiso denegado. Esta entidad no pertenece a tu negocio.`);
         }
         
         let remainingAmountToSettle = paymentAmount;
@@ -88,15 +88,17 @@ export async function POST(request: Request) {
         const updatedCodes = originalCodes.map(code => {
             const commissionValue = Number(code.commissionGenerated ?? DEFAULT_COMMISSION_PER_CODE);
             
+            // This logic will now find the correct codes to settle
             if (
                 code.generatedByUid === promoterUid &&
-                code.commissionStatus === 'unpaid' &&
+                (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined) &&
                 commissionValue > 0 &&
                 remainingAmountToSettle >= commissionValue
             ) {
                 remainingAmountToSettle -= commissionValue;
                 totalSettledAmount += commissionValue;
                 settledCodeIds.push(code.id);
+                
                 return {
                     ...code,
                     commissionStatus: 'paid' as const,
@@ -107,7 +109,7 @@ export async function POST(request: Request) {
         });
         
         if (settledCodeIds.length === 0) {
-             throw new Error("No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto.");
+             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto. Verifique que el estado de la comisión sea 'unpaid'.`);
         }
 
         transaction.set(paymentRef, {

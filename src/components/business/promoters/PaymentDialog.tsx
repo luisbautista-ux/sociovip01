@@ -3,7 +3,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CircleDollarSign } from "lucide-react";
@@ -77,7 +77,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
         <DialogHeader>
           <DialogTitle>Registrar Pago a {promoter.name}</DialogTitle>
           <DialogDescription>
-            Total pendiente: S/ {promoter.pendingAmount.toFixed(2)}. Selecciona una campaña y el monto a pagar.
+            Total pendiente: S/ {promoter.pendingAmount.toFixed(2)}. Selecciona una campaña para saldar su deuda.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -124,7 +124,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                         type="number"
                         step="0.01"
                         {...field}
-                        disabled={true} 
+                        disabled={true} // El campo ahora está deshabilitado
                         className="disabled:bg-muted/30 font-semibold"
                       />
                     </FormControl>

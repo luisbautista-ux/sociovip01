@@ -93,7 +93,7 @@ export async function GET(request: Request) {
       const promoterCommissionsForEntity: Record<string, { promoterName: string, pending: number, paid: number, codesRedeemed: number, commissionRate: string }> = {};
 
       (entity.generatedCodes || []).forEach(code => {
-        // CORRECTION: Commission is generated when 'redeemed' OR 'used'
+        // A commission is owed if a code is 'redeemed' (QR generated) or 'used' (scanned at door).
         if (!code.generatedByUid || (code.status !== 'redeemed' && code.status !== 'used') || !validPromoterUids.has(code.generatedByUid)) return;
 
         if (!promoterCommissionsForEntity[code.generatedByUid]) {
@@ -106,29 +106,23 @@ export async function GET(request: Request) {
           };
         }
         
-        let commission = 0;
-        let commissionDesc = `S/ ${DEFAULT_COMMISSION_PER_CODE.toFixed(2)}`;
-
-        if (code.commissionGenerated && code.commissionGenerated > 0) {
-            commission = code.commissionGenerated;
-            commissionDesc = `S/ ${commission.toFixed(2)}`;
-        } else {
+        let commission = Number(code.commissionGenerated ?? 0);
+        
+        // If commission was not pre-calculated on the code, determine it now.
+        if (commission === 0) {
             const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
             const firstRule = promoterAssignment?.commissionRules?.[0];
             if (firstRule && firstRule.commissionType === 'fixed' && firstRule.commissionValue > 0) {
               commission = firstRule.commissionValue;
-              commissionDesc = `S/ ${commission.toFixed(2)}`;
             } else {
-              commission = DEFAULT_COMMISSION_PER_CODE;
+              commission = DEFAULT_COMMISSION_PER_CODE; // Assign default if no specific rule applies
             }
         }
         
-        promoterCommissionsForEntity[code.generatedByUid].commissionRate = commissionDesc;
+        promoterCommissionsForEntity[code.generatedByUid].commissionRate = `S/ ${commission.toFixed(2)}`;
+        promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
         
         if (commission > 0) {
-          // A code that is "used" was previously "redeemed", so we count it here
-          promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
-          
           if (code.commissionStatus === 'paid') {
             promoterCommissionsForEntity[code.generatedByUid].paid += commission;
           } else { // 'unpaid' or undefined
