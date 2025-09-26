@@ -80,36 +80,43 @@ export async function POST(request: Request) {
             throw new Error("Permiso denegado. Esta entidad no pertenece a tu negocio.");
         }
         
-        let remainingAmountToSettle = paymentAmount;
         const originalCodes = entityData.generatedCodes || [];
-        const updatedCodes: GeneratedCode[] = [];
-        let totalPendingForEntity = 0;
-
-        for (const code of originalCodes) {
-            if (code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid' && (code.commissionGenerated ?? 0) > 0) {
-                totalPendingForEntity += code.commissionGenerated!;
-            }
-        }
         
-        if (paymentAmount > totalPendingForEntity) {
+        // Correctly calculate total pending amount for this specific promoter and entity
+        const totalPendingForEntity = originalCodes
+            .filter(code => code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid')
+            .reduce((sum, code) => sum + Number(code.commissionGenerated ?? 0), 0);
+
+        // Use a small tolerance for floating point comparisons
+        if (paymentAmount > totalPendingForEntity + 0.001) {
             throw new Error(`El monto de pago (S/ ${paymentAmount.toFixed(2)}) excede la deuda pendiente (S/ ${totalPendingForEntity.toFixed(2)}) para esta campaña.`);
         }
 
+        let remainingAmountToSettle = paymentAmount;
+        const updatedCodes: GeneratedCode[] = [];
+
         for (const code of originalCodes) {
-            if (remainingAmountToSettle > 0 && code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid' && (code.commissionGenerated ?? 0) > 0) {
-                if (remainingAmountToSettle >= (code.commissionGenerated!)) {
-                    remainingAmountToSettle -= code.commissionGenerated!;
-                    settledCodeIds.push(code.id);
-                    updatedCodes.push({
-                        ...code,
-                        commissionStatus: 'paid' as const,
-                        paymentId: paymentRef.id,
-                    });
-                } else {
-                    updatedCodes.push(code);
-                }
+            const commissionValue = Number(code.commissionGenerated ?? 0);
+            // Check if the code belongs to the promoter, is unpaid, and there's still an amount to settle
+            if (
+              remainingAmountToSettle > 0 &&
+              code.generatedByUid === promoterUid &&
+              code.commissionStatus === 'unpaid' &&
+              commissionValue > 0
+            ) {
+              if (remainingAmountToSettle >= commissionValue) {
+                remainingAmountToSettle -= commissionValue;
+                settledCodeIds.push(code.id);
+                updatedCodes.push({
+                  ...code,
+                  commissionStatus: 'paid' as const,
+                  paymentId: paymentRef.id,
+                });
+              } else {
+                 updatedCodes.push(code); // Not enough money to settle this one, push as is
+              }
             } else {
-                updatedCodes.push(code);
+              updatedCodes.push(code); // Push other codes without changes
             }
         }
 
@@ -134,13 +141,11 @@ export async function POST(request: Request) {
         transaction.update(entityRef, { generatedCodes: updatedCodes });
     });
 
-
     return NextResponse.json({
       success: true,
       paymentId: paymentRef.id,
       message: `Pago registrado exitosamente. Se liquidaron ${settledCodeIds.length} comisiones.`,
     });
-
 
   } catch (error: any) {
     console.error('API Route (register-payment): Error:', error);

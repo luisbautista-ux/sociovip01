@@ -6,15 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Loader2, CircleDollarSign, AlertTriangle } from "lucide-react";
+import { Loader2, CircleDollarSign } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription as UIDescription } from "@/components/ui/alert";
 
 const paymentFormSchema = z.object({
     entityId: z.string().min(1, "Debes seleccionar una campaña."),
@@ -55,11 +53,6 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
     return Array.from(entityMap.entries()).map(([id, data]) => ({ id, ...data }));
   }, [allCommissions, promoter]);
 
-  const maxAmountForSelectedEntity = useMemo(() => {
-    if (!selectedEntityId) return 0;
-    return pendingCommissionsByEntity.find(e => e.id === selectedEntityId)?.totalPending || 0;
-  }, [selectedEntityId, pendingCommissionsByEntity]);
-
   useEffect(() => {
     if (open && promoter) {
       form.reset({
@@ -73,15 +66,6 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
 
   const handleSubmit = (values: PaymentFormValues) => {
     if (!promoter?.uid || !values.entityId || values.amount <= 0) return;
-    
-    if (values.amount > maxAmountForSelectedEntity) {
-        form.setError("amount", {
-            type: "manual",
-            message: `El monto no puede ser mayor a S/ ${maxAmountForSelectedEntity.toFixed(2)}`
-        });
-        return;
-    }
-    
     onConfirmPayment(promoter.uid, values.entityId, values.amount, values.notes);
   };
   
@@ -108,7 +92,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                   <Select onValueChange={(value) => {
                       field.onChange(value);
                       const pending = pendingCommissionsByEntity.find(e => e.id === value)?.totalPending || 0;
-                      form.setValue('amount', pending); // Auto-fill with the full pending amount
+                      form.setValue('amount', pending);
                   }} value={field.value}>
                     <FormControl>
                       <SelectTrigger disabled={isSubmitting}>
@@ -140,12 +124,10 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                         type="number"
                         step="0.01"
                         {...field}
-                        disabled={isSubmitting}
+                        disabled={true} // Campo deshabilitado para evitar errores
+                        className="disabled:bg-muted/30 font-semibold"
                       />
                     </FormControl>
-                    <FormDescription>
-                        Deuda para esta campaña: S/ {maxAmountForSelectedEntity.toFixed(2)}
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -173,3 +155,4 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
     </Dialog>
   );
 }
+
