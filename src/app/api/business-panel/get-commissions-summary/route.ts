@@ -75,12 +75,16 @@ export async function GET(request: Request) {
         return NextResponse.json([]); // Return empty array if no businesses to check
     }
 
-    const [businessesSnapshot, entitiesSnapshot] = await Promise.all([
+    const [businessesSnapshot, entitiesSnapshot, linksSnapshot] = await Promise.all([
         adminDb.collection('businesses').where('__name__', 'in', businessIds).get(),
         adminDb.collection('businessEntities').where('businessId', 'in', businessIds).get(),
+        adminDb.collection('businessPromoterLinks').where('businessId', 'in', businessIds).get(),
     ]);
-
+    
     const businessesMap = new Map(businessesSnapshot.docs.map(doc => [doc.id, doc.data() as Business]));
+    const promoterLinks = linksSnapshot.docs.map(doc => doc.data() as BusinessPromoterLink);
+    const validPromoterUids = new Set(promoterLinks.map(link => link.platformUserUid));
+
     const allEntities = entitiesSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as BusinessManagedEntity);
     
     const commissionEntries: PromoterCommissionEntry[] = [];
@@ -89,7 +93,7 @@ export async function GET(request: Request) {
       const promoterCommissionsForEntity: Record<string, { promoterName: string, pending: number, paid: number, codesRedeemed: number }> = {};
 
       (entity.generatedCodes || []).forEach(code => {
-        if (!code.generatedByUid || code.status !== 'used') return;
+        if (!code.generatedByUid || code.status !== 'used' || !validPromoterUids.has(code.generatedByUid)) return;
 
         if (!promoterCommissionsForEntity[code.generatedByUid]) {
           promoterCommissionsForEntity[code.generatedByUid] = { 

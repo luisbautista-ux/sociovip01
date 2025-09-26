@@ -690,7 +690,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
         {currentBusinessId && (
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Detalle de Comisiones por Promotor y Campaña</CardTitle>
+              <CardTitle>Resumen de Comisiones por Promotor</CardTitle>
               <CardDescription>Gestiona tus promotores y sus comisiones pendientes y pagadas por cada campaña.</CardDescription>
               <div className="relative mt-4">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -887,3 +887,4 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
       </div>
     );
   }
+
