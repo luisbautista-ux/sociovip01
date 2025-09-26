@@ -3,8 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Search, Loader2, UserPlus } from "lucide-react";
+import { PlusCircle, Search, Loader2, UserPlus, ListChecks } from "lucide-react";
 import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry, BusinessPromoterLinkWithCommissions } from "@/lib/types";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
@@ -19,6 +18,7 @@ import { PromoterFormDialog } from "@/components/business/promoters/PromoterForm
 import { PaymentDialog } from "@/components/business/promoters/PaymentDialog";
 import { PromotersTable } from "@/components/business/promoters/PromotersTable";
 import { PromoterMobileCards } from "@/components/business/promoters/PromoterMobileCards";
+import { CommissionDetailsDialog } from "@/components/business/promoters/CommissionDetailsDialog";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
 
 export default function BusinessPromotersPage() {
@@ -26,17 +26,20 @@ export default function BusinessPromotersPage() {
     const currentBusinessId = userProfile?.businessId;
 
     const [searchTerm, setSearchTerm] = useState("");
-    const [promoterData, setPromoterData] = useState<BusinessPromoterLinkWithCommissions[]>([]);
+    const [allCommissions, setAllCommissions] = useState<PromoterCommissionEntry[]>([]);
+    const [allPromoterLinks, setAllPromoterLinks] = useState<BusinessPromoterLink[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
     
     const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     
     const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     const [promoterForPayment, setPromoterForPayment] = useState<{ name: string; uid: string; pendingAmount: number } | null>(null);
+    const [promoterForDetails, setPromoterForDetails] = useState<{ name: string; commissions: PromoterCommissionEntry[] } | null>(null);
 
     const fetchData = useCallback(async () => {
         if (!currentBusinessId || !currentUser) {
@@ -51,6 +54,7 @@ export default function BusinessPromotersPage() {
             const promoterLinksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
             const promoterLinksSnap = await getDocs(promoterLinksQuery);
             const links = promoterLinksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
+            setAllPromoterLinks(links);
 
             // 2. Fetch all commission data for the business
             const response = await fetch('/api/business-panel/get-commissions-summary', {
@@ -60,21 +64,7 @@ export default function BusinessPromotersPage() {
             if (!response.ok) throw new Error('Error al obtener los datos de comisiones.');
             
             const commissions: PromoterCommissionEntry[] = await response.json();
-
-            // 3. Consolidate data
-            const consolidatedData = links.map(link => {
-                const promoterCommissions = commissions.filter(c => c.promoterId === link.platformUserUid);
-                const pendingAmount = promoterCommissions.reduce((sum, c) => sum + c.commissionPending, 0);
-                const paidAmount = promoterCommissions.reduce((sum, c) => sum + c.commissionPaid, 0);
-
-                return {
-                    ...link,
-                    pendingAmount,
-                    paidAmount,
-                };
-            });
-            
-            setPromoterData(consolidatedData);
+            setAllCommissions(commissions);
 
         } catch (error: any) {
             console.error("Promoters Page: Failed to fetch data:", error);
@@ -88,12 +78,26 @@ export default function BusinessPromotersPage() {
       fetchData();
     }, [fetchData]);
 
+    const consolidatedPromotersData = useMemo((): BusinessPromoterLinkWithCommissions[] => {
+        return allPromoterLinks.map(link => {
+            const promoterCommissions = allCommissions.filter(c => c.promoterId === link.platformUserUid);
+            const pendingAmount = promoterCommissions.reduce((sum, c) => sum + c.commissionPending, 0);
+            const paidAmount = promoterCommissions.reduce((sum, c) => sum + c.commissionPaid, 0);
+
+            return {
+                ...link,
+                pendingAmount,
+                paidAmount,
+            };
+        });
+    }, [allPromoterLinks, allCommissions]);
+
     const filteredPromoters = useMemo(() => {
-        return promoterData.filter(promoter => 
+        return consolidatedPromotersData.filter(promoter => 
             promoter.promoterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             promoter.promoterDni.includes(searchTerm)
         );
-    }, [promoterData, searchTerm]);
+    }, [consolidatedPromotersData, searchTerm]);
 
     const handleOpenAddPromoterFlow = () => {
         setModalStep('dni_entry');
@@ -110,6 +114,12 @@ export default function BusinessPromotersPage() {
     const handleOpenPaymentDialog = (promoter: { uid: string, name: string, pendingAmount: number }) => {
         setPromoterForPayment(promoter);
         setShowPaymentModal(true);
+    };
+
+    const handleOpenDetailsDialog = (promoter: BusinessPromoterLinkWithCommissions) => {
+        const promoterCommissions = allCommissions.filter(c => c.promoterId === promoter.platformUserUid);
+        setPromoterForDetails({ name: promoter.promoterName, commissions: promoterCommissions });
+        setShowDetailsModal(true);
     };
 
     const handleAddOrEditPromoterLink = async (data: BusinessPromoterFormData) => {
@@ -262,7 +272,7 @@ export default function BusinessPromotersPage() {
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="ml-4 text-lg text-muted-foreground">Cargando promotores...</p>
               </div>
-            ) : promoterData.length === 0 && !searchTerm ? (
+            ) : allPromoterLinks.length === 0 && !searchTerm ? (
               <p className="text-center text-muted-foreground h-24 flex items-center justify-center">
                 Aún no has vinculado ningún promotor a tu negocio.
               </p>
@@ -272,6 +282,7 @@ export default function BusinessPromotersPage() {
                   promoters={filteredPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onRegisterPayment={handleOpenPaymentDialog}
+                  onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
                   onDeleteLink={handleDeletePromoterLink}
                   isSubmitting={isSubmitting}
@@ -280,6 +291,7 @@ export default function BusinessPromotersPage() {
                   promoters={filteredPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onRegisterPayment={handleOpenPaymentDialog}
+                  onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
                   onDeleteLink={handleDeletePromoterLink}
                   isSubmitting={isSubmitting}
@@ -325,7 +337,15 @@ export default function BusinessPromotersPage() {
                 isSubmitting={isSubmitting}
             />
         )}
+
+        {showDetailsModal && (
+            <CommissionDetailsDialog
+                open={showDetailsModal}
+                onOpenChange={setShowDetailsModal}
+                promoterName={promoterForDetails?.name || ''}
+                commissionEntries={promoterForDetails?.commissions || []}
+            />
+        )}
       </div>
     );
   }
-
