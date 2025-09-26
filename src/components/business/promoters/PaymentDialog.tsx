@@ -8,14 +8,26 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, CircleDollarSign, Ticket, Calendar } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { z } from "zod";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
-type PaymentFormValues = { notes?: string };
+const paymentFormSchema = z.object({
+    notes: z.string().optional(),
+    commissions: z.array(z.object({
+        id: z.string(),
+        selected: z.boolean(),
+        amount: z.number(),
+        name: z.string(),
+        type: z.string(),
+    })).optional(),
+});
+
+type PaymentFormValues = z.infer<typeof paymentFormSchema>;
+
 
 interface PaymentDialogProps {
   open: boolean;
@@ -27,51 +39,61 @@ interface PaymentDialogProps {
 }
 
 export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, onConfirmPayment, isSubmitting }: PaymentDialogProps) {
-  const [selectedCommissionIds, setSelectedCommissionIds] = useState<Set<string>>(new Set());
-
+  
   const form = useForm<PaymentFormValues>({
-    defaultValues: { notes: "" }
+    resolver: zodResolver(paymentFormSchema),
+    defaultValues: { notes: "", commissions: [] },
   });
 
-  const pendingCommissions = useMemo(() => {
-    if (!promoter?.uid) return [];
-    return allCommissions
-      .filter(c => c.promoterId === promoter.uid && c.commissionPending > 0)
-      .sort((a,b) => new Date(a.period).getTime() - new Date(b.period).getTime());
-  }, [allCommissions, promoter?.uid]);
+  const { fields, replace } = useFieldArray({
+    control: form.control,
+    name: "commissions",
+  });
+
+  const watchedCommissions = useWatch({
+    control: form.control,
+    name: "commissions",
+  });
 
   const totalToPay = useMemo(() => {
-    return pendingCommissions
-      .filter(comm => selectedCommissionIds.has(comm.id))
-      .reduce((sum, comm) => sum + comm.commissionPending, 0);
-  }, [selectedCommissionIds, pendingCommissions]);
+    return (watchedCommissions ?? [])
+      .filter(comm => comm.selected)
+      .reduce((sum, comm) => sum + comm.amount, 0);
+  }, [watchedCommissions]);
+
 
   useEffect(() => {
-    if (open) {
-      // Reset state only when the dialog is newly opened
-      setSelectedCommissionIds(new Set());
-      form.reset({
-        notes: promoter ? `Pago de comisiones a ${promoter.name}.` : ""
+    if (open && promoter?.uid) {
+      const pendingCommissions = allCommissions
+        .filter(c => c.promoterId === promoter.uid && c.commissionPending > 0)
+        .sort((a,b) => new Date(a.period).getTime() - new Date(b.period).getTime())
+        .map(c => ({
+          id: c.id,
+          selected: false,
+          amount: c.commissionPending,
+          name: c.entityName,
+          type: c.entityType
+        }));
+      
+      replace(pendingCommissions);
+      form.reset({ 
+          notes: `Pago de comisiones para ${promoter.name}.`,
+          commissions: pendingCommissions,
       });
+
+    } else if (!open) {
+      replace([]);
+      form.reset({ notes: "", commissions: [] });
     }
-  }, [open, promoter, form]); // form is stable, promoter changes trigger reset
+  }, [open, promoter, allCommissions, form, replace]);
 
-
-  const handleToggleCommission = (commissionId: string) => {
-    setSelectedCommissionIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(commissionId)) {
-        newSet.delete(commissionId);
-      } else {
-        newSet.add(commissionId);
-      }
-      return newSet;
-    });
-  };
 
   const handleSubmit = (values: PaymentFormValues) => {
     if (promoter?.uid && totalToPay > 0) {
-      onConfirmPayment(promoter.uid, totalToPay, values.notes, Array.from(selectedCommissionIds));
+      const selectedIds = (values.commissions || [])
+        .filter(c => c.selected)
+        .map(c => c.id);
+      onConfirmPayment(promoter.uid, totalToPay, values.notes, selectedIds);
     }
   };
   
@@ -92,29 +114,39 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
             <div className="space-y-2">
               <Label>Comisiones Pendientes:</Label>
               <ScrollArea className="h-48 w-full rounded-md border p-2 bg-muted/50">
-                  {pendingCommissions.length > 0 ? (
+                  {fields.length > 0 ? (
                       <div className="space-y-2">
-                          {pendingCommissions.map(comm => (
-                              <div
-                                key={comm.id}
-                                className="text-sm p-2 rounded-md bg-background flex items-center gap-3 cursor-pointer hover:bg-muted"
-                                onClick={() => handleToggleCommission(comm.id)}
-                              >
-                                  <Checkbox
-                                    checked={selectedCommissionIds.has(comm.id)}
-                                    onCheckedChange={() => handleToggleCommission(comm.id)}
-                                    aria-label={`Seleccionar comisión para ${comm.entityName}`}
-                                  />
-                                  <div className="flex-grow flex justify-between items-center">
-                                    <div className="flex items-center truncate">
-                                        {comm.entityType === 'event' ? <Calendar size={14} className="mr-2 text-muted-foreground"/> : <Ticket size={14} className="mr-2 text-muted-foreground"/>}
-                                        <span className="truncate" title={comm.entityName}>{comm.entityName}</span>
-                                    </div>
-                                    <span className="font-semibold text-primary pl-2">
-                                        S/ {comm.commissionPending.toFixed(2)}
-                                    </span>
-                                  </div>
-                              </div>
+                          {fields.map((field, index) => (
+                              <FormField
+                                  key={field.id}
+                                  control={form.control}
+                                  name={`commissions.${index}.selected`}
+                                  render={({ field: checkboxField }) => (
+                                    <FormItem
+                                      className="text-sm p-2 rounded-md bg-background flex items-center gap-3 cursor-pointer hover:bg-muted"
+                                      onClick={() => checkboxField.onChange(!checkboxField.value)}
+                                    >
+                                      <FormControl>
+                                        <Checkbox
+                                          checked={checkboxField.value}
+                                          onCheckedChange={checkboxField.onChange}
+                                          aria-label={`Seleccionar comisión para ${watchedCommissions?.[index]?.name}`}
+                                        />
+                                      </FormControl>
+                                      <div className="flex-grow flex justify-between items-center">
+                                        <div className="flex items-center truncate">
+                                          {watchedCommissions?.[index]?.type === 'event' ? <Calendar size={14} className="mr-2 text-muted-foreground"/> : <Ticket size={14} className="mr-2 text-muted-foreground"/>}
+                                          <span className="truncate" title={watchedCommissions?.[index]?.name}>
+                                            {watchedCommissions?.[index]?.name}
+                                          </span>
+                                        </div>
+                                        <span className="font-semibold text-primary pl-2">
+                                          S/ {watchedCommissions?.[index]?.amount.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </FormItem>
+                                  )}
+                                />
                           ))}
                       </div>
                   ) : (
