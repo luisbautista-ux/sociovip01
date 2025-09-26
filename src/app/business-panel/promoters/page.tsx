@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -194,8 +195,6 @@ export default function BusinessPromotersPage() {
         try {
             if (!currentUser) throw new Error("No autenticado.");
 
-            // This API call needs to be adapted. It now receives an entityId and a specific amount.
-            // The server will have to calculate which codes to mark as paid.
             const response = await fetch('/api/business-panel/register-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await currentUser.getIdToken()}` },
@@ -339,7 +338,7 @@ export default function BusinessPromotersPage() {
                 onOpenChange={setShowPaymentModal}
                 promoter={promoterForPayment}
                 allCommissions={allCommissions}
-                onConfirmPayment={handleConfirmPayment as any} // Cast needed due to signature change
+                onConfirmPayment={handleConfirmPayment}
                 isSubmitting={isSubmitting}
             />
         )}
@@ -360,4 +359,3 @@ export default function BusinessPromotersPage() {
       </div>
     );
   }
-
