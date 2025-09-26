@@ -254,11 +254,12 @@ function BusinessPromoterForm({
   );
 }
 
-const paymentFormSchema = z.object({
-  amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
+const paymentFormSchemaBase = z.object({
   notes: z.string().optional(),
 });
-type PaymentFormValues = z.infer<typeof paymentFormSchema>;
+
+type PaymentFormValues = z.infer<typeof paymentFormSchemaBase> & { amount: number };
+
 
 interface PaymentDialogProps {
   open: boolean;
@@ -269,8 +270,20 @@ interface PaymentDialogProps {
 }
 
 function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmitting }: PaymentDialogProps) {
+  
+  const paymentFormSchema = z.object({
+    amount: z.coerce.number()
+        .positive("El monto debe ser mayor a cero.")
+        .max(promoter?.pendingAmount || 0, `El monto no puede exceder el pendiente de S/ ${(promoter?.pendingAmount || 0).toFixed(2)}.`),
+    notes: z.string().optional(),
+  });
+
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
+    defaultValues: {
+        amount: promoter?.pendingAmount || 0,
+        notes: promoter ? `Pago de comisiones a ${promoter.name}.` : "",
+    }
   });
 
   useEffect(() => {
@@ -749,7 +762,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                                 <span className="font-semibold">{comm.promoterCodesRedeemed}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Tarifa</span>
+                                <span className="text-muted-foreground">Tarifa Comisión</span>
                                 <span className="font-medium">{comm.commissionRateApplied}</span>
                               </div>
                               <div className="flex justify-between">
@@ -892,7 +905,7 @@ function PaymentDialog({ open, onOpenChange, promoter, onConfirmPayment, isSubmi
                                 </RadioGroup></FormControl><FormMessageHook /></FormItem>
                                 )} />
                                 <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
-                                <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} {...field} maxLength={watchedDocType === 'dni' ? 8 : 20} onChange={(e) => { const numericValue = e.target.value.replace(/[^0-9]/g, ''); field.onChange(numericValue); }} autoFocus disabled={isSubmitting} /></FormControl><FormMessageHook /></FormItem>
+                                <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} {...field} maxLength={20} onChange={(e) => { const numericValue = e.target.value.replace(/[^0-9]/g, ''); field.onChange(numericValue); }} autoFocus disabled={isSubmitting} /></FormControl><FormMessageHook /></FormItem>
                                 )} />
                                 <DialogFooter className="pt-2">
                                 <Button type="button" variant="outline" onClick={closeModal} disabled={isSubmitting}>Cancelar</Button>
