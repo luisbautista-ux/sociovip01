@@ -80,40 +80,32 @@ export async function POST(request: Request) {
             throw new Error("Permiso denegado. Esta entidad no pertenece a tu negocio.");
         }
         
-        const originalCodes = entityData.generatedCodes || [];
-        
         let remainingAmountToSettle = paymentAmount;
-        const updatedCodes: GeneratedCode[] = [];
+        const originalCodes = entityData.generatedCodes || [];
 
-        for (const code of originalCodes) {
+        const updatedCodes = originalCodes.map(code => {
             const commissionValue = Number(code.commissionGenerated ?? 0);
-            
+
             if (
-              remainingAmountToSettle > 0 &&
-              code.generatedByUid === promoterUid &&
-              code.commissionStatus === 'unpaid' &&
-              commissionValue > 0
+                remainingAmountToSettle > 0 &&
+                code.generatedByUid === promoterUid &&
+                code.commissionStatus === 'unpaid' &&
+                commissionValue > 0 &&
+                remainingAmountToSettle >= commissionValue
             ) {
-              if (remainingAmountToSettle >= commissionValue) {
                 remainingAmountToSettle -= commissionValue;
                 settledCodeIds.push(code.id);
-                updatedCodes.push({
-                  ...code,
-                  commissionStatus: 'paid' as const,
-                  paymentId: paymentRef.id,
-                });
-              } else {
-                 // Not enough money left to settle this specific commission, push as is.
-                 updatedCodes.push(code);
-              }
-            } else {
-              // Push all other codes without changes.
-              updatedCodes.push(code);
+                return {
+                    ...code,
+                    commissionStatus: 'paid' as const,
+                    paymentId: paymentRef.id,
+                };
             }
-        }
-
+            return code; // Return the code unmodified if conditions are not met
+        });
+        
         if (settledCodeIds.length === 0) {
-            throw new Error("No se encontraron comisiones pendientes que coincidan con el monto a pagar o el promotor especificado.");
+            throw new Error("No se encontraron comisiones pendientes que coincidan con los criterios de pago.");
         }
 
         // Create the payment document
