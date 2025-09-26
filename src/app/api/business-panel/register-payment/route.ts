@@ -68,9 +68,9 @@ export async function POST(request: Request) {
     const paymentRef = adminDb.collection('promoterPayments').doc();
 
     await adminDb.runTransaction(async (transaction) => {
+      // Simplified query to avoid composite index requirement
       const entitiesQuery = adminDb.collection('businessEntities')
-          .where('businessId', '==', businessId)
-          .where('generatedCodes', '!=', null);
+          .where('businessId', '==', businessId);
           
       const entitiesSnap = await transaction.get(entitiesQuery);
 
@@ -79,7 +79,13 @@ export async function POST(request: Request) {
 
       for (const entityDocSnap of entitiesSnap.docs) {
         const entityData = entityDocSnap.data() as BusinessManagedEntity;
-        (entityData.generatedCodes || []).forEach(code => {
+        
+        // Manual check for generatedCodes existence
+        if (!entityData.generatedCodes || entityData.generatedCodes.length === 0) {
+            continue;
+        }
+
+        entityData.generatedCodes.forEach(code => {
           if (code.generatedByUid === promoterUid && code.status === 'used' && code.commissionStatus !== 'paid') {
             let commission = code.commissionGenerated || 0;
             if (commission === 0) {
@@ -141,7 +147,7 @@ export async function POST(request: Request) {
 
       for (const [entityId, updateInfo] of entityUpdates.entries()) {
         const entityDocSnap = await transaction.get(updateInfo.ref);
-        if (entityDocSnap.exists) {
+        if (entityDocSnap.exists()) {
             const entityData = entityDocSnap.data() as BusinessManagedEntity;
             const updatedCodes = (entityData.generatedCodes || []).map(c => {
                 if (updateInfo.codesToUpdate.includes(c.id)) {
