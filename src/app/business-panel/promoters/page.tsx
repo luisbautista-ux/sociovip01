@@ -3,6 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Search, Loader2, UserPlus } from "lucide-react";
 import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry } from "@/lib/types";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -76,7 +77,7 @@ export default function BusinessPromotersPage() {
     }, [fetchData]);
 
     const filteredCommissionsDetails = useMemo(() => {
-        const promoterCommissionTotals = commissions.reduce((acc, comm) => {
+        const promoterCommissionTotals = commissionData.reduce((acc, comm) => {
             if (!acc[comm.promoterId]) {
                 acc[comm.promoterId] = {
                     ...comm,
@@ -96,7 +97,7 @@ export default function BusinessPromotersPage() {
         return Object.values(promoterCommissionTotals).filter(comm => 
             comm.promoterName.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [commissions, searchTerm]);
+    }, [commissionData, searchTerm]);
 
     const handleOpenAddPromoterFlow = () => {
         setModalStep('dni_entry');
@@ -333,7 +334,3 @@ export default function BusinessPromotersPage() {
       </div>
     );
   }
-
-    
-
-    
