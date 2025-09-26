@@ -1,15 +1,14 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Ticket, Loader2, Info, History, HandCoins } from "lucide-react";
+import { Calendar, Ticket } from "lucide-react";
 import type { PromoterCommissionEntry } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 interface CommissionDetailsDialogProps {
   open: boolean;
@@ -17,10 +16,9 @@ interface CommissionDetailsDialogProps {
   promoterName: string;
   promoterUid: string;
   commissionEntries: PromoterCommissionEntry[];
-  onRegisterPaymentClick: () => void;
 }
 
-export function CommissionDetailsDialog({ open, onOpenChange, promoterName, promoterUid, commissionEntries, onRegisterPaymentClick }: CommissionDetailsDialogProps) {
+export function CommissionDetailsDialog({ open, onOpenChange, promoterName, promoterUid, commissionEntries }: CommissionDetailsDialogProps) {
 
   const { totalPending, totalPaid } = useMemo(() => {
       const pending = commissionEntries.reduce((sum, c) => sum + c.commissionPending, 0);
@@ -112,11 +110,8 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
             <p>Total Pagado: <span className="text-green-600">S/ {totalPaid.toFixed(2)}</span></p>
         </div>
 
-        <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
+        <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end w-full">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-            <Button onClick={onRegisterPaymentClick} disabled={totalPending <= 0} variant="gradient">
-                <HandCoins className="mr-2 h-4 w-4"/> Registrar Pago
-            </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

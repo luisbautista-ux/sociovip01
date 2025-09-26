@@ -7,35 +7,29 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, CircleDollarSign, Ticket, Calendar } from "lucide-react";
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { Loader2, CircleDollarSign, AlertTriangle } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect, useMemo } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const paymentFormSchema = z.object({
+    entityId: z.string().min(1, "Debes seleccionar una campaña."),
+    amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
     notes: z.string().optional(),
-    commissions: z.array(z.object({
-        id: z.string(),
-        selected: z.boolean(),
-        amount: z.number(),
-        name: z.string(),
-        type: z.string(),
-    })).optional(),
 });
 
 type PaymentFormValues = z.infer<typeof paymentFormSchema>;
-
 
 interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   promoter: { name: string; uid: string; pendingAmount: number } | null;
   allCommissions: PromoterCommissionEntry[];
-  onConfirmPayment: (promoterUid: string, amount: number, notes: string | undefined, settledCommissionIds: string[]) => Promise<void>;
+  onConfirmPayment: (promoterUid: string, entityId: string, amount: number, notes: string | undefined) => Promise<void>;
   isSubmitting: boolean;
 }
 
@@ -43,59 +37,62 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
   
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
-    defaultValues: { notes: "", commissions: [] },
+    defaultValues: { entityId: "", notes: "", amount: 0 },
   });
+  
+  const selectedEntityId = form.watch("entityId");
 
-  const { fields, replace } = useFieldArray({
-    control: form.control,
-    name: "commissions",
-  });
+  const pendingCommissionsByEntity = useMemo(() => {
+    if (!promoter) return [];
+    const entityMap = new Map<string, { name: string, totalPending: number }>();
+    allCommissions.forEach(comm => {
+      if (comm.promoterId === promoter.uid && comm.commissionPending > 0) {
+        const current = entityMap.get(comm.entityId) || { name: comm.entityName, totalPending: 0 };
+        current.totalPending += comm.commissionPending;
+        entityMap.set(comm.entityId, current);
+      }
+    });
+    return Array.from(entityMap.entries()).map(([id, data]) => ({ id, ...data }));
+  }, [allCommissions, promoter]);
 
-  const watchedCommissions = useWatch({
-    control: form.control,
-    name: "commissions",
-  });
-
-  const totalToPay = useMemo(() => {
-    return (watchedCommissions ?? [])
-      .filter(comm => comm.selected)
-      .reduce((sum, comm) => sum + comm.amount, 0);
-  }, [watchedCommissions]);
-
+  const maxAmountForSelectedEntity = useMemo(() => {
+    if (!selectedEntityId) return 0;
+    return pendingCommissionsByEntity.find(e => e.id === selectedEntityId)?.totalPending || 0;
+  }, [selectedEntityId, pendingCommissionsByEntity]);
 
   useEffect(() => {
-    if (open && promoter?.uid) {
-      const pendingCommissions = allCommissions
-        .filter(c => c.promoterId === promoter.uid && c.commissionPending > 0)
-        .sort((a,b) => new Date(a.period).getTime() - new Date(b.period).getTime())
-        .map(c => ({
-          id: c.id,
-          selected: false,
-          amount: c.commissionPending,
-          name: c.entityName,
-          type: c.entityType
-        }));
-      
-      replace(pendingCommissions);
-      form.reset({ 
-          notes: `Pago de comisiones para ${promoter.name}.`,
-          commissions: pendingCommissions,
+    if (open) {
+      form.reset({
+        entityId: "",
+        notes: `Pago de comisiones para ${promoter?.name || ""}.`,
+        amount: 0,
       });
-
-    } else if (!open) {
-      replace([]);
-      form.reset({ notes: "", commissions: [] });
     }
-  }, [open, promoter, allCommissions, form.reset, replace]);
+  }, [open, promoter, form]);
+
+  useEffect(() => {
+    // Add validation rule dynamically based on selected entity
+    form.register("amount", {
+      max: {
+        value: maxAmountForSelectedEntity,
+        message: `El monto no puede exceder la deuda pendiente de S/ ${maxAmountForSelectedEntity.toFixed(2)}.`
+      }
+    });
+  }, [maxAmountForSelectedEntity, form]);
 
 
   const handleSubmit = (values: PaymentFormValues) => {
-    if (promoter?.uid && totalToPay > 0) {
-      const selectedIds = (values.commissions || [])
-        .filter(c => c.selected)
-        .map(c => c.id);
-      onConfirmPayment(promoter.uid, totalToPay, values.notes, selectedIds);
+    if (!promoter?.uid || !values.entityId || values.amount <= 0) return;
+    
+    if (values.amount > maxAmountForSelectedEntity) {
+        form.setError("amount", {
+            type: "manual",
+            message: `El monto no puede ser mayor a S/ ${maxAmountForSelectedEntity.toFixed(2)}`
+        });
+        return;
     }
+    
+    onConfirmPayment(promoter.uid, values.entityId, values.amount, values.notes);
   };
   
   if (!promoter) return null;
@@ -106,75 +103,79 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
         <DialogHeader>
           <DialogTitle>Registrar Pago a {promoter.name}</DialogTitle>
           <DialogDescription>
-            Total pendiente: S/ {promoter.pendingAmount.toFixed(2)}. Selecciona las comisiones que deseas liquidar.
+            Total pendiente: S/ {promoter.pendingAmount.toFixed(2)}. Selecciona una campaña y el monto a pagar.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             
-            <div className="space-y-2">
-              <Label>Comisiones Pendientes:</Label>
-              <ScrollArea className="h-48 w-full rounded-md border p-2 bg-muted/50">
-                  {fields.length > 0 ? (
-                      <div className="space-y-2">
-                          {fields.map((field, index) => (
-                              <FormField
-                                  key={field.id}
-                                  control={form.control}
-                                  name={`commissions.${index}.selected`}
-                                  render={({ field: checkboxField }) => (
-                                    <FormItem
-                                      className="text-sm p-2 rounded-md bg-background flex items-center gap-3 cursor-pointer hover:bg-muted"
-                                      onClick={() => checkboxField.onChange(!checkboxField.value)}
-                                    >
-                                      <FormControl>
-                                        <Checkbox
-                                          checked={checkboxField.value}
-                                          onCheckedChange={checkboxField.onChange}
-                                          aria-label={`Seleccionar comisión para ${watchedCommissions?.[index]?.name}`}
-                                        />
-                                      </FormControl>
-                                      <div className="flex-grow flex justify-between items-center">
-                                        <div className="flex items-center truncate">
-                                          {watchedCommissions?.[index]?.type === 'event' ? <Calendar size={14} className="mr-2 text-muted-foreground"/> : <Ticket size={14} className="mr-2 text-muted-foreground"/>}
-                                          <span className="truncate" title={watchedCommissions?.[index]?.name}>
-                                            {watchedCommissions?.[index]?.name}
-                                          </span>
-                                        </div>
-                                        <span className="font-semibold text-primary pl-2">
-                                          S/ {watchedCommissions?.[index]?.amount.toFixed(2)}
-                                        </span>
-                                      </div>
-                                    </FormItem>
-                                  )}
-                                />
-                          ))}
-                      </div>
-                  ) : (
-                      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                          No hay comisiones pendientes.
-                      </div>
-                  )}
-              </ScrollArea>
-            </div>
+            <FormField
+              control={form.control}
+              name="entityId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Pagar Comisión de <span className="text-destructive">*</span></FormLabel>
+                  <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      const pending = pendingCommissionsByEntity.find(e => e.id === value)?.totalPending || 0;
+                      form.setValue('amount', pending); // Auto-fill with the full pending amount
+                  }} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger disabled={isSubmitting}>
+                        <SelectValue placeholder="Selecciona una campaña/evento" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {pendingCommissionsByEntity.map(entity => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name} (Pendiente: S/ {entity.totalPending.toFixed(2)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
-            <div>
-              <Label>Monto Total a Pagar (S/)</Label>
-              <Input type="number" value={totalToPay.toFixed(2)} readOnly disabled className="font-bold text-lg h-12 bg-muted/70"/>
-            </div>
+            {selectedEntityId && (
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monto a Pagar (S/) <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...field}
+                        disabled={isSubmitting}
+                        max={maxAmountForSelectedEntity}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                        Deuda para esta campaña: S/ {maxAmountForSelectedEntity.toFixed(2)}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Notas (Opcional)</FormLabel>
-                <FormControl><Textarea placeholder="Ej: Pago por Yape..." {...field} disabled={isSubmitting} /></FormControl>
+                <FormControl><Textarea placeholder="Ej: Pago por Yape, adelanto..." {...field} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}/>
+
              <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
-                <Button type="submit" variant="gradient" disabled={isSubmitting || totalToPay <= 0}>
+                <Button type="submit" variant="gradient" disabled={isSubmitting || !selectedEntityId || form.watch('amount') <= 0}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CircleDollarSign className="mr-2 h-4 w-4"/>}
-                  Confirmar Pago de S/ {totalToPay.toFixed(2)}
+                  Confirmar Pago
                 </Button>
             </DialogFooter>
           </form>
@@ -183,3 +184,4 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
     </Dialog>
   );
 }
+

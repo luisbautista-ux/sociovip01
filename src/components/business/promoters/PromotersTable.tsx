@@ -14,10 +14,11 @@ interface PromotersTableProps {
   onViewDetails: (promoter: BusinessPromoterLinkWithCommissions) => void;
   onEditLink: (link: BusinessPromoterLinkWithCommissions) => void;
   onDeleteLink: (link: BusinessPromoterLinkWithCommissions) => void;
+  onOpenPaymentDialog: (promoter: { uid: string, name: string, pendingAmount: number }) => void; // New prop
   isSubmitting: boolean;
 }
 
-export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEditLink, onDeleteLink, isSubmitting }: PromotersTableProps) {
+export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEditLink, onDeleteLink, onOpenPaymentDialog, isSubmitting }: PromotersTableProps) {
   if (promoters.length === 0) {
     return (
         <div className="hidden md:block text-center h-24 md:flex md:items-center md:justify-center">
@@ -66,6 +67,9 @@ export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEdi
                       </TableCell>
                       <TableCell className="text-right space-x-1">
                           <>
+                          <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs bg-green-500 text-white hover:bg-green-600" onClick={() => onOpenPaymentDialog({ uid: promoter.platformUserUid!, name: promoter.promoterName, pendingAmount: promoter.pendingAmount })} disabled={promoter.pendingAmount <= 0 || isSubmitting}>
+                              <HandCoins className="mr-1 h-3 w-3" /> Pagar
+                          </Button>
                           <Button variant="outline" size="xs" className="h-auto py-1 px-2 text-xs" onClick={() => onViewDetails(promoter)} disabled={isSubmitting}>
                               <ListChecks className="mr-1 h-3 w-3" /> Detalles
                           </Button>
@@ -91,3 +95,4 @@ export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEdi
     </div>
   );
 }
+

@@ -189,15 +189,17 @@ export default function BusinessPromotersPage() {
       }
     };
 
-    const handleConfirmPayment = async (promoterUid: string, amount: number, notes: string | undefined, settledCommissionIds: string[]) => {
+    const handleConfirmPayment = async (promoterUid: string, entityId: string, amount: number, notes: string | undefined) => {
         setIsSubmitting(true);
         try {
             if (!currentUser) throw new Error("No autenticado.");
 
+            // This API call needs to be adapted. It now receives an entityId and a specific amount.
+            // The server will have to calculate which codes to mark as paid.
             const response = await fetch('/api/business-panel/register-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await currentUser.getIdToken()}` },
-                body: JSON.stringify({ promoterUid, amount, notes, settledCommissionIds }),
+                body: JSON.stringify({ promoterUid, entityId, amount, notes }),
             });
             const result = await response.json();
 
@@ -287,6 +289,7 @@ export default function BusinessPromotersPage() {
                   onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
                   onDeleteLink={handleDeletePromoterLink}
+                  onOpenPaymentDialog={handleOpenPaymentDialog}
                   isSubmitting={isSubmitting}
                 />
                 <PromotersTable
@@ -295,6 +298,7 @@ export default function BusinessPromotersPage() {
                   onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
                   onDeleteLink={handleDeletePromoterLink}
+                  onOpenPaymentDialog={handleOpenPaymentDialog}
                   isSubmitting={isSubmitting}
                 />
               </>
@@ -335,7 +339,7 @@ export default function BusinessPromotersPage() {
                 onOpenChange={setShowPaymentModal}
                 promoter={promoterForPayment}
                 allCommissions={allCommissions}
-                onConfirmPayment={handleConfirmPayment}
+                onConfirmPayment={handleConfirmPayment as any} // Cast needed due to signature change
                 isSubmitting={isSubmitting}
             />
         )}
@@ -350,20 +354,10 @@ export default function BusinessPromotersPage() {
                 promoterName={promoterForDetails.name}
                 promoterUid={promoterForDetails.uid}
                 commissionEntries={promoterForDetails.commissions}
-                onRegisterPaymentClick={() => {
-                    const promoterLink = consolidatedPromotersData.find(p => p.platformUserUid === promoterForDetails.uid);
-                    if (promoterLink) {
-                        setShowDetailsModal(false);
-                        handleOpenPaymentDialog({
-                            uid: promoterLink.platformUserUid!,
-                            name: promoterLink.promoterName,
-                            pendingAmount: promoterLink.pendingAmount
-                        });
-                    }
-                }}
             />
         )}
 
       </div>
     );
   }
+
