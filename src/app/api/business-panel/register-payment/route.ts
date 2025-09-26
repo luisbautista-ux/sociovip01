@@ -5,9 +5,10 @@ import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
 import {z} from 'zod';
 import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
-import type {PlatformUser, BusinessManagedEntity} from '@/lib/types';
+import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue} from 'firebase-admin/firestore';
+import { DEFAULT_COMMISSION_PER_CODE } from '@/lib/constants';
 
 const RegisterPaymentSchema = z.object({
   promoterUid: z.string().min(1, 'El UID del promotor es requerido.'),
@@ -83,25 +84,12 @@ export async function POST(request: Request) {
         let totalSettledAmount = 0;
 
         const originalCodes = entityData.generatedCodes || [];
-
-        const hasAnyPending = originalCodes.some(c => 
-            c.entityId === entityId &&
-            c.generatedByUid === promoterUid &&
-            (c.status === 'redeemed' || c.status === 'used') &&
-            c.commissionStatus === 'unpaid' &&
-            Number(c.commissionGenerated ?? 0) > 0);
-
-        if (!hasAnyPending) {
-             throw new Error("No se encontraron comisiones pendientes de pago para esta campaña y promotor.");
-        }
         
         const updatedCodes = originalCodes.map(code => {
-            const commissionValue = Number(code.commissionGenerated ?? 0);
+            const commissionValue = Number(code.commissionGenerated ?? DEFAULT_COMMISSION_PER_CODE);
             
             if (
-                code.entityId === entityId &&
                 code.generatedByUid === promoterUid &&
-                (code.status === 'redeemed' || code.status === 'used') &&
                 code.commissionStatus === 'unpaid' &&
                 commissionValue > 0 &&
                 remainingAmountToSettle >= commissionValue
@@ -119,7 +107,7 @@ export async function POST(request: Request) {
         });
         
         if (settledCodeIds.length === 0) {
-             throw new Error("El monto del pago no es suficiente para cubrir al menos una comisión pendiente.");
+             throw new Error("No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto.");
         }
 
         transaction.set(paymentRef, {
