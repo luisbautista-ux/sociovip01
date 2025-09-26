@@ -4,14 +4,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Search, Loader2, UserPlus, ListChecks } from "lucide-react";
-import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry, BusinessPromoterLinkWithCommissions } from "@/lib/types";
+import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry, BusinessPromoterLinkWithCommissions, GeneratedCode } from "@/lib/types";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, writeBatch, runTransaction } from "firebase/firestore";
 
 import { DniEntryDialog } from "@/components/business/promoters/DniEntryDialog";
 import { PromoterFormDialog } from "@/components/business/promoters/PromoterFormDialog";
@@ -20,6 +20,7 @@ import { PromotersTable } from "@/components/business/promoters/PromotersTable";
 import { PromoterMobileCards } from "@/components/business/promoters/PromoterMobileCards";
 import { CommissionDetailsDialog } from "@/components/business/promoters/CommissionDetailsDialog";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
+import { DEFAULT_COMMISSION_PER_CODE } from "@/lib/constants";
 
 export default function BusinessPromotersPage() {
     const { userProfile, currentUser } = useAuth();
@@ -188,29 +189,75 @@ export default function BusinessPromotersPage() {
       }
     };
 
-    const handleConfirmPayment = async (promoterUid: string, amount: number, notes?: string) => {
-        if (!currentUser) {
-            toast({ title: "Error", description: "No se puede registrar el pago. Sesión no válida.", variant: "destructive" });
-            return;
-        }
-        setIsSubmitting(true);
-        try {
-            const idToken = await currentUser.getIdToken();
-            const response = await fetch('/api/business-panel/register-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                body: JSON.stringify({ promoterUid, amount, notes }),
+    const handleConfirmPayment = async (promoterUid: string, amount: number, notes: string | undefined, settledCommissionIds: string[]) => {
+      if (!currentUser || !currentBusinessId) return;
+      setIsSubmitting(true);
+      
+      const entitiesToUpdate: Map<string, { ref: any, codesToUpdate: string[] }> = new Map();
+      const allEntitiesSnap = await getDocs(query(collection(db, "businessEntities"), where("businessId", "==", currentBusinessId)));
+      const allEntities = allEntitiesSnap.docs.map(d => ({id: d.id, ...d.data()}) as any);
+
+      // This logic is getting complex client-side. The API should handle it.
+      // Refactoring to send minimal info to API.
+      // API will receive amount and list of commission entries to settle.
+      
+      try {
+        const idToken = await currentUser.getIdToken();
+        // The API now needs to know which codes to update.
+        // The 'settledCommissionIds' is not granular enough.
+        // Let's pass the actual `GeneratedCode` IDs that are covered by the payment.
+        
+        const pendingCodesToSettle: string[] = [];
+        let tempAmount = amount;
+
+        // Get all pending codes for this promoter, sorted by date.
+        const allPendingCodes: (GeneratedCode & {entityId: string})[] = [];
+        for (const entity of allEntities) {
+            (entity.generatedCodes || []).forEach((code: GeneratedCode) => {
+                if (code.generatedByUid === promoterUid && code.commissionStatus === 'unpaid' && code.usedDate) {
+                    allPendingCodes.push({...code, entityId: entity.id});
+                }
             });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Error al registrar el pago.');
-            toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)}.` });
-            setShowPaymentModal(false);
-            fetchData();
-        } catch (error: any) {
-            toast({ title: "Error al Registrar Pago", description: error.message, variant: "destructive" });
-        } finally {
-            setIsSubmitting(false);
         }
+        allPendingCodes.sort((a,b) => new Date(a.usedDate!).getTime() - new Date(b.usedDate!).getTime());
+
+        for (const code of allPendingCodes) {
+            const commission = code.commissionGenerated ?? DEFAULT_COMMISSION_PER_CODE;
+            if (tempAmount >= commission) {
+                pendingCodesToSettle.push(code.id);
+                tempAmount -= commission;
+            } else {
+                break;
+            }
+        }
+
+        if (pendingCodesToSettle.length === 0) {
+            throw new Error("El monto es insuficiente para cubrir cualquier comisión pendiente.");
+        }
+
+        const response = await fetch('/api/business-panel/register-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+          body: JSON.stringify({
+            promoterUid,
+            amount,
+            notes,
+            settledCodeIds: pendingCodesToSettle,
+          }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Error en el servidor al registrar el pago.');
+        
+        toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)} y se liquidaron ${pendingCodesToSettle.length} comisiones.` });
+        setShowPaymentModal(false);
+        fetchData();
+
+      } catch (error: any) {
+        toast({ title: "Error al Registrar Pago", description: error.message, variant: "destructive" });
+      } finally {
+        setIsSubmitting(false);
+      }
     };
     
     const handleDeletePromoterLink = async (link: BusinessPromoterLink) => {
@@ -336,6 +383,7 @@ export default function BusinessPromotersPage() {
                 open={showPaymentModal}
                 onOpenChange={setShowPaymentModal}
                 promoter={promoterForPayment}
+                allCommissions={allCommissions}
                 onConfirmPayment={handleConfirmPayment}
                 isSubmitting={isSubmitting}
             />
@@ -354,3 +402,4 @@ export default function BusinessPromotersPage() {
       </div>
     );
   }
+
