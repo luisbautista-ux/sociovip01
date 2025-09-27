@@ -181,24 +181,20 @@ export default function LectorValidateQrPage() {
   }, []);
 
   const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    if (entity.type !== 'event' || !entity.assignedPromoters || !code.generatedByUid) {
+      if (!code.generatedByUid) {
+        return 0;
+      }
+      const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
+      if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+        return 0;
+      }
+      const generalRule = promoterAssignment.commissionRules.find(
+          r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+      );
+      if (generalRule) {
+        return generalRule.commissionValue;
+      }
       return 0;
-    }
-  
-    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
-    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return 0;
-    }
-  
-    const generalRule = promoterAssignment.commissionRules.find(
-      r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
-    );
-  
-    if (generalRule) {
-      return generalRule.commissionValue;
-    }
-  
-    return 0; // Return 0 if no rule is found
   };
 
 
@@ -236,11 +232,8 @@ export default function LectorValidateQrPage() {
           codes[codeIndex].isVipCandidate = isVipCandidate;
           
           // --- Commission Logic ---
-          // The commission is calculated and recorded ONLY at this moment.
           const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
           codes[codeIndex].commissionGenerated = commissionAmount;
-
-          // The status is marked as 'unpaid' only if a commission was generated.
           if (commissionAmount > 0) {
             codes[codeIndex].commissionStatus = 'unpaid';
           }
@@ -344,7 +337,7 @@ export default function LectorValidateQrPage() {
                 <p className="text-sm text-muted-foreground">{foundEntity.description}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div><CalendarDays className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Vigencia:</strong> {anyToDate(foundEntity.startDate) ? format(anyToDate(foundEntity.startDate)!, "P", { locale: es }) : 'N/A'} - {anyToDate(foundEntity.endDate) ? format(anyToDate(foundEntity.endDate)!, "P", { locale: es }) : 'N/A'}</div>
-                  <div><Ticket className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Tipo:</strong> {foundEntity.type === 'promotion' ? "Promoción" : "Evento"}</div>
+                  <div><Ticket className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Tipo:</strong> {foundEntity.type === "promotion" ? "Promoción" : "Evento"}</div>
                   {foundCode.redeemedByInfo && <div><User className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Cliente:</strong> {foundCode.redeemedByInfo.name} (DNI: {foundCode.redeemedByInfo.dni})</div>}
                   {foundCode.redemptionDate && <div><Clock className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Fecha de Canje (QR):</strong> {anyToDate(foundCode.redemptionDate) ? format(anyToDate(foundCode.redemptionDate)!, "Pp", { locale: es }) : 'N/A'}</div>}
                   {foundCode.usedByInfo && <div><UserCheck className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Validado por:</strong> {foundCode.usedByInfo.name}</div>}
