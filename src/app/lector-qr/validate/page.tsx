@@ -180,30 +180,27 @@ export default function LectorValidateQrPage() {
     // Silently ignore scan failures
   }, []);
 
-    const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-        if (entity.type !== 'event' || !entity.assignedPromoters || !code.generatedByUid) {
-            return 0; // Solo los eventos con promotores asignados generan comisión
-        }
-
-        const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
-        if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-            return 0; // Si el promotor no está asignado o no tiene reglas, no hay comisión.
-        }
-        
-        // Lógica de búsqueda de regla:
-        // 1. Buscar regla por tipo de entrada (futuro)
-        // 2. Buscar regla general del evento
-        const generalRule = promoterAssignment.commissionRules.find(
-            r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
-        );
-
-        if (generalRule) {
-            return generalRule.commissionValue;
-        }
-        
-        // Si no se encuentra ninguna regla aplicable, la comisión es 0.
-        return 0;
-    };
+  const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    if (entity.type !== 'event' || !entity.assignedPromoters || !code.generatedByUid) {
+      return 0; // No commission for promotions or if promoter is not assigned
+    }
+  
+    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return 0; // No commission if no rules are found for this promoter
+    }
+  
+    // For now, get the first 'event_general' rule. This can be expanded for more complex scenarios.
+    const generalRule = promoterAssignment.commissionRules.find(
+      r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+  
+    if (generalRule) {
+      return generalRule.commissionValue;
+    }
+  
+    return 0; // Default to 0 if no applicable rule is found
+  };
 
 
   const handleValidateAndRedeem = async () => {
@@ -239,12 +236,12 @@ export default function LectorValidateQrPage() {
           codes[codeIndex].usedByInfo = { uid: userProfile.uid, name: userProfile.name };
           codes[codeIndex].isVipCandidate = isVipCandidate;
           
-          // --- Logica de Comisión ---
-          // Se calcula la comisión SOLO en este momento.
+          // --- Commission Logic ---
+          // The commission is calculated and recorded ONLY at this moment.
           const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
           codes[codeIndex].commissionGenerated = commissionAmount;
 
-          // Se marca como 'unpaid' solo si la comisión es > 0
+          // The status is marked as 'unpaid' only if a commission was generated.
           if (commissionAmount > 0) {
             codes[codeIndex].commissionStatus = 'unpaid';
           }
@@ -378,68 +375,6 @@ export default function LectorValidateQrPage() {
           )}
         </Card>
       )}
-
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Promociones y Eventos Disponibles</CardTitle>
-          <CardDescription>Actividades vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          
-          {activePromotions.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-2 flex items-center"><Ticket className="h-5 w-5 mr-2 text-primary"/>Promociones Disponibles</h3>
-              <Accordion type="single" collapsible className="w-full">
-                {activePromotions.map(entity => (
-                  <AccordionItem value={entity.id} key={entity.id}>
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                          <span>{entity.name}</span>
-                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Activa</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-1 text-sm pl-8">
-                      <p>{entity.description}</p>
-                      <p><strong>Vigencia:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'} - {entity.endDate ? format(anyToDate(entity.endDate)!, "P", { locale: es }) : 'N/A'}</p>
-                      {entity.usageLimit && entity.usageLimit > 0 && <p><strong>Límite de canjes:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.usageLimit}</p>}
-                      <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </div>
-          )}
-
-          {activeEvents.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-2 flex items-center"><CalendarDays className="h-5 w-5 mr-2 text-primary"/>Eventos Vigentes</h3>
-              <Accordion type="single" collapsible className="w-full">
-                {activeEvents.map(entity => (
-                  <AccordionItem value={entity.id} key={entity.id}>
-                    <AccordionTrigger>
-                      <div className="flex items-center gap-2">
-                          <span>{entity.name}</span>
-                          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Activo</Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-1 text-sm pl-8">
-                      <p>{entity.description}</p>
-                      <p><strong>Fecha:</strong> {entity.startDate ? format(anyToDate(entity.startDate)!, "P", { locale: es }) : 'N/A'}</p>
-                      <p><strong>Asistencia:</strong> {entity.generatedCodes?.filter(c => c.status === 'used').length || 0} / {entity.maxAttendance === 0 || !entity.maxAttendance ? '∞' : entity.maxAttendance}</p>
-                      <p><strong>Códigos disponibles para canje:</strong> {entity.generatedCodes?.filter(c => c.status === 'redeemed').length || 0}</p>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </div>
-          )}
-          
-          {activeBusinessEntities.length === 0 && (
-            <p className="text-muted-foreground">No hay promociones o eventos activos para hoy.</p>
-          )}
-
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -180,26 +180,26 @@ export default function BusinessPanelValidateQrPage() {
   }, []);
 
   const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    if (!entity.assignedPromoters || !code.generatedByUid) {
-      return 0; // No usar valor por defecto, si no hay promotor, no hay comisión.
+    if (entity.type !== 'event' || !entity.assignedPromoters || !code.generatedByUid) {
+      return 0; // No commission for promotions or if promoter is not assigned
     }
-
+  
     const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
     if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return 0; // No usar valor por defecto, si no hay reglas, no hay comisión.
+      return 0; // No commission if no rules are found for this promoter
     }
-    
-    // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
+  
+    // For now, get the first 'event_general' rule. This can be expanded for more complex scenarios.
     const generalRule = promoterAssignment.commissionRules.find(
-        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+      r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
     );
-    
+  
     if (generalRule) {
       return generalRule.commissionValue;
     }
-    
-    return 0; // Si no hay regla aplicable, la comisión es 0.
-};
+  
+    return 0; // Default to 0 if no applicable rule is found
+  };
 
 
   const handleValidateAndRedeem = async () => {
