@@ -22,6 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import * as ExcelJS from "exceljs";
 
 /* ===================== Helpers de fecha (aceptan Timestamp/Date/string/number) ===================== */
 function anyToDate(value: any): Date | null {
@@ -202,7 +203,7 @@ export default function BusinessClientsPage() {
     });
   }, [searchTerm, filterDate, qrClients]);
 
-  const handleExportCsv = () => {
+  const handleExport = async () => {
     if (filteredClients.length === 0) {
       toast({
         title: "Sin Datos",
@@ -212,35 +213,67 @@ export default function BusinessClientsPage() {
       return;
     }
   
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Clientes QR");
+
     const headers = [
-      "ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nacimiento", "Fecha Registro",
+      "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro",
     ];
-  
-    const rows = filteredClients.map((c) => [
-      c.id,
-      c.name,
-      c.surname,
-      `'${c.dni}`, // Precede con ' para tratar como texto
-      `'${c.phone || "N/A"}`, // Precede con '
-      renderDate(c.dob, "P"),
-      renderDate(c.registrationDate, "P p"),
-    ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`)); // Quoting and escaping
-  
-    const csvContent = [
-      headers.map(h => `"${h}"`).join(';'),
-      ...rows.map(r => r.join(';'))
-    ].join('\n');
-  
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF5D2A8E' } 
+        };
+        cell.font = {
+            bold: true,
+            color: { argb: 'FFFFFFFF' }
+        };
+        cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
+    });
+
+    filteredClients.forEach(client => {
+        const rowData = [
+          client.name,
+          client.surname,
+          client.dni,
+          client.phone || "N/A",
+          renderDate(client.dob, "P"),
+          renderDate(client.registrationDate, "P p"),
+        ];
+        const row = worksheet.addRow(rowData);
+        row.eachCell((cell) => {
+            cell.border = {
+                top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+            };
+        });
+    });
+
+    worksheet.columns.forEach(column => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, cell => {
+            const columnLength = cell.value ? cell.value.toString().length : 10;
+            if (columnLength > maxLength) {
+                maxLength = columnLength;
+            }
+        });
+        column.width = maxLength < 10 ? 10 : maxLength + 2;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `clientes_${isSuperAdmin ? "todos_negocios" : userProfile?.businessId ?? "negocio"}.csv`);
+    link.href = URL.createObjectURL(blob);
+    link.download = `SocioVip_Clientes_QR_${userProfile?.businessId ?? 'negocio'}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  
-    toast({ title: "Exportación Exitosa", description: `${filteredClients.length} clientes exportados.` });
+
+    toast({ title: "Exportación Exitosa", description: "Se ha descargado el archivo de Excel." });
   };
 
   if (loading) return <p>Cargando clientes…</p>;
@@ -252,8 +285,8 @@ export default function BusinessClientsPage() {
           <Contact className="h-8 w-8 mr-2" /> Mis Clientes
         </h1>
         <div className="self-end sm:self-center">
-            <Button onClick={handleExportCsv} variant="gradient">
-              <Download className="mr-2 h-4 w-4" /> Exportar CSV
+            <Button onClick={handleExport} variant="gradient">
+              <Download className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
         </div>
       </div>
