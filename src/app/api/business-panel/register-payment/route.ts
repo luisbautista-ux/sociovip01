@@ -8,7 +8,6 @@ import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue} from 'firebase-admin/firestore';
-import { DEFAULT_COMMISSION_PER_CODE } from '@/lib/constants';
 
 const RegisterPaymentSchema = z.object({
   promoterUid: z.string().min(1, 'El UID del promotor es requerido.'),
@@ -86,15 +85,16 @@ export async function POST(request: Request) {
         const originalCodes = entityData.generatedCodes || [];
         
         const updatedCodes = originalCodes.map(code => {
-            const commissionValue = Number(code.commissionGenerated ?? DEFAULT_COMMISSION_PER_CODE);
+            // Lee el valor de comisión ya grabado. Si no existe, es 0.
+            const commissionValue = Number(code.commissionGenerated ?? 0);
             
-            // This logic will now find the correct codes to settle
             if (
                 code.generatedByUid === promoterUid &&
+                code.status === 'used' // Only pay for validated (used) codes
+                &&
                 (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined) &&
                 commissionValue > 0 &&
-                remainingAmountToSettle >= commissionValue &&
-                code.status === 'used' // Only pay for validated (used) codes
+                remainingAmountToSettle >= commissionValue
             ) {
                 remainingAmountToSettle -= commissionValue;
                 totalSettledAmount += commissionValue;
@@ -141,5 +141,3 @@ export async function POST(request: Request) {
     return NextResponse.json({error: error.message || 'Ocurrió un error interno.'}, {status: 500});
   }
 }
-
-    
