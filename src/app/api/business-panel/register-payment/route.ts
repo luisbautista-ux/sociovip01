@@ -8,6 +8,7 @@ import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue} from 'firebase-admin/firestore';
+import { DEFAULT_COMMISSION_PER_CODE } from '@/lib/constants';
 
 const RegisterPaymentSchema = z.object({
   promoterUid: z.string().min(1, 'El UID del promotor es requerido.'),
@@ -85,13 +86,11 @@ export async function POST(request: Request) {
         const originalCodes = entityData.generatedCodes || [];
         
         const updatedCodes = originalCodes.map(code => {
-            // Lee el valor de comisión ya grabado. Si no existe, es 0.
             const commissionValue = Number(code.commissionGenerated ?? 0);
             
             if (
                 code.generatedByUid === promoterUid &&
-                code.status === 'used' // Only pay for validated (used) codes
-                &&
+                code.status === 'used' &&
                 (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined) &&
                 commissionValue > 0 &&
                 remainingAmountToSettle >= commissionValue
@@ -110,7 +109,7 @@ export async function POST(request: Request) {
         });
         
         if (settledCodeIds.length === 0) {
-             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto. Verifique que el estado del código sea 'Utilizado (en Puerta)'.`);
+             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto.`);
         }
 
         transaction.set(paymentRef, {
