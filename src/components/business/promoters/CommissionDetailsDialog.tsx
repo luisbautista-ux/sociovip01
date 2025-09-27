@@ -51,7 +51,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
                                 </CardHeader>
                                 <CardContent className="p-3 text-xs grid grid-cols-2 gap-1">
                                     <div>QRs Validados:</div><div className="text-right font-semibold">{comm.promoterCodesRedeemed}</div>
-                                    <div>Tarifa:</div><div className="text-right font-semibold">{comm.commissionRateApplied}</div>
+                                    <div>Tarifa:</div><div className="text-right font-semibold">{comm.commissionRateApplied || 'S/ 0.00'}</div>
                                     <div>Pendiente:</div><div className="text-right font-semibold text-destructive">S/ {comm.commissionPending.toFixed(2)}</div>
                                     <div>Pagado:</div><div className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</div>
                                 </CardContent>
@@ -83,7 +83,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
                                           </div>
                                       </TableCell>
                                       <TableCell className="text-center">{comm.promoterCodesRedeemed}</TableCell>
-                                      <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
+                                      <TableCell className="text-center">{comm.commissionRateApplied || 'S/ 0.00'}</TableCell>
                                       <TableCell className="text-right font-semibold text-destructive">
                                           S/ {comm.commissionPending.toFixed(2)}
                                       </TableCell>
