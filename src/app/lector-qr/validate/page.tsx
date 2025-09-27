@@ -181,13 +181,15 @@ export default function LectorValidateQrPage() {
   }, []);
 
   const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    if (!code.generatedByUid) return 0;
-    const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
-    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      if (!code.generatedByUid) {
+        return 0;
+      }
+      const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
+      if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
         return 0; 
-    }
-    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number');
-    return generalRule ? generalRule.commissionValue : 0;
+      }
+      const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number');
+      return generalRule ? generalRule.commissionValue : 0;
   };
 
 
@@ -365,3 +367,5 @@ export default function LectorValidateQrPage() {
     </div>
   );
 }
+
+    
