@@ -30,7 +30,7 @@ async function getCallerProfile(
   return userDoc.data() as PlatformUser;
 }
 
-// ESTA FUNCIÓN AHORA SIEMPRE RECALCULA LA COMISIÓN BASADO EN LAS REGLAS, IGNORANDO `commissionGenerated`.
+// ESTA FUNCIÓN AHORA SIEMPRE RECALCULA LA COMISIÓN BASADO EN LAS REGLAS, IGNORANDO CUALQUIER VALOR PREVIAMENTE GUARDADO.
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
     // Si no hay promotor asignado al código, no hay comisión.
     if (!code.generatedByUid) {
@@ -40,7 +40,7 @@ const getCommissionValueForCode = (entity: BusinessManagedEntity, code: Generate
     // Buscar la asignación del promotor DENTRO de la entidad (evento/promoción).
     const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
     
-    // Si el promotor no fue asignado a esta entidad, o no tiene reglas, no hay comisión.
+    // Si el promotor no fue asignado a esta entidad, o no tiene reglas de comisión, la comisión es 0.
     if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
       return 0;
     }
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
           };
         }
         
-        // La comisión SIEMPRE se recalcula aquí para corregir datos pasados y asegurar consistencia.
+        // LA COMISIÓN SIEMPRE SE RECALCULA AQUÍ, IGNORANDO `commissionGenerated` PARA CORREGIR DATOS PASADOS Y ASEGURAR CONSISTENCIA.
         const commission = getCommissionValueForCode(entity, code);
         
         promoterCommissionsForEntity[code.generatedByUid].commissionRateDisplay.add(`S/ ${commission.toFixed(2)}`);
@@ -192,5 +192,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
-    
