@@ -85,11 +85,12 @@ export async function POST(request: Request) {
         const originalCodes = entityData.generatedCodes || [];
         
         const updatedCodes = originalCodes.map(code => {
-            const commissionValue = typeof code.commissionGenerated === 'number' ? code.commissionGenerated : 0;
+            const commissionValue = Number(code.commissionGenerated ?? 0);
             
             if (
                 code.generatedByUid === promoterUid &&
-                code.status === 'used' && // Only pay for validated (used) codes
+                code.status === 'used' // Only pay for validated (used) codes
+                &&
                 (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined) &&
                 commissionValue > 0 &&
                 remainingAmountToSettle >= commissionValue

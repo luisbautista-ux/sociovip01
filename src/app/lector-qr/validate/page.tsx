@@ -439,5 +439,4 @@ export default function LectorValidateQrPage() {
   );
 }
 
-      
-
+    
