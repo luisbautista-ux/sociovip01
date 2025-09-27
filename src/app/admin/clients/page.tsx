@@ -16,7 +16,7 @@ import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MESES_DEL_ANO_ES } from "@/lib/constants";
-import * as XLSX from "xlsx";
+import * as ExcelJS from "exceljs";
 
 export default function AdminQrClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -88,73 +88,79 @@ export default function AdminQrClientsPage() {
     return searchMatch && birthdayMatch && registrationMatch;
   });
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (filteredClients.length === 0) {
       toast({ title: "Sin Datos", description: "No hay clientes QR para exportar.", variant: "destructive" });
       return;
     }
     
-    // Define los encabezados de la tabla
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Clientes QR");
+
     const headers = ["Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro"];
     
-    // Mapea los datos de los clientes a un formato de array de arrays
-    const data = filteredClients.map(client => [
-      client.name,
-      client.surname,
-      client.dni,
-      client.phone || "N/A",
-      client.dob && typeof client.dob === 'string' ? format(parseISO(client.dob), "dd/MM/yyyy") : "N/A",
-      client.registrationDate && typeof client.registrationDate === 'string' ? format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm") : "N/A",
-    ]);
+    // Añadir encabezado y aplicar estilo
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell, colNumber) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF5D2A8E' } // Morado oscuro
+        };
+        cell.font = {
+            bold: true,
+            color: { argb: 'FFFFFFFF' } // Blanco
+        };
+        cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+        };
+    });
 
-    // Crea la hoja de cálculo
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    // Añadir datos y aplicar estilo a las celdas
+    filteredClients.forEach(client => {
+        const rowData = [
+          client.name,
+          client.surname,
+          client.dni,
+          client.phone || "N/A",
+          client.dob && typeof client.dob === 'string' ? format(parseISO(client.dob), "dd/MM/yyyy") : "N/A",
+          client.registrationDate && typeof client.registrationDate === 'string' ? format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm") : "N/A",
+        ];
+        const row = worksheet.addRow(rowData);
+        row.eachCell((cell) => {
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
+    });
 
-    // Define los estilos
-    const headerStyle = {
-      font: { bold: true, color: { rgb: "FFFFFF" } },
-      fill: { fgColor: { rgb: "5D2A8E" } }, // Color morado oscuro
-      border: {
-        top: { style: "thin" }, bottom: { style: "thin" },
-        left: { style: "thin" }, right: { style: "thin" },
-      },
-    };
-    const cellStyle = {
-      border: {
-        top: { style: "thin" }, bottom: { style: "thin" },
-        left: { style: "thin" }, right: { style: "thin" },
-      },
-    };
-    
-    // Aplica los estilos al encabezado
-    const headerRange = XLSX.utils.decode_range(ws['!ref']!);
-    for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (!ws[cellAddress]) ws[cellAddress] = {};
-      ws[cellAddress].s = headerStyle;
-    }
-    
-    // Aplica los estilos a las celdas de datos
-    for (let R = 1; R <= data.length; ++R) {
-        for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
-            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-            if (!ws[cellAddress]) ws[cellAddress] = {};
-            ws[cellAddress].s = cellStyle;
-        }
-    }
-    
-    // Ajusta el ancho de las columnas
-    const colWidths = headers.map((header, i) => ({
-        wch: Math.max(header.length, ...data.map(row => (row[i] || "").toString().length)) + 2,
-    }));
-    ws['!cols'] = colWidths;
+    // Ajustar ancho de columnas
+    worksheet.columns.forEach(column => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, cell => {
+            const columnLength = cell.value ? cell.value.toString().length : 10;
+            if (columnLength > maxLength) {
+                maxLength = columnLength;
+            }
+        });
+        column.width = maxLength < 10 ? 10 : maxLength + 2;
+    });
 
-    // Crea el libro de trabajo y añade la hoja
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Clientes QR");
-    
-    // Escribe el archivo y lo descarga
-    XLSX.writeFile(wb, "SocioVip_Clientes_QR.xlsx");
+    // Generar y descargar el archivo
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "SocioVip_Clientes_QR.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
     toast({ title: "Exportación Exitosa", description: "Se ha descargado el archivo de Excel." });
   };
