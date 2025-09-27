@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         const originalCodes = entityData.generatedCodes || [];
         
         const updatedCodes = originalCodes.map(code => {
-            // Lee el valor de comisión ya grabado. Si no existe, es 0. NUNCA un valor por defecto.
+            // Lee el valor de comisión ya grabado. Si no existe, es 0.
             const commissionValue = Number(code.commissionGenerated ?? 0);
             
             if (

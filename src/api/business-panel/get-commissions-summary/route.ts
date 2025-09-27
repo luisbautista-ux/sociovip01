@@ -55,7 +55,7 @@ const getCommissionValueForCode = (entity: BusinessManagedEntity, code: Generate
       return generalRule.commissionValue;
     }
     
-    // Si no se encuentra ninguna regla aplicable, la comisión es 0. NUNCA un valor por defecto.
+    // Si no se encuentra ninguna regla aplicable, la comisión es 0.
     return 0;
 };
 
