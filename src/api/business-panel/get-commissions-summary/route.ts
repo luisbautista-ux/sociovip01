@@ -7,10 +7,9 @@ import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
 import type {
   PlatformUser,
   BusinessManagedEntity,
-  BusinessPromoterLink,
-  PromoterCommissionEntry,
   Business,
   GeneratedCode,
+  PromoterCommissionEntry,
 } from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 
@@ -47,7 +46,6 @@ const getCommissionValueForCode = (entity: BusinessManagedEntity, code: Generate
     }
     
     // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
-    // Futuro: Se puede expandir para buscar reglas por tipo de entrada, etc.
     const generalRule = promoterAssignment.commissionRules.find(
         r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
     );
