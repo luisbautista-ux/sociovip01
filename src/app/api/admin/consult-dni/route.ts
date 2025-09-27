@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         formFecha.append('dni', dni);
         formFecha.append('company', '');
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', '1807126567'); // Usando el token proporcionado
+        formFecha.append('security', '6f1f72771e'); // Usando el token proporcionado
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',

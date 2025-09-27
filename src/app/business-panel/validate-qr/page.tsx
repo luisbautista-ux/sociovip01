@@ -194,7 +194,7 @@ export default function BusinessPanelValidateQrPage() {
       const entityRef = doc(db, "businessEntities", foundEntity.id);
       await runTransaction(db, async (transaction) => {
           const entityDoc = await transaction.get(entityRef);
-          if (!entityDoc.exists()) {
+          if (!entityDoc.exists) {
               throw new Error("La promoción o evento ya no existe.");
           }
           const entityData = entityDoc.data() as BusinessManagedEntity;
@@ -419,3 +419,5 @@ export default function BusinessPanelValidateQrPage() {
 }
 
       
+
+    

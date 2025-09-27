@@ -93,7 +93,8 @@ export async function POST(request: Request) {
                 code.generatedByUid === promoterUid &&
                 (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined) &&
                 commissionValue > 0 &&
-                remainingAmountToSettle >= commissionValue
+                remainingAmountToSettle >= commissionValue &&
+                code.status === 'used' // Only pay for validated (used) codes
             ) {
                 remainingAmountToSettle -= commissionValue;
                 totalSettledAmount += commissionValue;
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
         });
         
         if (settledCodeIds.length === 0) {
-             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto. Verifique que el estado de la comisión sea 'unpaid'.`);
+             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto. Verifique que el estado del código sea 'Utilizado (en Puerta)'.`);
         }
 
         transaction.set(paymentRef, {
@@ -140,3 +141,5 @@ export async function POST(request: Request) {
     return NextResponse.json({error: error.message || 'Ocurrió un error interno.'}, {status: 500});
   }
 }
+
+    

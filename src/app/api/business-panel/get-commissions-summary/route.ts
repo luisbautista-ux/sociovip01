@@ -75,26 +75,24 @@ export async function GET(request: Request) {
         return NextResponse.json([]); // Return empty array if no businesses to check
     }
 
-    const [businessesSnapshot, entitiesSnapshot, linksSnapshot] = await Promise.all([
+    const [businessesSnapshot, entitiesSnapshot] = await Promise.all([
         adminDb.collection('businesses').where('__name__', 'in', businessIds).get(),
         adminDb.collection('businessEntities').where('businessId', 'in', businessIds).get(),
-        adminDb.collection('businessPromoterLinks').where('businessId', 'in', businessIds).get(),
     ]);
     
     const businessesMap = new Map(businessesSnapshot.docs.map(doc => [doc.id, doc.data() as Business]));
-    const promoterLinks = linksSnapshot.docs.map(doc => doc.data() as BusinessPromoterLink);
-    const validPromoterUids = new Set(promoterLinks.map(link => link.platformUserUid));
-
+    
     const allEntities = entitiesSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as BusinessManagedEntity);
     
     const commissionEntries: PromoterCommissionEntry[] = [];
 
     allEntities.forEach(entity => {
-      const promoterCommissionsForEntity: Record<string, { promoterName: string, pending: number, paid: number, codesRedeemed: number, commissionRate: string }> = {};
+      // Map to hold commission data per promoter for the current entity
+      const promoterCommissionsForEntity: Record<string, { promoterName: string; pending: number; paid: number; codesRedeemed: number, commissionRate: string }> = {};
 
       (entity.generatedCodes || []).forEach(code => {
-        // A commission is owed if a code is 'redeemed' (QR generated) or 'used' (scanned at door).
-        if (!code.generatedByUid || (code.status !== 'redeemed' && code.status !== 'used') || !validPromoterUids.has(code.generatedByUid)) return;
+        // A commission is owed ONLY if a code is 'used' (scanned at door).
+        if (!code.generatedByUid || code.status !== 'used') return;
 
         if (!promoterCommissionsForEntity[code.generatedByUid]) {
           promoterCommissionsForEntity[code.generatedByUid] = { 
@@ -108,15 +106,9 @@ export async function GET(request: Request) {
         
         let commission = Number(code.commissionGenerated ?? 0);
         
-        // If commission was not pre-calculated on the code, determine it now.
+        // This is a fallback. The commission should be set when the code is validated.
         if (commission === 0) {
-            const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
-            const firstRule = promoterAssignment?.commissionRules?.[0];
-            if (firstRule && firstRule.commissionType === 'fixed' && firstRule.commissionValue > 0) {
-              commission = firstRule.commissionValue;
-            } else {
-              commission = DEFAULT_COMMISSION_PER_CODE; // Assign default if no specific rule applies
-            }
+            commission = DEFAULT_COMMISSION_PER_CODE;
         }
         
         promoterCommissionsForEntity[code.generatedByUid].commissionRate = `S/ ${commission.toFixed(2)}`;
@@ -165,3 +157,6 @@ export async function GET(request: Request) {
     );
   }
 }
+
+
+    
