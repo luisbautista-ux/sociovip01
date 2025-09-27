@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
 import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
-import { GENERATED_CODE_STATUS_TRANSLATIONS, DEFAULT_COMMISSION_PER_CODE } from "@/lib/constants";
+import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from "firebase/firestore";
@@ -181,22 +181,25 @@ export default function BusinessPanelValidateQrPage() {
 
   const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
     if (!entity.assignedPromoters || !code.generatedByUid) {
-      return DEFAULT_COMMISSION_PER_CODE;
+      return 0; // No usar valor por defecto, si no hay promotor, no hay comisión.
     }
 
     const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
     if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return DEFAULT_COMMISSION_PER_CODE;
+      return 0; // No usar valor por defecto, si no hay reglas, no hay comisión.
     }
     
-    // For now, we only support 'event_general' commission rules.
-    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general');
+    // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
+    const generalRule = promoterAssignment.commissionRules.find(
+        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+    
     if (generalRule) {
       return generalRule.commissionValue;
     }
     
-    return DEFAULT_COMMISSION_PER_CODE;
-  };
+    return 0; // Si no hay regla aplicable, la comisión es 0.
+};
 
 
   const handleValidateAndRedeem = async () => {
@@ -236,7 +239,10 @@ export default function BusinessPanelValidateQrPage() {
           if (codes[codeIndex].generatedByUid) {
             const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
             codes[codeIndex].commissionGenerated = commissionAmount;
-            codes[codeIndex].commissionStatus = 'unpaid';
+            // Solo se marca como pendiente si la comisión es mayor a 0
+            if (commissionAmount > 0) {
+              codes[codeIndex].commissionStatus = 'unpaid';
+            }
           }
           
           transaction.update(entityRef, { generatedCodes: codes });
@@ -437,9 +443,3 @@ export default function BusinessPanelValidateQrPage() {
     </div>
   );
 }
-
-      
-
-    
-
-    

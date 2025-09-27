@@ -13,7 +13,6 @@ import type {
   GeneratedCode,
 } from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
-import {DEFAULT_COMMISSION_PER_CODE} from '@/lib/constants';
 
 async function getCallerProfile(
   authorizationHeader: string
@@ -33,28 +32,31 @@ async function getCallerProfile(
 }
 
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    // Si el código no tiene un valor de comisión pre-calculado, lo determinamos.
+    // Si la comisión ya fue calculada y guardada en el código, usar ese valor.
     if (typeof code.commissionGenerated === 'number') {
         return code.commissionGenerated;
     }
 
-    // Fallback logic if commission was not set during validation
+    // --- Fallback de recálculo si `commissionGenerated` no existe (no debería pasar con la nueva lógica) ---
     if (!entity.assignedPromoters || !code.generatedByUid) {
-      return DEFAULT_COMMISSION_PER_CODE;
+      return 0; // Si no hay promotor, no hay comisión.
     }
 
     const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
     if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return DEFAULT_COMMISSION_PER_CODE;
+      return 0; // Si no hay reglas, no hay comisión.
     }
     
-    // Prioritize the first valid rule found
-    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number');
+    // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
+    const generalRule = promoterAssignment.commissionRules.find(
+        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+    
     if (generalRule) {
       return generalRule.commissionValue;
     }
     
-    return DEFAULT_COMMISSION_PER_CODE;
+    return 0; // Si no se encuentra una regla aplicable.
 };
 
 
@@ -117,7 +119,7 @@ export async function GET(request: Request) {
       // Map to hold commission data per promoter for the current entity
       const promoterCommissionsForEntity: Record<string, { promoterName: string; pending: number; paid: number; codesRedeemed: number, commissionRate: string }> = {};
 
-      // A commission is owed ONLY if a code is 'used' (scanned at door).
+      // REGLA DE NEGOCIO CLAVE: La comisión se debe solo si un código está 'used' (escaneado en puerta).
       const usedCodes = (entity.generatedCodes || []).filter(c => c.status === 'used' && c.generatedByUid);
 
       usedCodes.forEach(code => {
@@ -129,12 +131,13 @@ export async function GET(request: Request) {
             pending: 0, 
             paid: 0,
             codesRedeemed: 0,
-            commissionRate: `S/ ${DEFAULT_COMMISSION_PER_CODE.toFixed(2)}`
+            commissionRate: `S/ 0.00` // Tarifa por defecto si no se puede calcular
           };
         }
         
         let commission = getCommissionValueForCode(entity, code);
         
+        // Asignar la tarifa de la regla encontrada, no una por defecto.
         promoterCommissionsForEntity[code.generatedByUid].commissionRate = `S/ ${commission.toFixed(2)}`;
         promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
         
