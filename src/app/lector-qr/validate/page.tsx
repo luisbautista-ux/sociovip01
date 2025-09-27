@@ -180,27 +180,31 @@ export default function LectorValidateQrPage() {
     // Silently ignore scan failures
   }, []);
 
-  const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    if (!entity.assignedPromoters || !code.generatedByUid) {
-      return 0; // No promoter, no commission.
-    }
+    const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+        if (entity.type !== 'event' || !entity.assignedPromoters || !code.generatedByUid) {
+            return 0; // Solo los eventos con promotores asignados generan comisión
+        }
 
-    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
-    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return 0; // No rules, no commission.
-    }
-    
-    // Find the first applicable rule. For now, we only have 'event_general'.
-    const generalRule = promoterAssignment.commissionRules.find(
-        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
-    );
-    
-    if (generalRule) {
-      return generalRule.commissionValue;
-    }
-    
-    return 0; // No applicable rule found, no commission.
-  };
+        const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
+        if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+            return 0; // Si el promotor no está asignado o no tiene reglas, no hay comisión.
+        }
+        
+        // Lógica de búsqueda de regla:
+        // 1. Buscar regla por tipo de entrada (futuro)
+        // 2. Buscar regla general del evento
+        const generalRule = promoterAssignment.commissionRules.find(
+            r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+        );
+
+        if (generalRule) {
+            return generalRule.commissionValue;
+        }
+        
+        // Si no se encuentra ninguna regla aplicable, la comisión es 0.
+        return 0;
+    };
+
 
   const handleValidateAndRedeem = async () => {
     if (!foundEntity || !foundCode || !userProfile?.uid) {
@@ -235,15 +239,16 @@ export default function LectorValidateQrPage() {
           codes[codeIndex].usedByInfo = { uid: userProfile.uid, name: userProfile.name };
           codes[codeIndex].isVipCandidate = isVipCandidate;
           
-          // --- Commission Logic ---
-          if (codes[codeIndex].generatedByUid) {
-            const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
-            codes[codeIndex].commissionGenerated = commissionAmount;
-            if (commissionAmount > 0) {
-              codes[codeIndex].commissionStatus = 'unpaid';
-            }
-          }
+          // --- Logica de Comisión ---
+          // Se calcula la comisión SOLO en este momento.
+          const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
+          codes[codeIndex].commissionGenerated = commissionAmount;
 
+          // Se marca como 'unpaid' solo si la comisión es > 0
+          if (commissionAmount > 0) {
+            codes[codeIndex].commissionStatus = 'unpaid';
+          }
+          
           transaction.update(entityRef, { generatedCodes: codes });
           setFoundCode(codes[codeIndex]);
       });
@@ -381,7 +386,7 @@ export default function LectorValidateQrPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           
-           {activePromotions.length > 0 && (
+          {activePromotions.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold mb-2 flex items-center"><Ticket className="h-5 w-5 mr-2 text-primary"/>Promociones Disponibles</h3>
               <Accordion type="single" collapsible className="w-full">
@@ -438,5 +443,3 @@ export default function LectorValidateQrPage() {
     </div>
   );
 }
-
-    
