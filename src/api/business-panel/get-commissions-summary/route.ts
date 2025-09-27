@@ -32,32 +32,13 @@ async function getCallerProfile(
 }
 
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    // Si la comisión ya fue calculada y guardada en el código, usar ese valor. Es la fuente de verdad.
+    // La fuente de verdad es el valor guardado en el código al momento de la validación.
+    // Si no es un número o es negativo, se considera 0.
     if (typeof code.commissionGenerated === 'number' && code.commissionGenerated >= 0) {
         return code.commissionGenerated;
     }
 
-    // --- Fallback de recálculo si `commissionGenerated` no existe ---
-    // Esta lógica debe ser idéntica a la que se usa al validar el QR.
-    if (!entity.assignedPromoters || !code.generatedByUid) {
-      return 0; // Si no hay promotor, no hay comisión.
-    }
-
-    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
-    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return 0; // Si no hay reglas, no hay comisión.
-    }
-    
-    // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
-    const generalRule = promoterAssignment.commissionRules.find(
-        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
-    );
-    
-    if (generalRule) {
-      return generalRule.commissionValue;
-    }
-    
-    // Si no se encuentra una regla aplicable, la comisión es 0. NUNCA usar un valor por defecto.
+    // No hay fallback a reglas ni valores por defecto. Si no se guardó, la comisión es 0.
     return 0;
 };
 
@@ -191,5 +172,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
-    
