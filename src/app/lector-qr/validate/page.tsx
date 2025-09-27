@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
 import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
-import { GENERATED_CODE_STATUS_TRANSLATIONS, DEFAULT_COMMISSION_PER_CODE } from "@/lib/constants";
+import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -180,6 +180,27 @@ export default function LectorValidateQrPage() {
     // Silently ignore scan failures
   }, []);
 
+  const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    if (!entity.assignedPromoters || !code.generatedByUid) {
+      return 0; // No promoter, no commission.
+    }
+
+    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return 0; // No rules, no commission.
+    }
+    
+    // Find the first applicable rule. For now, we only have 'event_general'.
+    const generalRule = promoterAssignment.commissionRules.find(
+        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+    
+    if (generalRule) {
+      return generalRule.commissionValue;
+    }
+    
+    return 0; // No applicable rule found, no commission.
+  };
 
   const handleValidateAndRedeem = async () => {
     if (!foundEntity || !foundCode || !userProfile?.uid) {
@@ -195,7 +216,7 @@ export default function LectorValidateQrPage() {
       const entityRef = doc(db, "businessEntities", foundEntity.id);
       await runTransaction(db, async (transaction) => {
           const entityDoc = await transaction.get(entityRef);
-          if (!entityDoc.exists()) {
+          if (!entityDoc.exists) {
               throw new Error("La promoción o evento ya no existe.");
           }
           const entityData = entityDoc.data() as BusinessManagedEntity;
@@ -216,8 +237,11 @@ export default function LectorValidateQrPage() {
           
           // --- Commission Logic ---
           if (codes[codeIndex].generatedByUid) {
-            codes[codeIndex].commissionGenerated = DEFAULT_COMMISSION_PER_CODE;
-            codes[codeIndex].commissionStatus = 'unpaid';
+            const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
+            codes[codeIndex].commissionGenerated = commissionAmount;
+            if (commissionAmount > 0) {
+              codes[codeIndex].commissionStatus = 'unpaid';
+            }
           }
 
           transaction.update(entityRef, { generatedCodes: codes });
@@ -416,3 +440,4 @@ export default function LectorValidateQrPage() {
 }
 
       
+

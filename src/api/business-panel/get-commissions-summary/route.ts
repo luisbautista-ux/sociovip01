@@ -1,0 +1,187 @@
+
+'use server';
+
+import {NextResponse} from 'next/server';
+import {headers} from 'next/headers';
+import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import type {
+  PlatformUser,
+  BusinessManagedEntity,
+  BusinessPromoterLink,
+  PromoterCommissionEntry,
+  Business,
+  GeneratedCode,
+} from '@/lib/types';
+import {getAuth} from 'firebase-admin/auth';
+
+async function getCallerProfile(
+  authorizationHeader: string
+): Promise<PlatformUser> {
+  if (!authorizationHeader.startsWith('Bearer ')) {
+    throw new Error('Invalid authorization header format.');
+  }
+  const idToken = authorizationHeader.split('Bearer ')[1];
+  const decodedToken = await getAuth().verifyIdToken(idToken);
+  const uid = decodedToken.uid;
+  const adminDb = admin.firestore();
+  const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
+  if (!userDoc.exists) {
+    throw new Error('Caller profile not found.');
+  }
+  return userDoc.data() as PlatformUser;
+}
+
+const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    // 1. Prioritize the value already stored in the code if it exists and is valid
+    if (typeof code.commissionGenerated === 'number' && code.commissionGenerated >= 0) {
+        return code.commissionGenerated;
+    }
+
+    // 2. Fallback to recalculate if not present (shouldn't happen with new logic)
+    if (!entity.assignedPromoters || !code.generatedByUid) {
+      return 0; 
+    }
+
+    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return 0;
+    }
+    
+    // Find the first applicable rule. For now, we only have 'event_general'.
+    const generalRule = promoterAssignment.commissionRules.find(
+        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+    
+    if (generalRule) {
+      return generalRule.commissionValue;
+    }
+    
+    // If no specific rule is found, the commission is 0.
+    return 0;
+};
+
+
+export async function GET(request: Request) {
+  let adminDb;
+
+  try {
+    await initializeAdminApp();
+    adminDb = admin.firestore();
+  } catch (error: any) {
+    console.error(
+      'API Route (get-commissions): Firebase Admin initialization failed.',
+      error
+    );
+    return NextResponse.json(
+      {error: `Error de inicialización del servidor: ${error.message}`},
+      {status: 500}
+    );
+  }
+
+  try {
+    const authorization = headers().get('Authorization');
+    if (!authorization) {
+      return NextResponse.json(
+        {error: 'No autenticado. Token no proporcionado.'},
+        {status: 401}
+      );
+    }
+
+    const callerProfile = await getCallerProfile(authorization);
+    const isBusinessAdminOrStaff =
+      callerProfile.roles.includes('business_admin') ||
+      callerProfile.roles.includes('staff');
+    const isPromoter = callerProfile.roles.includes('promoter');
+    
+    let businessIds: string[] | undefined;
+
+    if (isBusinessAdminOrStaff && callerProfile.businessId) {
+        businessIds = [callerProfile.businessId];
+    } else if (isPromoter) {
+        businessIds = callerProfile.businessIds;
+    }
+
+    if (!businessIds || businessIds.length === 0) {
+        return NextResponse.json([]); // Return empty array if no businesses to check
+    }
+
+    const [businessesSnapshot, entitiesSnapshot] = await Promise.all([
+        adminDb.collection('businesses').where('__name__', 'in', businessIds).get(),
+        adminDb.collection('businessEntities').where('businessId', 'in', businessIds).get(),
+    ]);
+    
+    const businessesMap = new Map(businessesSnapshot.docs.map(doc => [doc.id, doc.data() as Business]));
+    
+    const allEntities = entitiesSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as BusinessManagedEntity);
+    
+    const commissionEntries: PromoterCommissionEntry[] = [];
+
+    allEntities.forEach(entity => {
+      // Map to hold commission data per promoter for the current entity
+      const promoterCommissionsForEntity: Record<string, { promoterName: string; pending: number; paid: number; codesRedeemed: number, commissionRate: string }> = {};
+
+      // BUSINESS RULE: Commission is only generated for 'used' codes (scanned at the door).
+      const usedCodes = (entity.generatedCodes || []).filter(c => c.status === 'used' && c.generatedByUid);
+
+      usedCodes.forEach(code => {
+        if (!code.generatedByUid) return;
+
+        if (!promoterCommissionsForEntity[code.generatedByUid]) {
+          promoterCommissionsForEntity[code.generatedByUid] = { 
+            promoterName: code.generatedByName,
+            pending: 0, 
+            paid: 0,
+            codesRedeemed: 0,
+            commissionRate: `S/ 0.00`
+          };
+        }
+        
+        let commission = getCommissionValueForCode(entity, code);
+        
+        promoterCommissionsForEntity[code.generatedByUid].commissionRate = `S/ ${commission.toFixed(2)}`;
+        promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
+        
+        if (commission > 0) {
+          if (code.commissionStatus === 'paid') {
+            promoterCommissionsForEntity[code.generatedByUid].paid += commission;
+          } else { // 'unpaid' or undefined
+            promoterCommissionsForEntity[code.generatedByUid].pending += commission;
+          }
+        }
+      });
+
+      for (const promoterId in promoterCommissionsForEntity) {
+        const comm = promoterCommissionsForEntity[promoterId];
+        if (comm.pending > 0 || comm.paid > 0) {
+            if (isPromoter && promoterId !== callerProfile.uid) continue; 
+
+            commissionEntries.push({
+                id: `${entity.id}-${promoterId}`,
+                businessId: entity.businessId,
+                businessName: businessesMap.get(entity.businessId)?.name || 'N/A',
+                entityId: entity.id,
+                entityName: entity.name,
+                entityType: entity.type,
+                promoterId: promoterId,
+                promoterName: comm.promoterName,
+                commissionPending: comm.pending,
+                commissionPaid: comm.paid,
+                promoterCodesRedeemed: comm.codesRedeemed,
+                commissionRateApplied: comm.commissionRate,
+                paymentStatus: comm.pending > 0 ? 'Pendiente' : 'Pagado',
+                period: new Date(entity.startDate).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
+            });
+        }
+      }
+    });
+
+    return NextResponse.json(commissionEntries);
+  } catch (error: any) {
+    console.error('API Route (get-commissions): Error:', error);
+    return NextResponse.json(
+      {error: error.message || 'Ocurrió un error interno.'},
+      {status: 500}
+    );
+  }
+}
+

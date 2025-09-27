@@ -2,8 +2,6 @@
 // src/lib/constants.ts
 import type { GeneratedCode, SocioVipMember, PlatformUserRole } from "./types";
 
-export const DEFAULT_COMMISSION_PER_CODE = 5.00; // S/ 5.00 por código usado
-
 export const GENERATED_CODE_STATUS_TRANSLATIONS: Record<GeneratedCode['status'], string> = {
   available: "Disponible",
   redeemed: "Canjeado (QR Generado)",
@@ -321,3 +319,4 @@ export const PERU_LOCATIONS = {
 };
 
       
+
