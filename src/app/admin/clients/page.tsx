@@ -16,6 +16,7 @@ import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MESES_DEL_ANO_ES } from "@/lib/constants";
+import * as XLSX from "xlsx";
 
 export default function AdminQrClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,7 +33,6 @@ export default function AdminQrClientsPage() {
       const fetchedClients: QrClient[] = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         
-        // Robust date conversion
         const toSafeISOString = (dateValue: any): string | null => {
             if (!dateValue) return null;
             if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
@@ -50,8 +50,8 @@ export default function AdminQrClientsPage() {
           surname: data.surname,
           dni: data.dni,
           phone: data.phone,
-          dob: toSafeISOString(data.dob), // Use safe conversion
-          registrationDate: toSafeISOString(data.registrationDate), // Use safe conversion
+          dob: toSafeISOString(data.dob),
+          registrationDate: toSafeISOString(data.registrationDate),
         };
       });
       setQrClients(fetchedClients);
@@ -93,43 +93,82 @@ export default function AdminQrClientsPage() {
       toast({ title: "Sin Datos", description: "No hay clientes QR para exportar.", variant: "destructive" });
       return;
     }
-    const headers = ["ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro"];
-    const rows = filteredClients.map(client => [
-      `"${client.id}"`,
-      `"${client.name}"`,
-      `"${client.surname}"`,
-      `'${client.dni}`,
-      `'${client.phone}`,
-      client.dob && typeof client.dob === 'string' ? `"${format(parseISO(client.dob), "dd/MM/yyyy", { locale: es })}"` : '"N/A"',
-      client.registrationDate && typeof client.registrationDate === 'string' ? `"${format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm", { locale: es })}"` : '"N/A"',
+    
+    // Define los encabezados de la tabla
+    const headers = ["Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro"];
+    
+    // Mapea los datos de los clientes a un formato de array de arrays
+    const data = filteredClients.map(client => [
+      client.name,
+      client.surname,
+      client.dni,
+      client.phone || "N/A",
+      client.dob && typeof client.dob === 'string' ? format(parseISO(client.dob), "dd/MM/yyyy") : "N/A",
+      client.registrationDate && typeof client.registrationDate === 'string' ? format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm") : "N/A",
     ]);
 
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map(r => r.join(';'))
-    ].join('\n');
+    // Crea la hoja de cálculo
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+    // Define los estilos
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "5D2A8E" } }, // Color morado oscuro
+      border: {
+        top: { style: "thin" }, bottom: { style: "thin" },
+        left: { style: "thin" }, right: { style: "thin" },
+      },
+    };
+    const cellStyle = {
+      border: {
+        top: { style: "thin" }, bottom: { style: "thin" },
+        left: { style: "thin" }, right: { style: "thin" },
+      },
+    };
     
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", "sociovip_clientes_qr.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Aplica los estilos al encabezado
+    const headerRange = XLSX.utils.decode_range(ws['!ref']!);
+    for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+      if (!ws[cellAddress]) ws[cellAddress] = {};
+      ws[cellAddress].s = headerStyle;
+    }
+    
+    // Aplica los estilos a las celdas de datos
+    for (let R = 1; R <= data.length; ++R) {
+        for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[cellAddress]) ws[cellAddress] = {};
+            ws[cellAddress].s = cellStyle;
+        }
+    }
+    
+    // Ajusta el ancho de las columnas
+    const colWidths = headers.map((header, i) => ({
+        wch: Math.max(header.length, ...data.map(row => (row[i] || "").toString().length)) + 2,
+    }));
+    ws['!cols'] = colWidths;
+
+    // Crea el libro de trabajo y añade la hoja
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes QR");
+    
+    // Escribe el archivo y lo descarga
+    XLSX.writeFile(wb, "SocioVip_Clientes_QR.xlsx");
+
+    toast({ title: "Exportación Exitosa", description: "Se ha descargado el archivo de Excel." });
   };
 
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
         <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
           <ListChecks className="h-8 w-8 text-primary !block" />
           Clientes QR
         </h1>
         <Button onClick={handleExport} variant="outline" disabled={isLoading || qrClients.length === 0}>
-          <Download className="mr-2 h-4 w-4" /> Exportar CSV
+          <Download className="mr-2 h-4 w-4" /> Exportar a Excel
         </Button>
       </div>
       <Card className="shadow-lg">
