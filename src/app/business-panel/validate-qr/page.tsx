@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { QrCode as QrCodeIcon, Ticket, CalendarDays, User, Info, Search, CheckCircle2, XCircle, AlertTriangle, Clock, Users, Camera, UserCheck } from "lucide-react";
-import type { BusinessManagedEntity, GeneratedCode, Business, CommissionRule } from "@/lib/types";
+import type { BusinessManagedEntity, GeneratedCode, Business } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -180,13 +180,24 @@ export default function BusinessPanelValidateQrPage() {
   }, []);
 
   const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    if (!code.generatedByUid) return 0;
-    const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
-    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-        return 0; 
+    if (!code.generatedByUid) {
+        return 0;
     }
-    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number');
-    return generalRule ? generalRule.commissionValue : 0;
+    const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
+    
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return 0;
+    }
+    
+    const generalRule = promoterAssignment.commissionRules.find(
+        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+    
+    if (generalRule) {
+      return generalRule.commissionValue;
+    }
+    
+    return 0;
   };
 
 
