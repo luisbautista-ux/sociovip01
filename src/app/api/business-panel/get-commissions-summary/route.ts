@@ -33,6 +33,12 @@ async function getCallerProfile(
 }
 
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    // Si el código no tiene un valor de comisión pre-calculado, lo determinamos.
+    if (typeof code.commissionGenerated === 'number') {
+        return code.commissionGenerated;
+    }
+
+    // Fallback logic if commission was not set during validation
     if (!entity.assignedPromoters || !code.generatedByUid) {
       return DEFAULT_COMMISSION_PER_CODE;
     }
@@ -42,9 +48,9 @@ const getCommissionValueForCode = (entity: BusinessManagedEntity, code: Generate
       return DEFAULT_COMMISSION_PER_CODE;
     }
     
-    // For now, we only support 'event_general' commission rules.
-    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general');
-    if (generalRule && generalRule.commissionValue > 0) {
+    // Prioritize the first valid rule found
+    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number');
+    if (generalRule) {
       return generalRule.commissionValue;
     }
     
@@ -111,9 +117,11 @@ export async function GET(request: Request) {
       // Map to hold commission data per promoter for the current entity
       const promoterCommissionsForEntity: Record<string, { promoterName: string; pending: number; paid: number; codesRedeemed: number, commissionRate: string }> = {};
 
-      (entity.generatedCodes || []).forEach(code => {
-        // A commission is owed ONLY if a code is 'used' (scanned at door).
-        if (!code.generatedByUid || code.status !== 'used') return;
+      // A commission is owed ONLY if a code is 'used' (scanned at door).
+      const usedCodes = (entity.generatedCodes || []).filter(c => c.status === 'used' && c.generatedByUid);
+
+      usedCodes.forEach(code => {
+        if (!code.generatedByUid) return;
 
         if (!promoterCommissionsForEntity[code.generatedByUid]) {
           promoterCommissionsForEntity[code.generatedByUid] = { 
@@ -125,12 +133,7 @@ export async function GET(request: Request) {
           };
         }
         
-        let commission = Number(code.commissionGenerated ?? 0);
-        
-        // This is a fallback. The commission should be set when the code is validated.
-        if (commission === 0) {
-            commission = getCommissionValueForCode(entity, code);
-        }
+        let commission = getCommissionValueForCode(entity, code);
         
         promoterCommissionsForEntity[code.generatedByUid].commissionRate = `S/ ${commission.toFixed(2)}`;
         promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
@@ -178,5 +181,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
-    
