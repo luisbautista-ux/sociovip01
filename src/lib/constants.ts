@@ -317,3 +317,7 @@ export const PERU_LOCATIONS = {
     "PURUS": ["PURUS"]
   }
 };
+
+export const DEFAULT_COMMISSION_PER_CODE = 3;
+
+    
