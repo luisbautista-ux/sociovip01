@@ -32,22 +32,23 @@ async function getCallerProfile(
 }
 
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    // 1. Prioritize the value already stored in the code if it exists and is valid
+    // Si la comisión ya fue calculada y guardada en el código, usar ese valor. Es la fuente de verdad.
     if (typeof code.commissionGenerated === 'number' && code.commissionGenerated >= 0) {
         return code.commissionGenerated;
     }
 
-    // 2. Fallback to recalculate if not present (shouldn't happen with new logic)
+    // --- Fallback de recálculo si `commissionGenerated` no existe ---
+    // Esta lógica debe ser idéntica a la que se usa al validar el QR.
     if (!entity.assignedPromoters || !code.generatedByUid) {
-      return 0; 
+      return 0; // Si no hay promotor, no hay comisión.
     }
 
     const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
     if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return 0;
+      return 0; // Si no hay reglas, no hay comisión.
     }
     
-    // Find the first applicable rule. For now, we only have 'event_general'.
+    // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
     const generalRule = promoterAssignment.commissionRules.find(
         r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
     );
@@ -56,7 +57,7 @@ const getCommissionValueForCode = (entity: BusinessManagedEntity, code: Generate
       return generalRule.commissionValue;
     }
     
-    // If no specific rule is found, the commission is 0.
+    // Si no se encuentra una regla aplicable, la comisión es 0. NUNCA usar un valor por defecto.
     return 0;
 };
 
@@ -117,11 +118,13 @@ export async function GET(request: Request) {
     const commissionEntries: PromoterCommissionEntry[] = [];
 
     allEntities.forEach(entity => {
-      // Map to hold commission data per promoter for the current entity
-      const promoterCommissionsForEntity: Record<string, { promoterName: string; pending: number; paid: number; codesRedeemed: number, commissionRate: string }> = {};
-
-      // BUSINESS RULE: Commission is only generated for 'used' codes (scanned at the door).
+      // REGLA DE NEGOCIO CLAVE: La comisión se debe solo si un código está 'used' (escaneado en puerta).
       const usedCodes = (entity.generatedCodes || []).filter(c => c.status === 'used' && c.generatedByUid);
+
+      if(usedCodes.length === 0) return; // Si no hay códigos usados, saltar esta entidad.
+
+      // Agrupar comisiones por promotor para esta entidad
+      const promoterCommissionsForEntity: Record<string, { promoterName: string; pending: number; paid: number; codesRedeemed: number, commissionRateDisplay: Set<string> }> = {};
 
       usedCodes.forEach(code => {
         if (!code.generatedByUid) return;
@@ -132,13 +135,13 @@ export async function GET(request: Request) {
             pending: 0, 
             paid: 0,
             codesRedeemed: 0,
-            commissionRate: `S/ 0.00`
+            commissionRateDisplay: new Set()
           };
         }
         
-        let commission = getCommissionValueForCode(entity, code);
+        const commission = getCommissionValueForCode(entity, code);
         
-        promoterCommissionsForEntity[code.generatedByUid].commissionRate = `S/ ${commission.toFixed(2)}`;
+        promoterCommissionsForEntity[code.generatedByUid].commissionRateDisplay.add(`S/ ${commission.toFixed(2)}`);
         promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
         
         if (commission > 0) {
@@ -152,8 +155,12 @@ export async function GET(request: Request) {
 
       for (const promoterId in promoterCommissionsForEntity) {
         const comm = promoterCommissionsForEntity[promoterId];
+        // Solo agregar si hay deuda pendiente o ya se ha pagado algo (para el historial)
         if (comm.pending > 0 || comm.paid > 0) {
             if (isPromoter && promoterId !== callerProfile.uid) continue; 
+            
+            const uniqueRates = Array.from(comm.commissionRateDisplay);
+            const finalRateDisplay = uniqueRates.length > 1 ? 'Variable' : uniqueRates[0] || 'S/ 0.00';
 
             commissionEntries.push({
                 id: `${entity.id}-${promoterId}`,
@@ -167,7 +174,7 @@ export async function GET(request: Request) {
                 commissionPending: comm.pending,
                 commissionPaid: comm.paid,
                 promoterCodesRedeemed: comm.codesRedeemed,
-                commissionRateApplied: comm.commissionRate,
+                commissionRateApplied: finalRateDisplay,
                 paymentStatus: comm.pending > 0 ? 'Pendiente' : 'Pagado',
                 period: new Date(entity.startDate).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
             });
@@ -184,4 +191,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
