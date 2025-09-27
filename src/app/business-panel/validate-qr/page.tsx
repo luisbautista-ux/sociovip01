@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { QrCode as QrCodeIcon, Ticket, CalendarDays, User, Info, Search, CheckCircle2, XCircle, AlertTriangle, Clock, Users, Camera, UserCheck } from "lucide-react";
-import type { BusinessManagedEntity, GeneratedCode, Business } from "@/lib/types";
+import type { BusinessManagedEntity, GeneratedCode, Business, CommissionRule } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -179,6 +179,25 @@ export default function BusinessPanelValidateQrPage() {
     // Silently ignore scan failures
   }, []);
 
+  const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    if (!entity.assignedPromoters || !code.generatedByUid) {
+      return DEFAULT_COMMISSION_PER_CODE;
+    }
+
+    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return DEFAULT_COMMISSION_PER_CODE;
+    }
+    
+    // For now, we only support 'event_general' commission rules.
+    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general');
+    if (generalRule) {
+      return generalRule.commissionValue;
+    }
+    
+    return DEFAULT_COMMISSION_PER_CODE;
+  };
+
 
   const handleValidateAndRedeem = async () => {
     if (!foundEntity || !foundCode || !userProfile?.uid) {
@@ -215,7 +234,8 @@ export default function BusinessPanelValidateQrPage() {
 
           // --- Commission Logic ---
           if (codes[codeIndex].generatedByUid) {
-            codes[codeIndex].commissionGenerated = DEFAULT_COMMISSION_PER_CODE;
+            const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
+            codes[codeIndex].commissionGenerated = commissionAmount;
             codes[codeIndex].commissionStatus = 'unpaid';
           }
           
@@ -419,5 +439,7 @@ export default function BusinessPanelValidateQrPage() {
 }
 
       
+
+    
 
     

@@ -10,6 +10,7 @@ import type {
   BusinessPromoterLink,
   PromoterCommissionEntry,
   Business,
+  GeneratedCode,
 } from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 import {DEFAULT_COMMISSION_PER_CODE} from '@/lib/constants';
@@ -30,6 +31,26 @@ async function getCallerProfile(
   }
   return userDoc.data() as PlatformUser;
 }
+
+const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    if (!entity.assignedPromoters || !code.generatedByUid) {
+      return DEFAULT_COMMISSION_PER_CODE;
+    }
+
+    const promoterAssignment = entity.assignedPromoters.find(p => p.promoterProfileId === code.generatedByUid);
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return DEFAULT_COMMISSION_PER_CODE;
+    }
+    
+    // For now, we only support 'event_general' commission rules.
+    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general');
+    if (generalRule && generalRule.commissionValue > 0) {
+      return generalRule.commissionValue;
+    }
+    
+    return DEFAULT_COMMISSION_PER_CODE;
+};
+
 
 export async function GET(request: Request) {
   let adminDb;
@@ -108,7 +129,7 @@ export async function GET(request: Request) {
         
         // This is a fallback. The commission should be set when the code is validated.
         if (commission === 0) {
-            commission = DEFAULT_COMMISSION_PER_CODE;
+            commission = getCommissionValueForCode(entity, code);
         }
         
         promoterCommissionsForEntity[code.generatedByUid].commissionRate = `S/ ${commission.toFixed(2)}`;
@@ -157,6 +178,5 @@ export async function GET(request: Request) {
     );
   }
 }
-
 
     
