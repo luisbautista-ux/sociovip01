@@ -31,14 +31,33 @@ async function getCallerProfile(
   return userDoc.data() as PlatformUser;
 }
 
+// ESTA FUNCIÓN AHORA SIEMPRE RECALCULA LA COMISIÓN BASADO EN LAS REGLAS, IGNORANDO `commissionGenerated`.
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    // La fuente de verdad es el valor guardado en el código al momento de la validación.
-    // Si no es un número o es negativo, se considera 0.
-    if (typeof code.commissionGenerated === 'number' && code.commissionGenerated >= 0) {
-        return code.commissionGenerated;
+    // Si no hay promotor asignado al código, no hay comisión.
+    if (!code.generatedByUid) {
+      return 0;
     }
 
-    // No hay fallback a reglas ni valores por defecto. Si no se guardó, la comisión es 0.
+    // Buscar la asignación del promotor DENTRO de la entidad (evento/promoción).
+    const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
+    
+    // Si el promotor no fue asignado a esta entidad, o no tiene reglas, no hay comisión.
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return 0;
+    }
+    
+    // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
+    // Futuro: Se puede expandir para buscar reglas por tipo de entrada, etc.
+    const generalRule = promoterAssignment.commissionRules.find(
+        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+    
+    // Si se encuentra una regla general válida, se retorna su valor.
+    if (generalRule) {
+      return generalRule.commissionValue;
+    }
+    
+    // Si no se encuentra ninguna regla aplicable, la comisión es 0. NUNCA un valor por defecto.
     return 0;
 };
 
@@ -120,12 +139,14 @@ export async function GET(request: Request) {
           };
         }
         
+        // La comisión SIEMPRE se recalcula aquí para corregir datos pasados y asegurar consistencia.
         const commission = getCommissionValueForCode(entity, code);
         
         promoterCommissionsForEntity[code.generatedByUid].commissionRateDisplay.add(`S/ ${commission.toFixed(2)}`);
         promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
         
         if (commission > 0) {
+          // El estado del pago se sigue respetando (paid vs unpaid)
           if (code.commissionStatus === 'paid') {
             promoterCommissionsForEntity[code.generatedByUid].paid += commission;
           } else { // 'unpaid' or undefined
@@ -141,6 +162,7 @@ export async function GET(request: Request) {
             if (isPromoter && promoterId !== callerProfile.uid) continue; 
             
             const uniqueRates = Array.from(comm.commissionRateDisplay);
+            // Si hay múltiples tarifas aplicadas (no debería pasar con lógica correcta), se muestra "Variable".
             const finalRateDisplay = uniqueRates.length > 1 ? 'Variable' : uniqueRates[0] || 'S/ 0.00';
 
             commissionEntries.push({
