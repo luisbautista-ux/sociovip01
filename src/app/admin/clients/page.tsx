@@ -95,21 +95,21 @@ export default function AdminQrClientsPage() {
     }
     const headers = ["ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro"];
     const rows = filteredClients.map(client => [
-      client.id,
-      client.name,
-      client.surname,
-      `'${client.dni}`, // Prepend with ' to treat as text
-      `'${client.phone}`, // Prepend with ' to treat as text
-      client.dob && typeof client.dob === 'string' ? format(parseISO(client.dob), "dd/MM/yyyy", { locale: es }) : 'N/A',
-      client.registrationDate && typeof client.registrationDate === 'string' ? format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm", { locale: es }) : 'N/A',
-    ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`)); // Quote and escape
+      `"${client.id}"`,
+      `"${client.name}"`,
+      `"${client.surname}"`,
+      `'${client.dni}`,
+      `'${client.phone}`,
+      client.dob && typeof client.dob === 'string' ? `"${format(parseISO(client.dob), "dd/MM/yyyy", { locale: es })}"` : '"N/A"',
+      client.registrationDate && typeof client.registrationDate === 'string' ? `"${format(parseISO(client.registrationDate), "dd/MM/yyyy HH:mm", { locale: es })}"` : '"N/A"',
+    ]);
 
     const csvContent = [
-      headers.map(h => `"${h}"`).join(';'), // Use semicolon and quote headers
-      ...rows.map(r => r.join(';')) // Use semicolon
+      headers.join(';'),
+      ...rows.map(r => r.join(';'))
     ].join('\n');
     
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' }); // Add BOM
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
