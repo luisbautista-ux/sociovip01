@@ -31,6 +31,36 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
   return userDoc.data() as PlatformUser;
 }
 
+// ESTA FUNCIÓN AHORA SIEMPRE RECALCULA LA COMISIÓN BASADO EN LAS REGLAS, IGNORANDO CUALQUIER VALOR PREVIAMENTE GUARDADO.
+const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    
+    // Si no hay promotor asignado al código, no hay comisión.
+    if (!code.generatedByUid) {
+      return 0;
+    }
+
+    // Buscar la asignación del promotor DENTRO de la entidad (evento/promoción).
+    const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
+    
+    // Si el promotor no fue asignado a esta entidad, o no tiene reglas de comisión, la comisión es 0.
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
+      return 0;
+    }
+    
+    // Buscar la primera regla de tipo 'event_general' que tenga un valor numérico.
+    const generalRule = promoterAssignment.commissionRules.find(
+        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
+    );
+    
+    // Si se encuentra una regla general válida, se retorna su valor.
+    if (generalRule) {
+      return generalRule.commissionValue;
+    }
+    
+    // Si no se encuentra ninguna regla aplicable, la comisión es 0.
+    return 0;
+};
+
 export async function POST(request: Request) {
   let adminDb;
 
@@ -78,40 +108,41 @@ export async function POST(request: Request) {
             throw new Error(`Permiso denegado. Esta entidad no pertenece a tu negocio.`);
         }
         
-        let remainingAmountToSettle = paymentAmount;
-        const settledCodeIds: string[] = [];
-        let totalSettledAmount = 0;
+        const codesToSettle = (entityData.generatedCodes || []).filter(code => 
+            code.generatedByUid === promoterUid &&
+            code.status === 'used' &&
+            (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined)
+        );
 
-        const originalCodes = entityData.generatedCodes || [];
+        if (codesToSettle.length === 0) {
+            throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor.`);
+        }
         
+        let totalSettledAmount = 0;
+        const settledCodeIds: string[] = [];
+
+        codesToSettle.forEach(code => {
+            const commissionValue = getCommissionValueForCode(entityData, code);
+            totalSettledAmount += commissionValue;
+            settledCodeIds.push(code.id);
+        });
+
+        // Validar que el monto a pagar coincida con el total calculado
+        if (Math.abs(totalSettledAmount - paymentAmount) > 0.01) { // Compara con una tolerancia
+            throw new Error(`El monto a pagar (S/ ${paymentAmount.toFixed(2)}) no coincide con el total de comisiones pendientes (S/ ${totalSettledAmount.toFixed(2)}) para esta campaña.`);
+        }
+        
+        const originalCodes = entityData.generatedCodes || [];
         const updatedCodes = originalCodes.map(code => {
-            // Lee el valor de comisión ya grabado. Si no existe, es 0.
-            const commissionValue = Number(code.commissionGenerated ?? 0);
-            
-            if (
-                code.generatedByUid === promoterUid &&
-                code.status === 'used' // Only pay for validated (used) codes
-                &&
-                (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined) &&
-                commissionValue > 0 &&
-                remainingAmountToSettle >= commissionValue
-            ) {
-                remainingAmountToSettle -= commissionValue;
-                totalSettledAmount += commissionValue;
-                settledCodeIds.push(code.id);
-                
+            if (settledCodeIds.includes(code.id)) {
                 return {
                     ...code,
                     commissionStatus: 'paid' as const,
                     paymentId: paymentRef.id,
                 };
             }
-            return code; 
+            return code;
         });
-        
-        if (settledCodeIds.length === 0) {
-             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto. Verifique que el estado del código sea 'Utilizado (en Puerta)'.`);
-        }
 
         transaction.set(paymentRef, {
             businessId,
