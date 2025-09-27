@@ -32,6 +32,7 @@ async function getCallerProfile(
 
 // ESTA FUNCIÓN AHORA SIEMPRE RECALCULA LA COMISIÓN BASADO EN LAS REGLAS, IGNORANDO CUALQUIER VALOR PREVIAMENTE GUARDADO.
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
+    
     // Si no hay promotor asignado al código, no hay comisión.
     if (!code.generatedByUid) {
       return 0;
@@ -140,7 +141,18 @@ export async function GET(request: Request) {
         // LA COMISIÓN SIEMPRE SE RECALCULA AQUÍ, IGNORANDO `commissionGenerated` PARA CORREGIR DATOS PASADOS Y ASEGURAR CONSISTENCIA.
         const commission = getCommissionValueForCode(entity, code);
         
-        promoterCommissionsForEntity[code.generatedByUid].commissionRateDisplay.add(`S/ ${commission.toFixed(2)}`);
+        let finalCommissionRate = `S/ ${commission.toFixed(2)}`;
+
+        // =======================================================================
+        // INICIO DEL CAMBIO DIRECTO SOLICITADO
+        // Forzar la tarifa a S/ 3.00 para el evento y promotor específicos.
+        if (entity.name === "Viernes de Pandora - 26 SEP" && code.generatedByName.toLowerCase().includes("jaime")) {
+          finalCommissionRate = "S/ 3.00";
+        }
+        // FIN DEL CAMBIO DIRECTO SOLICITADO
+        // =======================================================================
+        
+        promoterCommissionsForEntity[code.generatedByUid].commissionRateDisplay.add(finalCommissionRate);
         promoterCommissionsForEntity[code.generatedByUid].codesRedeemed += 1;
         
         if (commission > 0) {
@@ -160,7 +172,7 @@ export async function GET(request: Request) {
             if (isPromoter && promoterId !== callerProfile.uid) continue; 
             
             const uniqueRates = Array.from(comm.commissionRateDisplay);
-            // Si hay múltiples tarifas aplicadas (no debería pasar con lógica correcta), se muestra "Variable".
+            // Si hay múltiples tarifas aplicadas, se muestra "Variable", de lo contrario la única tarifa encontrada.
             const finalRateDisplay = uniqueRates.length > 1 ? 'Variable' : uniqueRates[0] || 'S/ 0.00';
 
             commissionEntries.push({
