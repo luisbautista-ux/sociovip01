@@ -398,7 +398,7 @@ export default function PromoterEntitiesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
       <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-  <Gift className="h-8 w-8 text-primary !block" /> Promociones y Eventos
+  <Gift className="h-8 w-8 text-primary !block" /> Campañas
 </h1>
       </div>
       
@@ -471,3 +471,5 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
+
+    

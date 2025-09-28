@@ -28,7 +28,7 @@ import { DialogTitle } from "@/components/ui/dialog";
 
 const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
-  { href: "/promoter/entities", label: "Promociones", icon: Gift },
+  { href: "/promoter/entities", label: "Campañas", icon: Gift },
   { href: "/promoter/commissions", label: "Comisiones", icon: DollarSign },
   { href: "/promoter/profile", label: "Mi Perfil", icon: UserCircle },
 ];
@@ -270,3 +270,5 @@ export default function PromoterLayout({
     </div>
   );
 }
+
+    
