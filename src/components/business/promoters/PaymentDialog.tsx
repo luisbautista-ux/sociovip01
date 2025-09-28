@@ -14,14 +14,6 @@ import { useEffect, useMemo } from "react";
 import type { PromoterCommissionEntry } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const paymentFormSchema = z.object({
-    entityId: z.string().min(1, "Debes seleccionar una campaña."),
-    amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
-    notes: z.string().optional(),
-});
-
-type PaymentFormValues = z.infer<typeof paymentFormSchema>;
-
 interface PaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,25 +25,49 @@ interface PaymentDialogProps {
 
 export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, onConfirmPayment, isSubmitting }: PaymentDialogProps) {
   
-  const form = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentFormSchema),
-    defaultValues: { entityId: "", notes: "", amount: 0 },
-  });
-  
-  const selectedEntityId = form.watch("entityId");
-
   const pendingCommissionsByEntity = useMemo(() => {
     if (!promoter) return [];
-    const entityMap = new Map<string, { name: string; totalPending: number }>();
+    const entityMap = new Map<string, { name: string; totalPending: number, minCommission: number }>();
+    
     allCommissions.forEach(comm => {
       if (comm.promoterId === promoter.uid && comm.commissionPending > 0) {
-        const current = entityMap.get(comm.entityId) || { name: comm.entityName, totalPending: 0 };
+        const current = entityMap.get(comm.entityId) || { name: comm.entityName, totalPending: 0, minCommission: Infinity };
         current.totalPending += comm.commissionPending;
+        
+        // Asumimos que commissionRateApplied es 'S/ 3.00' o similar
+        const rateMatch = comm.commissionRateApplied.match(/S\/\s*([\d.]+)/);
+        if (rateMatch && rateMatch[1]) {
+            const rateValue = parseFloat(rateMatch[1]);
+            if (rateValue > 0 && rateValue < current.minCommission) {
+                current.minCommission = rateValue;
+            }
+        }
+
         entityMap.set(comm.entityId, current);
       }
     });
+
     return Array.from(entityMap.entries()).map(([id, data]) => ({ id, ...data }));
   }, [allCommissions, promoter]);
+
+  const selectedEntityId = useForm<any>().watch("entityId");
+
+  const paymentFormSchema = z.object({
+      entityId: z.string().min(1, "Debes seleccionar una campaña."),
+      amount: z.coerce.number()
+        .positive("El monto debe ser mayor a cero.")
+        .max(pendingCommissionsByEntity.find(e => e.id === selectedEntityId)?.totalPending || 0, "El monto no puede ser mayor a la deuda pendiente de esta campaña.")
+        .min(pendingCommissionsByEntity.find(e => e.id === selectedEntityId)?.minCommission || 0.01, "El monto debe ser suficiente para cubrir al menos una comisión."),
+      notes: z.string().optional(),
+  });
+
+  type PaymentFormValues = z.infer<typeof paymentFormSchema>;
+  
+  const form = useForm<PaymentFormValues>({
+    resolver: zodResolver(paymentFormSchema),
+    defaultValues: { entityId: "", notes: "", amount: 0 },
+    mode: "onChange"
+  });
 
   useEffect(() => {
     if (open && promoter) {
@@ -77,7 +93,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
         <DialogHeader>
           <DialogTitle>Registrar Pago a {promoter.name}</DialogTitle>
           <DialogDescription>
-            Total pendiente: S/ {promoter.pendingAmount.toFixed(2)}. Selecciona una campaña para saldar su deuda.
+            Total pendiente de todas las campañas: S/ {promoter.pendingAmount.toFixed(2)}.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -93,6 +109,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                       field.onChange(value);
                       const pending = pendingCommissionsByEntity.find(e => e.id === value)?.totalPending || 0;
                       form.setValue('amount', pending);
+                      form.trigger('amount'); // Re-trigger validation for amount
                   }} value={field.value}>
                     <FormControl>
                       <SelectTrigger disabled={isSubmitting}>
@@ -112,27 +129,25 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
               )}
             />
             
-            {selectedEntityId && (
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monto a Pagar (S/) <span className="text-destructive">*</span></FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        {...field}
-                        disabled={true} // El campo ahora está deshabilitado
-                        className="disabled:bg-muted/30 font-semibold"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monto a Pagar (S/) <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      {...field}
+                      disabled={isSubmitting || !form.watch('entityId')}
+                      className="font-semibold"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>
@@ -144,7 +159,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
 
              <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
-                <Button type="submit" variant="gradient" disabled={isSubmitting || !selectedEntityId || form.watch('amount') <= 0}>
+                <Button type="submit" variant="gradient" disabled={isSubmitting || !form.formState.isValid}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CircleDollarSign className="mr-2 h-4 w-4"/>}
                   Confirmar Pago
                 </Button>

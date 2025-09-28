@@ -1,3 +1,4 @@
+
 'use server';
 
 import {NextResponse} from 'next/server';
@@ -93,32 +94,38 @@ export async function POST(request: Request) {
 
         const originalCodes = entityData.generatedCodes || [];
         
-        const updatedCodes = originalCodes.map(code => {
+        // Filtra y ordena los códigos elegibles para garantizar un orden de pago consistente
+        const eligibleCodes = originalCodes
+            .filter(code => 
+                code.generatedByUid === promoterUid &&
+                code.status === 'used' &&
+                (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined)
+            )
+            .sort((a, b) => new Date(a.usedDate || 0).getTime() - new Date(b.usedDate || 0).getTime());
+
+        const updatedCodes = [...originalCodes];
+
+        for (const code of eligibleCodes) {
             const commissionValue = getCommissionValueForCode(entityData, code);
             
-            if (
-                code.generatedByUid === promoterUid &&
-                code.status === 'used' 
-                &&
-                (code.commissionStatus === 'unpaid' || code.commissionStatus === undefined) &&
-                commissionValue > 0 &&
-                remainingAmountToSettle >= commissionValue
-            ) {
+            if (commissionValue > 0 && remainingAmountToSettle >= commissionValue) {
                 remainingAmountToSettle -= commissionValue;
                 totalSettledAmount += commissionValue;
                 settledCodeIds.push(code.id);
-                
-                return {
-                    ...code,
-                    commissionStatus: 'paid' as const,
-                    paymentId: paymentRef.id,
-                };
+
+                const originalCodeIndex = updatedCodes.findIndex(c => c.id === code.id);
+                if (originalCodeIndex !== -1) {
+                    updatedCodes[originalCodeIndex] = {
+                        ...updatedCodes[originalCodeIndex],
+                        commissionStatus: 'paid' as const,
+                        paymentId: paymentRef.id,
+                    };
+                }
             }
-            return code; 
-        });
+        }
         
         if (settledCodeIds.length === 0) {
-             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que coincidan con el monto. Verifique que el estado del código sea 'Utilizado (en Puerta)'.`);
+             throw new Error(`No se encontraron comisiones pendientes de pago para esta campaña y promotor que puedan ser cubiertas con el monto ingresado (S/ ${paymentAmount.toFixed(2)}).`);
         }
 
         transaction.set(paymentRef, {
