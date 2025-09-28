@@ -49,17 +49,28 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
 
     return Array.from(entityMap.entries()).map(([id, data]) => ({ id, ...data }));
   }, [allCommissions, promoter]);
-
-  const selectedEntityId = useForm<any>().watch("entityId");
-
-  const paymentFormSchema = z.object({
-      entityId: z.string().min(1, "Debes seleccionar una campaña."),
-      amount: z.coerce.number()
-        .positive("El monto debe ser mayor a cero.")
-        .max(pendingCommissionsByEntity.find(e => e.id === selectedEntityId)?.totalPending || 0, "El monto no puede ser mayor a la deuda pendiente de esta campaña.")
-        .min(pendingCommissionsByEntity.find(e => e.id === selectedEntityId)?.minCommission || 0.01, "El monto debe ser suficiente para cubrir al menos una comisión."),
-      notes: z.string().optional(),
-  });
+  
+  const paymentFormSchema = useMemo(() => {
+    return z.object({
+        entityId: z.string().min(1, "Debes seleccionar una campaña."),
+        amount: z.coerce.number().positive("El monto debe ser mayor a cero."),
+        notes: z.string().optional(),
+    }).refine((data) => {
+        const selectedEntity = pendingCommissionsByEntity.find(e => e.id === data.entityId);
+        if (!selectedEntity) return true; // No validation if entity not found yet
+        return data.amount <= selectedEntity.totalPending;
+    }, {
+        message: "El monto no puede ser mayor a la deuda pendiente de esta campaña.",
+        path: ["amount"],
+    }).refine((data) => {
+        const selectedEntity = pendingCommissionsByEntity.find(e => e.id === data.entityId);
+        if (!selectedEntity || selectedEntity.minCommission === Infinity) return true;
+        return data.amount >= selectedEntity.minCommission;
+    }, {
+        message: "El monto debe ser suficiente para cubrir al menos una comisión.",
+        path: ["amount"],
+    });
+  }, [pendingCommissionsByEntity]);
 
   type PaymentFormValues = z.infer<typeof paymentFormSchema>;
   
