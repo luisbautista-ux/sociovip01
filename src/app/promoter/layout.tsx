@@ -28,8 +28,8 @@ import { DialogTitle } from "@/components/ui/dialog";
 
 const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
-  { href: "/promoter/entities", label: "Promociones y Eventos", icon: Gift },
-  { href: "/promoter/commissions", label: "Mis Comisiones", icon: DollarSign },
+  { href: "/promoter/entities", label: "Promociones", icon: Gift },
+  { href: "/promoter/commissions", label: "Comisiones", icon: DollarSign },
   { href: "/promoter/profile", label: "Mi Perfil", icon: UserCircle },
 ];
 
@@ -49,16 +49,16 @@ function PromoterSidebarNavContent({ closeSheet, promoterName, promoterPhotoUrl 
           {promoterName && <p className="text-xs text-muted-foreground">{promoterName}</p>}
         </div>
       </div>
-      <nav className="flex-grow p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
         {navItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}
+            onClick={closeSheet}
             className={cn(
               "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
               pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
             )}
-            onClick={closeSheet}
           >
             <item.icon className="h-5 w-5" />
             <span>{item.label}</span>
@@ -101,6 +101,34 @@ function PromoterSidebar({ promoterName, promoterPhotoUrl }: { promoterName?: st
   );
 }
 
+
+function PromoterBottomNav() {
+  const pathname = usePathname();
+
+  return (
+    <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background shadow-lg md:hidden">
+      <nav className="flex items-center justify-around h-16">
+        {navItems.map((item) => {
+           const isActive = pathname.startsWith(item.href);
+          return(
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center justify-center text-xs font-medium w-full h-full transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground hover:bg-accent/50"
+              )}
+            >
+              <item.icon className="h-5 w-5 mb-0.5" />
+              <span>{item.label}</span>
+            </Link>
+        )})}
+      </nav>
+    </footer>
+  );
+}
+
+
 export default function PromoterLayout({
   children,
 }: {
@@ -108,8 +136,7 @@ export default function PromoterLayout({
 }) {
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-
+  
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
       router.push("/login");
@@ -189,33 +216,23 @@ export default function PromoterLayout({
 
   return (
     <div className="flex min-h-screen bg-muted/40">
+      {/* Desktop Sidebar */}
       <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
         <PromoterSidebar promoterName={promoterDisplayName} promoterPhotoUrl={promoterPhotoUrl}/>
       </div>
+      
       <div className="flex flex-col flex-1">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
-          <div className="md:hidden">
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button size="icon" variant="outline">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Toggle Menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
-                <DialogTitle className="sr-only">Menú de Navegación del Panel de Promotor</DialogTitle>
-                <PromoterSidebarNavContent promoterName={promoterDisplayName} promoterPhotoUrl={promoterPhotoUrl} closeSheet={() => setIsSheetOpen(false)} />
-              </SheetContent>
-            </Sheet>
+        {/* Mobile Header (simplified) */}
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
+          <div className="flex items-center gap-2">
+            <SocioVipLogo className="h-7 w-7 text-gradient" />
+            <h1 className="font-semibold text-lg text-gradient">Panel Promotor</h1>
           </div>
-          <div className="flex-grow flex items-center gap-2">
-            <SocioVipLogo className="h-7 w-7 text-gradient md:hidden" />
-          </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {promoterDisplayName}
             </span>
-             <AlertDialog>
+            <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline" size="icon" title="Cerrar Sesión">
                         <LogOut className="h-4 w-4" />
@@ -239,12 +256,16 @@ export default function PromoterLayout({
             </AlertDialog>
           </div>
         </header>
-        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+
+        {/* Desktop Header (empty placeholder, could be removed or used for breadcrumbs) */}
+         <header className="sticky top-0 z-30 hidden h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:flex"></header>
+
+        <main className="flex-1 p-4 sm:p-6 overflow-auto pb-20 md:pb-6">
           {children}
         </main>
-        <footer className="py-4 px-6 border-t text-center text-xs text-muted-foreground bg-background sm:bg-transparent">
-          <p>© {new Date().getFullYear()} SocioVIP Promotor Panel</p>
-        </footer>
+        
+        {/* Mobile Bottom Navigation */}
+        <PromoterBottomNav />
       </div>
     </div>
   );
