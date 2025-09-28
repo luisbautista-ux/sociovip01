@@ -192,7 +192,15 @@ export default function BusinessPanelLayout({
       </div>
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
-          <div className="md:hidden flex items-center gap-4">
+          {/* Mobile Header */}
+          <div className="md:hidden flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              {businessDetails?.logoUrl && (
+                <NextImage src={businessDetails.logoUrl} alt={businessDetails.name} width={40} height={40} className="h-10 w-10 object-contain rounded-md" />
+              )}
+              <h1 className="font-semibold text-xl text-primary">{businessDetails?.name}</h1>
+            </div>
+            
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button size="icon" variant="outline">
@@ -205,11 +213,8 @@ export default function BusinessPanelLayout({
                  <BusinessSidebar closeSheet={() => setIsSheetOpen(false)} />
               </SheetContent>
             </Sheet>
-            {businessDetails?.logoUrl && (
-              <NextImage src={businessDetails.logoUrl} alt={businessDetails.name} width={40} height={40} className="h-10 w-10 object-contain rounded-md" />
-            )}
-            <h1 className="font-semibold text-xl text-primary">{businessDetails?.name}</h1>
           </div>
+          {/* Desktop Header remains empty */}
           <div className="flex-grow hidden md:block">
           </div>
         </header>
