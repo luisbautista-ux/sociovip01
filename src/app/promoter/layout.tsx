@@ -116,7 +116,7 @@ function PromoterBottomNav() {
               href={item.href}
               className={cn(
                 "flex flex-col items-center justify-center text-xs font-medium w-full h-full transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground hover:bg-accent/50"
+                isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent/50"
               )}
             >
               <item.icon className="h-5 w-5 mb-0.5" />
