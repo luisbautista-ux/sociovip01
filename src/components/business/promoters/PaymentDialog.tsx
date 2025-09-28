@@ -34,7 +34,6 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
         const current = entityMap.get(comm.entityId) || { name: comm.entityName, totalPending: 0, minCommission: Infinity };
         current.totalPending += comm.commissionPending;
         
-        // Asumimos que commissionRateApplied es 'S/ 3.00' o similar
         const rateMatch = comm.commissionRateApplied.match(/S\/\s*([\d.]+)/);
         if (rateMatch && rateMatch[1]) {
             const rateValue = parseFloat(rateMatch[1]);
@@ -57,8 +56,9 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
         notes: z.string().optional(),
     }).refine((data) => {
         const selectedEntity = pendingCommissionsByEntity.find(e => e.id === data.entityId);
-        if (!selectedEntity) return true; // No validation if entity not found yet
-        return data.amount <= selectedEntity.totalPending;
+        if (!selectedEntity) return true;
+        // Permitir un pequeño margen de error para comparaciones de punto flotante
+        return data.amount <= selectedEntity.totalPending + 0.001;
     }, {
         message: "El monto no puede ser mayor a la deuda pendiente de esta campaña.",
         path: ["amount"],
@@ -120,7 +120,7 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
                       field.onChange(value);
                       const pending = pendingCommissionsByEntity.find(e => e.id === value)?.totalPending || 0;
                       form.setValue('amount', pending);
-                      form.trigger('amount'); // Re-trigger validation for amount
+                      form.trigger('amount'); 
                   }} value={field.value}>
                     <FormControl>
                       <SelectTrigger disabled={isSubmitting}>
