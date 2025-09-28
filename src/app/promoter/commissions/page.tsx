@@ -17,6 +17,7 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import * as ExcelJS from "exceljs";
 
 export default function PromoterCommissionsPage() {
   const { toast } = useToast();
@@ -80,35 +81,71 @@ export default function PromoterCommissionsPage() {
     return filteredCommissions.reduce((sum, comm) => sum + comm.commissionPaid, 0);
   }, [filteredCommissions]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (filteredCommissions.length === 0) {
       toast({ title: "Sin Datos", description: "No hay comisiones para exportar con el filtro actual." });
       return;
     }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Mis Comisiones");
+
     const headers = ["Negocio", "Campaña", "QRs Validados", "Tarifa Comisión", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
-    const rows = filteredCommissions.map(c => [
-      c.businessName,
-      c.entityName,
-      c.promoterCodesRedeemed,
-      c.commissionRateApplied,
-      c.commissionPending.toFixed(2),
-      c.commissionPaid.toFixed(2)
-    ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
+    
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF5D2A8E' } // Purple color
+      };
+      cell.font = {
+        bold: true,
+        color: { argb: 'FFFFFFFF' }
+      };
+      cell.border = {
+        top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    });
+    
+    filteredCommissions.forEach(c => {
+      const row = worksheet.addRow([
+        c.businessName,
+        c.entityName,
+        c.promoterCodesRedeemed,
+        c.commissionRateApplied,
+        c.commissionPending,
+        c.commissionPaid
+      ]);
+      row.getCell(5).numFmt = '"S/" #,##0.00';
+      row.getCell(6).numFmt = '"S/" #,##0.00';
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
+      });
+    });
 
-    const csvContent = [
-      headers.map(h => `"${h}"`).join(';'),
-      ...rows.map(r => r.join(';'))
-    ].join('\n');
+    worksheet.columns.forEach(column => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, (cell) => {
+            const columnLength = cell.value ? cell.value.toString().length : 10;
+            if (columnLength > maxLength) {
+                maxLength = columnLength;
+            }
+        });
+        column.width = maxLength < 10 ? 12 : maxLength + 4;
+    });
 
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `mis_comisiones_${userProfile?.name?.replace(/\s+/g, '_') || 'promotor'}.csv`);
+    link.href = URL.createObjectURL(blob);
+    link.download = `mis_comisiones_${userProfile?.name?.replace(/\s+/g, '_') || 'promotor'}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast({ title: "Exportación Exitosa", description: "Comisiones exportadas a CSV." });
+    toast({ title: "Exportación Exitosa", description: "Comisiones exportadas a Excel." });
   };
 
   return (
