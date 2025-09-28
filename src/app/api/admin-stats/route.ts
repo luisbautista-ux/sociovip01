@@ -21,11 +21,11 @@ export async function GET(request: Request) {
       adminDb.collection('businessEntities').get() 
     ]);
 
-    let totalCodes = 0;
+    let totalCodesRedeemed = 0;
     businessEntitiesSnap.forEach(doc => {
       const data = doc.data();
       if (data.generatedCodes && Array.isArray(data.generatedCodes)) {
-        totalCodes += data.generatedCodes.length;
+        totalCodesRedeemed += data.generatedCodes.filter(c => c.status === 'redeemed' || c.status === 'used').length;
       }
     });
     
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       totalBusinesses: businessesSnap.data().count,
       totalPlatformUsers: platformUsersSnap.data().count,
       totalSocioVipMembers: socioVipMembersSnap.data().count,
-      totalQrCodesGenerated: totalCodes,
+      totalQrCodesGenerated: totalCodesRedeemed,
     };
 
     return NextResponse.json(stats);
