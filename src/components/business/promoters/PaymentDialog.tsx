@@ -27,21 +27,23 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
   
   const pendingCommissionsByEntity = useMemo(() => {
     if (!promoter) return [];
-    const entityMap = new Map<string, { name: string; totalPending: number, minCommission: number }>();
+    const entityMap = new Map<string, { name: string; totalPending: number, commissionRate: number | null }>();
     
     allCommissions.forEach(comm => {
       if (comm.promoterId === promoter.uid && comm.commissionPending > 0) {
-        const current = entityMap.get(comm.entityId) || { name: comm.entityName, totalPending: 0, minCommission: Infinity };
+        const current = entityMap.get(comm.entityId) || { name: comm.entityName, totalPending: 0, commissionRate: null };
         current.totalPending += comm.commissionPending;
         
-        const rateMatch = comm.commissionRateApplied.match(/S\/\s*([\d.]+)/);
-        if (rateMatch && rateMatch[1]) {
+        // Extract a single, consistent commission rate for the entity
+        if (current.commissionRate === null) {
+          const rateMatch = comm.commissionRateApplied.match(/S\/\s*([\d.]+)/);
+          if (rateMatch && rateMatch[1]) {
             const rateValue = parseFloat(rateMatch[1]);
-            if (rateValue > 0 && rateValue < current.minCommission) {
-                current.minCommission = rateValue;
+            if (rateValue > 0) {
+              current.commissionRate = rateValue;
             }
+          }
         }
-
         entityMap.set(comm.entityId, current);
       }
     });
@@ -64,10 +66,14 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
         path: ["amount"],
     }).refine((data) => {
         const selectedEntity = pendingCommissionsByEntity.find(e => e.id === data.entityId);
-        if (!selectedEntity || selectedEntity.minCommission === Infinity) return true;
-        return data.amount >= selectedEntity.minCommission;
+        if (!selectedEntity || !selectedEntity.commissionRate) return true; 
+        
+        // Check if the amount is a multiple of the commission rate (within a small tolerance)
+        const remainder = data.amount % selectedEntity.commissionRate;
+        // The payment must be for an exact number of codes.
+        return remainder < 0.01 || Math.abs(remainder - selectedEntity.commissionRate) < 0.01;
     }, {
-        message: "El monto debe ser suficiente para cubrir al menos una comisión.",
+        message: "El monto ingresado debe corresponder al pago de una cantidad exacta de comisiones.",
         path: ["amount"],
     });
   }, [pendingCommissionsByEntity]);
@@ -181,3 +187,4 @@ export function PaymentDialog({ open, onOpenChange, promoter, allCommissions, on
     </Dialog>
   );
 }
+
