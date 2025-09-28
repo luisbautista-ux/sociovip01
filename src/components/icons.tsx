@@ -3,7 +3,7 @@
 import Image, { type ImageProps } from "next/image";
 
 export const LOGO_URL =
-  "https://i.ibb.co/Cbc2yWY/Brown-Mascot-Lion-Free-Logo-1.jpg";
+  "https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png";
 
 type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
   size?: number;
