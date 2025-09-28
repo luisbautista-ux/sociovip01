@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar } from 'recharts';
 import type { BusinessManagedEntity } from "@/lib/types";
-import { BarChart3, Users, Loader2, Info, Ticket, Calendar } from "lucide-react";
+import { BarChart3, Users, Loader2, Info, Ticket, Calendar, QrCode } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, isValid, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -26,6 +26,7 @@ interface SelectedEntityStats {
     id: string;
     name: string;
     codesGenerated: number;
+    qrGenerated: number; 
     codesUsed: number;
 }
 
@@ -102,9 +103,10 @@ export default function BusinessAnalyticsPage() {
     if (!entity) return null;
 
     const codesGenerated = entity.generatedCodes?.length || 0;
+    const qrGenerated = entity.generatedCodes?.filter(c => c.status === 'redeemed' || c.status === 'used').length || 0;
     const codesUsed = entity.generatedCodes?.filter(c => c.status === 'used').length || 0;
     
-    return { id: entity.id, name: entity.name, codesGenerated, codesUsed };
+    return { id: entity.id, name: entity.name, codesGenerated, qrGenerated, codesUsed };
   }, [selectedEntityId, allEntities]);
 
   if (isLoading) {
@@ -202,29 +204,36 @@ export default function BusinessAnalyticsPage() {
                               }}
                             />
                             <Legend />
-                            <Bar dataKey="codesGenerated" fill="hsl(var(--primary))" name="Códigos Generados" radius={[0, 4, 4, 0]} barSize={35} />
-                            <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="Códigos Usados (en puerta)" radius={[0, 4, 4, 0]} barSize={35} />
+                            <Bar dataKey="codesGenerated" fill="hsl(var(--secondary))" name="Códigos Creados" radius={[0, 4, 4, 0]} barSize={35} />
+                            <Bar dataKey="qrGenerated" fill="hsl(var(--primary))" name="QRs Generados" radius={[0, 4, 4, 0]} barSize={35} />
+                            <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="QRs Usados (en puerta)" radius={[0, 4, 4, 0]} barSize={35} />
                          </BarChart>
                       </ResponsiveContainer>
                     </div>
                     <div className="md:col-span-1 space-y-4">
-                      <StatCard 
-                          title="Códigos Generados (Total)" 
+                       <StatCard 
+                          title="Códigos Creados (Total)" 
                           value={selectedEntityStats.codesGenerated} 
                           icon={Ticket} 
                           description="Total de códigos únicos creados para esta campaña."
                        />
                        <StatCard 
-                          title="Códigos Usados (Asistencia)" 
+                          title="QRs Generados" 
+                          value={selectedEntityStats.qrGenerated} 
+                          icon={QrCode}
+                          description="QRs generados por clientes con un código."
+                        />
+                       <StatCard 
+                          title="QRs Usados (Asistencia)" 
                           value={selectedEntityStats.codesUsed} 
                           icon={Users}
-                          description="Códigos escaneados y validados en la puerta."
+                          description="QRs escaneados y validados en la puerta."
                         />
                        <StatCard 
                           title="Tasa de Canje" 
-                          value={`${selectedEntityStats.codesGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.codesGenerated) * 100).toFixed(1) : 0}%`} 
+                          value={`${selectedEntityStats.qrGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.qrGenerated) * 100).toFixed(1) : 0}%`} 
                           icon={BarChart3} 
-                          description="% de códigos generados que fueron usados."
+                          description="% de QRs generados que fueron usados."
                         />
                     </div>
                 </div>
