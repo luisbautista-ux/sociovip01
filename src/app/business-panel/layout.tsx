@@ -59,6 +59,7 @@ export default function BusinessPanelLayout({
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   
   useEffect(() => {
     const applyBusinessColorsAndName = async () => {
@@ -68,6 +69,7 @@ export default function BusinessPanelLayout({
           const businessSnap = await getDoc(businessDocRef);
           if (businessSnap.exists()) {
             const businessData = businessSnap.data() as Business;
+            setBusinessDetails(businessData); // Store business details
             
             // Set colors for theme
             const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0');
@@ -190,7 +192,7 @@ export default function BusinessPanelLayout({
       </div>
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center gap-4">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button size="icon" variant="outline">
@@ -200,12 +202,15 @@ export default function BusinessPanelLayout({
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
                  <DialogTitle className="sr-only">Menú de Navegación del Panel de Negocio</DialogTitle>
-                 {/* Utiliza el componente de la barra lateral directamente aquí */}
                  <BusinessSidebar closeSheet={() => setIsSheetOpen(false)} />
               </SheetContent>
             </Sheet>
+            {businessDetails?.logoUrl && (
+              <NextImage src={businessDetails.logoUrl} alt={businessDetails.name} width={28} height={28} className="h-7 w-7 object-contain rounded-md" />
+            )}
+            <h1 className="font-semibold text-lg text-primary">{businessDetails?.name}</h1>
           </div>
-          <div className="flex-grow">
+          <div className="flex-grow hidden md:block">
           </div>
         </header>
         <main className="flex-1 p-4 sm:p-6 overflow-auto">
