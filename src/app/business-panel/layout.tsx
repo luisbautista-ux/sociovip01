@@ -206,7 +206,7 @@ export default function BusinessPanelLayout({
               </SheetContent>
             </Sheet>
             {businessDetails?.logoUrl && (
-              <NextImage src={businessDetails.logoUrl} alt={businessDetails.name} width={32} height={32} className="h-8 w-8 object-contain rounded-md" />
+              <NextImage src={businessDetails.logoUrl} alt={businessDetails.name} width={40} height={40} className="h-10 w-10 object-contain rounded-md" />
             )}
             <h1 className="font-semibold text-xl text-primary">{businessDetails?.name}</h1>
           </div>
