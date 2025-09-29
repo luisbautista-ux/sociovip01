@@ -6,8 +6,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar } from "lucide-react";
-import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView } from "@/lib/types";
+import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star } from "lucide-react";
+import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
@@ -16,10 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, updateDoc, getDoc, runTransaction } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -157,43 +158,46 @@ export default function PromoterEntitiesPage() {
 
     try {
         const targetEntityRef = doc(db, "businessEntities", entityId);
-        const targetEntitySnap = await getDoc(targetEntityRef);
-        if (!targetEntitySnap.exists()) {
-            throw new Error(`La entidad "${entityId}" no fue encontrada.`);
-        }
-        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
-        
-        const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
-            ...code,
-            id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            entityId: entityId,
-            value: code.value,
-            status: 'available',
-            generatedByName: userProfile.name,
-            generatedByUid: userProfile.uid,
-            generatedDate: new Date().toISOString(),
-            observation: observation || null,
-            redemptionDate: null, 
-            redeemedByInfo: null, 
-            isVipCandidate: false,
-        }) as GeneratedCode));
-        
-        const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
-        
-        await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
-        
-        // Update local state instead of full refetch
-        const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
-            e.id === entityId ? { ...e, generatedCodes: updatedCodes } : e
-        );
-        setPromotions(updateLocalState);
-        setEvents(updateLocalState);
+        await runTransaction(db, async (transaction) => {
+            const targetEntitySnap = await transaction.get(targetEntityRef);
+            if (!targetEntitySnap.exists()) {
+                throw new Error(`La entidad "${entityId}" no fue encontrada.`);
+            }
+            const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
+            
+            const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
+                ...code,
+                id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                entityId: entityId,
+                value: code.value,
+                status: 'available',
+                generatedByName: userProfile.name,
+                generatedByUid: userProfile.uid,
+                generatedDate: new Date().toISOString(),
+                observation: observation || null,
+                redemptionDate: null, 
+                redeemedByInfo: null, 
+                isVipCandidate: false,
+            }) as GeneratedCode));
+            
+            const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+            const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
+            
+            transaction.update(targetEntityRef, { generatedCodes: updatedCodes });
 
-        toast({ title: "Códigos Creados", description: `${newCodes.length} código(s) añadido(s) a "${targetEntityData.name}".` });
+            // Update local state optimistically inside transaction logic for immediate feedback
+             const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
+                e.id === entityId ? { ...e, generatedCodes: updatedCodes, promoterCodesCreated: e.promoterCodesCreated + newCodes.length } : e
+            );
+            setPromotions(updateLocalState);
+            setEvents(updateLocalState);
+        });
+        
+        toast({ title: "Códigos Creados", description: `${newCodes.length} código(s) añadido(s).` });
     } catch (error: any) {
         console.error("Promoter Page: Error saving new codes:", error);
         toast({ title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive" });
+        fetchAssignedEntities(); // Refetch on error to ensure consistency
         throw error;
     }
   };
@@ -209,35 +213,42 @@ export default function PromoterEntitiesPage() {
 
     const targetEntityRef = doc(db, "businessEntities", entityId);
     try {
-      const targetEntitySnap = await getDoc(targetEntityRef);
-      if (!targetEntitySnap.exists()) {
-        toast({ title: "Error", description: `Entidad "${entityId}" no encontrada para actualizar códigos.`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
-      
-      const otherPromotersCodes = (targetEntityData.generatedCodes || []).filter(
-        c => c.generatedByUid !== userProfile.uid 
-      ).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-      
-      const thisPromotersUpdatedCodes = updatedCodesFromDialog
-        .filter(c => c.generatedByUid === userProfile.uid)
-        .map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+      await runTransaction(db, async (transaction) => {
+        const targetEntitySnap = await transaction.get(targetEntityRef);
+        if (!targetEntitySnap.exists()) {
+            throw new Error(`Entidad "${entityId}" no encontrada para actualizar códigos.`);
+        }
+        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
+        
+        const otherPromotersCodes = (targetEntityData.generatedCodes || []).filter(
+            c => c.generatedByUid !== userProfile.uid 
+        ).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+        
+        const thisPromotersUpdatedCodes = updatedCodesFromDialog
+            .filter(c => c.generatedByUid === userProfile.uid)
+            .map(c => sanitizeObjectForFirestore(c as GeneratedCode));
 
-      const finalCodesToSave = [...otherPromotersCodes, ...thisPromotersUpdatedCodes];
+        const finalCodesToSave = [...otherPromotersCodes, ...thisPromotersUpdatedCodes];
 
-      await updateDoc(targetEntityRef, { generatedCodes: finalCodesToSave });
-      toast({ title: "Mis Códigos Actualizados", description: `Tus códigos para "${targetEntityData.name}" han sido actualizados.` });
+        transaction.update(targetEntityRef, { generatedCodes: finalCodesToSave });
+        
+        // Optimistic UI update
+        const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
+            e.id === entityId ? { ...e, generatedCodes: finalCodesToSave } : e
+        );
+        setPromotions(updateLocalState);
+        setEvents(updateLocalState);
+      });
       
-      fetchAssignedEntities(); 
-
+      toast({ title: "Mis Códigos Actualizados", description: `Tus códigos han sido actualizados.` });
+      
       if (selectedEntityForViewingCodes?.id === entityId) {
-        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: finalCodesToSave} : null);
+        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: internalCodes} : null);
       }
     } catch (error: any) {
       console.error("Promoter Entities Page: Error saving updated codes from ManageDialog:", error.code, error.message, error);
       toast({ title: "Error al Actualizar Códigos", description: `No se pudieron actualizar tus códigos. ${error.message}`, variant: "destructive" });
+      fetchAssignedEntities();
     } finally {
       setIsSubmitting(false);
     }
@@ -260,6 +271,40 @@ export default function PromoterEntitiesPage() {
     setSelectedEntityForViewingCodes(entity);
     setShowManageCodesModal(true);
   };
+
+  const handleReserveBox = async (entityId: string, boxId: string) => {
+    if (!userProfile) return;
+    setIsSubmitting(true);
+    const entityRef = doc(db, "businessEntities", entityId);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const entitySnap = await transaction.get(entityRef);
+            if (!entitySnap.exists()) throw new Error("El evento ya no existe.");
+
+            const entityData = entitySnap.data() as BusinessManagedEntity;
+            const boxes = entityData.eventBoxes || [];
+            const boxIndex = boxes.findIndex(b => b.id === boxId);
+            
+            if (boxIndex === -1) throw new Error("El box ya no existe.");
+            if (boxes[boxIndex].status !== 'available') throw new Error("Este box ya no está disponible.");
+
+            boxes[boxIndex].status = 'reserved';
+            boxes[boxIndex].promoterId = userProfile.uid;
+            boxes[boxIndex].promoterName = userProfile.name;
+
+            transaction.update(entityRef, { eventBoxes: boxes });
+            
+            // Optimistic update for local state
+            setEvents(prev => prev.map(e => e.id === entityId ? {...e, eventBoxes: boxes} : e));
+        });
+        toast({ title: "Box Reservado", description: "Has reservado el box exitosamente." });
+    } catch (error: any) {
+        toast({ title: "Error al Reservar", description: error.message, variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
+};
   
   const EntityTable = ({ entitiesToShow, type }: { entitiesToShow: PromoterEntityView[], type: 'promotion' | 'event' }) => {
     if (entitiesToShow.length === 0) {
@@ -288,44 +333,63 @@ export default function PromoterEntitiesPage() {
                     const isActivatable = isEntityCurrentlyActivatable(entity);
                     
                     return (
-                    <TableRow key={entity.id || `entity-fallback-${Math.random()}`}>
-                        <TableCell className="font-medium align-top py-3 space-y-1">
-                            <div className="font-semibold text-base">{entity.name}</div>
-                            {entity.businessName && <div className="text-xs text-muted-foreground flex items-center mt-0.5"><Building size={14} className="mr-1"/>{entity.businessName}</div>}
-                            <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
-                                    className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
-                                {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
-                            </Badge>
-                            <div className="flex flex-col items-start gap-1 pt-1.5">
-                            <Button 
-                                variant="outline" 
-                                size="xs" 
-                                onClick={() => openCreateCodesDialog(entity)} 
-                                disabled={!isActivatable || isSubmitting}
-                                className="px-2 py-1 h-auto text-xs"
-                            >
-                                <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
-                            </Button>
-                            <Button 
-                                variant="outline" 
-                                size="xs" 
-                                onClick={() => openViewCodesDialog(entity)}
-                                disabled={isSubmitting}
-                                className="px-2 py-1 h-auto text-xs"
-                            >
-                                <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
-                            </Button>
+                    <React.Fragment key={entity.id || `entity-fallback-${Math.random()}`}>
+                        <TableRow>
+                            <TableCell className="font-medium align-top py-3 space-y-1">
+                                <div className="font-semibold text-base">{entity.name}</div>
+                                {entity.businessName && <div className="text-xs text-muted-foreground flex items-center mt-0.5"><Building size={14} className="mr-1"/>{entity.businessName}</div>}
+                                <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
+                                        className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
+                                    {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
+                                </Badge>
+                                <div className="flex flex-col items-start gap-1 pt-1.5">
+                                <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                    <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
+                                </Button>
+                                <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                    <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
+                                </Button>
+                                </div>
+                            </TableCell>
+                            
+                            <TableCell className="align-top py-3 text-left text-xs">
+                            <div className="flex flex-col space-y-0.5">
+                                <div>Códigos Creados ({promoterCodeStats.created})</div>
+                                <div>QRs Generados ({entity.promoterCodesUsed || 0})</div>
+                                <div>QRs Usados ({entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0})</div>
                             </div>
-                        </TableCell>
-                        
-                        <TableCell className="align-top py-3 text-left text-xs">
-                        <div className="flex flex-col space-y-0.5">
-                            <div>Códigos Creados ({promoterCodeStats.created})</div>
-                            <div>QRs Generados ({entity.promoterCodesUsed || 0})</div>
-                            <div>QRs Usados ({entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0})</div>
-                        </div>
-                        </TableCell>
-                    </TableRow>
+                            </TableCell>
+                        </TableRow>
+                        {(entity.eventBoxes && entity.eventBoxes.length > 0) && (
+                            <TableRow>
+                                <TableCell colSpan={2} className="p-0">
+                                    <div className="bg-muted/30 p-3">
+                                        <h4 className="font-semibold text-xs mb-2 flex items-center"><Box size={14} className="mr-2"/>Boxes Disponibles para Vender</h4>
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                                            {entity.eventBoxes.map(box => {
+                                                const isAvailable = box.status === 'available';
+                                                const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
+                                                return(
+                                                <div key={box.id} className="border bg-background p-2 rounded-md text-xs space-y-1">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="font-medium">{box.name}</span>
+                                                        <span className="font-semibold text-primary">S/ {box.cost.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="text-muted-foreground text-[11px]">Capacidad: {box.capacity || 'N/A'}</div>
+                                                    {isAvailable && <Button size="xs" className="w-full h-7 text-xs" onClick={() => handleReserveBox(entity.id, box.id)} disabled={isSubmitting}>Reservar</Button>}
+                                                    {!isAvailable && (
+                                                        <Badge variant={isReservedByMe ? "default" : "secondary"} className={cn("w-full justify-center", isReservedByMe && "bg-blue-600")}>
+                                                            {isReservedByMe ? "Reservado por ti" : box.status === 'reserved' ? 'Reservado' : 'Vendido'}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            )})}
+                                        </div>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </React.Fragment>
                     )})}
                 </TableBody>
             </Table>
@@ -355,24 +419,38 @@ export default function PromoterEntitiesPage() {
                                     <p>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></p>
                                 </div>
                            </div>
+                           {(entity.eventBoxes && entity.eventBoxes.length > 0) && (
+                                <>
+                                    <Separator />
+                                    <div className="space-y-2">
+                                        <h4 className="font-semibold text-xs flex items-center"><Box size={14} className="mr-2"/>Boxes</h4>
+                                        <div className="grid grid-cols-2 gap-2">
+                                             {entity.eventBoxes.map(box => {
+                                                const isAvailable = box.status === 'available';
+                                                const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
+                                                return(
+                                                    <div key={box.id} className="border bg-background p-2 rounded-md text-xs space-y-1">
+                                                        <p className="font-medium">{box.name}</p>
+                                                        <p className="font-semibold text-primary">S/ {box.cost.toFixed(2)}</p>
+                                                        {isAvailable && <Button size="xs" className="w-full h-6 text-[11px]" onClick={() => handleReserveBox(entity.id, box.id)} disabled={isSubmitting}>Reservar</Button>}
+                                                        {!isAvailable && (
+                                                            <Badge variant={isReservedByMe ? "default" : "secondary"} className={cn("w-full justify-center", isReservedByMe && "bg-blue-600")}>
+                                                                {isReservedByMe ? "Reservado por ti" : box.status === 'reserved' ? 'Reservado' : 'Vendido'}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                )
+                                             })}
+                                        </div>
+                                    </div>
+                                </>
+                           )}
                            <Separator />
                            <div className="flex gap-2">
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="flex-1"
-                                    onClick={() => openCreateCodesDialog(entity)} 
-                                    disabled={!isActivatable || isSubmitting}
-                                >
+                                <Button variant="outline" size="sm" className="flex-1" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting}>
                                     <QrCodeIcon className="h-4 w-4 mr-2" /> Crear
                                 </Button>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="flex-1"
-                                    onClick={() => openViewCodesDialog(entity)}
-                                    disabled={isSubmitting}
-                                >
+                                <Button variant="outline" size="sm" className="flex-1" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting}>
                                     <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos
                                 </Button>
                            </div>
@@ -471,5 +549,3 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
-
-    
