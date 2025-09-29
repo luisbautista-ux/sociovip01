@@ -15,12 +15,12 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc } from "firebase/firestore";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, BusinessPromoterLink, CommissionRule, Business } from "@/lib/types";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, BusinessPromoterLink, CommissionRule, Business, EventBoxFormData, BatchBoxFormData } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -30,6 +30,7 @@ import { BusinessEventForm, type EventDetailsFormValues } from '@/components/bus
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
+import { BatchBoxForm } from '@/components/business/forms/BatchBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
 import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDialog';
 import { Label } from '@/components/ui/label';
@@ -60,8 +61,13 @@ const ManageEventDialog = ({
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
+    
+    // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
+    const [isBoxFormOpen, setIsBoxFormOpen] = useState(false);
+    const [editingBox, setEditingBox] = useState<EventBox | null>(null);
+    const [isBatchBoxFormOpen, setIsBatchBoxFormOpen] = useState(false);
 
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
@@ -122,6 +128,60 @@ const ManageEventDialog = ({
             return { ...prev, ticketTypes: updatedTicketTypes };
         });
     };
+    
+    const handleBoxSubmit = (boxData: EventBoxFormData) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            let updatedBoxes: EventBox[];
+            const boxId = editingBox?.id || `box_${Date.now()}`;
+            const newOrUpdatedBox: EventBox = {
+                ...boxData,
+                id: boxId,
+                eventId: prev.id,
+                businessId: prev.businessId,
+            };
+
+            if (editingBox) {
+                updatedBoxes = (prev.eventBoxes || []).map(b => b.id === editingBox.id ? newOrUpdatedBox : b);
+            } else {
+                updatedBoxes = [...(prev.eventBoxes || []), newOrUpdatedBox];
+            }
+            return { ...prev, eventBoxes: updatedBoxes };
+        });
+        setIsBoxFormOpen(false);
+        setEditingBox(null);
+    };
+    
+    const handleBatchBoxSubmit = (batchData: BatchBoxFormData) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const newBoxes: EventBox[] = [];
+            for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
+                newBoxes.push({
+                    id: `box_batch_${Date.now()}_${i}`,
+                    eventId: prev.id,
+                    businessId: prev.businessId,
+                    name: `${batchData.prefix} ${i}`,
+                    cost: batchData.cost,
+                    description: batchData.description,
+                    capacity: batchData.capacity,
+                    status: 'available',
+                });
+            }
+            const updatedBoxes = [...(prev.eventBoxes || []), ...newBoxes];
+            return { ...prev, eventBoxes: updatedBoxes };
+        });
+        setIsBatchBoxFormOpen(false);
+    };
+
+    const handleBoxDelete = (boxId: string) => {
+        setLocalEventState(prev => {
+            if (!prev) return null;
+            const updatedBoxes = (prev.eventBoxes || []).filter(b => b.id !== boxId);
+            return { ...prev, eventBoxes: updatedBoxes };
+        });
+    };
+
 
     const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
         const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
@@ -215,7 +275,7 @@ const ManageEventDialog = ({
                         <TabsList className="w-full grid grid-cols-4">
                             <TabsTrigger value="details">Detalles</TabsTrigger>
                             <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                            <TabsTrigger value="boxes">Boxes</TabsTrigger>
+                            <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
                             <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
                         </TabsList>
 
@@ -264,7 +324,46 @@ const ManageEventDialog = ({
                                </Card>
                             </TabsContent>
                             <TabsContent value="boxes">
-                                <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Gestión de Boxes</CardTitle>
+                                        <CardDescription>Añade y configura los boxes para tu evento, de forma individual o masiva.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex gap-2">
+                                            <Button onClick={() => { setEditingBox(null); setIsBoxFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Box</Button>
+                                            <Button onClick={() => setIsBatchBoxFormOpen(true)} variant="outline"><Box className="h-4 w-4 mr-2"/>Crear en Lote</Button>
+                                        </div>
+                                        <Table className="mt-4">
+                                            <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                                            <TableBody>
+                                                {(localEventState.eventBoxes || []).map(box => (
+                                                    <TableRow key={box.id}>
+                                                        <TableCell>{box.name}</TableCell>
+                                                        <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
+                                                        <TableCell>{box.capacity || 'N/A'}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{box.status}</Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                    <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                        {(!localEventState.eventBoxes || localEventState.eventBoxes.length === 0) && (
+                                            <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
                             </TabsContent>
                            <TabsContent value="promoters">
                                 <Card>
@@ -346,6 +445,31 @@ const ManageEventDialog = ({
                     isSubmitting={isSubmitting}
                 />
               </DialogContent>
+            </Dialog>
+            <Dialog open={isBoxFormOpen} onOpenChange={setIsBoxFormOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{editingBox ? 'Editar Box' : 'Nuevo Box'}</DialogTitle>
+                    </DialogHeader>
+                    <EventBoxForm
+                        eventBox={editingBox || undefined}
+                        onSubmit={handleBoxSubmit}
+                        onCancel={() => setIsBoxFormOpen(false)}
+                        isSubmitting={isSubmitting}
+                    />
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isBatchBoxFormOpen} onOpenChange={setIsBatchBoxFormOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Crear Boxes en Lote</DialogTitle>
+                    </DialogHeader>
+                    <BatchBoxForm
+                        onSubmit={handleBatchBoxSubmit}
+                        onCancel={() => setIsBatchBoxFormOpen(false)}
+                        isSubmitting={isSubmitting}
+                    />
+                </DialogContent>
             </Dialog>
         </>
     );

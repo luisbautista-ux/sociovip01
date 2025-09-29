@@ -190,14 +190,15 @@ export interface TicketType {
 
 export interface EventBox {
   id: string;
-  eventId: string; 
+  eventId: string;
   businessId: string;
   name: string;
   cost: number;
   description?: string;
-  status: 'available' | 'unavailable';
+  status: 'available' | 'reserved' | 'sold';
   capacity?: number;
-  sellerName?: string;
+  promoterId?: string; // UID del promotor que lo reservó/vendió
+  promoterName?: string; // Nombre del promotor
   ownerName?: string;
   ownerDni?: string;
 }
@@ -400,9 +401,9 @@ export interface EventBoxFormData {
   name: string;
   cost: number;
   description?: string;
-  status: 'available' | 'unavailable';
+  status: 'available' | 'reserved' | 'sold';
   capacity?: number;
-  sellerName?: string;
+  promoterName?: string;
   ownerName?: string;
   ownerDni?: string;
 }
@@ -414,7 +415,7 @@ export interface BatchBoxFormData {
   cost: number;
   capacity?: number;
   description?: string;
-  status: 'available' | 'unavailable';
+  status: 'available' | 'reserved' | 'sold';
 }
 
 // Para el flujo "DNI-primero"

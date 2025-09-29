@@ -26,9 +26,9 @@ const eventBoxFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
   cost: z.coerce.number().min(0, "El costo no puede ser negativo."),
   description: z.string().optional(),
-  status: z.enum(['available', 'unavailable'], { required_error: "Debes seleccionar un estado."}),
+  status: z.enum(['available', 'reserved', 'sold'], { required_error: "Debes seleccionar un estado."}),
   capacity: z.coerce.number().int().min(1, "La capacidad debe ser al menos 1.").optional().or(z.literal(undefined)),
-  sellerName: z.string().optional(),
+  promoterName: z.string().optional(),
   ownerName: z.string().optional(),
   ownerDni: z.string().optional().refine(val => !val || (val.length >= 7 && val.length <= 15), {
     message: "DNI/CE del dueño debe tener entre 7 y 15 caracteres si se ingresa.",
@@ -53,7 +53,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       description: eventBox?.description || "",
       status: eventBox?.status || 'available',
       capacity: eventBox?.capacity === undefined || eventBox?.capacity === null ? undefined : eventBox.capacity,
-      sellerName: eventBox?.sellerName || "",
+      promoterName: eventBox?.promoterName || "",
       ownerName: eventBox?.ownerName || "",
       ownerDni: eventBox?.ownerDni || "",
     },
@@ -66,7 +66,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       description: eventBox?.description || "",
       status: eventBox?.status || 'available',
       capacity: eventBox?.capacity === undefined || eventBox?.capacity === null ? undefined : eventBox.capacity,
-      sellerName: eventBox?.sellerName || "",
+      promoterName: eventBox?.promoterName || "",
       ownerName: eventBox?.ownerName || "",
       ownerDni: eventBox?.ownerDni || "",
     });
@@ -137,11 +137,11 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
         />
         <FormField
           control={form.control}
-          name="sellerName"
+          name="promoterName"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Vendedor Asignado (Opcional)</FormLabel>
-              <FormControl><Input placeholder="Nombre del vendedor" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Nombre del promotor/vendedor" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -183,7 +183,8 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
                 </FormControl>
                 <SelectContent>
                   <SelectItem value="available">Disponible</SelectItem>
-                  <SelectItem value="unavailable">No Disponible</SelectItem>
+                  <SelectItem value="reserved">Reservado</SelectItem>
+                  <SelectItem value="sold">Vendido</SelectItem>
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -194,7 +195,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+          <Button type="submit" variant="gradient" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {eventBox ? "Guardar Cambios" : "Crear Box"}
           </Button>
