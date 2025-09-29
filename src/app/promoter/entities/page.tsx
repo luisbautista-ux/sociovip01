@@ -20,7 +20,7 @@ import { collection, getDocs, query, where, Timestamp, doc, updateDoc, getDoc, r
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -36,9 +36,9 @@ export default function PromoterEntitiesPage() {
   
   const [showManageCodesModal, setShowManageCodesModal] = useState(false);
   const [selectedEntityForViewingCodes, setSelectedEntityForViewingCodes] = useState<BusinessManagedEntity | null>(null);
-  
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [selectedEntityForStats, setSelectedEntityForStats] = useState<PromoterEntityView | null>(null);
+
+  const [showBoxesModal, setShowBoxesModal] = useState(false);
+  const [selectedEventForBoxes, setSelectedEventForBoxes] = useState<PromoterEntityView | null>(null);
 
   const getPromoterCodeStats = useCallback((entityGeneratedCodes: GeneratedCode[] | undefined): { created: number; used: number } => {
     if (!userProfile || !entityGeneratedCodes) return { created: 0, used: 0 };
@@ -242,9 +242,6 @@ export default function PromoterEntitiesPage() {
       
       toast({ title: "Mis Códigos Actualizados", description: `Tus códigos han sido actualizados.` });
       
-      if (selectedEntityForViewingCodes?.id === entityId) {
-        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: internalCodes} : null);
-      }
     } catch (error: any) {
       console.error("Promoter Entities Page: Error saving updated codes from ManageDialog:", error.code, error.message, error);
       toast({ title: "Error al Actualizar Códigos", description: `No se pudieron actualizar tus códigos. ${error.message}`, variant: "destructive" });
@@ -296,7 +293,17 @@ export default function PromoterEntitiesPage() {
             transaction.update(entityRef, { eventBoxes: boxes });
             
             // Optimistic update for local state
-            setEvents(prev => prev.map(e => e.id === entityId ? {...e, eventBoxes: boxes} : e));
+            const updateFunc = (prev: PromoterEntityView[]) => prev.map(e => {
+                if (e.id === entityId) {
+                    const updatedEvent = { ...e, eventBoxes: boxes };
+                    if (selectedEventForBoxes?.id === entityId) {
+                        setSelectedEventForBoxes(updatedEvent);
+                    }
+                    return updatedEvent;
+                }
+                return e;
+            });
+            setEvents(updateFunc);
         });
         toast({ title: "Box Reservado", description: "Has reservado el box exitosamente." });
     } catch (error: any) {
@@ -304,7 +311,7 @@ export default function PromoterEntitiesPage() {
     } finally {
         setIsSubmitting(false);
     }
-};
+  };
   
   const EntityTable = ({ entitiesToShow, type }: { entitiesToShow: PromoterEntityView[], type: 'promotion' | 'event' }) => {
     if (entitiesToShow.length === 0) {
@@ -342,13 +349,18 @@ export default function PromoterEntitiesPage() {
                                         className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
                                     {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
                                 </Badge>
-                                <div className="flex flex-col items-start gap-1 pt-1.5">
-                                <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                    <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
-                                </Button>
-                                <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                    <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
-                                </Button>
+                                <div className="flex items-center gap-1 pt-1.5">
+                                    <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                        <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
+                                    </Button>
+                                    <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                        <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
+                                    </Button>
+                                    {entity.type === 'event' && entity.eventBoxes && entity.eventBoxes.length > 0 && (
+                                        <Button variant="outline" size="xs" onClick={() => {setSelectedEventForBoxes(entity); setShowBoxesModal(true);}} className="px-2 py-1 h-auto text-xs">
+                                            <Box className="h-3 w-3 mr-1" /> Ver Boxes ({entity.eventBoxes.length})
+                                        </Button>
+                                    )}
                                 </div>
                             </TableCell>
                             
@@ -360,35 +372,6 @@ export default function PromoterEntitiesPage() {
                             </div>
                             </TableCell>
                         </TableRow>
-                        {(entity.eventBoxes && entity.eventBoxes.length > 0) && (
-                            <TableRow>
-                                <TableCell colSpan={2} className="p-0">
-                                    <div className="bg-muted/30 p-3">
-                                        <h4 className="font-semibold text-xs mb-2 flex items-center"><Box size={14} className="mr-2"/>Boxes Disponibles para Vender</h4>
-                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                                            {entity.eventBoxes.map(box => {
-                                                const isAvailable = box.status === 'available';
-                                                const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
-                                                return(
-                                                <div key={box.id} className="border bg-background p-2 rounded-md text-xs space-y-1">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="font-medium">{box.name}</span>
-                                                        <span className="font-semibold text-primary">S/ {box.cost.toFixed(2)}</span>
-                                                    </div>
-                                                    <div className="text-muted-foreground text-[11px]">Capacidad: {box.capacity || 'N/A'}</div>
-                                                    {isAvailable && <Button size="xs" className="w-full h-7 text-xs" onClick={() => handleReserveBox(entity.id, box.id)} disabled={isSubmitting}>Reservar</Button>}
-                                                    {!isAvailable && (
-                                                        <Badge variant={isReservedByMe ? "default" : "secondary"} className={cn("w-full justify-center", isReservedByMe && "bg-blue-600")}>
-                                                            {isReservedByMe ? "Reservado por ti" : box.status === 'reserved' ? 'Reservado' : 'Vendido'}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            )})}
-                                        </div>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        )}
                     </React.Fragment>
                     )})}
                 </TableBody>
@@ -419,40 +402,19 @@ export default function PromoterEntitiesPage() {
                                     <p>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></p>
                                 </div>
                            </div>
-                           {(entity.eventBoxes && entity.eventBoxes.length > 0) && (
-                                <>
-                                    <Separator />
-                                    <div className="space-y-2">
-                                        <h4 className="font-semibold text-xs flex items-center"><Box size={14} className="mr-2"/>Boxes</h4>
-                                        <div className="grid grid-cols-2 gap-2">
-                                             {entity.eventBoxes.map(box => {
-                                                const isAvailable = box.status === 'available';
-                                                const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
-                                                return(
-                                                    <div key={box.id} className="border bg-background p-2 rounded-md text-xs space-y-1">
-                                                        <p className="font-medium">{box.name}</p>
-                                                        <p className="font-semibold text-primary">S/ {box.cost.toFixed(2)}</p>
-                                                        {isAvailable && <Button size="xs" className="w-full h-6 text-[11px]" onClick={() => handleReserveBox(entity.id, box.id)} disabled={isSubmitting}>Reservar</Button>}
-                                                        {!isAvailable && (
-                                                            <Badge variant={isReservedByMe ? "default" : "secondary"} className={cn("w-full justify-center", isReservedByMe && "bg-blue-600")}>
-                                                                {isReservedByMe ? "Reservado por ti" : box.status === 'reserved' ? 'Reservado' : 'Vendido'}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                )
-                                             })}
-                                        </div>
-                                    </div>
-                                </>
-                           )}
                            <Separator />
-                           <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="flex-1" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting}>
-                                    <QrCodeIcon className="h-4 w-4 mr-2" /> Crear
+                           <div className="flex flex-col gap-2">
+                                <Button variant="outline" size="sm" className="w-full" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting}>
+                                    <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
                                 </Button>
-                                <Button variant="outline" size="sm" className="flex-1" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting}>
-                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos
+                                <Button variant="outline" size="sm" className="w-full" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting}>
+                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Mis Códigos
                                 </Button>
+                                {entity.type === 'event' && entity.eventBoxes && entity.eventBoxes.length > 0 && (
+                                    <Button variant="outline" size="sm" className="w-full" onClick={() => {setSelectedEventForBoxes(entity); setShowBoxesModal(true);}}>
+                                        <Box className="h-4 w-4 mr-2" /> Ver Boxes ({entity.eventBoxes.length})
+                                    </Button>
+                                )}
                            </div>
                         </CardContent>
                     </Card>
@@ -476,8 +438,8 @@ export default function PromoterEntitiesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
       <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-  <Gift className="h-8 w-8 text-primary !block" /> Campañas
-</h1>
+          <Gift className="h-8 w-8 text-primary !block" /> Campañas
+        </h1>
       </div>
       
       <section>
@@ -498,6 +460,50 @@ export default function PromoterEntitiesPage() {
         </Card>
       </section>
 
+    <Dialog open={showBoxesModal} onOpenChange={(isOpen) => { if (!isOpen) setSelectedEventForBoxes(null); setShowBoxesModal(isOpen); }}>
+        <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Boxes para: {selectedEventForBoxes?.name}</DialogTitle>
+                <DialogDescription>
+                    Visualiza y reserva los boxes disponibles para este evento.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto space-y-2 p-1">
+                {(selectedEventForBoxes?.eventBoxes && selectedEventForBoxes.eventBoxes.length > 0) ? (
+                    selectedEventForBoxes.eventBoxes.map(box => {
+                         const isAvailable = box.status === 'available';
+                         const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
+                         return (
+                            <div key={box.id} className="border p-3 rounded-md flex items-center justify-between gap-4">
+                                <div>
+                                    <p className="font-semibold">{box.name}</p>
+                                    <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
+                                    <p className="text-sm font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
+                                </div>
+                                <div className="shrink-0">
+                                    {isAvailable && (
+                                        <Button size="sm" onClick={() => handleReserveBox(selectedEventForBoxes!.id, box.id)} disabled={isSubmitting}>
+                                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : "Reservar"}
+                                        </Button>
+                                    )}
+                                    {!isAvailable && (
+                                        <Badge variant={isReservedByMe ? "default" : "secondary"} className={cn("w-full justify-center text-xs", isReservedByMe && "bg-blue-600")}>
+                                            {isReservedByMe ? "Reservado por ti" : box.status === 'reserved' ? 'Reservado' : 'Vendido'}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                         )
+                    })
+                ) : (
+                    <p className="text-center text-muted-foreground py-8">Este evento no tiene boxes disponibles.</p>
+                )}
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowBoxesModal(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
     {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
