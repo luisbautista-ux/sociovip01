@@ -9,11 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { BatchBoxFormData } from "@/lib/types";
+import type { BatchBoxFormData, EventBox } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 const batchBoxFormSchema = z.object({
+  templateBoxId: z.string().optional(), // Template selection
   prefix: z.string().min(1, "El prefijo es requerido."),
   fromNumber: z.coerce.number().int().min(1, "Debe ser al menos 1."),
   toNumber: z.coerce.number().int().min(1, "Debe ser al menos 1."),
@@ -28,12 +31,13 @@ const batchBoxFormSchema = z.object({
 type BatchBoxFormValues = z.infer<typeof batchBoxFormSchema>;
 
 interface BatchBoxFormProps {
+  existingBoxes?: EventBox[];
   onSubmit: (data: BatchBoxFormData) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
 
-export function BatchBoxForm({ onSubmit, onCancel, isSubmitting = false }: BatchBoxFormProps) {
+export function BatchBoxForm({ existingBoxes = [], onSubmit, onCancel, isSubmitting = false }: BatchBoxFormProps) {
   const form = useForm<BatchBoxFormValues>({
     resolver: zodResolver(batchBoxFormSchema),
     defaultValues: {
@@ -46,13 +50,59 @@ export function BatchBoxForm({ onSubmit, onCancel, isSubmitting = false }: Batch
     },
   });
 
+  const handleTemplateChange = (boxId: string) => {
+    const selectedBox = existingBoxes.find(b => b.id === boxId);
+    if (selectedBox) {
+      form.setValue("cost", selectedBox.cost);
+      form.setValue("capacity", selectedBox.capacity);
+      form.setValue("description", selectedBox.description);
+      
+      // Intelligent prefix suggestion
+      const nameParts = selectedBox.name.split(' ');
+      const lastPart = nameParts[nameParts.length - 1];
+      if (isNaN(Number(lastPart))) {
+        form.setValue("prefix", selectedBox.name);
+      } else {
+        form.setValue("prefix", nameParts.slice(0, -1).join(' '));
+      }
+    }
+  };
+
+
   const handleSubmit = (values: BatchBoxFormValues) => {
-    onSubmit({ ...values, status: 'available' });
+    const { templateBoxId, ...rest } = values;
+    onSubmit({ ...rest, status: 'available' });
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-3">
+        
+        {existingBoxes && existingBoxes.length > 0 && (
+            <FormField
+              control={form.control}
+              name="templateBoxId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Usar Plantilla (Opcional)</FormLabel>
+                  <Select onValueChange={(value) => { field.onChange(value); handleTemplateChange(value);}} disabled={isSubmitting}>
+                      <FormControl>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Selecciona un box existente como plantilla"/>
+                          </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                          {existingBoxes.map(box => (
+                              <SelectItem key={box.id} value={box.id}>{box.name} (S/ {box.cost})</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        )}
+        
         <FormField control={form.control} name="prefix" render={({ field }) => (
           <FormItem>
             <FormLabel>Prefijo del Nombre <span className="text-destructive">*</span></FormLabel>

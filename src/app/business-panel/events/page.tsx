@@ -465,6 +465,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
+                        existingBoxes={localEventState.eventBoxes}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -803,7 +804,7 @@ export default function BusinessEventsPage() {
                                         <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
-                            </DropdownMenuContent>
+                              </DropdownMenuContent>
                         </DropdownMenu>
                     </CardFooter>
                   </Card>
@@ -919,4 +920,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
