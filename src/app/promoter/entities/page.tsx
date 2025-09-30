@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { User as FirebaseUser } from "firebase/auth";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile, currentUser } = useAuth();
@@ -555,7 +556,7 @@ export default function PromoterEntitiesPage() {
   );
 }
 
-function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; }) {
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: FirebaseUser | null; }) {
     const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
     const [ownerName, setOwnerName] = useState(box.ownerName || "");
     const [ownerPhone, setOwnerPhone] = useState(box.ownerPhone || "");
@@ -606,6 +607,10 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                 toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${data.name}`});
             } else {
                 toast({ title: "No Encontrado", description: "No se encontró un cliente. Por favor, ingrese el nombre manualmente.", variant: "default"});
+            }
+            
+            if (data.phone) {
+                setOwnerPhone(data.phone);
             }
 
         } catch (error: any) {

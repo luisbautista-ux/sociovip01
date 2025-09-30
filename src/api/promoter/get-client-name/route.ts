@@ -54,7 +54,7 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
                 lineas.forEach((linea: string) => {
                     if (linea.startsWith("Nombres:")) nombres = linea.replace("Nombres:", "").trim();
                     else if (linea.startsWith("Apellido Paterno:")) apellidoPaterno = linea.replace("Apellido Paterno:", "").trim();
-                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterno = linea.replace("Apellido Materno:", "").trim();
+                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterно = linea.replace("Apellido Materno:", "").trim();
                 });
                 const nombreCompleto = `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim().replace(/\s+/g, ' ');
                 if (nombreCompleto) {
@@ -98,7 +98,10 @@ export async function GET(request: Request) {
     const qrClientSnap = await qrClientQuery.get();
     if (!qrClientSnap.empty) {
         const client = qrClientSnap.docs[0].data();
-        return NextResponse.json({ name: `${client.name} ${client.surname}`.trim() });
+        return NextResponse.json({ 
+            name: `${client.name} ${client.surname}`.trim(),
+            phone: client.phone || null
+        });
     }
 
     // 2. socioVipMembers
@@ -106,18 +109,21 @@ export async function GET(request: Request) {
     const socioVipSnap = await socioVipQuery.get();
     if (!socioVipSnap.empty) {
         const socio = socioVipSnap.docs[0].data();
-        return NextResponse.json({ name: `${socio.name} ${socio.surname}`.trim() });
+        return NextResponse.json({ 
+            name: `${socio.name} ${socio.surname}`.trim(),
+            phone: socio.phone || null
+        });
     }
 
     // 3. If it's a DNI and not found internally, consult external API
     if (validation.data.docType === 'dni') {
         const externalData = await consultExternalDniApi(validatedDni);
         if (externalData && externalData.nombreCompleto) {
-            return NextResponse.json({ name: externalData.nombreCompleto });
+            return NextResponse.json({ name: externalData.nombreCompleto, phone: null });
         }
     }
 
-    return NextResponse.json({ name: null });
+    return NextResponse.json({ name: null, phone: null });
 
   } catch (error: any) {
     console.error("API Route (get-client-name): Error:", error);

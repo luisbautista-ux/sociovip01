@@ -154,6 +154,7 @@ export interface GeneratedCode {
   isVipCandidate?: boolean;
   ownerName?: string;
   ownerDni?: string;
+  ownerPhone?: string; // New field for box owner phone
   // New fields for commissions
   commissionGenerated?: number;
   commissionStatus?: CommissionStatus;
