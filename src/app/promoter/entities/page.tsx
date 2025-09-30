@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -624,13 +625,9 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
             
             {canManage && (
                 <div className="space-y-3 pt-3 border-t">
-                    <RadioGroup defaultValue="dni" value={docType} onValueChange={(value) => setDocType(value as 'dni' | 'ce')} className="grid grid-cols-2 gap-2">
-                        <Label htmlFor={`docType-dni-${box.id}`} className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", docType === 'dni' && "bg-primary text-primary-foreground border-primary")}>
-                            <RadioGroupItem value="dni" id={`docType-dni-${box.id}`} className="sr-only" /> DNI
-                        </Label>
-                        <Label htmlFor={`docType-ce-${box.id}`} className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", docType === 'ce' && "bg-primary text-primary-foreground border-primary")}>
-                            <RadioGroupItem value="ce" id={`docType-ce-${box.id}`} className="sr-only" /> Carnet Ext.
-                        </Label>
+                    <RadioGroup defaultValue="dni" value={docType} onValueChange={(value) => setDocType(value as 'dni' | 'ce')} className="flex space-x-2">
+                        <Button type="button" onClick={() => setDocType('dni')} variant={docType === 'dni' ? 'gradient' : 'outline'} size="xs" className="h-auto flex-1 text-xs py-1.5">DNI</Button>
+                        <Button type="button" onClick={() => setDocType('ce')} variant={docType === 'ce' ? 'gradient' : 'outline'} size="xs" className="h-auto flex-1 text-xs py-1.5">Carnet Ext.</Button>
                     </RadioGroup>
 
                     <div className="space-y-1">
