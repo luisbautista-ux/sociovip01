@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -273,7 +274,7 @@ export default function PromoterEntitiesPage() {
     setShowManageCodesModal(true);
   };
 
-  const handleUpdateBoxOwner = async (entityId: string, boxId: string, ownerName: string, ownerDni: string, newStatus: 'reserved' | 'sold') => {
+  const handleUpdateBoxOwner = async (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => {
       if (!userProfile) return;
       setIsSubmitting(true);
       const entityRef = doc(db, "businessEntities", entityId);
@@ -290,7 +291,6 @@ export default function PromoterEntitiesPage() {
               if (boxIndex === -1) throw new Error("El box ya no existe.");
               const currentBox = boxes[boxIndex];
 
-              // Allow update only if available or reserved by the same promoter
               if (currentBox.status !== 'available' && currentBox.promoterId !== userProfile.uid) {
                   throw new Error("Este box ya fue reservado por otro promotor.");
               }
@@ -300,13 +300,13 @@ export default function PromoterEntitiesPage() {
                 status: newStatus,
                 ownerName,
                 ownerDni,
+                ownerPhone,
                 promoterId: userProfile.uid,
                 promoterName: userProfile.name,
               };
 
               transaction.update(entityRef, { eventBoxes: boxes });
               
-              // Optimistic update for local state
               const updateFunc = (prev: PromoterEntityView[]) => prev.map(e => {
                   if (e.id === entityId) {
                       const updatedEvent = { ...e, eventBoxes: boxes };
@@ -339,7 +339,6 @@ export default function PromoterEntitiesPage() {
 
     return (
       <div className="space-y-4">
-        {/* Vista para pantallas grandes (tabla) */}
         <div className="hidden md:block">
             <Table>
                 <TableHeader>
@@ -391,7 +390,6 @@ export default function PromoterEntitiesPage() {
                 </TableBody>
             </Table>
         </div>
-        {/* Vista para pantallas pequeñas (tarjetas) */}
         <div className="md:hidden space-y-4">
            {entitiesToShow.map(entity => {
                 const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
@@ -493,6 +491,7 @@ export default function PromoterEntitiesPage() {
                             isSubmitting={isSubmitting}
                             onUpdateBoxOwner={handleUpdateBoxOwner}
                             currentUser={currentUser}
+                            toast={toast}
                         />
                     ))
                 ) : (
@@ -556,9 +555,10 @@ export default function PromoterEntitiesPage() {
   );
 }
 
-function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; }) {
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser, toast }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; toast: any; }) {
     const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
     const [ownerName, setOwnerName] = useState(box.ownerName || "");
+    const [ownerPhone, setOwnerPhone] = useState(box.ownerPhone || "");
     const [docType, setDocType] = useState<'dni' | 'ce'>('dni');
     const [isDniLoading, setIsDniLoading] = useState(false);
 
@@ -568,6 +568,7 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     useEffect(() => {
         setOwnerDni(box.ownerDni || "");
         setOwnerName(box.ownerName || "");
+        setOwnerPhone(box.ownerPhone || "");
     }, [box]);
 
     const handleVerifyDni = async () => {
@@ -610,7 +611,6 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         }
     };
     
-
     return (
         <div className="border p-3 rounded-md space-y-3">
             <div className="flex items-start justify-between gap-4">
@@ -651,12 +651,16 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                         <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
                         <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
                     </div>
+                     <div className="space-y-1">
+                        <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular Dueño</Label>
+                        <Input id={`phone-${box.id}`} type="tel" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/[^0-9]/g, '').slice(0,9))} placeholder="987654321" maxLength={9} disabled={isSubmitting} />
+                    </div>
                     <div className="flex gap-2 justify-end">
                        {box.status === 'available' && (
-                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, 'reserved')} disabled={isSubmitting || !ownerName || !ownerDni}>Reservar</Button>
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'reserved')} disabled={isSubmitting || !ownerName || !ownerDni}>Reservar</Button>
                        )}
                        {isReservedByMe && (
-                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, 'sold')} disabled={isSubmitting || !ownerName || !ownerDni}>Marcar como Vendido</Button>
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'sold')} disabled={isSubmitting || !ownerName || !ownerDni}>Marcar como Vendido</Button>
                        )}
                     </div>
                 </div>

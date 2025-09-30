@@ -152,6 +152,8 @@ export interface GeneratedCode {
   } | null;
   observation?: string | null;
   isVipCandidate?: boolean;
+  ownerName?: string;
+  ownerDni?: string;
   // New fields for commissions
   commissionGenerated?: number;
   commissionStatus?: CommissionStatus;
@@ -201,6 +203,7 @@ export interface EventBox {
   promoterName?: string; // Nombre del promotor
   ownerName?: string;
   ownerDni?: string;
+  ownerPhone?: string;
 }
 
 export interface BusinessManagedEntity { 
