@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -593,20 +592,22 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
             const response = await fetch(`/api/business-panel/get-client-by-dni?dni=${ownerDni}`, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.name) {
-                    setOwnerName(data.name);
-                    toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${data.name}`});
-                } else {
-                    toast({ title: "No Encontrado", description: "No se encontró un cliente con ese DNI. Por favor, ingrese el nombre manualmente.", variant: "default"});
-                }
-            } else {
-                 toast({ title: "Error de Búsqueda", description: "No se pudo verificar el DNI.", variant: "destructive"});
+
+            if (!response.ok) {
+                 const errorData = await response.json();
+                 throw new Error(errorData.error || 'Error del servidor');
             }
-        } catch (error) {
+
+            const data = await response.json();
+            if (data.name) {
+                setOwnerName(data.name);
+                toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${data.name}`});
+            } else {
+                toast({ title: "No Encontrado", description: "No se encontró un cliente con ese DNI. Por favor, ingrese el nombre manualmente.", variant: "default"});
+            }
+        } catch (error: any) {
             console.error("Error fetching client by DNI:", error);
-            toast({ title: "Error de Red", description: "No se pudo conectar con el servidor para verificar el DNI.", variant: "destructive"});
+            toast({ title: "Error de Búsqueda", description: `No se pudo verificar el DNI. ${error.message}`, variant: "destructive"});
         } finally {
             setIsDniLoading(false);
         }
