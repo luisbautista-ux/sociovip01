@@ -23,7 +23,6 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile, currentUser } = useAuth();
@@ -590,42 +589,22 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         setIsDniLoading(true);
         try {
             const idToken = await currentUser.getIdToken();
-            let nameFound = null;
-
-            // 1. Check internal DB first
-            const internalResponse = await fetch(`/api/business-panel/get-client-by-dni?dni=${ownerDni}`, {
+            const response = await fetch(`/api/promoter/get-client-name?dni=${ownerDni}&docType=${docType}`, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
-            if (internalResponse.ok) {
-                const internalData = await internalResponse.json();
-                if (internalData.name) {
-                    nameFound = internalData.name;
-                }
-            } else {
-                 const errorData = await internalResponse.json();
-                 throw new Error(errorData.error || `Error interno del servidor (${internalResponse.status})`);
-            }
 
-            // 2. If not found and it's a DNI, check external API
-            if (!nameFound && docType === 'dni') {
-                const externalResponse = await fetch(`/api/admin/consult-dni`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-                    body: JSON.stringify({ dni: ownerDni }),
-                });
-                if (externalResponse.ok) {
-                    const externalData = await externalResponse.json();
-                    if (externalData.nombreCompleto) {
-                        nameFound = externalData.nombreCompleto;
-                    }
-                }
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Error del servidor (${response.status})`);
             }
             
-            if (nameFound) {
-                setOwnerName(nameFound);
-                toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${nameFound}`});
+            const data = await response.json();
+
+            if (data.name) {
+                setOwnerName(data.name);
+                toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${data.name}`});
             } else {
-                toast({ title: "No Encontrado", description: "No se encontró un cliente con ese DNI. Por favor, ingrese el nombre manualmente.", variant: "default"});
+                toast({ title: "No Encontrado", description: "No se encontró un cliente. Por favor, ingrese el nombre manualmente.", variant: "default"});
             }
 
         } catch (error: any) {

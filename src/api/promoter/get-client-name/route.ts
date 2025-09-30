@@ -7,12 +7,11 @@ import { getAuth } from 'firebase-admin/auth';
 import type { PlatformUser } from '@/lib/types';
 import { z } from 'zod';
 
-const GetClientSchema = z.object({
-    dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(20, "DNI/CE no debe exceder 20 caracteres."),
+const GetClientNameSchema = z.object({
+    dni: z.string().min(7).max(20),
+    docType: z.enum(['dni', 'ce']),
 });
 
-
-// Helper to get caller profile and ensure they are authenticated
 async function getCallerProfile(authorizationHeader: string): Promise<PlatformUser> {
     if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
       throw new Error('No se proporcionó un token de autorización válido.');
@@ -35,45 +34,62 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const dni = searchParams.get('dni');
+    const docType = searchParams.get('docType');
     
-    const validation = GetClientSchema.safeParse({ dni });
+    const validation = GetClientNameSchema.safeParse({ dni, docType });
     if (!validation.success) {
-      return NextResponse.json({ error: 'DNI/CE inválido o no proporcionado.', details: validation.error.flatten() }, { status: 400 });
+      return NextResponse.json({ error: 'DNI/CE inválido o no proporcionado.' }, { status: 400 });
     }
+    const validatedDni = validation.data.dni;
 
     const authorization = request.headers.get('Authorization');
     if (!authorization) {
         return NextResponse.json({ error: 'No autenticado. Token no proporcionado.' }, { status: 401 });
     }
 
-    // Authenticate the caller (e.g., business admin)
-    const caller = await getCallerProfile(authorization);
-    const isBusinessUser = caller.roles.includes('business_admin') || caller.roles.includes('staff');
-    if (!isBusinessUser) {
-        return NextResponse.json({ error: 'Permiso denegado.' }, { status: 403 });
-    }
-    
+    // Authenticate the caller (promoter)
+    await getCallerProfile(authorization);
+
     // --- Search in internal DB ---
     // 1. qrClients
-    const qrClientQuery = adminDb.collection('qrClients').where('dni', '==', validation.data.dni).limit(1);
+    const qrClientQuery = adminDb.collection('qrClients').where('dni', '==', validatedDni).limit(1);
     const qrClientSnap = await qrClientQuery.get();
     if (!qrClientSnap.empty) {
         const client = qrClientSnap.docs[0].data();
-        return NextResponse.json({ name: `${client.name} ${client.surname}`.trim(), source: 'qrClient' });
+        return NextResponse.json({ name: `${client.name} ${client.surname}`.trim() });
     }
 
     // 2. socioVipMembers
-    const socioVipQuery = adminDb.collection('socioVipMembers').where('dni', '==', validation.data.dni).limit(1);
+    const socioVipQuery = adminDb.collection('socioVipMembers').where('dni', '==', validatedDni).limit(1);
     const socioVipSnap = await socioVipQuery.get();
     if (!socioVipSnap.empty) {
         const socio = socioVipSnap.docs[0].data();
-        return NextResponse.json({ name: `${socio.name} ${socio.surname}`.trim(), source: 'socioVip' });
+        return NextResponse.json({ name: `${socio.name} ${socio.surname}`.trim() });
     }
-    
-    return NextResponse.json({ name: null, message: "No se encontró cliente con ese DNI." }, { status: 200 });
+
+    // 3. If it's a DNI and not found internally, consult external API
+    if (validation.data.docType === 'dni') {
+      try {
+        const externalApiResponse = await fetch(`${new URL(request.url).origin}/api/admin/consult-dni`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni: validatedDni }),
+        });
+        if (externalApiResponse.ok) {
+            const externalData = await externalApiResponse.json();
+            if (externalData.nombreCompleto) {
+                return NextResponse.json({ name: externalData.nombreCompleto });
+            }
+        }
+      } catch (e) {
+          console.warn("External DNI API call failed in get-client-name:", e);
+      }
+    }
+
+    return NextResponse.json({ name: null });
 
   } catch (error: any) {
-    console.error("API Route (get-client-by-dni): Error:", error);
+    console.error("API Route (get-client-name): Error:", error);
     let status = 500;
     let errorMessage = error.message || 'Error interno del servidor.';
 
