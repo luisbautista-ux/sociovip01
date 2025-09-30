@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import * as React from "react";
@@ -7,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star } from "lucide-react";
+import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search } from "lucide-react";
 import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox, QrClient, SocioVipMember } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile, currentUser } = useAuth();
@@ -560,17 +559,32 @@ export default function PromoterEntitiesPage() {
 function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; }) {
     const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
     const [ownerName, setOwnerName] = useState(box.ownerName || "");
-    const [isReservedByMe, setIsReservedByMe] = useState(box.status === 'reserved' && box.promoterId === userProfile?.uid);
+    const [docType, setDocType] = useState<'dni' | 'ce'>('dni');
     const [isDniLoading, setIsDniLoading] = useState(false);
+
+    const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
+    const canManage = box.status === 'available' || isReservedByMe;
 
     useEffect(() => {
         setOwnerDni(box.ownerDni || "");
         setOwnerName(box.ownerName || "");
-        setIsReservedByMe(box.status === 'reserved' && box.promoterId === userProfile?.uid);
-    }, [box, userProfile]);
+    }, [box]);
 
-    const handleDniBlur = async () => {
-        if (!ownerDni || ownerDni.length < 8 || !currentUser) return;
+    const handleVerifyDni = async () => {
+        if (!ownerDni || !currentUser) return;
+        
+        const dniRegex = /^\d{8}$/;
+        const ceRegex = /^\d{10,20}$/;
+
+        if (docType === 'dni' && !dniRegex.test(ownerDni)) {
+            toast({ title: "DNI Inválido", description: "El DNI debe contener 8 dígitos numéricos.", variant: "destructive" });
+            return;
+        }
+        if (docType === 'ce' && !ceRegex.test(ownerDni)) {
+            toast({ title: "CE Inválido", description: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos.", variant: "destructive" });
+            return;
+        }
+
         setIsDniLoading(true);
         try {
             const idToken = await currentUser.getIdToken();
@@ -581,16 +595,21 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                 const data = await response.json();
                 if (data.name) {
                     setOwnerName(data.name);
+                    toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${data.name}`});
+                } else {
+                    toast({ title: "No Encontrado", description: "No se encontró un cliente con ese DNI. Por favor, ingrese el nombre manualmente.", variant: "default"});
                 }
+            } else {
+                 toast({ title: "Error de Búsqueda", description: "No se pudo verificar el DNI.", variant: "destructive"});
             }
         } catch (error) {
             console.error("Error fetching client by DNI:", error);
+            toast({ title: "Error de Red", description: "No se pudo conectar con el servidor para verificar el DNI.", variant: "destructive"});
         } finally {
             setIsDniLoading(false);
         }
     };
     
-    const canManage = box.status === 'available' || isReservedByMe;
 
     return (
         <div className="border p-3 rounded-md space-y-3">
@@ -600,16 +619,34 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                     <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
                     <p className="text-sm font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
                 </div>
-                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500': box.status === 'available', 'bg-blue-600': isReservedByMe })}>{isReservedByMe ? "Reservado por ti" : box.status === 'sold' ? 'Vendido' : 'Disponible'}</Badge>
+                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500': box.status === 'available', 'bg-blue-600': isReservedByMe, 'bg-gray-500': box.status === 'sold' })}>{isReservedByMe ? "Reservado por ti" : box.status === 'sold' ? `Vendido por ${box.promoterName || 'otro'}` : 'Disponible'}</Badge>
             </div>
             
             {canManage && (
-                <div className="space-y-2">
-                    <div className="space-y-1 relative">
-                        <Label htmlFor={`dni-${box.id}`} className="text-xs">DNI/CE Dueño</Label>
-                        <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => setOwnerDni(e.target.value)} onBlur={handleDniBlur} placeholder="DNI del cliente" disabled={isSubmitting || isDniLoading} />
-                        {isDniLoading && <Loader2 className="absolute right-2 top-7 h-4 w-4 animate-spin text-muted-foreground" />}
+                <div className="space-y-3 pt-3 border-t">
+                    <RadioGroup defaultValue="dni" value={docType} onValueChange={(value) => setDocType(value as 'dni' | 'ce')} className="grid grid-cols-2 gap-2">
+                        <Label htmlFor={`docType-dni-${box.id}`} className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", docType === 'dni' && "bg-primary text-primary-foreground border-primary")}>
+                            <RadioGroupItem value="dni" id={`docType-dni-${box.id}`} className="sr-only" /> DNI
+                        </Label>
+                        <Label htmlFor={`docType-ce-${box.id}`} className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", docType === 'ce' && "bg-primary text-primary-foreground border-primary")}>
+                            <RadioGroupItem value="ce" id={`docType-ce-${box.id}`} className="sr-only" /> Carnet Ext.
+                        </Label>
+                    </RadioGroup>
+
+                    <div className="space-y-1">
+                        <Label htmlFor={`dni-${box.id}`} className="text-xs">Número de Documento</Label>
+                        <div className="flex gap-2">
+                            <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                const maxLength = docType === 'dni' ? 8 : 20;
+                                setOwnerDni(val.slice(0, maxLength));
+                            }} placeholder={docType === 'dni' ? "8 dígitos" : "10-20 dígitos"} disabled={isSubmitting || isDniLoading} />
+                            <Button size="icon" variant="outline" onClick={handleVerifyDni} disabled={isSubmitting || isDniLoading || !ownerDni}>
+                                {isDniLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
+                            </Button>
+                        </div>
                     </div>
+
                      <div className="space-y-1">
                         <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
                         <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
@@ -627,4 +664,3 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         </div>
     );
 }
-
