@@ -59,26 +59,8 @@ export async function GET(request: Request) {
         return NextResponse.json({ name: `${socio.name} ${socio.surname}`.trim(), source: 'socioVip' });
     }
     
-    // --- Fallback to external API ---
-    if (dni.length === 8) { // Only call external for DNI
-        try {
-            const apiBaseUrl = new URL(request.url).origin;
-            const apiResponse = await fetch(`${apiBaseUrl}/api/admin/consult-dni`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dni }),
-            });
-
-            if (apiResponse.ok) {
-                const data = await apiResponse.json();
-                if (data.nombreCompleto) {
-                     return NextResponse.json({ name: data.nombreCompleto.trim(), source: 'external' });
-                }
-            }
-        } catch (apiError) {
-            console.warn(`API Route (get-client-by-dni): External DNI consultation failed for DNI ${dni}.`, apiError);
-        }
-    }
+    // NOTE: External API call has been moved to the client-side component to simplify this endpoint
+    // and avoid circular dependencies or complex URL constructions. This endpoint now only checks internal DB.
 
     // If no client is found anywhere, return a specific response.
     return NextResponse.json({ name: null, message: "No se encontró cliente con ese DNI." }, { status: 200 });

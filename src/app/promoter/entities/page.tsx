@@ -590,22 +590,44 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         setIsDniLoading(true);
         try {
             const idToken = await currentUser.getIdToken();
-            const response = await fetch(`/api/business-panel/get-client-by-dni?dni=${ownerDni}`, {
+            let nameFound = null;
+
+            // 1. Check internal DB first
+            const internalResponse = await fetch(`/api/business-panel/get-client-by-dni?dni=${ownerDni}`, {
                 headers: { 'Authorization': `Bearer ${idToken}` }
             });
-
-            if (!response.ok) {
-                 const errorData = await response.json();
-                 throw new Error(errorData.error || 'Error del servidor');
+            if (internalResponse.ok) {
+                const internalData = await internalResponse.json();
+                if (internalData.name) {
+                    nameFound = internalData.name;
+                }
+            } else {
+                 const errorData = await internalResponse.json();
+                 throw new Error(errorData.error || `Error interno del servidor (${internalResponse.status})`);
             }
 
-            const data = await response.json();
-            if (data.name) {
-                setOwnerName(data.name);
-                toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${data.name}`});
+            // 2. If not found and it's a DNI, check external API
+            if (!nameFound && docType === 'dni') {
+                const externalResponse = await fetch(`/api/admin/consult-dni`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+                    body: JSON.stringify({ dni: ownerDni }),
+                });
+                if (externalResponse.ok) {
+                    const externalData = await externalResponse.json();
+                    if (externalData.nombreCompleto) {
+                        nameFound = externalData.nombreCompleto;
+                    }
+                }
+            }
+            
+            if (nameFound) {
+                setOwnerName(nameFound);
+                toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${nameFound}`});
             } else {
                 toast({ title: "No Encontrado", description: "No se encontró un cliente con ese DNI. Por favor, ingrese el nombre manualmente.", variant: "default"});
             }
+
         } catch (error: any) {
             console.error("Error fetching client by DNI:", error);
             toast({ title: "Error de Búsqueda", description: `No se pudo verificar el DNI. ${error.message}`, variant: "destructive"});
