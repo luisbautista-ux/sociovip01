@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -491,7 +492,6 @@ export default function PromoterEntitiesPage() {
                             isSubmitting={isSubmitting}
                             onUpdateBoxOwner={handleUpdateBoxOwner}
                             currentUser={currentUser}
-                            toast={toast}
                         />
                     ))
                 ) : (
@@ -555,12 +555,13 @@ export default function PromoterEntitiesPage() {
   );
 }
 
-function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser, toast }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; toast: any; }) {
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; }) {
     const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
     const [ownerName, setOwnerName] = useState(box.ownerName || "");
     const [ownerPhone, setOwnerPhone] = useState(box.ownerPhone || "");
     const [docType, setDocType] = useState<'dni' | 'ce'>('dni');
     const [isDniLoading, setIsDniLoading] = useState(false);
+    const { toast } = useToast();
 
     const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
     const canManage = box.status === 'available' || isReservedByMe;
