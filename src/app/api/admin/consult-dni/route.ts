@@ -91,7 +91,12 @@ export async function POST(request: Request) {
         if (responseFecha.ok) {
             const dataFecha = await responseFecha.json() as FechaResponse;
             if (dataFecha.success && dataFecha.data?.fechaNacimiento) {
-                fechaNacimiento = dataFecha.data.fechaNacimiento;
+                 // Validar formato de fecha dd/mm/yyyy
+                if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataFecha.data.fechaNacimiento)) {
+                    fechaNacimiento = dataFecha.data.fechaNacimiento;
+                } else {
+                    console.warn(`API Route (consult-dni): formato de fecha de nacimiento inválido recibido: ${dataFecha.data.fechaNacimiento}`);
+                }
             }
         }
     } catch (error) {
