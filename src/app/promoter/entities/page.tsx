@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -491,6 +492,7 @@ export default function PromoterEntitiesPage() {
                             isSubmitting={isSubmitting}
                             onUpdateBoxOwner={handleUpdateBoxOwner}
                             currentUser={currentUser}
+                            toast={toast}
                         />
                     ))
                 ) : (
@@ -554,8 +556,7 @@ export default function PromoterEntitiesPage() {
   );
 }
 
-function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; }) {
-    const { toast } = useToast();
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser, toast }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; toast: any; }) {
     const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
     const [ownerName, setOwnerName] = useState(box.ownerName || "");
     const [ownerPhone, setOwnerPhone] = useState(box.ownerPhone || "");
