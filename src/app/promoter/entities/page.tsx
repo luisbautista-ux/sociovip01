@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function PromoterEntitiesPage() {
-  const { userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { userProfile, loadingAuth, loadingProfile, currentUser } = useAuth();
   const [promotions, setPromotions] = useState<PromoterEntityView[]>([]);
   const [events, setEvents] = useState<PromoterEntityView[]>([]);
   const [businessesMap, setBusinessesMap] = useState<Map<string, Business>>(new Map());
@@ -181,6 +181,8 @@ export default function PromoterEntitiesPage() {
                 redemptionDate: null, 
                 redeemedByInfo: null, 
                 isVipCandidate: false,
+                ownerName: code.ownerName,
+                ownerDni: code.ownerDni,
             }) as GeneratedCode));
             
             const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
@@ -442,7 +444,7 @@ export default function PromoterEntitiesPage() {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando promociones y eventos asignados...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Cargando campañas asignadas...</p>
       </div>
     );
   }
@@ -491,6 +493,7 @@ export default function PromoterEntitiesPage() {
                             userProfile={userProfile}
                             isSubmitting={isSubmitting}
                             onUpdateBoxOwner={handleUpdateBoxOwner}
+                            currentUser={currentUser}
                         />
                     ))
                 ) : (
@@ -554,10 +557,11 @@ export default function PromoterEntitiesPage() {
   );
 }
 
-function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, newStatus: 'reserved' | 'sold') => void }) {
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; }) {
     const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
     const [ownerName, setOwnerName] = useState(box.ownerName || "");
     const [isReservedByMe, setIsReservedByMe] = useState(box.status === 'reserved' && box.promoterId === userProfile?.uid);
+    const [isDniLoading, setIsDniLoading] = useState(false);
 
     useEffect(() => {
         setOwnerDni(box.ownerDni || "");
@@ -566,16 +570,23 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     }, [box, userProfile]);
 
     const handleDniBlur = async () => {
-        if (!ownerDni || ownerDni.length < 8) return;
-        const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", ownerDni));
-        const socioQuery = query(collection(db, "socioVipMembers"), where("dni", "==", ownerDni));
-        const [qrSnap, socioSnap] = await Promise.all([getDocs(qrClientQuery), getDocs(socioQuery)]);
-        if (!qrSnap.empty) {
-            const client = qrSnap.docs[0].data() as QrClient;
-            setOwnerName(`${client.name} ${client.surname}`);
-        } else if (!socioSnap.empty) {
-            const socio = socioSnap.docs[0].data() as SocioVipMember;
-            setOwnerName(`${socio.name} ${socio.surname}`);
+        if (!ownerDni || ownerDni.length < 8 || !currentUser) return;
+        setIsDniLoading(true);
+        try {
+            const idToken = await currentUser.getIdToken();
+            const response = await fetch(`/api/business-panel/get-client-by-dni?dni=${ownerDni}`, {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.name) {
+                    setOwnerName(data.name);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching client by DNI:", error);
+        } finally {
+            setIsDniLoading(false);
         }
     };
     
@@ -594,9 +605,10 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
             
             {canManage && (
                 <div className="space-y-2">
-                    <div className="space-y-1">
+                    <div className="space-y-1 relative">
                         <Label htmlFor={`dni-${box.id}`} className="text-xs">DNI/CE Dueño</Label>
-                        <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => setOwnerDni(e.target.value)} onBlur={handleDniBlur} placeholder="DNI del cliente" disabled={isSubmitting} />
+                        <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => setOwnerDni(e.target.value)} onBlur={handleDniBlur} placeholder="DNI del cliente" disabled={isSubmitting || isDniLoading} />
+                        {isDniLoading && <Loader2 className="absolute right-2 top-7 h-4 w-4 animate-spin text-muted-foreground" />}
                     </div>
                      <div className="space-y-1">
                         <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
