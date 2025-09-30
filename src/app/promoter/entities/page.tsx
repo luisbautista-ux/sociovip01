@@ -601,16 +601,21 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
             }
             
             const data = await response.json();
-
+            
+            let toastMessage = "";
             if (data.name) {
                 setOwnerName(data.name);
-                toast({ title: "Cliente Encontrado", description: `Se autocompletó el nombre: ${data.name}`});
-            } else {
-                toast({ title: "No Encontrado", description: "No se encontró un cliente. Por favor, ingrese el nombre manualmente.", variant: "default"});
+                toastMessage += `Se autocompletó el nombre: ${data.name}.`;
             }
-            
             if (data.phone) {
                 setOwnerPhone(data.phone);
+                toastMessage += ` Y el celular: ${data.phone}.`;
+            }
+
+            if(toastMessage) {
+                toast({ title: "Cliente Encontrado", description: toastMessage.trim() });
+            } else {
+                toast({ title: "No Encontrado", description: "No se encontró un cliente. Por favor, ingrese los datos manualmente.", variant: "default"});
             }
 
         } catch (error: any) {
