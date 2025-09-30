@@ -27,6 +27,48 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     return userDoc.data() as PlatformUser;
 }
 
+// Función auxiliar para consultar la API de DNI externa de forma segura desde el backend
+async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string } | null> {
+    try {
+        const endpointNombres = "https://dniperu.com/querySelector";
+        const formNombres = new URLSearchParams();
+        formNombres.append('dni4', dni);
+        formNombres.append('Buscar', 'Buscar');
+
+        const responseNombres = await fetch(endpointNombres, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://dniperu.com/',
+            },
+            body: formNombres.toString(),
+        });
+        
+        if (responseNombres.ok) {
+            const dataNombres = await responseNombres.json();
+            if (dataNombres.mensaje) {
+                const lineas = dataNombres.mensaje.split('\n');
+                let nombres = "";
+                let apellidoPaterno = "";
+                let apellidoMaterno = "";
+                lineas.forEach((linea: string) => {
+                    if (linea.startsWith("Nombres:")) nombres = linea.replace("Nombres:", "").trim();
+                    else if (linea.startsWith("Apellido Paterno:")) apellidoPaterno = linea.replace("Apellido Paterno:", "").trim();
+                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterno = linea.replace("Apellido Materno:", "").trim();
+                });
+                const nombreCompleto = `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim().replace(/\s+/g, ' ');
+                if (nombreCompleto) {
+                    return { nombreCompleto };
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("External DNI API call failed in get-client-name API route:", e);
+    }
+    return null;
+}
+
+
 export async function GET(request: Request) {
   try {
     await initializeAdminApp();
@@ -38,7 +80,7 @@ export async function GET(request: Request) {
     
     const validation = GetClientNameSchema.safeParse({ dni, docType });
     if (!validation.success) {
-      return NextResponse.json({ error: 'DNI/CE inválido o no proporcionado.' }, { status: 400 });
+      return NextResponse.json({ error: 'DNI/CE inválido o no proporcionado.', details: validation.error.flatten() }, { status: 400 });
     }
     const validatedDni = validation.data.dni;
 
@@ -69,21 +111,10 @@ export async function GET(request: Request) {
 
     // 3. If it's a DNI and not found internally, consult external API
     if (validation.data.docType === 'dni') {
-      try {
-        const externalApiResponse = await fetch(`${new URL(request.url).origin}/api/admin/consult-dni`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dni: validatedDni }),
-        });
-        if (externalApiResponse.ok) {
-            const externalData = await externalApiResponse.json();
-            if (externalData.nombreCompleto) {
-                return NextResponse.json({ name: externalData.nombreCompleto });
-            }
+        const externalData = await consultExternalDniApi(validatedDni);
+        if (externalData && externalData.nombreCompleto) {
+            return NextResponse.json({ name: externalData.nombreCompleto });
         }
-      } catch (e) {
-          console.warn("External DNI API call failed in get-client-name:", e);
-      }
     }
 
     return NextResponse.json({ name: null });
@@ -100,6 +131,6 @@ export async function GET(request: Request) {
         errorMessage = 'Token de sesión inválido o expirado.';
     }
     
-    return NextResponse.json({ error: errorMessage }, { status });
+    return NextResponse.json({ error: errorMessage, details: error.message }, { status });
   }
 }
