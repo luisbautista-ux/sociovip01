@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -184,6 +183,7 @@ export default function PromoterEntitiesPage() {
                 isVipCandidate: false,
                 ownerName: code.ownerName,
                 ownerDni: code.ownerDni,
+                ownerPhone: code.ownerPhone,
             }) as GeneratedCode));
             
             const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
@@ -625,10 +625,26 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
             
             {canManage && (
                 <div className="space-y-3 pt-3 border-t">
-                    <RadioGroup defaultValue="dni" value={docType} onValueChange={(value) => setDocType(value as 'dni' | 'ce')} className="flex space-x-2">
-                        <Button type="button" onClick={() => setDocType('dni')} variant={docType === 'dni' ? 'gradient' : 'outline'} size="xs" className="h-auto flex-1 text-xs py-1.5">DNI</Button>
-                        <Button type="button" onClick={() => setDocType('ce')} variant={docType === 'ce' ? 'gradient' : 'outline'} size="xs" className="h-auto flex-1 text-xs py-1.5">Carnet Ext.</Button>
-                    </RadioGroup>
+                    <div className="flex items-center p-0.5 rounded-lg bg-muted w-full">
+                        <Button
+                            type="button"
+                            onClick={() => setDocType('dni')}
+                            variant={docType === 'dni' ? 'gradient' : 'ghost'}
+                            size="sm"
+                            className="flex-1 text-xs h-7"
+                        >
+                            DNI
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => setDocType('ce')}
+                            variant={docType === 'ce' ? 'gradient' : 'ghost'}
+                            size="sm"
+                            className="flex-1 text-xs h-7"
+                        >
+                            Carnet Ext.
+                        </Button>
+                    </div>
 
                     <div className="space-y-1">
                         <Label htmlFor={`dni-${box.id}`} className="text-xs">Número de Documento</Label>
