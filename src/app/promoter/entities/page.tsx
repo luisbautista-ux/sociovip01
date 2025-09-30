@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCard
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star } from "lucide-react";
-import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox } from "@/lib/types";
+import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox, QrClient, SocioVipMember } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function PromoterEntitiesPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -270,48 +272,58 @@ export default function PromoterEntitiesPage() {
     setShowManageCodesModal(true);
   };
 
-  const handleReserveBox = async (entityId: string, boxId: string) => {
-    if (!userProfile) return;
-    setIsSubmitting(true);
-    const entityRef = doc(db, "businessEntities", entityId);
+  const handleUpdateBoxOwner = async (entityId: string, boxId: string, ownerName: string, ownerDni: string, newStatus: 'reserved' | 'sold') => {
+      if (!userProfile) return;
+      setIsSubmitting(true);
+      const entityRef = doc(db, "businessEntities", entityId);
 
-    try {
-        await runTransaction(db, async (transaction) => {
-            const entitySnap = await transaction.get(entityRef);
-            if (!entitySnap.exists()) throw new Error("El evento ya no existe.");
+      try {
+          await runTransaction(db, async (transaction) => {
+              const entitySnap = await transaction.get(entityRef);
+              if (!entitySnap.exists()) throw new Error("El evento ya no existe.");
 
-            const entityData = entitySnap.data() as BusinessManagedEntity;
-            const boxes = entityData.eventBoxes || [];
-            const boxIndex = boxes.findIndex(b => b.id === boxId);
-            
-            if (boxIndex === -1) throw new Error("El box ya no existe.");
-            if (boxes[boxIndex].status !== 'available') throw new Error("Este box ya no está disponible.");
+              const entityData = entitySnap.data() as BusinessManagedEntity;
+              const boxes = [...(entityData.eventBoxes || [])];
+              const boxIndex = boxes.findIndex(b => b.id === boxId);
+              
+              if (boxIndex === -1) throw new Error("El box ya no existe.");
+              const currentBox = boxes[boxIndex];
 
-            boxes[boxIndex].status = 'reserved';
-            boxes[boxIndex].promoterId = userProfile.uid;
-            boxes[boxIndex].promoterName = userProfile.name;
+              // Allow update only if available or reserved by the same promoter
+              if (currentBox.status !== 'available' && currentBox.promoterId !== userProfile.uid) {
+                  throw new Error("Este box ya fue reservado por otro promotor.");
+              }
 
-            transaction.update(entityRef, { eventBoxes: boxes });
-            
-            // Optimistic update for local state
-            const updateFunc = (prev: PromoterEntityView[]) => prev.map(e => {
-                if (e.id === entityId) {
-                    const updatedEvent = { ...e, eventBoxes: boxes };
-                    if (selectedEventForBoxes?.id === entityId) {
-                        setSelectedEventForBoxes(updatedEvent);
-                    }
-                    return updatedEvent;
-                }
-                return e;
-            });
-            setEvents(updateFunc);
-        });
-        toast({ title: "Box Reservado", description: "Has reservado el box exitosamente." });
-    } catch (error: any) {
-        toast({ title: "Error al Reservar", description: error.message, variant: "destructive" });
-    } finally {
-        setIsSubmitting(false);
-    }
+              boxes[boxIndex] = {
+                ...currentBox,
+                status: newStatus,
+                ownerName,
+                ownerDni,
+                promoterId: userProfile.uid,
+                promoterName: userProfile.name,
+              };
+
+              transaction.update(entityRef, { eventBoxes: boxes });
+              
+              // Optimistic update for local state
+              const updateFunc = (prev: PromoterEntityView[]) => prev.map(e => {
+                  if (e.id === entityId) {
+                      const updatedEvent = { ...e, eventBoxes: boxes };
+                      if (selectedEventForBoxes?.id === entityId) {
+                          setSelectedEventForBoxes(updatedEvent);
+                      }
+                      return updatedEvent;
+                  }
+                  return e;
+              });
+              setEvents(updateFunc);
+          });
+          toast({ title: "Box Actualizado", description: "Los datos del dueño del box se guardaron." });
+      } catch (error: any) {
+          toast({ title: "Error al Actualizar Box", description: error.message, variant: "destructive" });
+      } finally {
+          setIsSubmitting(false);
+      }
   };
   
   const EntityTable = ({ entitiesToShow, type }: { entitiesToShow: PromoterEntityView[], type: 'promotion' | 'event' }) => {
@@ -466,36 +478,21 @@ export default function PromoterEntitiesPage() {
             <DialogHeader>
                 <DialogTitle>Boxes para: {selectedEventForBoxes?.name}</DialogTitle>
                 <DialogDescription>
-                    Visualiza y reserva los boxes disponibles para este evento.
+                    Gestiona los boxes disponibles para este evento.
                 </DialogDescription>
             </DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto space-y-2 p-1">
                 {(selectedEventForBoxes?.eventBoxes && selectedEventForBoxes.eventBoxes.length > 0) ? (
-                    selectedEventForBoxes.eventBoxes.map(box => {
-                         const isAvailable = box.status === 'available';
-                         const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
-                         return (
-                            <div key={box.id} className="border p-3 rounded-md flex items-center justify-between gap-4">
-                                <div>
-                                    <p className="font-semibold">{box.name}</p>
-                                    <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
-                                    <p className="text-sm font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
-                                </div>
-                                <div className="shrink-0">
-                                    {isAvailable && (
-                                        <Button size="sm" onClick={() => handleReserveBox(selectedEventForBoxes!.id, box.id)} disabled={isSubmitting}>
-                                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : "Reservar"}
-                                        </Button>
-                                    )}
-                                    {!isAvailable && (
-                                        <Badge variant={isReservedByMe ? "default" : "secondary"} className={cn("w-full justify-center text-xs", isReservedByMe && "bg-blue-600")}>
-                                            {isReservedByMe ? "Reservado por ti" : box.status === 'reserved' ? 'Reservado' : 'Vendido'}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                         )
-                    })
+                    selectedEventForBoxes.eventBoxes.map(box => (
+                        <BoxManagementCard 
+                            key={box.id}
+                            box={box}
+                            eventId={selectedEventForBoxes.id}
+                            userProfile={userProfile}
+                            isSubmitting={isSubmitting}
+                            onUpdateBoxOwner={handleUpdateBoxOwner}
+                        />
+                    ))
                 ) : (
                     <p className="text-center text-muted-foreground py-8">Este evento no tiene boxes disponibles.</p>
                 )}
@@ -556,3 +553,66 @@ export default function PromoterEntitiesPage() {
     </div>
   );
 }
+
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, newStatus: 'reserved' | 'sold') => void }) {
+    const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
+    const [ownerName, setOwnerName] = useState(box.ownerName || "");
+    const [isReservedByMe, setIsReservedByMe] = useState(box.status === 'reserved' && box.promoterId === userProfile?.uid);
+
+    useEffect(() => {
+        setOwnerDni(box.ownerDni || "");
+        setOwnerName(box.ownerName || "");
+        setIsReservedByMe(box.status === 'reserved' && box.promoterId === userProfile?.uid);
+    }, [box, userProfile]);
+
+    const handleDniBlur = async () => {
+        if (!ownerDni || ownerDni.length < 8) return;
+        const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", ownerDni));
+        const socioQuery = query(collection(db, "socioVipMembers"), where("dni", "==", ownerDni));
+        const [qrSnap, socioSnap] = await Promise.all([getDocs(qrClientQuery), getDocs(socioQuery)]);
+        if (!qrSnap.empty) {
+            const client = qrSnap.docs[0].data() as QrClient;
+            setOwnerName(`${client.name} ${client.surname}`);
+        } else if (!socioSnap.empty) {
+            const socio = socioSnap.docs[0].data() as SocioVipMember;
+            setOwnerName(`${socio.name} ${socio.surname}`);
+        }
+    };
+    
+    const canManage = box.status === 'available' || isReservedByMe;
+
+    return (
+        <div className="border p-3 rounded-md space-y-3">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="font-semibold">{box.name}</p>
+                    <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
+                    <p className="text-sm font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
+                </div>
+                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500': box.status === 'available', 'bg-blue-600': isReservedByMe })}>{isReservedByMe ? "Reservado por ti" : box.status === 'sold' ? 'Vendido' : 'Disponible'}</Badge>
+            </div>
+            
+            {canManage && (
+                <div className="space-y-2">
+                    <div className="space-y-1">
+                        <Label htmlFor={`dni-${box.id}`} className="text-xs">DNI/CE Dueño</Label>
+                        <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => setOwnerDni(e.target.value)} onBlur={handleDniBlur} placeholder="DNI del cliente" disabled={isSubmitting} />
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
+                        <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                       {box.status === 'available' && (
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, 'reserved')} disabled={isSubmitting || !ownerName || !ownerDni}>Reservar</Button>
+                       )}
+                       {isReservedByMe && (
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, 'sold')} disabled={isSubmitting || !ownerName || !ownerDni}>Marcar como Vendido</Button>
+                       )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
