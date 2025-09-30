@@ -54,7 +54,7 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
                 lineas.forEach((linea: string) => {
                     if (linea.startsWith("Nombres:")) nombres = linea.replace("Nombres:", "").trim();
                     else if (linea.startsWith("Apellido Paterno:")) apellidoPaterno = linea.replace("Apellido Paterno:", "").trim();
-                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterно = linea.replace("Apellido Materno:", "").trim();
+                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterno = linea.replace("Apellido Materno:", "").trim();
                 });
                 const nombreCompleto = `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim().replace(/\s+/g, ' ');
                 if (nombreCompleto) {
