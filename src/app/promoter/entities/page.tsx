@@ -492,7 +492,6 @@ export default function PromoterEntitiesPage() {
                             isSubmitting={isSubmitting}
                             onUpdateBoxOwner={handleUpdateBoxOwner}
                             currentUser={currentUser}
-                            toast={toast}
                         />
                     ))
                 ) : (
@@ -556,7 +555,8 @@ export default function PromoterEntitiesPage() {
   );
 }
 
-function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser, toast }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; toast: any; }) {
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: any; }) {
+    const { toast } = useToast();
     const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
     const [ownerName, setOwnerName] = useState(box.ownerName || "");
     const [ownerPhone, setOwnerPhone] = useState(box.ownerPhone || "");
@@ -625,22 +625,22 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
             
             {canManage && (
                 <div className="space-y-3 pt-3 border-t">
-                    <div className="flex items-center p-0.5 rounded-lg bg-muted w-full">
+                    <div className="flex items-center p-1 rounded-lg bg-muted w-full">
                         <Button
                             type="button"
                             onClick={() => setDocType('dni')}
-                            variant={docType === 'dni' ? 'gradient' : 'ghost'}
+                            variant={docType === 'dni' ? 'default' : 'ghost'}
+                            className={cn("flex-1 text-xs h-7", docType === 'dni' && 'bg-primary text-primary-foreground')}
                             size="sm"
-                            className="flex-1 text-xs h-7"
                         >
                             DNI
                         </Button>
                         <Button
                             type="button"
                             onClick={() => setDocType('ce')}
-                            variant={docType === 'ce' ? 'gradient' : 'ghost'}
+                            variant={docType === 'ce' ? 'default' : 'ghost'}
+                            className={cn("flex-1 text-xs h-7", docType === 'ce' && 'bg-primary text-primary-foreground')}
                             size="sm"
-                            className="flex-1 text-xs h-7"
                         >
                             Carnet Ext.
                         </Button>
@@ -659,14 +659,13 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                             </Button>
                         </div>
                     </div>
-
-                     <div className="space-y-1">
-                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
-                        <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
-                    </div>
                      <div className="space-y-1">
                         <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular Dueño</Label>
                         <Input id={`phone-${box.id}`} type="tel" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/[^0-9]/g, '').slice(0,9))} placeholder="987654321" maxLength={9} disabled={isSubmitting} />
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
+                        <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
                     </div>
                     <div className="flex gap-2 justify-end">
                        {box.status === 'available' && (
