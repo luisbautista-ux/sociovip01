@@ -577,14 +577,14 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         if (!ownerDni || !currentUser) return;
         
         const dniRegex = /^\d{8}$/;
-        const ceRegex = /^\d{10,20}$/;
+        const ceRegex = /^\d{7,20}$/;
 
         if (docType === 'dni' && !dniRegex.test(ownerDni)) {
             toast({ title: "DNI Inválido", description: "El DNI debe contener 8 dígitos numéricos.", variant: "destructive" });
             return;
         }
         if (docType === 'ce' && !ceRegex.test(ownerDni)) {
-            toast({ title: "CE Inválido", description: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos.", variant: "destructive" });
+            toast({ title: "CE Inválido", description: "El Carnet de Extranjería debe tener entre 7 y 20 dígitos.", variant: "destructive" });
             return;
         }
 
@@ -602,18 +602,18 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
             
             const data = await response.json();
             
-            let toastMessage = "";
+            let toastMessages: string[] = [];
             if (data.name) {
                 setOwnerName(data.name);
-                toastMessage += `Se autocompletó el nombre: ${data.name}.`;
+                toastMessages.push(`Nombre: ${data.name}.`);
             }
             if (data.phone) {
                 setOwnerPhone(data.phone);
-                toastMessage += ` Y el celular: ${data.phone}.`;
+                toastMessages.push(`Celular: ${data.phone}.`);
             }
 
-            if(toastMessage) {
-                toast({ title: "Cliente Encontrado", description: toastMessage.trim() });
+            if (toastMessages.length > 0) {
+                toast({ title: "Cliente Encontrado", description: `Datos autocompletados. ${toastMessages.join(' ')}` });
             } else {
                 toast({ title: "No Encontrado", description: "No se encontró un cliente. Por favor, ingrese los datos manualmente.", variant: "default"});
             }
@@ -667,7 +667,7 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                                 const val = e.target.value.replace(/[^0-9]/g, '');
                                 const maxLength = docType === 'dni' ? 8 : 20;
                                 setOwnerDni(val.slice(0, maxLength));
-                            }} placeholder={docType === 'dni' ? "8 dígitos" : "10-20 dígitos"} disabled={isSubmitting || isDniLoading} />
+                            }} placeholder={docType === 'dni' ? "8 dígitos" : "7-20 dígitos"} disabled={isSubmitting || isDniLoading} />
                             <Button size="icon" variant="outline" onClick={handleVerifyDni} disabled={isSubmitting || isDniLoading || !ownerDni}>
                                 {isDniLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
                             </Button>
