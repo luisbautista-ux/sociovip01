@@ -861,9 +861,9 @@ export default function BusinessEventsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Evento</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Aforo Total</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-center">Fecha</TableHead>
+                    <TableHead className="text-center">Aforo Total</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -878,9 +878,9 @@ export default function BusinessEventsPage() {
                     return (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium">{event.name}</TableCell>
-                        <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                        <TableCell>{displayAttendance}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell className="text-center">{displayAttendance}</TableCell>
+                        <TableCell className="text-center">
                           <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>
@@ -964,6 +964,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
