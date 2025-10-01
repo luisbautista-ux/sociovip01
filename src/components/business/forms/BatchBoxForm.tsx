@@ -135,14 +135,14 @@ export function BatchBoxForm({ existingBoxes = [], onSubmit, onCancel, isSubmitt
         )}/>
         <FormField control={form.control} name="capacity" render={({ field }) => (
             <FormItem>
-                <FormLabel>Capacidad (Opcional)</FormLabel>
+                <FormLabel>Capacidad </FormLabel>
                 <FormControl><Input type="number" placeholder="8" {...field} value={field.value ?? ""} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
             </FormItem>
         )}/>
         <FormField control={form.control} name="description" render={({ field }) => (
             <FormItem>
-                <FormLabel>Descripción (Opcional)</FormLabel>
+                <FormLabel>Descripción </FormLabel>
                 <FormControl><Textarea placeholder="Detalles de los boxes, ej: Incluye 2 botellas y piqueos." {...field} value={field.value || ""} rows={2} disabled={isSubmitting} /></FormControl>
                 <FormMessage />
             </FormItem>

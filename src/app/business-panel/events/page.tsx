@@ -277,27 +277,29 @@ const ManageEventDialog = ({
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-grow overflow-hidden">
-                        <div className="px-6 border-b shrink-0">
-                            <div className="overflow-x-auto">
+                    <div className="px-6 border-b shrink-0">
+                        <div className="overflow-x-auto">
+                            <Tabs value={activeTab} onValueChange={setActiveTab}>
                                 <TabsList className="w-max sm:w-auto">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
                                     <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
                                     <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
                                     <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
                                 </TabsList>
-                            </div>
+                            </Tabs>
                         </div>
-
-                        <div className="flex-grow overflow-y-auto">
-                            <TabsContent value="details" className="p-6">
+                    </div>
+                    
+                    <div className="flex-grow overflow-y-auto">
+                        <Tabs value={activeTab} className="h-full">
+                            <TabsContent value="details" className="p-6 h-full">
                                 <BusinessEventForm 
                                     event={localEventState} 
                                     onFormChange={handleDetailsChange} 
                                     isSubmitting={isSubmitting}
                                 />
                             </TabsContent>
-                            <TabsContent value="tickets" className="p-6">
+                            <TabsContent value="tickets" className="p-6 h-full">
                                 <Card>
                                  <CardHeader>
                                      <CardTitle>Gestión de Tipos de Entrada</CardTitle>
@@ -335,7 +337,7 @@ const ManageEventDialog = ({
                                  </CardContent>
                                 </Card>
                             </TabsContent>
-                            <TabsContent value="boxes" className="p-6">
+                            <TabsContent value="boxes" className="p-6 h-full">
                                     <Card>
                                         <CardHeader>
                                             <CardTitle>Gestión de Boxes</CardTitle>
@@ -419,7 +421,7 @@ const ManageEventDialog = ({
                                         </CardContent>
                                     </Card>
                             </TabsContent>
-                           <TabsContent value="promoters" className="p-6">
+                           <TabsContent value="promoters" className="p-6 h-full">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Asignar Promotores al Evento</CardTitle>
@@ -475,9 +477,9 @@ const ManageEventDialog = ({
                                     </CardContent>
                                 </Card>
                             </TabsContent>
-                        </div>
-                    </Tabs>
-                    
+                        </Tabs>
+                    </div>
+
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
                         <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
@@ -976,6 +978,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 

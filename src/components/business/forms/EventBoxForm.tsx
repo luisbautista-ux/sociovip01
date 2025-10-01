@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from "react";
@@ -106,13 +105,13 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Descripción (Opcional)</FormLabel>
+              <FormLabel>Descripción </FormLabel>
               <FormControl><Textarea placeholder="Detalles del box, ej: Incluye 2 botellas y piqueos." {...field} value={field.value || ""} rows={2} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-         <FormField
+        <FormField
           control={form.control}
           name="capacity"
           render={({ field }) => (
@@ -140,7 +139,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           name="promoterName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Vendedor Asignado (Opcional)</FormLabel>
+              <FormLabel>Vendedor Asignado </FormLabel>
               <FormControl><Input placeholder="Nombre del promotor/vendedor" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -151,7 +150,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           name="ownerName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre Dueño del Box (Opcional)</FormLabel>
+              <FormLabel>Nombre Dueño del Box </FormLabel>
               <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormDescription className="text-xs">Si el box es reservado por un cliente específico.</FormDescription>
               <FormMessage />
@@ -163,7 +162,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           name="ownerDni"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>DNI/CE Dueño del Box (Opcional)</FormLabel>
+              <FormLabel>DNI/CE Dueño del Box </FormLabel>
               <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
