@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -284,7 +285,7 @@ const ManageEventDialog = ({
                             <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
                         </TabsList>
 
-                        <div className="flex-grow overflow-y-auto mt-4 pr-2">
+                        <div className="flex-grow overflow-y-auto mt-4">
                             <TabsContent value="details">
                                 <BusinessEventForm 
                                     event={localEventState} 
