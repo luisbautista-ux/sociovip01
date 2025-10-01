@@ -272,7 +272,7 @@ const ManageEventDialog = ({
         <>
             <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-                    <DialogHeader className="p-6 pb-2">
+                    <DialogHeader className="p-6 pb-2 shrink-0">
                         <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
@@ -352,8 +352,8 @@ const ManageEventDialog = ({
                                                 {(localEventState.eventBoxes || []).map(box => (
                                                     <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
                                                         "bg-green-500/10 border-green-300": box.status === 'available',
-                                                        "bg-purple-500/10 border-purple-300": box.status === 'sold',
                                                         "bg-blue-500/10 border-blue-300": box.status === 'reserved',
+                                                        "bg-purple-500/10 border-purple-300": box.status === 'sold',
                                                     })}>
                                                         <CardHeader className="p-3">
                                                             <CardTitle className="text-base">{box.name}</CardTitle>
@@ -976,6 +976,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
