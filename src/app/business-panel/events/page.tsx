@@ -277,9 +277,9 @@ const ManageEventDialog = ({
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
+                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
                         <div className="overflow-x-auto">
-                            <TabsList className="w-max sm:w-full justify-start">
+                            <TabsList className="w-max sm:w-auto">
                                 <TabsTrigger value="details">Detalles</TabsTrigger>
                                 <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
                                 <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
@@ -287,18 +287,15 @@ const ManageEventDialog = ({
                             </TabsList>
                         </div>
                         
-                        <div className="flex-grow overflow-y-auto mt-4">
-                            <TabsContent value="details">
-                                <div className="overflow-y-auto h-full">
-                                    <BusinessEventForm 
-                                        event={localEventState} 
-                                        onFormChange={handleDetailsChange} 
-                                        isSubmitting={isSubmitting}
-                                    />
-                                </div>
+                        <div className="flex-grow mt-4 overflow-y-auto">
+                            <TabsContent value="details" className="h-full">
+                                <BusinessEventForm 
+                                    event={localEventState} 
+                                    onFormChange={handleDetailsChange} 
+                                    isSubmitting={isSubmitting}
+                                />
                             </TabsContent>
-                            <TabsContent value="tickets">
-                               <div className="overflow-y-auto h-full">
+                            <TabsContent value="tickets" className="h-full">
                                 <Card>
                                  <CardHeader>
                                      <CardTitle>Gestión de Tipos de Entrada</CardTitle>
@@ -333,10 +330,8 @@ const ManageEventDialog = ({
                                       )}
                                  </CardContent>
                                 </Card>
-                                </div>
                             </TabsContent>
-                            <TabsContent value="boxes">
-                                <div className="overflow-y-auto h-full">
+                            <TabsContent value="boxes" className="h-full">
                                     <Card>
                                         <CardHeader>
                                             <CardTitle>Gestión de Boxes</CardTitle>
@@ -419,10 +414,8 @@ const ManageEventDialog = ({
                                             )}
                                         </CardContent>
                                     </Card>
-                                </div>
                             </TabsContent>
-                           <TabsContent value="promoters">
-                                <div className="overflow-y-auto h-full">
+                           <TabsContent value="promoters" className="h-full">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Asignar Promotores al Evento</CardTitle>
@@ -477,7 +470,6 @@ const ManageEventDialog = ({
                                         </div>
                                     </CardContent>
                                 </Card>
-                                </div>
                             </TabsContent>
                         </div>
                     </Tabs>
@@ -878,7 +870,7 @@ export default function BusinessEventsPage() {
                     <TableHead className="text-center">Fecha</TableHead>
                     <TableHead className="text-center">Aforo Total</TableHead>
                     <TableHead className="text-center">Estado</TableHead>
-                    <TableHead className="text-right pr-12">Acciones</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -899,7 +891,7 @@ export default function BusinessEventsPage() {
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right space-x-1 pr-8">
+                        <TableCell className="text-right space-x-1">
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Códigos</Button>
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})</Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
@@ -980,4 +972,5 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
