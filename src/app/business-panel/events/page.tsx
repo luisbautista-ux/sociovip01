@@ -277,10 +277,10 @@ const ManageEventDialog = ({
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
-                    <div className="px-6 border-b shrink-0">
+                     <div className="px-6 border-b shrink-0">
                         <div className="overflow-x-auto">
                             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                                <TabsList className="w-max sm:w-auto">
+                                <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
                                     <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
                                     <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
@@ -978,6 +978,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
