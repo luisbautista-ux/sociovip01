@@ -627,7 +627,7 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     };
     
     return (
-        <div className={cn("p-4 rounded-lg space-y-3 transition-all border-2 shadow-sm",
+        <div className={cn("p-4 rounded-lg space-y-3 transition-all duration-300 ease-in-out border-2 shadow-lg hover:shadow-xl hover:-translate-y-1",
             box.status === 'available' ? 'bg-card border-primary ring-1 ring-primary/20' 
             : isReservedByMe ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/20' 
             : 'bg-muted/30 border-gray-300 dark:border-gray-700 ring-1 ring-gray-500/10'
