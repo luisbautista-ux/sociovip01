@@ -860,11 +860,11 @@ export default function BusinessEventsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Evento</TableHead>
+                    <TableHead className="w-[30%]">Evento</TableHead>
                     <TableHead className="text-left">Fecha</TableHead>
                     <TableHead className="text-left">Aforo Total</TableHead>
                     <TableHead className="text-left">Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="text-right w-[35%]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -964,6 +964,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
