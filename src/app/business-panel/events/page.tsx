@@ -860,11 +860,11 @@ export default function BusinessEventsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[30%]">Evento</TableHead>
-                    <TableHead className="text-left">Fecha</TableHead>
-                    <TableHead className="text-left">Aforo Total</TableHead>
-                    <TableHead className="text-left">Estado</TableHead>
-                    <TableHead className="text-right w-[35%]">Acciones</TableHead>
+                    <TableHead className="w-[35%]">Evento</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Aforo Total</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -878,9 +878,9 @@ export default function BusinessEventsPage() {
                     return (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium">{event.name}</TableCell>
-                        <TableCell className="text-left">{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                        <TableCell className="text-left">{displayAttendance}</TableCell>
-                        <TableCell className="text-left">
+                        <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell>{displayAttendance}</TableCell>
+                        <TableCell>
                           <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>
@@ -964,6 +964,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
