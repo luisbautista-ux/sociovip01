@@ -34,7 +34,7 @@ import { BatchBoxForm } from '@/components/business/forms/BatchBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
 import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDialog';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -278,8 +278,8 @@ const ManageEventDialog = ({
                     </DialogHeader>
                     
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-grow overflow-hidden">
-                        <div className="px-6 border-b">
-                            <div className="overflow-x-auto -mb-px">
+                        <div className="px-6 border-b shrink-0">
+                            <div className="overflow-x-auto">
                                 <TabsList className="w-max sm:w-auto">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
                                     <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
@@ -305,7 +305,8 @@ const ManageEventDialog = ({
                                  </CardHeader>
                                  <CardContent>
                                      <Button onClick={() => { setEditingTicket(null); setIsTicketFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Tipo de Entrada</Button>
-                                     <Table className="mt-4">
+                                     <div className="mt-4 overflow-x-auto">
+                                     <Table>
                                          <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                          <TableBody>
                                              {(localEventState.ticketTypes || []).map(ticket => (
@@ -327,6 +328,7 @@ const ManageEventDialog = ({
                                              ))}
                                          </TableBody>
                                      </Table>
+                                     </div>
                                       {(!localEventState.ticketTypes || localEventState.ticketTypes.length === 0) && (
                                         <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
                                       )}
@@ -383,7 +385,7 @@ const ManageEventDialog = ({
                                             </div>
 
                                             {/* Desktop View for Boxes */}
-                                            <div className="hidden md:block mt-4">
+                                            <div className="hidden md:block mt-4 overflow-x-auto">
                                                 <Table>
                                                     <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                                     <TableBody>
@@ -476,7 +478,7 @@ const ManageEventDialog = ({
                         </div>
                     </Tabs>
                     
-                    <DialogFooter className="p-6 pt-2 border-t mt-auto">
+                    <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
                         <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -895,7 +897,7 @@ export default function BusinessEventsPage() {
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Códigos</Button>
-                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})</Button>
+                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Codigos ({event.generatedCodes?.length || 0})</Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
                           <AlertDialog>
                               <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
@@ -974,6 +976,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -642,9 +643,9 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     return (
         <div className={cn("p-4 rounded-lg space-y-3 transition-all duration-300 ease-in-out border-2 shadow-lg hover:shadow-xl hover:-translate-y-1",
             {
-                "bg-green-50 border-green-300": box.status === 'available',
-                "bg-blue-50 border-blue-300": box.status === 'reserved',
-                "bg-purple-50 border-purple-300": box.status === 'sold',
+                "bg-green-500/10 border-green-300": box.status === 'available',
+                "bg-blue-500/10 border-blue-300": box.status === 'reserved',
+                "bg-purple-500/10 border-purple-300": box.status === 'sold',
             }
         )}>
             <div className="flex items-start justify-between gap-4">
