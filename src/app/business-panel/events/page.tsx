@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -278,7 +277,7 @@ const ManageEventDialog = ({
                     </DialogHeader>
                     
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
-                        <TabsList className="w-full justify-start overflow-x-auto">
+                        <TabsList className="w-max sm:w-full justify-start overflow-x-auto">
                             <TabsTrigger value="details">Detalles</TabsTrigger>
                             <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
                             <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
@@ -969,15 +968,4 @@ export default function BusinessEventsPage() {
   );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
+    
