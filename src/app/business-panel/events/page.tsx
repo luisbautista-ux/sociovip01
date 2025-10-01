@@ -864,7 +864,7 @@ export default function BusinessEventsPage() {
                     <TableHead className="text-center">Fecha</TableHead>
                     <TableHead className="text-center">Aforo Total</TableHead>
                     <TableHead className="text-center">Estado</TableHead>
-                    <TableHead className="text-center">Acciones</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -885,7 +885,7 @@ export default function BusinessEventsPage() {
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-center space-x-1">
+                        <TableCell className="text-right space-x-1">
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos</Button>
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
@@ -964,6 +964,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
