@@ -344,10 +344,10 @@ const ManageEventDialog = ({
                                         {/* Mobile View for Boxes */}
                                         <div className="md:hidden space-y-4 mt-4">
                                             {(localEventState.eventBoxes || []).map(box => (
-                                                <Card key={box.id} className={cn("overflow-hidden border shadow-sm", {
-                                                    "bg-green-50 border-green-300": box.status === 'available',
-                                                    "bg-purple-50 border-purple-300": box.status === 'sold',
-                                                    "bg-blue-50 border-blue-300": box.status === 'reserved',
+                                                <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
+                                                    "bg-green-500/10 border-green-300": box.status === 'available',
+                                                    "bg-purple-500/10 border-purple-300": box.status === 'sold',
+                                                    "bg-blue-500/10 border-blue-300": box.status === 'reserved',
                                                 })}>
                                                     <CardHeader className="p-3">
                                                         <CardTitle className="text-base">{box.name}</CardTitle>
@@ -968,6 +968,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
