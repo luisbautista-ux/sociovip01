@@ -627,17 +627,17 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     };
     
     return (
-        <div className={cn("p-4 rounded-lg space-y-3 transition-all",
-            box.status === 'available' ? 'bg-card border-primary/50 border' : 'bg-muted/30 border',
-            isReservedByMe && 'bg-blue-500/10 border-blue-500/50'
+        <div className={cn("p-4 rounded-lg space-y-3 transition-all border shadow-sm",
+            box.status === 'available' ? 'bg-card border-primary ring-1 ring-primary/20' : 'bg-muted/30',
+            isReservedByMe && 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/20'
         )}>
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <p className="font-semibold text-base">{box.name}</p>
+                    <p className="font-semibold text-base text-foreground">{box.name}</p>
                     <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
-                    <p className="text-lg font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
                 </div>
-                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500': box.status === 'available', 'bg-blue-600': isReservedByMe, 'bg-gray-500': box.status === 'sold' })}>{isReservedByMe ? "Reservado por ti" : box.status === 'sold' ? `Vendido por ${box.promoterName || 'otro'}` : 'Disponible'}</Badge>
+                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500 text-white': box.status === 'available', 'bg-blue-600 text-white': isReservedByMe, 'bg-gray-500 text-white': box.status === 'sold' && !isReservedByMe })}>{isReservedByMe ? "Reservado por ti" : box.status === 'sold' ? `Vendido por ${box.promoterName || 'otro'}` : 'Disponible'}</Badge>
             </div>
             
             {canManage && (
