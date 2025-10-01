@@ -344,7 +344,11 @@ const ManageEventDialog = ({
                                         {/* Mobile View for Boxes */}
                                         <div className="md:hidden space-y-4 mt-4">
                                             {(localEventState.eventBoxes || []).map(box => (
-                                                <Card key={box.id} className="overflow-hidden">
+                                                <Card key={box.id} className={cn("overflow-hidden border shadow-sm", {
+                                                    "bg-green-50 border-green-300": box.status === 'available',
+                                                    "bg-purple-50 border-purple-300": box.status === 'sold',
+                                                    "bg-blue-50 border-blue-300": box.status === 'reserved',
+                                                })}>
                                                     <CardHeader className="p-3">
                                                         <CardTitle className="text-base">{box.name}</CardTitle>
                                                     </CardHeader>
@@ -860,11 +864,11 @@ export default function BusinessEventsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[35%]">Evento</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Aforo Total</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="w-[30%]">Evento</TableHead>
+                    <TableHead className="text-left">Fecha</TableHead>
+                    <TableHead className="text-left">Aforo Total</TableHead>
+                    <TableHead className="text-left">Estado</TableHead>
+                    <TableHead className="text-right w-[240px]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -878,16 +882,16 @@ export default function BusinessEventsPage() {
                     return (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium">{event.name}</TableCell>
-                        <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                        <TableCell>{displayAttendance}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-left">{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell className="text-left">{displayAttendance}</TableCell>
+                        <TableCell className="text-left">
                           <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-1">
-                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos</Button>
-                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
+                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Códigos</Button>
+                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})</Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
                           <AlertDialog>
                               <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
@@ -964,6 +968,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
