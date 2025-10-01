@@ -69,6 +69,12 @@ const ManageEventDialog = ({
     const [editingBox, setEditingBox] = useState<EventBox | null>(null);
     const [isBatchBoxFormOpen, setIsBatchBoxFormOpen] = useState(false);
 
+    const boxStatusTranslations: Record<EventBox['status'], string> = {
+        available: 'Disponible',
+        reserved: 'Reservado',
+        sold: 'Vendido',
+    };
+
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
             setLocalEventState({ ...editingEvent });
@@ -345,7 +351,7 @@ const ManageEventDialog = ({
                                                     <CardContent className="p-3 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
                                                         <div className="text-muted-foreground">Costo:</div><div className="font-semibold">S/ {box.cost.toFixed(2)}</div>
                                                         <div className="text-muted-foreground">Capacidad:</div><div className="font-semibold">{box.capacity || 'N/A'}</div>
-                                                        <div className="text-muted-foreground">Estado:</div><div><Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{box.status}</Badge></div>
+                                                        <div className="text-muted-foreground">Estado:</div><div><Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge></div>
                                                     </CardContent>
                                                     <CardFooter className="p-2 bg-muted/50">
                                                         <DropdownMenu>
@@ -379,7 +385,7 @@ const ManageEventDialog = ({
                                                             <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
                                                             <TableCell>{box.capacity || 'N/A'}</TableCell>
                                                             <TableCell>
-                                                                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{box.status}</Badge>
+                                                                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
@@ -958,6 +964,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
