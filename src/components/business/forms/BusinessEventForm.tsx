@@ -107,7 +107,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
 
   return (
     <Form {...form}>
-      <form className="space-y-4">
+      <form className="space-y-4 overflow-y-auto">
         <FormField
           control={form.control}
           name="name"

@@ -25,7 +25,7 @@ import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, saniti
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
@@ -864,11 +864,11 @@ export default function BusinessEventsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[30%]">Evento</TableHead>
-                    <TableHead className="text-left">Fecha</TableHead>
-                    <TableHead className="text-left">Aforo Total</TableHead>
-                    <TableHead className="text-left">Estado</TableHead>
-                    <TableHead className="text-right w-[240px]">Acciones</TableHead>
+                    <TableHead>Evento</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Aforo Total</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -882,9 +882,9 @@ export default function BusinessEventsPage() {
                     return (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium">{event.name}</TableCell>
-                        <TableCell className="text-left">{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                        <TableCell className="text-left">{displayAttendance}</TableCell>
-                        <TableCell className="text-left">
+                        <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell>{displayAttendance}</TableCell>
+                        <TableCell>
                           <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>

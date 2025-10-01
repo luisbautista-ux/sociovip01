@@ -78,7 +78,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 overflow-y-auto py-4">
         <FormField
           control={form.control}
           name="name"
