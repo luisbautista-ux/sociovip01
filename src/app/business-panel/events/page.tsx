@@ -277,9 +277,9 @@ const ManageEventDialog = ({
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
-                     <div className="px-6 border-b shrink-0">
+                    <div className="px-6 border-b shrink-0">
                         <div className="overflow-x-auto">
-                            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
                                     <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
@@ -293,16 +293,24 @@ const ManageEventDialog = ({
                     <div className="flex-grow overflow-y-auto">
                         <Tabs value={activeTab} className="h-full">
                             <TabsContent value="details" className="p-6 h-full">
-                                <BusinessEventForm 
-                                    event={localEventState} 
-                                    onFormChange={handleDetailsChange} 
-                                    isSubmitting={isSubmitting}
-                                />
+                                <Card>
+                                  <CardHeader>
+                                    <CardTitle>Detalles Principales del Evento</CardTitle>
+                                    <CardDescription>Configura la información básica y las fechas de tu evento.</CardDescription>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <BusinessEventForm 
+                                        event={localEventState} 
+                                        onFormChange={handleDetailsChange} 
+                                        isSubmitting={isSubmitting}
+                                    />
+                                  </CardContent>
+                                </Card>
                             </TabsContent>
                             <TabsContent value="tickets" className="p-6 h-full">
                                 <Card>
                                  <CardHeader>
-                                     <CardTitle>Gestión de Tipos de Entrada</CardTitle>
+                                     <CardTitle>Gestión de tipos de entrada</CardTitle>
                                      <CardDescription>Añade y configura las entradas para tu evento. El aforo total se calcula sumando las cantidades de cada tipo.</CardDescription>
                                  </CardHeader>
                                  <CardContent>
@@ -340,7 +348,7 @@ const ManageEventDialog = ({
                             <TabsContent value="boxes" className="p-6 h-full">
                                     <Card>
                                         <CardHeader>
-                                            <CardTitle>Gestión de Boxes</CardTitle>
+                                            <CardTitle>Gestión de boxes</CardTitle>
                                             <CardDescription>Añade y configura los boxes para tu evento, de forma individual o masiva.</CardDescription>
                                         </CardHeader>
                                         <CardContent>
@@ -424,7 +432,7 @@ const ManageEventDialog = ({
                            <TabsContent value="promoters" className="p-6 h-full">
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>Asignar Promotores al Evento</CardTitle>
+                                        <CardTitle>Asignar promotores al evento</CardTitle>
                                         <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento y luego configura sus comisiones.</CardDescription>
                                     </CardHeader>
                                     <CardContent className="space-y-6">
@@ -978,6 +986,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 

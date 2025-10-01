@@ -113,7 +113,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nombre del Evento <span className="text-destructive">*</span></FormLabel>
+              <FormLabel><span className="font-bold">Nombre del Evento</span> <span className="text-destructive">*</span></FormLabel>
               <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -124,7 +124,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Descripción <span className="text-destructive">*</span></FormLabel>
+              <FormLabel><strong>Descripción</strong> <span className="text-destructive">*</span></FormLabel>
               <FormControl><Textarea placeholder="Detalles del evento..." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -135,7 +135,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           name="termsAndConditions"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Términos y Condiciones (Opcional)</FormLabel>
+              <FormLabel><strong>Términos y Condiciones (Opcional)</strong></FormLabel>
               <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -147,7 +147,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
             name="startDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Inicio <span className="text-destructive">*</span></FormLabel>
+                <FormLabel><strong>Fecha de Inicio</strong> <span className="text-destructive">*</span></FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -170,7 +170,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
             name="endDate"
             render={({ field }) => (
               <FormItem className="flex flex-col">
-                <FormLabel>Fecha de Fin <span className="text-destructive">*</span></FormLabel>
+                <FormLabel><strong>Fecha de Fin</strong> <span className="text-destructive">*</span></FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -203,7 +203,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
                       disabled={isSubmitting}
                     />
                   </FormControl>
-                  <FormLabel className="font-normal">Aforo Ilimitado</FormLabel>
+                  <FormLabel className="font-normal"><strong>Aforo Ilimitado</strong></FormLabel>
                 </FormItem>
               )}
             />
@@ -241,7 +241,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           name="imageUrl"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>URL de Imagen (Opcional)</FormLabel>
+              <FormLabel><strong>URL de Imagen</strong> (Opcional)</FormLabel>
               <FormControl>
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-muted-foreground" />
@@ -257,7 +257,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           name="aiHint"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Palabras Clave para Imagen (si URL está vacía)</FormLabel>
+              <FormLabel><strong>Palabras Clave para Imagen (si URL está vacía)</strong></FormLabel>
               <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
@@ -269,7 +269,7 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
               <div className="space-y-0.5">
-                <FormLabel>Activar Evento <span className="text-destructive">*</span></FormLabel>
+                <FormLabel><strong>Activar Evento</strong> <span className="text-destructive">*</span></FormLabel>
                 <FormMessage />
               </div>
               <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
