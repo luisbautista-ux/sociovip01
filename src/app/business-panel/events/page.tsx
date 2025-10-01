@@ -271,31 +271,33 @@ const ManageEventDialog = ({
     return (
         <>
             <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
-                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                    <DialogHeader>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-2">
                         <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
-                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <TabsList className="w-max sm:w-auto">
-                                <TabsTrigger value="details">Detalles</TabsTrigger>
-                                <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                                <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
-                                <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
-                            </TabsList>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-grow overflow-hidden">
+                        <div className="px-6 border-b">
+                            <div className="overflow-x-auto -mb-px">
+                                <TabsList className="w-max sm:w-auto">
+                                    <TabsTrigger value="details">Detalles</TabsTrigger>
+                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
+                                    <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
+                                </TabsList>
+                            </div>
                         </div>
-                        
-                        <div className="flex-grow mt-4 overflow-y-auto">
-                            <TabsContent value="details" className="h-full">
+
+                        <div className="flex-grow overflow-y-auto">
+                            <TabsContent value="details" className="p-6">
                                 <BusinessEventForm 
                                     event={localEventState} 
                                     onFormChange={handleDetailsChange} 
                                     isSubmitting={isSubmitting}
                                 />
                             </TabsContent>
-                            <TabsContent value="tickets" className="h-full">
+                            <TabsContent value="tickets" className="p-6">
                                 <Card>
                                  <CardHeader>
                                      <CardTitle>Gestión de Tipos de Entrada</CardTitle>
@@ -331,7 +333,7 @@ const ManageEventDialog = ({
                                  </CardContent>
                                 </Card>
                             </TabsContent>
-                            <TabsContent value="boxes" className="h-full">
+                            <TabsContent value="boxes" className="p-6">
                                     <Card>
                                         <CardHeader>
                                             <CardTitle>Gestión de Boxes</CardTitle>
@@ -415,7 +417,7 @@ const ManageEventDialog = ({
                                         </CardContent>
                                     </Card>
                             </TabsContent>
-                           <TabsContent value="promoters" className="h-full">
+                           <TabsContent value="promoters" className="p-6">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Asignar Promotores al Evento</CardTitle>
@@ -474,7 +476,7 @@ const ManageEventDialog = ({
                         </div>
                     </Tabs>
                     
-                    <DialogFooter className="pt-4 border-t mt-auto">
+                    <DialogFooter className="p-6 pt-2 border-t mt-auto">
                         <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
                         <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -972,5 +974,6 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
