@@ -334,31 +334,69 @@ const ManageEventDialog = ({
                                             <Button onClick={() => { setEditingBox(null); setIsBoxFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Box</Button>
                                             <Button onClick={() => setIsBatchBoxFormOpen(true)} variant="outline"><Box className="h-4 w-4 mr-2"/>Crear en Lote</Button>
                                         </div>
-                                        <Table className="mt-4">
-                                            <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-                                            <TableBody>
-                                                {(localEventState.eventBoxes || []).map(box => (
-                                                    <TableRow key={box.id}>
-                                                        <TableCell>{box.name}</TableCell>
-                                                        <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
-                                                        <TableCell>{box.capacity || 'N/A'}</TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{box.status}</Badge>
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
-                                                                    <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
+                                        
+                                        {/* Mobile View for Boxes */}
+                                        <div className="md:hidden space-y-4 mt-4">
+                                            {(localEventState.eventBoxes || []).map(box => (
+                                                <Card key={box.id} className="overflow-hidden">
+                                                    <CardHeader className="p-3">
+                                                        <CardTitle className="text-base">{box.name}</CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-3 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                                                        <div className="text-muted-foreground">Costo:</div><div className="font-semibold">S/ {box.cost.toFixed(2)}</div>
+                                                        <div className="text-muted-foreground">Capacidad:</div><div className="font-semibold">{box.capacity || 'N/A'}</div>
+                                                        <div className="text-muted-foreground">Estado:</div><div><Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{box.status}</Badge></div>
+                                                    </CardContent>
+                                                    <CardFooter className="p-2 bg-muted/50">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="sm" className="w-full justify-center text-xs h-auto py-1">Acciones <MoreVertical className="ml-1 h-4 w-4"/></Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent>
+                                                                <DropdownMenuItem onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
+                                                                <AlertDialog>
+                                                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                                                    <AlertDialogContent>
+                                                                        <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                                    </AlertDialogContent>
+                                                                </AlertDialog>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </CardFooter>
+                                                </Card>
+                                            ))}
+                                        </div>
+
+                                        {/* Desktop View for Boxes */}
+                                        <div className="hidden md:block mt-4">
+                                            <Table>
+                                                <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                                                <TableBody>
+                                                    {(localEventState.eventBoxes || []).map(box => (
+                                                        <TableRow key={box.id}>
+                                                            <TableCell>{box.name}</TableCell>
+                                                            <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
+                                                            <TableCell>{box.capacity || 'N/A'}</TableCell>
+                                                            <TableCell>
+                                                                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{box.status}</Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                                <AlertDialog>
+                                                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
+                                                                    <AlertDialogContent>
+                                                                        <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                                    </AlertDialogContent>
+                                                                </AlertDialog>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+
                                         {(!localEventState.eventBoxes || localEventState.eventBoxes.length === 0) && (
                                             <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
                                         )}
@@ -920,5 +958,6 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
