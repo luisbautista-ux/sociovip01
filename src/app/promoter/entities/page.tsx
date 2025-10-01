@@ -627,12 +627,15 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     };
     
     return (
-        <div className="border p-3 rounded-md space-y-3">
+        <div className={cn("p-4 rounded-lg space-y-3 transition-all",
+            box.status === 'available' ? 'bg-card border-primary/50 border' : 'bg-muted/30 border',
+            isReservedByMe && 'bg-blue-500/10 border-blue-500/50'
+        )}>
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <p className="font-semibold">{box.name}</p>
+                    <p className="font-semibold text-base">{box.name}</p>
                     <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
-                    <p className="text-sm font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
                 </div>
                 <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500': box.status === 'available', 'bg-blue-600': isReservedByMe, 'bg-gray-500': box.status === 'sold' })}>{isReservedByMe ? "Reservado por ti" : box.status === 'sold' ? `Vendido por ${box.promoterName || 'otro'}` : 'Disponible'}</Badge>
             </div>
@@ -681,7 +684,7 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                         <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
                         <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
                     </div>
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-2 justify-end pt-2">
                        {box.status === 'available' && (
                          <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'reserved')} disabled={isSubmitting || !ownerName || !ownerDni}>Reservar</Button>
                        )}

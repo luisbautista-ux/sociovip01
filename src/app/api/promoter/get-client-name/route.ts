@@ -1,4 +1,3 @@
-
 'use server';
 
 import { NextResponse } from 'next/server';
@@ -68,7 +67,6 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
     return null;
 }
 
-
 export async function GET(request: Request) {
   try {
     await initializeAdminApp();
@@ -98,7 +96,11 @@ export async function GET(request: Request) {
     const qrClientSnap = await qrClientQuery.get();
     if (!qrClientSnap.empty) {
         const client = qrClientSnap.docs[0].data();
-        return NextResponse.json({ name: `${client.name} ${client.surname}`.trim() });
+        console.log('qrClient data:', client);  // Verificar los datos obtenidos de la base de datos
+        return NextResponse.json({
+            name: `${client.name} ${client.surname}`.trim(),
+            phone: client.phone || "No disponible",  // Si no hay teléfono, devuelve "No disponible"
+        });
     }
 
     // 2. socioVipMembers
@@ -106,18 +108,22 @@ export async function GET(request: Request) {
     const socioVipSnap = await socioVipQuery.get();
     if (!socioVipSnap.empty) {
         const socio = socioVipSnap.docs[0].data();
-        return NextResponse.json({ name: `${socio.name} ${socio.surname}`.trim() });
+        console.log('socioVip data:', socio);  // Verificar los datos obtenidos de la base de datos
+        return NextResponse.json({
+            name: `${socio.name} ${socio.surname}`.trim(),
+            phone: socio.phone || "No disponible",  // Si no hay teléfono, devuelve "No disponible"
+        });
     }
 
     // 3. If it's a DNI and not found internally, consult external API
     if (validation.data.docType === 'dni') {
         const externalData = await consultExternalDniApi(validatedDni);
         if (externalData && externalData.nombreCompleto) {
-            return NextResponse.json({ name: externalData.nombreCompleto });
+            return NextResponse.json({ name: externalData.nombreCompleto, phone: null });
         }
     }
 
-    return NextResponse.json({ name: null });
+    return NextResponse.json({ name: null, phone: null });
 
   } catch (error: any) {
     console.error("API Route (get-client-name): Error:", error);
