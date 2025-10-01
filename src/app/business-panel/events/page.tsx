@@ -25,7 +25,7 @@ import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, saniti
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
-import { Tabs, TabsContent, TabsList } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
@@ -278,23 +278,28 @@ const ManageEventDialog = ({
                     </DialogHeader>
                     
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
-                        <TabsList className="w-max sm:w-full justify-start overflow-x-auto">
-                            <TabsTrigger value="details">Detalles</TabsTrigger>
-                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                            <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
-                            <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
-                        </TabsList>
-
+                        <div className="overflow-x-auto">
+                            <TabsList className="w-max sm:w-full justify-start">
+                                <TabsTrigger value="details">Detalles</TabsTrigger>
+                                <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
+                                <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
+                                <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
+                            </TabsList>
+                        </div>
+                        
                         <div className="flex-grow overflow-y-auto mt-4">
                             <TabsContent value="details">
-                                <BusinessEventForm 
-                                    event={localEventState} 
-                                    onFormChange={handleDetailsChange} 
-                                    isSubmitting={isSubmitting}
-                                />
+                                <div className="overflow-y-auto h-full">
+                                    <BusinessEventForm 
+                                        event={localEventState} 
+                                        onFormChange={handleDetailsChange} 
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </div>
                             </TabsContent>
                             <TabsContent value="tickets">
-                               <Card>
+                               <div className="overflow-y-auto h-full">
+                                <Card>
                                  <CardHeader>
                                      <CardTitle>Gestión de Tipos de Entrada</CardTitle>
                                      <CardDescription>Añade y configura las entradas para tu evento. El aforo total se calcula sumando las cantidades de cada tipo.</CardDescription>
@@ -327,93 +332,97 @@ const ManageEventDialog = ({
                                         <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
                                       )}
                                  </CardContent>
-                               </Card>
+                                </Card>
+                                </div>
                             </TabsContent>
                             <TabsContent value="boxes">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Gestión de Boxes</CardTitle>
-                                        <CardDescription>Añade y configura los boxes para tu evento, de forma individual o masiva.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="flex gap-2">
-                                            <Button onClick={() => { setEditingBox(null); setIsBoxFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Box</Button>
-                                            <Button onClick={() => setIsBatchBoxFormOpen(true)} variant="outline"><Box className="h-4 w-4 mr-2"/>Crear en Lote</Button>
-                                        </div>
-                                        
-                                        {/* Mobile View for Boxes */}
-                                        <div className="md:hidden space-y-4 mt-4">
-                                            {(localEventState.eventBoxes || []).map(box => (
-                                                <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
-                                                    "bg-green-500/10 border-green-300": box.status === 'available',
-                                                    "bg-purple-500/10 border-purple-300": box.status === 'sold',
-                                                    "bg-blue-500/10 border-blue-300": box.status === 'reserved',
-                                                })}>
-                                                    <CardHeader className="p-3">
-                                                        <CardTitle className="text-base">{box.name}</CardTitle>
-                                                    </CardHeader>
-                                                    <CardContent className="p-3 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
-                                                        <div className="text-muted-foreground">Costo:</div><div className="font-semibold">S/ {box.cost.toFixed(2)}</div>
-                                                        <div className="text-muted-foreground">Capacidad:</div><div className="font-semibold">{box.capacity || 'N/A'}</div>
-                                                        <div className="text-muted-foreground">Estado:</div><div><Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge></div>
-                                                    </CardContent>
-                                                    <CardFooter className="p-2 bg-muted/50">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm" className="w-full justify-center text-xs h-auto py-1">Acciones <MoreVertical className="ml-1 h-4 w-4"/></Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                <DropdownMenuItem onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
-                                                                <AlertDialog>
-                                                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem></AlertDialogTrigger>
-                                                                    <AlertDialogContent>
-                                                                        <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
-                                                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                                                                    </AlertDialogContent>
-                                                                </AlertDialog>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </CardFooter>
-                                                </Card>
-                                            ))}
-                                        </div>
+                                <div className="overflow-y-auto h-full">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>Gestión de Boxes</CardTitle>
+                                            <CardDescription>Añade y configura los boxes para tu evento, de forma individual o masiva.</CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="flex gap-2">
+                                                <Button onClick={() => { setEditingBox(null); setIsBoxFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Box</Button>
+                                                <Button onClick={() => setIsBatchBoxFormOpen(true)} variant="outline"><Box className="h-4 w-4 mr-2"/>Crear en Lote</Button>
+                                            </div>
+                                            
+                                            {/* Mobile View for Boxes */}
+                                            <div className="md:hidden space-y-4 mt-4">
+                                                {(localEventState.eventBoxes || []).map(box => (
+                                                    <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
+                                                        "bg-green-500/10 border-green-300": box.status === 'available',
+                                                        "bg-purple-500/10 border-purple-300": box.status === 'sold',
+                                                        "bg-blue-500/10 border-blue-300": box.status === 'reserved',
+                                                    })}>
+                                                        <CardHeader className="p-3">
+                                                            <CardTitle className="text-base">{box.name}</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="p-3 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                                                            <div className="text-muted-foreground">Costo:</div><div className="font-semibold">S/ {box.cost.toFixed(2)}</div>
+                                                            <div className="text-muted-foreground">Capacidad:</div><div className="font-semibold">{box.capacity || 'N/A'}</div>
+                                                            <div className="text-muted-foreground">Estado:</div><div><Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge></div>
+                                                        </CardContent>
+                                                        <CardFooter className="p-2 bg-muted/50">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="sm" className="w-full justify-center text-xs h-auto py-1">Acciones <MoreVertical className="ml-1 h-4 w-4"/></Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent>
+                                                                    <DropdownMenuItem onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
+                                                                    <AlertDialog>
+                                                                        <AlertDialogTrigger asChild><DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                                                        <AlertDialogContent>
+                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                            <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                                        </AlertDialogContent>
+                                                                    </AlertDialog>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </CardFooter>
+                                                    </Card>
+                                                ))}
+                                            </div>
 
-                                        {/* Desktop View for Boxes */}
-                                        <div className="hidden md:block mt-4">
-                                            <Table>
-                                                <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
-                                                <TableBody>
-                                                    {(localEventState.eventBoxes || []).map(box => (
-                                                        <TableRow key={box.id}>
-                                                            <TableCell>{box.name}</TableCell>
-                                                            <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
-                                                            <TableCell>{box.capacity || 'N/A'}</TableCell>
-                                                            <TableCell>
-                                                                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
-                                                            </TableCell>
-                                                            <TableCell className="text-right">
-                                                                <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                                                <AlertDialog>
-                                                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
-                                                                    <AlertDialogContent>
-                                                                        <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
-                                                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                                                                    </AlertDialogContent>
-                                                                </AlertDialog>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </div>
+                                            {/* Desktop View for Boxes */}
+                                            <div className="hidden md:block mt-4">
+                                                <Table>
+                                                    <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                                                    <TableBody>
+                                                        {(localEventState.eventBoxes || []).map(box => (
+                                                            <TableRow key={box.id}>
+                                                                <TableCell>{box.name}</TableCell>
+                                                                <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
+                                                                <TableCell>{box.capacity || 'N/A'}</TableCell>
+                                                                <TableCell>
+                                                                    <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
+                                                                </TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                                    <AlertDialog>
+                                                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
+                                                                        <AlertDialogContent>
+                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                            <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                                        </AlertDialogContent>
+                                                                    </AlertDialog>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
 
-                                        {(!localEventState.eventBoxes || localEventState.eventBoxes.length === 0) && (
-                                            <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
-                                        )}
-                                    </CardContent>
-                                </Card>
+                                            {(!localEventState.eventBoxes || localEventState.eventBoxes.length === 0) && (
+                                                <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </div>
                             </TabsContent>
                            <TabsContent value="promoters">
+                                <div className="overflow-y-auto h-full">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Asignar Promotores al Evento</CardTitle>
@@ -468,6 +477,7 @@ const ManageEventDialog = ({
                                         </div>
                                     </CardContent>
                                 </Card>
+                                </div>
                             </TabsContent>
                         </div>
                     </Tabs>
@@ -865,10 +875,10 @@ export default function BusinessEventsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Evento</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Aforo Total</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="text-center">Fecha</TableHead>
+                    <TableHead className="text-center">Aforo Total</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
+                    <TableHead className="text-right pr-12">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -882,14 +892,14 @@ export default function BusinessEventsPage() {
                     return (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium">{event.name}</TableCell>
-                        <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                        <TableCell>{displayAttendance}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell className="text-center">{displayAttendance}</TableCell>
+                        <TableCell className="text-center">
                           <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right space-x-1">
+                        <TableCell className="text-right space-x-1 pr-8">
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Códigos</Button>
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver ({event.generatedCodes?.length || 0})</Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
@@ -970,3 +980,4 @@ export default function BusinessEventsPage() {
 }
 
     
+
