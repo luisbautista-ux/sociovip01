@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search, ScanLine, CheckCircle } from "lucide-react";
+import { QrCode, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search, ScanLine, CheckCircle } from "lucide-react";
 import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox, QrClient, SocioVipMember } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -366,7 +366,7 @@ export default function PromoterEntitiesPage() {
                                 </Badge>
                                 <div className="flex items-center gap-1 pt-1.5">
                                     <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                        <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
+                                        <QrCode className="h-3 w-3 mr-1" /> Crear Códigos
                                     </Button>
                                     <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
                                         <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
@@ -379,11 +379,20 @@ export default function PromoterEntitiesPage() {
                                 </div>
                             </TableCell>
                             
-                            <TableCell className="align-top py-3 text-left text-xs">
-                              <div className="flex flex-col space-y-1">
-                                  <div className="flex items-center gap-2"><QrCodeIcon className="h-4 w-4 text-muted-foreground" />Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
-                                  <div className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-muted-foreground" />QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
-                                  <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-muted-foreground" />QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
+                            <TableCell className="align-top py-3 text-left text-sm">
+                              <div className="flex flex-col space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <QrCode className="h-4 w-4 text-primary" />
+                                    Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <ScanLine className="h-4 w-4 text-blue-600" />
+                                    QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span>
+                                  </div>
                               </div>
                             </TableCell>
                         </TableRow>
@@ -419,7 +428,7 @@ export default function PromoterEntitiesPage() {
                            <Separator />
                            <div className="flex flex-col gap-2">
                                 <Button variant="outline" size="sm" className="w-full" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting}>
-                                    <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
+                                    <QrCode className="h-4 w-4 mr-2" /> Crear Códigos
                                 </Button>
                                 <Button variant="outline" size="sm" className="w-full" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting}>
                                     <ListChecks className="h-4 w-4 mr-2" /> Ver Mis Códigos
