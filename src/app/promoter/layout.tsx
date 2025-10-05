@@ -211,19 +211,22 @@ export default function PromoterLayout({
     );
   }
   
-  const getShortName = (fullName: string | undefined | null) => {
+  const getShortNameForDesktop = (fullName: string | undefined | null) => {
     if (!fullName) return "Promotor";
     const parts = fullName.split(' ');
-    if (parts.length >= 2) {
-      // Intenta obtener el primer nombre y el primer apellido
-      const firstName = parts[0];
-      const lastName = parts.find((part, index) => index > 0 && part.length > 2) || parts[1]; // Encuentra el primer "apellido" real
-      return `${firstName} ${lastName}`;
+    // Si el nombre es "Luis Armando Bautista Quispe", parts es ["Luis", "Armando", "Bautista", "Quispe"]
+    if (parts.length >= 3) { 
+      // Asume Nombre ApellidoPaterno
+      return `${parts[0]} ${parts[2]}`;
+    }
+    if (parts.length === 2) {
+        return fullName;
     }
     return fullName;
   }
   
-  const promoterDisplayName = getShortName(userProfile?.name);
+  const promoterDisplayNameDesktop = getShortNameForDesktop(userProfile?.name);
+  const promoterDisplayNameMobile = userProfile?.name || "Promotor";
   const promoterDisplayEmail = currentUser?.email || "";
   const promoterPhotoUrl = userProfile?.photoURL;
 
@@ -231,7 +234,7 @@ export default function PromoterLayout({
     <div className="flex min-h-screen bg-muted/40">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
-        <PromoterSidebar promoterName={promoterDisplayName} promoterEmail={promoterDisplayEmail} promoterPhotoUrl={promoterPhotoUrl}/>
+        <PromoterSidebar promoterName={promoterDisplayNameDesktop} promoterEmail={promoterDisplayEmail} promoterPhotoUrl={promoterPhotoUrl}/>
       </div>
       
       <div className="flex flex-col flex-1 h-full">
@@ -239,11 +242,11 @@ export default function PromoterLayout({
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
           <div className="flex items-center gap-3">
             <SocioVipLogo size={32} />
-            <h1 className="font-semibold text-lg text-gradient">{promoterDisplayName}</h1>
+            <h1 className="font-semibold text-lg text-gradient">{promoterDisplayNameMobile}</h1>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
-              {promoterDisplayName}
+              {promoterDisplayNameMobile}
             </span>
             <AlertDialog>
                 <AlertDialogTrigger asChild>
