@@ -211,7 +211,19 @@ export default function PromoterLayout({
     );
   }
   
-  const promoterDisplayName = userProfile?.name || currentUser?.email || "Promotor";
+  const getShortName = (fullName: string | undefined | null) => {
+    if (!fullName) return "Promotor";
+    const parts = fullName.split(' ');
+    if (parts.length >= 2) {
+      // Intenta obtener el primer nombre y el primer apellido
+      const firstName = parts[0];
+      const lastName = parts.find((part, index) => index > 0 && part.length > 2) || parts[1]; // Encuentra el primer "apellido" real
+      return `${firstName} ${lastName}`;
+    }
+    return fullName;
+  }
+  
+  const promoterDisplayName = getShortName(userProfile?.name);
   const promoterDisplayEmail = currentUser?.email || "";
   const promoterPhotoUrl = userProfile?.photoURL;
 
