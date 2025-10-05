@@ -214,8 +214,8 @@ export default function PromoterDashboardPage() {
       </h1>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Negocios Asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
-        <StatCard title="Códigos Creados por Ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
+        <StatCard title="Negocios asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
+        <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
         <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} />
         <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesUsedByPromoter} icon={CheckCircle} />
       </div>
@@ -272,9 +272,9 @@ export default function PromoterDashboardPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Negocio</TableHead>
-                  <TableHead className="text-center">Códigos Creados</TableHead>
-                  <TableHead className="text-center">QRs Generados</TableHead>
-                  <TableHead className="text-center">QRs Usados</TableHead>
+                  <TableHead className="text-center">Códigos creados</TableHead>
+                  <TableHead className="text-center">QRs generados</TableHead>
+                  <TableHead className="text-center">QRs usados</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

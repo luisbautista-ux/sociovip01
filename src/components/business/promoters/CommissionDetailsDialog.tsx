@@ -30,7 +30,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Detalle de Comisiones para: {promoterName}</DialogTitle>
+          <DialogTitle>Detalle de comisiones para: {promoterName}</DialogTitle>
           <DialogDescription>
             Desglose de comisiones generadas y estado de pago por cada campaña.
           </DialogDescription>

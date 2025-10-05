@@ -156,7 +156,7 @@ export default function PromoterCommissionsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Detalle de Comisiones</CardTitle>
+          <CardTitle>Detalle de comisiones</CardTitle>
           <CardDescription>
              Aquí se listan tus comisiones pendientes y pagadas por cada campaña en la que participaste.
           </CardDescription>

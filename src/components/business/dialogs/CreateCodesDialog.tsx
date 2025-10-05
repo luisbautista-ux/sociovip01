@@ -81,7 +81,7 @@ export function CreateCodesDialog({
     if (isNaN(numToCreate) || numToCreate < 1 || numToCreate > Math.min(50, maxCodesCanCreate === 0 && maxAttendance && maxAttendance > 0 ? 0 : 50)) { 
       toast({
         title: "Cantidad Inválida",
-        description: `Por favor, ingresa un número entre 1 y ${Math.min(50, maxCodesCanCreate || 50)}.`,
+        description: `Por favor, ingresa un número entre 1 a  ${Math.min(50, maxCodesCanCreate ||  50)}.`,
         variant: "destructive",
       });
       return;
@@ -173,11 +173,11 @@ export function CreateCodesDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {showSuccess ? "Códigos Creados Exitosamente" : `Crear Códigos para: ${entityName}`}
+            {showSuccess ? "Códigos Creados Exitosamente" : `Crear códigos para: ${entityName}`}
           </DialogTitle>
           {!showSuccess && (
             <DialogDescription>
-              Define la cantidad de códigos y una observación opcional que se aplicará a todos los códigos de este lote.
+              Define la cantidad de códigos.
             </DialogDescription>
           )}
         </DialogHeader>
@@ -201,7 +201,7 @@ export function CreateCodesDialog({
               render={() => (
                 <FormItem>
                   <Label htmlFor="numCodesToGenerate">
-                    Cantidad de Códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+                    Cantidad de códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
                   </Label>
                   <FormControl>
                     <Input

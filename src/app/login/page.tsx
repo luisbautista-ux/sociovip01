@@ -181,7 +181,7 @@ export default function LoginPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>
-                                Tu correo electrónico <span className="text-destructive">*</span>
+                                Correo electrónico <span className="text-destructive">*</span>
                               </FormLabel>
                               <FormControl>
                                 <Input
@@ -203,7 +203,7 @@ export default function LoginPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>
-                                Ingresa 6 caracteres o más <span className="text-destructive">*</span>
+                                Contraseña <span className="text-destructive">*</span>
                               </FormLabel>
                               <div className="relative">
                                 <FormControl>

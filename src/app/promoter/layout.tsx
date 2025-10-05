@@ -226,7 +226,7 @@ export default function PromoterLayout({
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
           <div className="flex items-center gap-3">
             <SocioVipLogo size={32} />
-            <h1 className="font-semibold text-lg text-gradient">Panel Promotor</h1>
+            <h1 className="font-semibold text-lg text-gradient">{promoterDisplayName}</h1>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
@@ -270,5 +270,3 @@ export default function PromoterLayout({
     </div>
   );
 }
-
-    
