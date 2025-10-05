@@ -214,9 +214,7 @@ export default function PromoterLayout({
   const getShortName = (fullName: string | undefined | null) => {
     if (!fullName) return "Promotor";
     const parts = fullName.split(' ');
-    // Si el nombre es "Luis Armando Bautista Quispe", parts es ["Luis", "Armando", "Bautista", "Quispe"]
-    if (parts.length >= 3) { 
-      // Asume Nombre ApellidoPaterno
+    if (parts.length >= 3) {
       return `${parts[0]} ${parts[2]}`;
     }
     return fullName;
@@ -238,7 +236,7 @@ export default function PromoterLayout({
         {/* Mobile Header (simplified) */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
           <div className="flex items-center gap-3">
-             <Avatar className="h-8 w-8">
+             <Avatar className="h-10 w-10">
                 <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterDisplayNameMobile} />
                 <AvatarFallback>{promoterDisplayNameMobile ? promoterDisplayNameMobile.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
             </Avatar>
