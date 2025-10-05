@@ -33,7 +33,7 @@ const navItems = [
   { href: "/promoter/profile", label: "Mi Perfil", icon: UserCircle },
 ];
 
-function PromoterSidebarNavContent({ closeSheet, promoterName, promoterPhotoUrl }: { closeSheet?: () => void; promoterName?: string, promoterPhotoUrl?: string | null }) {
+function PromoterSidebarNavContent({ closeSheet, promoterName, promoterEmail, promoterPhotoUrl }: { closeSheet?: () => void; promoterName?: string, promoterEmail?: string, promoterPhotoUrl?: string | null }) {
   const pathname = usePathname();
   const { logout } = useAuth();
 
@@ -45,8 +45,8 @@ function PromoterSidebarNavContent({ closeSheet, promoterName, promoterPhotoUrl 
             <AvatarFallback>{promoterName ? promoterName.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-md font-semibold text-gradient">Panel Promotor</h1>
-          {promoterName && <p className="text-xs text-muted-foreground">{promoterName}</p>}
+          <h1 className="text-md font-semibold text-gradient">{promoterName || 'Panel Promotor'}</h1>
+          {promoterEmail && <p className="text-xs text-muted-foreground truncate">{promoterEmail}</p>}
         </div>
       </div>
       <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
@@ -93,10 +93,10 @@ function PromoterSidebarNavContent({ closeSheet, promoterName, promoterPhotoUrl 
   );
 }
 
-function PromoterSidebar({ promoterName, promoterPhotoUrl }: { promoterName?: string; promoterPhotoUrl?: string | null }) {
+function PromoterSidebar({ promoterName, promoterEmail, promoterPhotoUrl }: { promoterName?: string; promoterEmail?: string; promoterPhotoUrl?: string | null }) {
   return (
     <aside className="w-64 h-screen bg-card text-card-foreground border-r border-border flex flex-col sticky top-0">
-      <PromoterSidebarNavContent promoterName={promoterName} promoterPhotoUrl={promoterPhotoUrl} />
+      <PromoterSidebarNavContent promoterName={promoterName} promoterEmail={promoterEmail} promoterPhotoUrl={promoterPhotoUrl} />
     </aside>
   );
 }
@@ -212,13 +212,14 @@ export default function PromoterLayout({
   }
   
   const promoterDisplayName = userProfile?.name || currentUser?.email || "Promotor";
+  const promoterDisplayEmail = currentUser?.email || "";
   const promoterPhotoUrl = userProfile?.photoURL;
 
   return (
     <div className="flex min-h-screen bg-muted/40">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
-        <PromoterSidebar promoterName={promoterDisplayName} promoterPhotoUrl={promoterPhotoUrl}/>
+        <PromoterSidebar promoterName={promoterDisplayName} promoterEmail={promoterDisplayEmail} promoterPhotoUrl={promoterPhotoUrl}/>
       </div>
       
       <div className="flex flex-col flex-1 h-full">
