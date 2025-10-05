@@ -177,7 +177,7 @@ export default function PromoterProfilePage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isSubmitting}
-                  className="text-sm font-medium text-primary hover:underline focus:outline-none"
+                  className="text-sm font-bold text-primary focus:outline-none"
                 >
                   Editar
                 </button>
