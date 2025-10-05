@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { BarChart2, Gift, DollarSign, Menu, UserCircle, LogOut } from "lucide-react";
+import { BarChart2, Gift, HandCoins, Menu, UserCircle, LogOut } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
@@ -29,7 +29,7 @@ import { DialogTitle } from "@/components/ui/dialog";
 const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
   { href: "/promoter/entities", label: "Campañas", icon: Gift },
-  { href: "/promoter/commissions", label: "Comisiones", icon: DollarSign },
+  { href: "/promoter/commissions", label: "Comisiones", icon: HandCoins },
   { href: "/promoter/profile", label: "Mi Perfil", icon: UserCircle },
 ];
 
@@ -40,7 +40,7 @@ function PromoterSidebarNavContent({ closeSheet, promoterName, promoterEmail, pr
   return (
     <>
       <div className="p-4 border-b border-border flex items-center space-x-3">
-        <Avatar>
+        <Avatar className="h-10 w-10">
             <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterName || 'Promotor'} />
             <AvatarFallback>{promoterName ? promoterName.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
         </Avatar>
@@ -66,6 +66,11 @@ function PromoterSidebarNavContent({ closeSheet, promoterName, promoterEmail, pr
         ))}
       </nav>
       <div className="p-4 border-t border-border mt-auto space-y-2">
+        {useAuth().currentUser && (
+          <p className="text-xs text-muted-foreground truncate" title={useAuth().currentUser?.email || undefined}>
+            Logueado como: {useAuth().currentUser?.email}
+          </p>
+        )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="outline" className="w-full">
@@ -214,7 +219,7 @@ export default function PromoterLayout({
   const getShortName = (fullName: string | undefined | null) => {
     if (!fullName) return "Promotor";
     const parts = fullName.split(' ');
-    if (parts.length >= 3) {
+    if (parts.length > 2) { // "Luis Armando Bautista Quispe" -> "Luis Bautista"
       return `${parts[0]} ${parts[2]}`;
     }
     return fullName;

@@ -4,7 +4,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DollarSign, Download, Info, Loader2, Calendar, Briefcase, Hash, BadgeCent, Ticket } from "lucide-react";
+import { HandCoins, Download, Info, Loader2, Calendar, Briefcase, Hash, BadgeCent, Ticket } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -151,7 +151,7 @@ export default function PromoterCommissionsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-        <DollarSign className="h-8 w-8 text-primary !block" /> Mis Comisiones
+        <HandCoins className="h-8 w-8 text-primary !block" /> Mis Comisiones
       </h1>
 
       <Card className="shadow-lg">
@@ -277,4 +277,3 @@ export default function PromoterCommissionsPage() {
 
 
     
-
