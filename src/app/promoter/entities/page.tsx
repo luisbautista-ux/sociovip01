@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search } from "lucide-react";
+import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search, ScanLine, CheckCircle } from "lucide-react";
 import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox, QrClient, SocioVipMember } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -380,10 +380,10 @@ export default function PromoterEntitiesPage() {
                             </TableCell>
                             
                             <TableCell className="align-top py-3 text-left text-xs">
-                              <div className="flex flex-col space-y-0.5">
-                                  <div>Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
-                                  <div>QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
-                                  <div>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
+                              <div className="flex flex-col space-y-1">
+                                  <div className="flex items-center gap-2"><QrCodeIcon className="h-4 w-4 text-muted-foreground" />Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
+                                  <div className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-muted-foreground" />QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
+                                  <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-muted-foreground" />QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
                               </div>
                             </TableCell>
                         </TableRow>
