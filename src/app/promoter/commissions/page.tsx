@@ -90,7 +90,7 @@ export default function PromoterCommissionsPage() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Mis Comisiones");
 
-    const headers = ["Negocio", "Campaña", "QRs Validados", "Tarifa Comisión", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
+    const headers = ["Negocio", "Campaña", "QRs Validados", "Comisión", "Monto Pendiente (S/)", "Monto Pagado (S/)"];
     
     const headerRow = worksheet.addRow(headers);
     headerRow.eachCell((cell) => {
@@ -197,7 +197,7 @@ export default function PromoterCommissionsPage() {
                       <CardContent className="p-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                         <div className="font-semibold text-muted-foreground">QRs Validados</div>
                         <div className="text-right">{comm.promoterCodesRedeemed}</div>
-                        <div className="font-semibold text-muted-foreground">Tarifa</div>
+                        <div className="font-semibold text-muted-foreground">Comisión</div>
                         <div className="text-right">{comm.commissionRateApplied}</div>
                         <div className="font-semibold text-muted-foreground">Pendiente</div>
                         <div className="text-right font-bold text-destructive">S/ {comm.commissionPending.toFixed(2)}</div>
@@ -223,7 +223,7 @@ export default function PromoterCommissionsPage() {
                       <TableHead>Campaña</TableHead>
                       <TableHead>Negocio</TableHead>
                       <TableHead className="text-center">QRs Validados</TableHead>
-                      <TableHead className="text-center">Tarifa Comisión</TableHead>
+                      <TableHead className="text-center">Comisión</TableHead>
                       <TableHead className="text-right">Monto Pendiente</TableHead>
                       <TableHead className="text-right">Monto Pagado</TableHead>
                     </TableRow>
@@ -242,7 +242,9 @@ export default function PromoterCommissionsPage() {
                           <TableCell className="text-right font-semibold text-destructive">
                               S/ {comm.commissionPending.toFixed(2)}
                           </TableCell>
-                          <TableCell className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-semibold text-green-600">
+                              S/ {comm.commissionPaid.toFixed(2)}
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
@@ -275,3 +277,4 @@ export default function PromoterCommissionsPage() {
 
 
     
+

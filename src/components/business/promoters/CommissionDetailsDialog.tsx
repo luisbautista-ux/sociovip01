@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useMemo } from "react";
@@ -51,7 +52,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
                                 </CardHeader>
                                 <CardContent className="p-3 text-xs grid grid-cols-2 gap-1">
                                     <div>QRs Validados:</div><div className="text-right font-semibold">{comm.promoterCodesRedeemed}</div>
-                                    <div>Tarifa:</div><div className="text-right font-semibold">{comm.commissionRateApplied || 'S/ 0.00'}</div>
+                                    <div>Comisión:</div><div className="text-right font-semibold">{comm.commissionRateApplied || 'S/ 0.00'}</div>
                                     <div>Pendiente:</div><div className="text-right font-semibold text-destructive">S/ {comm.commissionPending.toFixed(2)}</div>
                                     <div>Pagado:</div><div className="text-right font-semibold text-green-600">S/ {comm.commissionPaid.toFixed(2)}</div>
                                 </CardContent>
@@ -66,7 +67,7 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
                           <TableRow>
                               <TableHead>Campaña</TableHead>
                               <TableHead className="text-center">QRs Validados</TableHead>
-                              <TableHead className="text-center">Tarifa</TableHead>
+                              <TableHead className="text-center">Comisión</TableHead>
                               <TableHead className="text-right">Pendiente</TableHead>
                               <TableHead className="text-right">Pagado</TableHead>
                           </TableRow>
@@ -117,3 +118,4 @@ export function CommissionDetailsDialog({ open, onOpenChange, promoterName, prom
     </Dialog>
   );
 }
+
