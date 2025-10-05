@@ -4,14 +4,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect, useMemo } from "react";
 import type { GeneratedCode } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Form, FormControl, FormField, FormMessage, FormDescription, FormItem } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormMessage, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 
 function generateAlphanumericCode(length: number): string {
@@ -51,7 +50,6 @@ export function CreateCodesDialog({
     currentCodeCount = 0,
 }: CreateCodesDialogProps) {
   const [numCodes, setNumCodes] = useState<number | string>(1);
-  const [observation, setObservation] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [justCreatedCodes, setJustCreatedCodes] = useState<GeneratedCode[]>([]);
   const [isCreating, setIsCreating] = useState(false); 
@@ -69,7 +67,6 @@ export function CreateCodesDialog({
     // Reset state only when the dialog is opened
     if (open) {
       setNumCodes(1);
-      setObservation("");
       setShowSuccess(false);
       setJustCreatedCodes([]);
       setIsCreating(false);
@@ -121,7 +118,6 @@ export function CreateCodesDialog({
       }
 
       currentAndNewCodes.add(newCodeValue);
-      const codeObservation = observation.trim() === "" ? undefined : observation.trim();
       newCodesBatch.push({
         id: `code-${entityId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
         entityId: entityId,
@@ -130,7 +126,7 @@ export function CreateCodesDialog({
         generatedByName: currentUserProfileName || "Sistema",
         generatedByUid: currentUserProfileUid || undefined,
         generatedDate: new Date().toISOString(),
-        observation: codeObservation || null, // Ensure null if empty
+        observation: null,
         redemptionDate: null, 
         redeemedByInfo: null, 
         isVipCandidate: false,
@@ -139,7 +135,7 @@ export function CreateCodesDialog({
 
     try {
         // Await the database operation
-        await onCodesCreated(entityId, newCodesBatch, observation.trim() === "" ? undefined : observation.trim(), currentUserProfileUid);
+        await onCodesCreated(entityId, newCodesBatch, undefined, currentUserProfileUid);
         // On success, update the UI
         setJustCreatedCodes(newCodesBatch);
         setShowSuccess(true);
@@ -201,7 +197,7 @@ export function CreateCodesDialog({
               render={() => (
                 <FormItem>
                   <Label htmlFor="numCodesToGenerate">
-                    Cantidad de códigos (1-{Math.min(50, canCreateAnyCodes ? maxCodesCanCreate || 50 : 0)}) <span className="text-destructive">*</span>
+                    Cantidad de códigos (Máx. 50 x vez) <span className="text-destructive">*</span>
                   </Label>
                   <FormControl>
                     <Input
