@@ -200,7 +200,7 @@ export default function PromoterEntitiesPage() {
             setEvents(updateLocalState);
         });
         
-        toast({ title: "Códigos Creados", description: `${newCodes.length} código(s) añadido(s).` });
+        toast({ title: "Códigos creados", description: `${newCodes.length} código(s) añadido(s).` });
     } catch (error: any) {
         console.error("Promoter Page: Error saving new codes:", error);
         toast({ title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive" });
@@ -346,7 +346,7 @@ export default function PromoterEntitiesPage() {
                 <TableHeader>
                 <TableRow>
                     <TableHead className="min-w-[300px]">{type === 'event' ? 'Evento' : 'Promoción'}</TableHead>
-                    <TableHead className="min-w-[250px]">Mis Códigos y QRs</TableHead>
+                    <TableHead className="min-w-[250px]">Mis códigos y QRs</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -366,14 +366,14 @@ export default function PromoterEntitiesPage() {
                                 </Badge>
                                 <div className="flex items-center gap-1 pt-1.5">
                                     <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                        <QrCode className="h-3 w-3 mr-1" /> Crear Códigos
+                                        <QrCode className="h-3 w-3 mr-1" /> Crear códigos
                                     </Button>
                                     <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                        <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
+                                        <ListChecks className="h-3 w-3 mr-1" /> Ver mis códigos ({promoterCodeStats.created})
                                     </Button>
                                     {entity.type === 'event' && entity.eventBoxes && entity.eventBoxes.length > 0 && (
                                         <Button variant="outline" size="xs" onClick={() => {setSelectedEventForBoxes(entity); setShowBoxesModal(true);}} className="px-2 py-1 h-auto text-xs">
-                                            <Box className="h-3 w-3 mr-1" /> Ver Boxes ({entity.eventBoxes.length})
+                                            <Box className="h-3 w-3 mr-1" /> Ver boxes ({entity.eventBoxes.length})
                                         </Button>
                                     )}
                                 </div>
@@ -383,15 +383,15 @@ export default function PromoterEntitiesPage() {
                               <div className="flex flex-col space-y-2">
                                   <div className="flex items-center gap-2">
                                     <QrCode className="h-4 w-4 text-primary" />
-                                    Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span>
+                                    Códigos creados: <span className="font-semibold">{promoterCodeStats.created}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <ScanLine className="h-4 w-4 text-blue-600" />
-                                    QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span>
+                                    QRs generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <CheckCircle className="h-4 w-4 text-green-600" />
-                                    QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span>
+                                    QRs usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span>
                                   </div>
                               </div>
                             </TableCell>
@@ -420,22 +420,22 @@ export default function PromoterEntitiesPage() {
                         <CardContent className="p-4 space-y-4">
                            <div className="flex justify-between items-start gap-4">
                                 <div className="text-sm text-left shrink-0 space-y-2">
-                                    <div className="flex items-center gap-2"><QrCode className="h-4 w-4 text-primary" />Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
-                                    <div className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-blue-600" />QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
-                                    <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-600" />QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
+                                    <div className="flex items-center gap-2"><QrCode className="h-4 w-4 text-primary" />Códigos creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
+                                    <div className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-blue-600" />QRs generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
+                                    <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-600" />QRs usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
                                 </div>
                            </div>
                            <Separator />
                            <div className="flex flex-col gap-2">
                                 <Button variant="outline" size="sm" className="w-full" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting}>
-                                    <QrCode className="h-4 w-4 mr-2" /> Crear Códigos
+                                    <QrCode className="h-4 w-4 mr-2" /> Crear códigos
                                 </Button>
                                 <Button variant="outline" size="sm" className="w-full" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting}>
-                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Mis Códigos
+                                    <ListChecks className="h-4 w-4 mr-2" /> Ver mis códigos
                                 </Button>
                                 {entity.type === 'event' && entity.eventBoxes && entity.eventBoxes.length > 0 && (
                                     <Button variant="outline" size="sm" className="w-full" onClick={() => {setSelectedEventForBoxes(entity); setShowBoxesModal(true);}}>
-                                        <Box className="h-4 w-4 mr-2" /> Ver Boxes ({entity.eventBoxes.length})
+                                        <Box className="h-4 w-4 mr-2" /> Ver boxes ({entity.eventBoxes.length})
                                     </Button>
                                 )}
                            </div>
@@ -690,7 +690,7 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                     </div>
 
                     <div className="space-y-1">
-                        <Label htmlFor={`dni-${box.id}`} className="text-xs">Número de Documento</Label>
+                        <Label htmlFor={`dni-${box.id}`} className="text-xs">Número de Documento del dueño</Label>
                         <div className="flex gap-2">
                             <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => {
                                 const val = e.target.value.replace(/[^0-9]/g, '');
@@ -703,11 +703,11 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                         </div>
                     </div>
                      <div className="space-y-1">
-                        <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular Dueño</Label>
+                        <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular del dueño</Label>
                         <Input id={`phone-${box.id}`} type="tel" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/[^0-9]/g, '').slice(0,9))} placeholder="987654321" maxLength={9} disabled={isSubmitting} />
                     </div>
                      <div className="space-y-1">
-                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre Dueño</Label>
+                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre del dueño</Label>
                         <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
                     </div>
                     <div className="flex gap-2 justify-end pt-2">

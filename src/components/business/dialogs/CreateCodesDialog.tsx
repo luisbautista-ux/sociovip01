@@ -226,7 +226,7 @@ export function CreateCodesDialog({
             <p className="text-lg font-medium">¡Has creado {justCreatedCodes.length} código(s)!</p>
             {justCreatedCodes.length > 0 && (
               <Button onClick={handleCopyCreatedCodes} variant="outline" size="lg" className="w-full">
-                <Copy className="mr-2 h-5 w-5" /> Copiar Códigos Creados ({justCreatedCodes.length})
+                <Copy className="mr-2 h-5 w-5" /> Copiar códigos creados ({justCreatedCodes.length})
               </Button>
             )}
              <p className="text-sm text-muted-foreground">
@@ -243,7 +243,7 @@ export function CreateCodesDialog({
               <Button variant="outline" onClick={handleCloseAndReset} disabled={isCreating || isSubmittingMain}>Cancelar</Button>
               <Button onClick={handleCreateCodes} variant="gradient" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes} autoFocus>
                 {(isCreating || isSubmittingMain) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <PlusCircle className="mr-2 h-4 w-4" /> Crear Códigos
+                <PlusCircle className="mr-2 h-4 w-4" /> Crear códigos
               </Button>
             </>
           )}

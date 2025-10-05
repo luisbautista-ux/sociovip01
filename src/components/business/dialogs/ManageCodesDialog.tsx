@@ -222,7 +222,7 @@ export function ManageCodesDialog({
     
     setInternalCodes(updatedRawCodes); 
     onCodesUpdated(entity.id, updatedRawCodes); 
-    toast({ title: "Códigos del Lote Eliminados", description: `${codesToDeleteFromBatchIds.length} código(s) no canjeado(s) del lote han sido eliminados.`, variant: "destructive" });
+    toast({ title: "Códigos del lote eliminados", description: `${codesToDeleteFromBatchIds.length} código(s) no canjeado(s) del lote han sido eliminados.`, variant: "destructive" });
     
     const remainingInBatch = updatedRawCodes.filter(c => batchItem.codesInBatch?.some(orig => orig.id === c.id));
     if (remainingInBatch.length === 0 && batchItem.batchId) {
@@ -271,7 +271,7 @@ export function ManageCodesDialog({
     const handleShareAllAvailableCodes = () => {
         const availableCodes = internalCodes.filter(c => c.status === 'available').map(c => c.value);
         if (availableCodes.length === 0) {
-            toast({ title: "Sin Códigos Disponibles", description: "No hay códigos disponibles para compartir." });
+            toast({ title: "Sin códigos disponibles", description: "No hay códigos disponibles para compartir." });
             return;
         }
         openWhatsApp(availableCodes);
@@ -327,7 +327,7 @@ export function ManageCodesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl"> 
         <DialogHeader>
-          <DialogTitle>{isPromoterView ? 'Mis Códigos para:' : 'Códigos para:'} {entity.name}</DialogTitle>
+          <DialogTitle>{isPromoterView ? 'Mis códigos para:' : 'Códigos para:'} {entity.name}</DialogTitle>
           <DialogDescription>
             {isPromoterView 
               ? "Visualiza los códigos que has generado para esta campaña. Se agrupan si se crearon juntos."
@@ -338,14 +338,14 @@ export function ManageCodesDialog({
 
         <div className="my-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <Button onClick={onRequestCreateNewCodes} variant="default" className="bg-primary hover:bg-primary/90">
-            <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevos Códigos
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear nuevos códigos
           </Button>
           <Button
             onClick={handleShareAllAvailableCodes}
             variant="outline"
             disabled={!internalCodes.some(c => c.status === 'available')}
           >
-            <WhatsAppIcon className="mr-2 h-4 w-4" /> Compartir Disponibles ({internalCodes.filter(c => c.status === 'available').length})
+            <WhatsAppIcon className="mr-2 h-4 w-4" /> Compartir disponibles ({internalCodes.filter(c => c.status === 'available').length})
           </Button>
         </div>
 
@@ -362,7 +362,7 @@ export function ManageCodesDialog({
                   <TableHead className="w-[140px] px-2 py-2">Código</TableHead>
                   <TableHead className="w-[110px] px-2 py-2 text-center">Estado</TableHead>
                   {!isPromoterView && <TableHead className="w-[120px] px-2 py-2 text-center">Creado por</TableHead>}
-                  <TableHead className="w-[120px] px-2 py-2 text-center">Fecha Canje</TableHead>
+                  <TableHead className="w-[120px] px-2 py-2 text-center">Fecha canje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -394,7 +394,7 @@ export function ManageCodesDialog({
                                     className="text-xs h-auto py-1 px-1.5"
                                     onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}
                                 >
-                                    <WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir Lote ({item.codesInBatch!.length})
+                                    <WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir lote ({item.codesInBatch!.length})
                                 </Button>
                               </div>
                             </div>

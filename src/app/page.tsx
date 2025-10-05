@@ -134,7 +134,7 @@ export default function HomePage() {
     const isEvent = entity.type === 'event';
 
     return (
-      <Card key={entity.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group">
+      <Card key={entity.id} className="shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2">
         <Link href={businessUrl} passHref>
           <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
             <NextImage
