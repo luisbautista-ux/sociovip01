@@ -75,10 +75,10 @@ export function CreateCodesDialog({
 
   const handleCreateCodes = async () => {
     const numToCreate = Number(numCodes);
-    if (isNaN(numToCreate) || numToCreate < 1 || numToCreate > Math.min(50, maxCodesCanCreate === 0 && maxAttendance && maxAttendance > 0 ? 0 : 50)) { 
+    if (isNaN(numToCreate) || numToCreate < 1 || numToCreate > 50) { 
       toast({
-        title: "Cantidad Inválida",
-        description: `Por favor, ingresa un número entre 1 a  ${Math.min(50, maxCodesCanCreate ||  50)}.`,
+        title: "Cantidad inválida",
+        description: "Solo se permite crear 50 códigos a la vez.",
         variant: "destructive",
       });
       return;
