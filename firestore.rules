@@ -1,97 +1,108 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // --- Helper Functions ---
+    function isSuperAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
+    }
+    
+    function isBusinessAdmin(businessId) {
+      return isSignedIn() &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin']);
+    }
+    
+    function isBusinessStaff(businessId) {
+      return isSignedIn() &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff']);
+    }
 
-    // =============================== 
-    //            Helpers
-    // ===============================
+    function isPromoterAssignedToBusiness(businessId) {
+        return isSignedIn() &&
+               'businessIds' in get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data &&
+               get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessIds.hasAny([businessId]);
+    }
+    
+    function isHost(businessId) {
+       return isSignedIn() &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
+             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['host', 'lector_qr', 'staff', 'business_admin']);
+    }
+
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    // --- Collection Rules ---
 
-    function getUserData() {
-      // Use the 'exists' function to safely access data that might not exist yet.
-      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+    // Platform Users: Managed only by Super Admins
+    match /platformUsers/{userId} {
+      allow read, write: if isSuperAdmin();
+      // Allow a user to update their own profile (name, phone, photoURL)
+      allow update: if request.auth.uid == userId &&
+                      request.resource.data.keys().hasOnly(['name', 'phone', 'photoURL']);
     }
     
-    function userHasRole(role) {
-        return isSignedIn() && getUserData().roles.includes(role);
-    }
-    
-    function isSuperAdmin() {
-      return userHasRole('superadmin');
-    }
-
-    function isRoleForBusiness(role, businessId) {
-      return userHasRole(role) && getUserData().businessId == businessId;
-    }
-
-    function isBusinessAdmin(businessId) {
-      return isRoleForBusiness('business_admin', businessId);
-    }
-
-    function isStaff(businessId) {
-      return isRoleForBusiness('staff', businessId);
-    }
-    
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // ===============================
-    //          Collections
-    // ===============================
-
+    // Businesses: Read by anyone, written by Super Admins, staff of that business can update branding
     match /businesses/{businessId} {
       allow read: if true;
       allow create, update, delete: if isSuperAdmin();
+      // Allow business staff/admin to update their own branding
+      allow update: if isBusinessStaff(businessId) &&
+                      request.resource.data.keys().hasOnly([
+                        'name', 'contactEmail', 'publicAddress', 'publicPhone', 
+                        'personalPhone', 'slogan', 'primaryColor', 'secondaryColor', 
+                        'logoUrl', 'publicCoverImageUrl'
+                      ]);
     }
-
+    
+    // Business Entities (Promotions/Events): Public can read, staff can manage for their business
     match /businessEntities/{entityId} {
-      allow get: if true; 
-      
-      // A business user can list entities IF they are querying for their own businessId.
-      allow list: if isSuperAdmin() || 
-                     (isSignedIn() && request.query.businessId == getUserData().businessId);
-      
-      allow create: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
-      allow update: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
-      allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
+      allow read: if true;
+      allow create: if isBusinessStaff(request.resource.data.businessId);
+      allow update, delete: if isBusinessStaff(resource.data.businessId);
+      // Allow a promoter to update the codes (to add their generated ones)
+      allow update: if isSignedIn() &&
+                      isPromoterAssignedToBusiness(resource.data.businessId);
+      // Allow host to update codes (to mark as used)
+      allow update: if isHost(resource.data.businessId);
     }
-
-    match /businessPromoterLinks/{linkId} {
-        allow get: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
-        
-        // A business user can list links IF they are querying for their own businessId.
-        allow list: if isSuperAdmin() || 
-                     (isSignedIn() && request.query.businessId == getUserData().businessId);
-
-        allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
-    }
-
-    match /promoterPayments/{paymentId} {
-        // A business user can manage payments for their own business.
-        allow read, write: if isSuperAdmin() || 
-                             (isSignedIn() && (
-                               (request.method in ['get', 'list'] && request.query.businessId == getUserData().businessId) ||
-                               (request.method in ['create', 'update', 'delete'] && request.resource.data.businessId == getUserData().businessId)
-                             ));
-    }
-
+    
+    // QR Clients: Can be read by staff of the associated business, created by public flow (server-side)
     match /qrClients/{clientId} {
-      allow read, list: if true; // Allow wide read access for now
-      allow create: if true;
-      allow update, delete: if isSuperAdmin();
+      allow read: if isSuperAdmin() || 
+                    (isSignedIn() && 
+                     resource.data.keys().hasAny(['associatedBusinessIds', 'generatedForBusinessId']) &&
+                     (isBusinessStaff(resource.data.generatedForBusinessId) || 
+                      (resource.data.associatedBusinessIds.size() > 0 && isBusinessStaff(resource.data.associatedBusinessIds[0])) // Simple check, might need refinement
+                     )
+                    );
+      allow write: if isSuperAdmin(); // Only Super Admins can manually edit/delete
+      // Public creation is handled by a backend function/API, so direct write is denied
     }
 
+    // SocioVipMembers: Managed by SuperAdmins
     match /socioVipMembers/{memberId} {
-      allow read, list, create, update, delete: if isSuperAdmin();
+       allow read, write: if isSuperAdmin();
+    }
+    
+    // Business-Promoter Links: Managed by staff of the business
+    match /businessPromoterLinks/{linkId} {
+       allow read: if isSignedIn();
+       allow create: if isBusinessStaff(request.resource.data.businessId);
+       allow update, delete: if isBusinessStaff(resource.data.businessId);
     }
 
-    match /platformUsers/{userId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSuperAdmin();
+    // Promoter Payments: Can be read by involved parties, created by business staff
+    match /promoterPayments/{paymentId} {
+        allow read: if isSignedIn() && 
+                      (isBusinessStaff(resource.data.businessId) || request.auth.uid == resource.data.promoterUid);
+        allow create: if isBusinessStaff(request.resource.data.businessId);
+        allow update, delete: if false; // Payments are immutable
     }
   }
 }

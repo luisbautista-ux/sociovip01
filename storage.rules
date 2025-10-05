@@ -1,23 +1,39 @@
+
 rules_version = '2';
 
+// Reglas para el servicio de Firebase Storage
 service firebase.storage {
+  // Coincide con cualquier bucket en tu proyecto
   match /b/{bucket}/o {
-    // Regla global: permite la lectura pública de todos los archivos.
-    // Esto es útil para que las imágenes de perfil, logos, etc., se puedan mostrar
-    // en la aplicación sin necesidad de que el usuario esté autenticado.
-    match /{allPaths=**} {
-      allow read: if true;
+
+    // Reglas específicas para la carpeta 'businesses' (logos, portadas, etc.)
+    match /businesses/{businessId}/{allPaths=**} {
+      allow read: if true; // Cualquiera puede leer las imágenes de los negocios.
+      allow write: if request.auth != null &&
+                      (hasRole(['superadmin']) || 
+                      (hasRole(['business_admin', 'staff']) && userOwnsBusiness(businessId)));
+    }
+    
+    // Nueva regla para avatares de promotores
+    match /promoter-avatars/{userId} {
+      allow read: if true; // Permitir lectura pública para mostrar las imágenes
+      allow write: if request.auth != null && request.auth.uid == userId; // El usuario solo puede escribir en su propia ruta
     }
 
-    // Regla para la escritura en la carpeta de negocios.
-    // Permite que cualquier usuario autenticado pueda escribir (subir/actualizar)
-    // archivos en cualquier subcarpeta dentro de 'businesses'.
-    // La seguridad se maneja en el lado del cliente (código de la app),
-    // que solo permite a un usuario subir archivos a la carpeta de su
-    // propio negocio (usando su businessId). Los nombres de archivo únicos
-    // previenen que un usuario sobrescriba los archivos de otro.
-    match /businesses/{businessId}/{allPaths=**} {
-      allow write: if request.auth != null;
+    // --- FUNCIONES HELPER ---
+    
+    // Función que verifica si el UID del usuario que hace la petición
+    // tiene un perfil en Firestore y su businessId coincide con el proporcionado.
+    function userOwnsBusiness(businessId) {
+      return exists(/databases/(default)/documents/platformUsers/$(request.auth.uid)) &&
+             get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId;
+    }
+    
+    // Función que verifica si el usuario autenticado tiene al menos uno
+    // de los roles especificados en la lista.
+    function hasRole(allowedRoles) {
+      return exists(/databases/(default)/documents/platformUsers/$(request.auth.uid)) &&
+             get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(allowedRoles);
     }
   }
 }

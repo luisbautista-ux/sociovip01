@@ -28,6 +28,7 @@ interface AuthContextType {
   signup: (email: string, pass: string, name?: string, role?: PlatformUserRole) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
+  refreshUserProfile: () => Promise<void>; // Added this
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,64 +56,67 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
-      // Clear local state immediately
       setCurrentUser(null);
       setUserProfile(null);
       Cookies.remove('idToken');
-      // Redirect to login page
       router.push("/login"); 
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
     }
   }, [router]);
 
+  const fetchUserProfile = useCallback(async (user: FirebaseUser) => {
+    if (!user) {
+      setUserProfile(null);
+      setLoadingProfile(false);
+      return;
+    }
+    setLoadingProfile(true);
+    try {
+      const userDocRef = doc(db, "platformUsers", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const profileDataFromDb = userDocSnap.data();
+        let rolesArray: PlatformUser['roles'] = [];
+        if (profileDataFromDb.roles && Array.isArray(profileDataFromDb.roles)) {
+          rolesArray = profileDataFromDb.roles;
+        } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') {
+          rolesArray = [profileDataFromDb.role as PlatformUserRole];
+        }
+        const profileData: PlatformUser = {
+          id: userDocSnap.id,
+          uid: user.uid,
+          ...profileDataFromDb,
+          roles: rolesArray,
+        } as PlatformUser;
+        setUserProfile(profileData);
+      } else {
+        console.error(`AuthContext: No profile found for UID ${user.uid}. Logging out.`);
+        await logout();
+      }
+    } catch (error) {
+      console.error("AuthContext: Error fetching user profile:", error);
+      await logout();
+    } finally {
+      setLoadingProfile(false);
+    }
+  }, [logout]);
+  
+  const refreshUserProfile = useCallback(async () => {
+    if (currentUser) {
+        await fetchUserProfile(currentUser);
+    }
+  }, [currentUser, fetchUserProfile]);
+
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoadingAuth(true); // Start auth check
-      setLoadingProfile(true); // Assume profile will be loaded
-
+      setLoadingAuth(true);
       if (user) {
         setCurrentUser(user);
         const token = await user.getIdToken();
         Cookies.set('idToken', token, { path: '/', secure: true, sameSite: 'strict' });
-        
-        try {
-          const userDocRef = doc(db, "platformUsers", user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          
-          if (userDocSnap.exists()) {
-            const profileDataFromDb = userDocSnap.data();
-            let rolesArray: PlatformUser['roles'] = [];
-            if (profileDataFromDb.roles && Array.isArray(profileDataFromDb.roles)) {
-              rolesArray = profileDataFromDb.roles;
-            } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') {
-              rolesArray = [profileDataFromDb.role as PlatformUserRole];
-            }
-            const profileData: PlatformUser = {
-              id: userDocSnap.id,
-              uid: user.uid,
-              ...profileDataFromDb,
-              roles: rolesArray,
-            } as PlatformUser;
-            setUserProfile(profileData);
-          } else {
-            console.error(`AuthContext: No profile found in Firestore for UID ${user.uid}. Logging out.`);
-            toast({
-              title: "Error de Perfil",
-              description: "Tu cuenta existe, pero no se encontró un perfil de datos válido. Se ha cerrado la sesión.",
-              variant: "destructive",
-              duration: 8000
-            });
-            await logout();
-            setUserProfile(null);
-          }
-        } catch (error) {
-          console.error("AuthContext: Error fetching user profile, logging out:", error);
-          await logout();
-          setUserProfile(null);
-        } finally {
-          setLoadingProfile(false);
-        }
+        await fetchUserProfile(user);
       } else {
         setCurrentUser(null);
         setUserProfile(null);
@@ -122,7 +126,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [logout]);
+  }, [fetchUserProfile]);
   
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
@@ -198,7 +202,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signup,
     logout,
     sendPasswordReset,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset]);
+    refreshUserProfile,
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
