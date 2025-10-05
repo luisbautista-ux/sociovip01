@@ -173,10 +173,14 @@ export default function PromoterProfilePage() {
                   className="hidden"
                   accept="image/png, image/jpeg, image/webp"
                 />
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
-                   <Upload className="h-4 w-4 mr-2" />
-                   Cambiar Foto
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSubmitting}
+                  className="text-sm font-medium text-primary hover:underline focus:outline-none"
+                >
+                  Editar
+                </button>
               </div>
 
               <FormField
