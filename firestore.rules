@@ -1,108 +1,68 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- Helper Functions ---
-    function isSuperAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['superadmin']);
-    }
-    
-    function isBusinessAdmin(businessId) {
-      return isSignedIn() &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin']);
-    }
-    
-    function isBusinessStaff(businessId) {
-      return isSignedIn() &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['business_admin', 'staff']);
-    }
 
-    function isPromoterAssignedToBusiness(businessId) {
-        return isSignedIn() &&
-               'businessIds' in get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data &&
-               get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessIds.hasAny([businessId]);
-    }
-    
-    function isHost(businessId) {
-       return isSignedIn() &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId &&
-             get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(['host', 'lector_qr', 'staff', 'business_admin']);
-    }
+    // ===== REGLAS DE LECTURA PÚBLICA =====
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    // --- Collection Rules ---
-
-    // Platform Users: Managed only by Super Admins
-    match /platformUsers/{userId} {
-      allow read, write: if isSuperAdmin();
-      // Allow a user to update their own profile (name, phone, photoURL)
-      allow update: if request.auth.uid == userId &&
-                      request.resource.data.keys().hasOnly(['name', 'phone', 'photoURL']);
-    }
-    
-    // Businesses: Read by anyone, written by Super Admins, staff of that business can update branding
+    // Cualquiera puede leer la lista de negocios para la página principal
     match /businesses/{businessId} {
       allow read: if true;
-      allow create, update, delete: if isSuperAdmin();
-      // Allow business staff/admin to update their own branding
-      allow update: if isBusinessStaff(businessId) &&
-                      request.resource.data.keys().hasOnly([
-                        'name', 'contactEmail', 'publicAddress', 'publicPhone', 
-                        'personalPhone', 'slogan', 'primaryColor', 'secondaryColor', 
-                        'logoUrl', 'publicCoverImageUrl'
-                      ]);
     }
-    
-    // Business Entities (Promotions/Events): Public can read, staff can manage for their business
+
+    // Cualquiera puede leer las promociones/eventos para listarlas
     match /businessEntities/{entityId} {
       allow read: if true;
-      allow create: if isBusinessStaff(request.resource.data.businessId);
-      allow update, delete: if isBusinessStaff(resource.data.businessId);
-      // Allow a promoter to update the codes (to add their generated ones)
-      allow update: if isSignedIn() &&
-                      isPromoterAssignedToBusiness(resource.data.businessId);
-      // Allow host to update codes (to mark as used)
-      allow update: if isHost(resource.data.businessId);
-    }
-    
-    // QR Clients: Can be read by staff of the associated business, created by public flow (server-side)
-    match /qrClients/{clientId} {
-      allow read: if isSuperAdmin() || 
-                    (isSignedIn() && 
-                     resource.data.keys().hasAny(['associatedBusinessIds', 'generatedForBusinessId']) &&
-                     (isBusinessStaff(resource.data.generatedForBusinessId) || 
-                      (resource.data.associatedBusinessIds.size() > 0 && isBusinessStaff(resource.data.associatedBusinessIds[0])) // Simple check, might need refinement
-                     )
-                    );
-      allow write: if isSuperAdmin(); // Only Super Admins can manually edit/delete
-      // Public creation is handled by a backend function/API, so direct write is denied
     }
 
-    // SocioVipMembers: Managed by SuperAdmins
+    // ===== REGLAS DE ESCRITURA Y LECTURA RESTRINGIDA =====
+
+    // Colección: platformUsers
+    // Almacena los perfiles de todos los usuarios de la plataforma (admins, staff, etc.)
+    match /platformUsers/{userId} {
+      // Un usuario solo puede leer su propio perfil.
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // El Super Admin puede leer cualquier perfil.
+      allow read: if request.auth != null && isSuperAdmin();
+
+      // Un usuario puede actualizar su propio nombre, teléfono y foto.
+      // El DNI, email, roles y businessId solo los puede cambiar un Super Admin.
+      allow update: if request.auth != null && request.auth.uid == userId
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'lastLogin']);
+
+      // El Super Admin puede crear y actualizar cualquier perfil sin restricciones de campos.
+      allow write: if request.auth != null && isSuperAdmin();
+    }
+
+    // Colección: socioVipMembers
+    // Almacena a los clientes que son parte del programa Socio VIP.
     match /socioVipMembers/{memberId} {
-       allow read, write: if isSuperAdmin();
-    }
-    
-    // Business-Promoter Links: Managed by staff of the business
-    match /businessPromoterLinks/{linkId} {
-       allow read: if isSignedIn();
-       allow create: if isBusinessStaff(request.resource.data.businessId);
-       allow update, delete: if isBusinessStaff(resource.data.businessId);
+      // El Super Admin puede hacer todo (CRUD).
+      allow read, write, delete: if request.auth != null && isSuperAdmin();
     }
 
-    // Promoter Payments: Can be read by involved parties, created by business staff
-    match /promoterPayments/{paymentId} {
-        allow read: if isSignedIn() && 
-                      (isBusinessStaff(resource.data.businessId) || request.auth.uid == resource.data.promoterUid);
-        allow create: if isBusinessStaff(request.resource.data.businessId);
-        allow update, delete: if false; // Payments are immutable
+    // Colección: qrClients
+    // Almacena a los clientes que han generado un QR al menos una vez.
+    match /qrClients/{clientId} {
+      // El Super Admin puede leer todos los clientes.
+      allow read: if request.auth != null && isSuperAdmin();
+      // Nadie más debe poder escribir directamente aquí.
+      allow write: if false;
     }
-  }
-}
+    
+    // Colección: businessPromoterLinks
+    // Almacena los vínculos entre un negocio y un promotor.
+    match /businessPromoterLinks/{linkId} {
+        // Solo un Super Admin o un Admin/Staff del negocio correspondiente puede leer los vínculos.
+        allow read: if request.auth != null && (isSuperAdmin() || userIsAdminOrStaffOfBusiness(resource.data.businessId));
+        
+        // Solo un Super Admin o un Admin/Staff del negocio correspondiente puede crear, actualizar o borrar vínculos.
+        allow write: if request.auth != null && (isSuperAdmin() || userIsAdminOrStaffOfBusiness(request.resource.data.businessId));
+    }
+    
+    // Colección: promoterPayments
+    // Almacena los registros de pagos de comisiones a promotores.
+    match /promoterPayments/{paymentId} {
+      // Solo Super Admin o Admin/Staff del negocio pueden leer o escribir pagos.
+      allow read, write: if request.a

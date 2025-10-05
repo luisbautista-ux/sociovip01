@@ -1,8 +1,6 @@
-
 "use client";
 
-import * as React from "react";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -34,7 +32,7 @@ export default function PromoterProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -80,7 +78,7 @@ export default function PromoterProfilePage() {
     try {
       if (selectedFile) {
         toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
-        const storageRef = ref(storage, `promoter-avatars/${currentUser.uid}`);
+        const storageRef = ref(storage, `promoter-avatars/${currentUser.uid}/${selectedFile.name}`);
         const uploadResult = await uploadBytes(storageRef, selectedFile);
         uploadedPhotoURL = await getDownloadURL(uploadResult.ref);
       }
