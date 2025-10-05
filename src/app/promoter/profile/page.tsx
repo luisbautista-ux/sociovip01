@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -100,13 +101,23 @@ export default function PromoterProfilePage() {
         description: "Tu información ha sido guardada correctamente.",
       });
 
-      setSelectedFile(null); // Clear selected file after successful upload
+      setSelectedFile(null);
 
     } catch (error: any) {
+      console.error("Error updating profile:", error);
+      let errorMessage = "Ocurrió un error inesperado.";
+      if (error.code === 'storage/unauthorized') {
+        errorMessage = "No tienes permiso para subir esta imagen. Revisa las reglas de Storage.";
+      } else if (error.code === 'storage/object-not-found') {
+        errorMessage = "No se encontró la ruta de subida en el servidor.";
+      } else {
+        errorMessage = error.message || "No se pudo guardar tu perfil.";
+      }
       toast({
         title: "Error al Actualizar",
-        description: `No se pudo guardar tu perfil. ${error.message}`,
+        description: errorMessage,
         variant: "destructive",
+        duration: 9000,
       });
     } finally {
       setIsSubmitting(false);
