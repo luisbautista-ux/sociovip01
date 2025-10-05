@@ -407,19 +407,19 @@ export default function PromoterEntitiesPage() {
                 const isActivatable = isEntityCurrentlyActivatable(entity);
                 return (
                     <Card key={entity.id} className="overflow-hidden">
-                        <CardHeader className="p-4">
-                            <CardTitle className="text-lg">{entity.name}</CardTitle>
-                            {entity.businessName && <ShadcnCardDescription className="text-xs text-muted-foreground flex items-center pt-1"><Building size={14} className="mr-1.5"/>{entity.businessName}</ShadcnCardDescription>}
+                        <CardHeader className="p-4 flex flex-row justify-between items-start">
+                            <div>
+                                <CardTitle className="text-lg">{entity.name}</CardTitle>
+                                {entity.businessName && <ShadcnCardDescription className="text-xs text-muted-foreground flex items-center pt-1"><Building size={14} className="mr-1.5"/>{entity.businessName}</ShadcnCardDescription>}
+                            </div>
+                            <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
+                                    className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1 shrink-0")}>
+                                {entity.isActive ? (isActivatable ? "Vigente" : "Fuera de Fecha") : "Inactiva"}
+                            </Badge>
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                            <div className="flex justify-between items-start gap-4">
-                                <div>
-                                    <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
-                                            className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
-                                        {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
-                                    </Badge>
-                                </div>
-                                <div className="text-xs text-right shrink-0">
+                                <div className="text-xs text-left shrink-0">
                                     <p>Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></p>
                                     <p>QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></p>
                                     <p>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></p>
@@ -723,3 +723,4 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         </div>
     );
 }
+
