@@ -380,11 +380,11 @@ export default function PromoterEntitiesPage() {
                             </TableCell>
                             
                             <TableCell className="align-top py-3 text-left text-xs">
-                            <div className="flex flex-col space-y-0.5">
-                                <div>Códigos Creados ({promoterCodeStats.created})</div>
-                                <div>QRs Generados ({entity.promoterCodesUsed || 0})</div>
-                                <div>QRs Usados ({entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0})</div>
-                            </div>
+                              <div className="flex flex-col space-y-0.5">
+                                  <div>Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
+                                  <div>QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
+                                  <div>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
+                              </div>
                             </TableCell>
                         </TableRow>
                     </React.Fragment>
