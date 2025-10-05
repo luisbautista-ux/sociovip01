@@ -1084,7 +1084,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               {promotions.map((promo) => (
                 <Card
                   key={promo.id}
-                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group"
+                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1"
                 >
                   <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
                     <NextImage
@@ -1123,7 +1123,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               {allEvents.map((event) => (
                 <Card
                   key={event.id}
-                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group"
+                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1"
                 >
                   <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
                     <NextImage
@@ -1501,6 +1501,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
 
 
 
