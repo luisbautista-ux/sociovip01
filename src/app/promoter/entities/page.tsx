@@ -419,10 +419,10 @@ export default function PromoterEntitiesPage() {
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                            <div className="flex justify-between items-start gap-4">
-                                <div className="text-xs text-left shrink-0">
-                                    <p>Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></p>
-                                    <p>QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></p>
-                                    <p>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></p>
+                                <div className="text-sm text-left shrink-0 space-y-2">
+                                    <div className="flex items-center gap-2"><QrCode className="h-4 w-4 text-primary" />Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
+                                    <div className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-blue-600" />QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
+                                    <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-600" />QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
                                 </div>
                            </div>
                            <Separator />
@@ -723,4 +723,3 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         </div>
     );
 }
-
