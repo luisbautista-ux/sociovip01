@@ -211,7 +211,7 @@ export default function PromoterLayout({
     );
   }
   
-  const getShortNameForDesktop = (fullName: string | undefined | null) => {
+  const getShortName = (fullName: string | undefined | null) => {
     if (!fullName) return "Promotor";
     const parts = fullName.split(' ');
     // Si el nombre es "Luis Armando Bautista Quispe", parts es ["Luis", "Armando", "Bautista", "Quispe"]
@@ -219,13 +219,10 @@ export default function PromoterLayout({
       // Asume Nombre ApellidoPaterno
       return `${parts[0]} ${parts[2]}`;
     }
-    if (parts.length === 2) {
-        return fullName;
-    }
     return fullName;
   }
   
-  const promoterDisplayNameDesktop = getShortNameForDesktop(userProfile?.name);
+  const promoterDisplayNameDesktop = getShortName(userProfile?.name);
   const promoterDisplayNameMobile = userProfile?.name || "Promotor";
   const promoterDisplayEmail = currentUser?.email || "";
   const promoterPhotoUrl = userProfile?.photoURL;
@@ -241,7 +238,10 @@ export default function PromoterLayout({
         {/* Mobile Header (simplified) */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
           <div className="flex items-center gap-3">
-            <SocioVipLogo size={32} />
+             <Avatar className="h-8 w-8">
+                <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterDisplayNameMobile} />
+                <AvatarFallback>{promoterDisplayNameMobile ? promoterDisplayNameMobile.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
+            </Avatar>
             <h1 className="font-semibold text-lg text-gradient">{promoterDisplayNameMobile}</h1>
           </div>
           <div className="flex items-center gap-2">
