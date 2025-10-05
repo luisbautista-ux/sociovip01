@@ -8,7 +8,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDtMgj_WySsrpmVdYLxem22UzCG8xCKQ4I",
   authDomain: "cloverpass.firebaseapp.com",
   projectId: "cloverpass",
-  storageBucket: "cloverpass.appspot.com",
+  storageBucket: "cloverpass.firebasestorage.app",
   messagingSenderId: "564817412003",
   appId: "1:564817412003:web:83938e8372bb360c0bde416"
 };
