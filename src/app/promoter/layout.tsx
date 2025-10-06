@@ -111,25 +111,28 @@ function PromoterBottomNav() {
   const pathname = usePathname();
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background shadow-lg md:hidden">
-      <nav className="flex items-center justify-around h-16">
-        {navItems.map((item) => {
-           const isActive = pathname.startsWith(item.href);
-          return(
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center text-xs font-medium w-full h-full transition-colors",
-                isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-              )}
-            >
-              <item.icon className="h-5 w-5 mb-0.5" />
-              <span>{item.label}</span>
-            </Link>
-        )})}
-      </nav>
-    </footer>
+    <footer className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg md:hidden">
+  <nav className="flex items-center justify-around h-16 w-full max-w-full overflow-hidden">
+    {navItems.map((item) => {
+      const isActive = pathname.startsWith(item.href);
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={cn(
+            "flex flex-col items-center justify-center text-xs font-medium w-full h-full transition-colors",
+            isActive
+              ? "bg-primary/10 text-primary"
+              : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+          )}
+        >
+          <item.icon className="h-5 w-5 mb-0.5" />
+          <span>{item.label}</span>
+        </Link>
+      );
+    })}
+  </nav>
+</footer>
   );
 }
 
@@ -184,7 +187,6 @@ export default function PromoterLayout({
           <CardContent>
             <CardDescription>
               No se encontró un perfil de usuario en la base de datos para tu cuenta (UID: {currentUser.uid}).
-              Asegúrate de que este UID esté correctamente vinculado a un perfil en la colección 'platformUsers'.
             </CardDescription>
             <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6">
               Cerrar Sesión e Ir a Login
@@ -205,7 +207,6 @@ export default function PromoterLayout({
           <CardContent>
             <CardDescription>
               No tienes los permisos necesarios para acceder al Panel de Promotor.
-              Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
             </CardDescription>
             <Button onClick={() => router.push('/')} variant="gradient">
               Ir a la Página Principal
@@ -215,75 +216,69 @@ export default function PromoterLayout({
       </div>
     );
   }
-  
+
   const getShortName = (fullName: string | undefined | null) => {
     if (!fullName) return "Promotor";
     const parts = fullName.split(' ');
-    if (parts.length > 2) { // "Luis Armando Bautista Quispe" -> "Luis Bautista"
-      return `${parts[0]} ${parts[2]}`;
-    }
+    if (parts.length > 2) return `${parts[0]} ${parts[2]}`;
     return fullName;
-  }
-  
+  };
+
   const promoterDisplayNameDesktop = getShortName(userProfile?.name);
   const promoterDisplayNameMobile = userProfile?.name || "Promotor";
   const promoterDisplayEmail = currentUser?.email || "";
   const promoterPhotoUrl = userProfile?.photoURL;
 
   return (
-    <div className="flex min-h-screen bg-muted/40">
-      {/* Desktop Sidebar */}
+    <div className="flex min-h-dvh bg-muted/40">
+      {/* Sidebar Desktop */}
       <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
-        <PromoterSidebar promoterName={promoterDisplayNameDesktop} promoterEmail={promoterDisplayEmail} promoterPhotoUrl={promoterPhotoUrl}/>
+        <PromoterSidebar
+          promoterName={promoterDisplayNameDesktop}
+          promoterEmail={promoterDisplayEmail}
+          promoterPhotoUrl={promoterPhotoUrl}
+        />
       </div>
-      
-      <div className="flex flex-col flex-1 h-screen"> {/* Set parent to h-screen */}
-        {/* Mobile Header (simplified) */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
+
+      {/* Contenedor principal */}
+      <div className="flex flex-col flex-1 relative">
+        
+        {/* Header Móvil */}
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:hidden">
           <div className="flex items-center gap-3">
-             <Avatar className="h-10 w-10">
-                <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterDisplayNameMobile} />
-                <AvatarFallback>{promoterDisplayNameMobile ? promoterDisplayNameMobile.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterDisplayNameMobile} />
+              <AvatarFallback>{promoterDisplayNameMobile ? promoterDisplayNameMobile.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
             </Avatar>
             <h1 className="font-semibold text-lg text-gradient">{promoterDisplayNameMobile}</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {promoterDisplayNameMobile}
-            </span>
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="icon" title="Cerrar Sesión">
-                        <LogOut className="h-4 w-4" />
-                        <span className="sr-only">Cerrar Sesión</span>
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                    <AlertDialogTitle>¿Cerrar Sesión?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        ¿Estás seguro de que quieres cerrar tu sesión de Promotor?
-                    </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">
-                        Sí, Cerrar Sesión
-                    </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="icon" title="Cerrar Sesión">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Cerrar Sesión?</AlertDialogTitle>
+                <AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={logout} className="bg-destructive hover:bg-destructive/90">
+                  Sí, Cerrar Sesión
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </header>
 
-        {/* Desktop Header (empty placeholder, could be removed or used for breadcrumbs) */}
-         <header className="sticky top-0 z-30 hidden h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:flex"></header>
-
-        <main className="flex-1 p-4 sm:p-6 overflow-auto pb-20 md:pb-6">
+        {/* Contenido principal */}
+        <main className="flex-1 w-full max-w-full overflow-y-auto p-4 sm:p-6 pb-[5.5rem] md:pb-6">
           {children}
         </main>
-        
-        {/* Mobile Bottom Navigation */}
+
+        {/* Footer Móvil fijo */}
         <PromoterBottomNav />
       </div>
     </div>
