@@ -237,7 +237,7 @@ export default function PromoterLayout({
         <PromoterSidebar promoterName={promoterDisplayNameDesktop} promoterEmail={promoterDisplayEmail} promoterPhotoUrl={promoterPhotoUrl}/>
       </div>
       
-      <div className="flex flex-col flex-1 h-full">
+      <div className="flex flex-col flex-1 h-screen"> {/* Set parent to h-screen */}
         {/* Mobile Header (simplified) */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden">
           <div className="flex items-center gap-3">
@@ -289,3 +289,4 @@ export default function PromoterLayout({
     </div>
   );
 }
+
