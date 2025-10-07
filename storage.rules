@@ -24,13 +24,13 @@ service firebase.storage {
     // Función reutilizable para verificar si un usuario pertenece a un negocio.
     function isBusinessMember(businessId) {
       // Obtener el perfil del usuario desde Firestore.
-      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid));
       
       // Caso 1: Para admin/staff, verificar el campo 'businessId' (string).
-      let isDirectMember = userProfile.keys().hasAny(['businessId']) && userProfile.businessId == businessId;
+      let isDirectMember = 'businessId' in userProfile && userProfile.businessId == businessId;
       
       // Caso 2: Para promotores, verificar si el 'businessId' está en el array 'businessIds' (list).
-      let isPromoterMember = userProfile.keys().hasAny(['businessIds']) && businessId in userProfile.businessIds;
+      let isPromoterMember = 'businessIds' in userProfile && businessId in userProfile.businessIds;
 
       return isDirectMember || isPromoterMember;
     }
