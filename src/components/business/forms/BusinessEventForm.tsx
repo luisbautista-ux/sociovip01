@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React from "react";
+import React, { useImperativeHandle } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -59,13 +58,17 @@ const eventDetailsFormSchema = z.object({
 
 export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 
+export interface EventDetailsFormRef {
+  getValues: () => EventDetailsFormValues;
+  trigger: () => Promise<boolean>;
+}
+
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
-  onFormChange: (data: EventDetailsFormValues) => void;
 }
 
-export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFormChange }: BusinessEventFormProps) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     defaultValues: {
@@ -81,29 +84,25 @@ export const BusinessEventForm = React.memo(({ event, isSubmitting = false, onFo
       aiHint: event?.aiHint || "",
     },
   });
-  
-  // Use useEffect to subscribe to form changes and call onFormChange
-  React.useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      // Zod parse to ensure the data is valid before propagating
-      let formData = {...value};
-      if (name === "unlimitedAttendance") {
-          if (formData.unlimitedAttendance) {
-              formData.maxAttendance = 0;
-              form.setValue("maxAttendance", 0); // Update form state as well
-          }
-      }
-      
-      const parsed = eventDetailsFormSchema.safeParse(formData);
-      if (parsed.success) {
-        onFormChange(parsed.data);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, onFormChange]);
+
+  useImperativeHandle(ref, () => ({
+    getValues: () => {
+      const formValues = form.getValues();
+      return {
+        ...formValues,
+        maxAttendance: formValues.unlimitedAttendance ? 0 : formValues.maxAttendance,
+      };
+    },
+    trigger: () => form.trigger(),
+  }));
   
   const isUnlimited = form.watch("unlimitedAttendance");
 
+  React.useEffect(() => {
+    if (isUnlimited) {
+      form.setValue("maxAttendance", 0);
+    }
+  }, [isUnlimited, form]);
 
   return (
     <Form {...form}>

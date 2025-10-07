@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,7 +26,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
+import { BusinessEventForm, type EventDetailsFormRef, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
@@ -61,6 +61,7 @@ const ManageEventDialog = ({
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
+    const detailsFormRef = useRef<EventDetailsFormRef>(null);
     
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
@@ -85,24 +86,23 @@ const ManageEventDialog = ({
         }
     }, [isManageEventDialogOpen, editingEvent]);
 
-    const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                name: values.name,
-                description: values.description,
-                termsAndConditions: values.termsAndConditions,
-                startDate: values.startDate.toISOString(),
-                endDate: values.endDate.toISOString(),
-                unlimitedAttendance: values.unlimitedAttendance,
-                maxAttendance: values.unlimitedAttendance ? 0 : values.maxAttendance,
-                isActive: values.isActive,
-                imageUrl: values.imageUrl,
-                aiHint: values.aiHint,
-            };
-        });
-    }, []);
+    const handleSaveChanges = async () => {
+        if (!detailsFormRef.current) return;
+        const isValid = await detailsFormRef.current.trigger();
+        if (!isValid) {
+            toast({ title: "Revisa los campos", description: "Hay errores en el formulario de detalles.", variant: "destructive" });
+            return;
+        }
+
+        const detailsData = detailsFormRef.current.getValues();
+
+        const finalEventData = {
+            ...localEventState,
+            ...detailsData
+        } as BusinessManagedEntity;
+        
+        handleSaveEvent(finalEventData);
+    };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
         setLocalEventState(prev => {
@@ -265,6 +265,8 @@ const ManageEventDialog = ({
             return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
+    
+    const { toast } = useToast();
 
     if (!isManageEventDialogOpen || !localEventState) return null;
 
@@ -300,8 +302,8 @@ const ManageEventDialog = ({
                                   </CardHeader>
                                   <CardContent>
                                     <BusinessEventForm 
+                                        ref={detailsFormRef}
                                         event={localEventState} 
-                                        onFormChange={handleDetailsChange} 
                                         isSubmitting={isSubmitting}
                                     />
                                   </CardContent>
@@ -490,7 +492,7 @@ const ManageEventDialog = ({
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !localEventState.name}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>
@@ -986,6 +988,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
