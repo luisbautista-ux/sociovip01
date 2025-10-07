@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -39,7 +40,7 @@ import { Label } from "@/components/ui/label";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db, storage } from "@/lib/firebase";
-import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -792,3 +793,5 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
+
+    
