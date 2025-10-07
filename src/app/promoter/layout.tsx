@@ -240,7 +240,7 @@ export default function PromoterLayout({
         />
       </div>
 
-      {/* Contenedor principal que se flexiona */}
+      {/* Contenedor principal */}
       <div className="flex flex-col flex-1 h-dvh">
         
         {/* Header Móvil */}
