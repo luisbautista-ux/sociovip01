@@ -240,7 +240,7 @@ export default function PromoterLayout({
         />
       </div>
 
-      {/* Contenedor principal */}
+      {/* Contenedor principal que se flexiona */}
       <div className="flex flex-col flex-1 h-dvh">
         
         {/* Header Móvil */}
@@ -273,7 +273,7 @@ export default function PromoterLayout({
           </AlertDialog>
         </header>
 
-        {/* Contenido principal */}
+        {/* Contenido principal con scroll */}
         <main className="flex-1 w-full overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6">
           {children}
         </main>
