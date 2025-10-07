@@ -1,39 +1,40 @@
-
 rules_version = '2';
 
-// Reglas para el servicio de Firebase Storage
+// Documentación de Storage Rules: https://firebase.google.com/docs/storage/security
 service firebase.storage {
-  // Coincide con cualquier bucket en tu proyecto
   match /b/{bucket}/o {
 
-    // Reglas específicas para la carpeta 'businesses' (logos, portadas, etc.)
-    match /businesses/{businessId}/{allPaths=**} {
-      allow read: if true; // Cualquiera puede leer las imágenes de los negocios.
-      allow write: if request.auth != null &&
-                      (hasRole(['superadmin']) || 
-                      (hasRole(['business_admin', 'staff']) && userOwnsBusiness(businessId)));
+    // Regla general: por defecto, nadie puede leer o escribir.
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
     
-    // Nueva regla para avatares de promotores
-    match /promoter-avatars/{userId} {
-      allow read: if true; // Permitir lectura pública para mostrar las imágenes
-      allow write: if request.auth != null && request.auth.uid == userId; // El usuario solo puede escribir en su propia ruta
+    // PERFIL DE PROMOTOR
+    // Reglas para las imágenes de perfil de los promotores.
+    // La ruta es: promoter-avatars/{userId}/{fileName}
+    match /promoter-avatars/{userId}/{allPaths=**} {
+        // Permitir que cualquiera lea las imágenes (son públicas).
+        allow read: if true;
+
+        // Permitir escritura (crear, actualizar, eliminar) solo si el usuario autenticado
+        // es el dueño de esa carpeta.
+        allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // IMAGENES DE NEGOCIOS (LOGOS, PORTADAS, ETC)
+    // Reglas para las imágenes de los negocios (logos, portadas, etc).
+    // La ruta es: business-assets/{businessId}/{fileName}
+    match /business-assets/{businessId}/{allPaths=**} {
+        // Permitir que cualquiera lea las imágenes (son públicas).
+        allow read: if true;
+
+        // Permitir escritura (crear, actualizar, eliminar) solo si el usuario autenticado
+        // tiene un perfil en Firestore (en 'platformUsers') y su 'businessId'
+        // coincide con el de la carpeta a la que intenta escribir.
+        allow write: if request.auth != null && 
+                      exists(/databases/$(database)/documents/platformUsers/$(request.auth.uid)) &&
+                      get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId;
     }
 
-    // --- FUNCIONES HELPER ---
-    
-    // Función que verifica si el UID del usuario que hace la petición
-    // tiene un perfil en Firestore y su businessId coincide con el proporcionado.
-    function userOwnsBusiness(businessId) {
-      return exists(/databases/(default)/documents/platformUsers/$(request.auth.uid)) &&
-             get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.businessId == businessId;
-    }
-    
-    // Función que verifica si el usuario autenticado tiene al menos uno
-    // de los roles especificados en la lista.
-    function hasRole(allowedRoles) {
-      return exists(/databases/(default)/documents/platformUsers/$(request.auth.uid)) &&
-             get(/databases/(default)/documents/platformUsers/$(request.auth.uid)).data.roles.hasAny(allowedRoles);
-    }
   }
 }
