@@ -241,7 +241,7 @@ export default function PromoterLayout({
       </div>
 
       {/* Contenedor principal */}
-      <div className="flex flex-col flex-1 relative">
+      <div className="relative flex flex-grow flex-col pb-[5.5rem] md:pb-0">
         
         {/* Header Móvil */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:hidden">
@@ -274,7 +274,7 @@ export default function PromoterLayout({
         </header>
 
         {/* Contenido principal */}
-        <main className="flex-1 w-full max-w-full overflow-y-auto p-4 sm:p-6 pb-[5.5rem] md:pb-6">
+        <main className="flex-1 w-full max-w-full overflow-y-auto p-4 sm:p-6">
           {children}
         </main>
 
