@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -39,8 +38,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -212,56 +212,73 @@ export default function BusinessPromotionsPage() {
   const handleFormSubmit = async (data: BusinessPromotionFormData) => {
     if (!currentBusinessId) {
       toast({ title: "Error de Negocio", description: "ID de negocio no disponible para guardar la promoción.", variant: "destructive", duration: 7000 });
-      setIsSubmitting(false);
       return;
     }
     setIsSubmitting(true);
 
-    const promotionPayloadBase = {
-      name: data.name,
-      description: data.description,
-      termsAndConditions: data.termsAndConditions || "",
-      startDate: data.startDate, 
-      endDate: data.endDate,     
-      usageLimit: data.usageLimit === undefined || data.usageLimit === null || data.usageLimit === '' || isNaN(Number(data.usageLimit)) ? 0 : Number(data.usageLimit),
-      isActive: data.isActive,
-      imageUrl: data.imageUrl || (data.aiHint ? `https://placehold.co/600x400.png?text=${encodeURIComponent(data.aiHint.split(' ').slice(0,2).join('+'))}` : editingPromotion?.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(data.name.substring(0,10))}`),
-      aiHint: data.aiHint || data.name.split(' ').slice(0,2).join(' '),
-    };
-    
-    const fullPayloadRaw: Omit<BusinessManagedEntity, 'id' | 'createdAt' | 'startDate' | 'endDate' | 'ticketTypes' | 'eventBoxes' | 'assignedPromoters' | 'maxAttendance'> & { startDate: any, endDate: any, createdAt?: any, generatedCodes?: GeneratedCode[] } = {
-        ...promotionPayloadBase,
-        businessId: currentBusinessId,
-        type: "promotion" as "promotion",
-        startDate: Timestamp.fromDate(new Date(promotionPayloadBase.startDate)),
-        endDate: Timestamp.fromDate(new Date(promotionPayloadBase.endDate)),
-        generatedCodes: (editingPromotion && !isDuplicating ? editingPromotion.generatedCodes : []) || [],
-        ticketTypes: [],
-        eventBoxes: [],
-        assignedPromoters: [],
-        maxAttendance: 0,
-    };
-    
-    const promotionPayloadForFirestore = sanitizeObjectForFirestore(fullPayloadRaw);
-    
     try {
-      if (editingPromotion && !isDuplicating && editingPromotion.id) { 
-        const { id, createdAt, ...updateData } = promotionPayloadForFirestore; 
-        await updateDoc(doc(db, "businessEntities", editingPromotion.id), updateData);
-        toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
-      } else { 
-        const { id, ...createDataRaw } = promotionPayloadForFirestore;
-        const createData = { ...createDataRaw, createdAt: serverTimestamp() };
-        const docRef = await addDoc(collection(db, "businessEntities"), createData);
-        toast({ title: isDuplicating ? "Promoción Duplicada" : "Promoción Creada", description: `La promoción "${data.name}" ha sido creada con ID: ${docRef.id}.` });
+      let finalImageUrl = editingPromotion?.imageUrl || "";
+      const isNewEntity = !editingPromotion || !editingPromotion.id || isDuplicating;
+      const entityId = isNewEntity ? doc(collection(db, "businessEntities")).id : editingPromotion.id;
+
+      if (data.imageFile) {
+        const oldImageUrl = !isNewEntity ? editingPromotion.imageUrl : null;
+        
+        toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
+        const storageRef = ref(storage, `promotion-images/${currentBusinessId}/${entityId}/${data.imageFile.name}`);
+        const uploadResult = await uploadBytes(storageRef, data.imageFile);
+        finalImageUrl = await getDownloadURL(uploadResult.ref);
+
+        if (oldImageUrl && oldImageUrl.includes("firebase")) {
+          try {
+            const oldImageRef = ref(storage, oldImageUrl);
+            await deleteObject(oldImageRef);
+          } catch (deleteError: any) {
+            if (deleteError.code !== 'storage/object-not-found') {
+              console.warn("Could not delete old promotion image:", deleteError);
+            }
+          }
+        }
       }
+
+      const promotionPayloadBase = {
+        name: data.name,
+        description: data.description,
+        termsAndConditions: data.termsAndConditions || "",
+        startDate: data.startDate,
+        endDate: data.endDate,
+        usageLimit: data.usageLimit === undefined || data.usageLimit === null || isNaN(Number(data.usageLimit)) ? 0 : Number(data.usageLimit),
+        isActive: data.isActive,
+        imageUrl: finalImageUrl,
+      };
+
+      const fullPayloadForFirestore: Omit<BusinessManagedEntity, 'id' | 'createdAt'> & { createdAt?: any } = {
+          ...promotionPayloadBase,
+          businessId: currentBusinessId,
+          type: "promotion" as "promotion",
+          startDate: Timestamp.fromDate(new Date(promotionPayloadBase.startDate)),
+          endDate: Timestamp.fromDate(new Date(promotionPayloadBase.endDate)),
+          generatedCodes: (editingPromotion && !isDuplicating ? editingPromotion.generatedCodes : []) || [],
+          ticketTypes: [],
+          eventBoxes: [],
+          assignedPromoters: [],
+          maxAttendance: 0,
+      };
+      
+      const sanitizedPayload = sanitizeObjectForFirestore(fullPayloadForFirestore);
+
+      if (isNewEntity) {
+        await setDoc(doc(db, "businessEntities", entityId), { ...sanitizedPayload, createdAt: serverTimestamp() });
+        toast({ title: isDuplicating ? "Promoción Duplicada" : "Promoción Creada", description: `La promoción "${data.name}" ha sido creada.` });
+      } else {
+        await updateDoc(doc(db, "businessEntities", entityId), sanitizedPayload);
+        toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
+      }
+
       setShowCreateEditPromotionModal(false);
-      setEditingPromotion(null);
-      setIsDuplicating(false);
-      if (currentBusinessId) fetchBusinessData(currentBusinessId); 
+      if (currentBusinessId) fetchBusinessData(currentBusinessId);
     } catch (error: any) {
-      const errorDesc = `No se pudo guardar la promoción. ${error.message}.`;
-      toast({ title: "Error al Guardar Promoción", description: errorDesc, variant: "destructive", duration: 10000});
+      toast({ title: "Error al Guardar", description: `No se pudo guardar la promoción. ${error.message}`, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -775,9 +792,3 @@ export default function BusinessPromotionsPage() {
     </div>
   );
 }
-    
-
-    
-
-
-

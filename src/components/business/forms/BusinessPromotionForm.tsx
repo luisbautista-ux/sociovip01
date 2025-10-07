@@ -1,10 +1,10 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -26,6 +26,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
+import NextImage from "next/image";
 
 const promotionFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -34,18 +35,16 @@ const promotionFormSchema = z.object({
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
   usageLimit: z.coerce.number().int().positive().optional().or(z.literal(0)).or(z.literal(undefined)),
   isActive: z.boolean().default(true),
-  imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
-  aiHint: z.string().optional(),
+  imageUrl: z.string().optional(),
+  imageFile: z.custom<File | null>(() => true).optional(),
   termsAndConditions: z.string().optional(),
 }).refine(data => {
-    // Ensure endDate is on or after startDate
     if (data.startDate && data.endDate) {
-        // Compare only date parts if time is not relevant or set to midnight
         const start = new Date(data.startDate.getFullYear(), data.startDate.getMonth(), data.startDate.getDate());
         const end = new Date(data.endDate.getFullYear(), data.endDate.getMonth(), data.endDate.getDate());
         return end >= start;
     }
-    return true; // Pass if dates are not set (though schema requires them)
+    return true;
 }, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
   path: ["endDate"],
@@ -61,6 +60,10 @@ interface BusinessPromotionFormProps {
 }
 
 export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitting = false }: BusinessPromotionFormProps) {
+  
+  const [previewUrl, setPreviewUrl] = useState<string | null>(promotion?.imageUrl || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<PromotionFormValues>({
     resolver: zodResolver(promotionFormSchema),
     defaultValues: {
@@ -71,13 +74,41 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       usageLimit: promotion?.usageLimit === undefined || promotion?.usageLimit === null ? undefined : promotion.usageLimit,
       isActive: promotion?.isActive === undefined ? true : promotion.isActive,
       imageUrl: promotion?.imageUrl || "",
-      aiHint: promotion?.aiHint || "",
+      imageFile: null,
       termsAndConditions: promotion?.termsAndConditions || "",
     },
   });
 
+  useEffect(() => {
+    if (promotion) {
+      setPreviewUrl(promotion.imageUrl || null);
+      form.reset({
+        name: promotion.name || "",
+        description: promotion.description || "",
+        startDate: promotion.startDate ? new Date(promotion.startDate) : new Date(),
+        endDate: promotion.endDate ? new Date(promotion.endDate) : new Date(new Date().setDate(new Date().getDate() + 7)),
+        usageLimit: promotion.usageLimit === undefined || promotion.usageLimit === null ? undefined : promotion.usageLimit,
+        isActive: promotion.isActive === undefined ? true : promotion.isActive,
+        imageUrl: promotion.imageUrl || "",
+        imageFile: null,
+        termsAndConditions: promotion.termsAndConditions || "",
+      });
+    }
+  }, [promotion, form]);
+  
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        form.setError("imageFile", { message: "El archivo debe ser menor a 5MB."});
+        return;
+      }
+      form.setValue("imageFile", file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = (values: PromotionFormValues) => {
-    // Ensure usageLimit is number or undefined before submitting
     const dataToSubmit: BusinessPromotionFormData = {
         ...values,
         usageLimit: values.usageLimit === undefined || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
@@ -88,6 +119,31 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        
+        <div className="flex flex-col items-center justify-center mb-4 space-y-3">
+          <div className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center">
+            {previewUrl ? (
+              <NextImage src={previewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
+            ) : (
+              <div className="text-muted-foreground flex flex-col items-center">
+                <ImageIcon className="h-10 w-10" />
+                <span className="text-sm mt-1">Vista Previa</span>
+              </div>
+            )}
+          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            accept="image/png, image/jpeg, image/webp"
+          />
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
+             Cambiar Imagen
+          </Button>
+          <FormMessage>{form.formState.errors.imageFile?.message}</FormMessage>
+        </div>
+
         <FormField
           control={form.control}
           name="name"
@@ -193,33 +249,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="imageUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>URL de Imagen</FormLabel>
-              <FormControl>
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="https://ejemplo.com/imagen.png" {...field} value={field.value || ""} disabled={isSubmitting} />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-         <FormField
-          control={form.control}
-          name="aiHint"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Palabras Clave para Imagen (si URL está vacía)</FormLabel>
-              <FormControl><Input placeholder="Ej: fiesta cocteles (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-               <FormMessage />
-            </FormItem>
-          )}
-        />
+        
         <FormField
           control={form.control}
           name="isActive"
@@ -239,8 +269,4 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {promotion ? "Guardar Cambios" : "Crear Promoción"}
           </Button>
-        </DialogFooter>
-      </form>
-    </Form>
-  );
-}
+        

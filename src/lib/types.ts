@@ -318,7 +318,7 @@ export interface SocioVipMemberFormData {
   name: string;
   surname: string;
   phone: string;
-  dob: Date; 
+  dob: Date; d
   email: string;
   address?: string;
   profession?: string;
@@ -343,6 +343,7 @@ export interface BusinessPromotionFormData {
   usageLimit?: number | string; // Allow string for empty input
   isActive: boolean;
   imageUrl?: string;
+  imageFile?: File | null; // For file uploads
   aiHint?: string;
   termsAndConditions?: string;
 }
@@ -451,23 +452,3 @@ export interface InitialDataForPromoterLink {
   existingLink?: BusinessPromoterLink; 
   existingPlatformUserPromoter?: PlatformUser; 
   qrClientData?: QrClient; 
-  socioVipData?: SocioVipMember; 
-}
-
-export interface PromoterEntityView extends BusinessManagedEntity {
-    businessName: string;
-    promoterCodesCreated: number;
-    promoterCodesUsed: number;
-}
-
-export interface PromoterPayment {
-    id: string;
-    businessId: string;
-    promoterUid: string;
-    amountPaid: number;
-    paymentDate: Timestamp | string;
-    paidByUid: string;
-    paidByName: string;
-    notes?: string;
-    settledCodeIds: string[];
-}
