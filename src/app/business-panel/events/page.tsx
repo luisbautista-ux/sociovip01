@@ -60,7 +60,6 @@ const ManageEventDialog = ({
     setEditingEvent: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
-    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
     
     // States for forms within the dialog
@@ -78,16 +77,12 @@ const ManageEventDialog = ({
 
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
-            setLocalEventState({ ...editingEvent });
-            // When a new event is opened for editing, reset to the details tab.
             setActiveTab("details");
-        } else {
-            setLocalEventState(null);
         }
     }, [isManageEventDialogOpen, editingEvent]);
 
     const handleSaveChanges = async () => {
-        if (!detailsFormRef.current) return;
+        if (!detailsFormRef.current || !editingEvent) return;
         const isValid = await detailsFormRef.current.trigger();
         if (!isValid) {
             toast({ title: "Revisa los campos", description: "Hay errores en el formulario de detalles.", variant: "destructive" });
@@ -97,7 +92,7 @@ const ManageEventDialog = ({
         const detailsData = detailsFormRef.current.getValues();
 
         const finalEventData = {
-            ...localEventState,
+            ...editingEvent,
             ...detailsData
         } as BusinessManagedEntity;
         
@@ -105,7 +100,7 @@ const ManageEventDialog = ({
     };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             let updatedTicketTypes: TicketType[];
             const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
@@ -128,7 +123,7 @@ const ManageEventDialog = ({
     };
     
     const handleTicketDelete = (ticketId: string) => {
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             const updatedTicketTypes = (prev.ticketTypes || []).filter(t => t.id !== ticketId);
             return { ...prev, ticketTypes: updatedTicketTypes };
@@ -136,7 +131,7 @@ const ManageEventDialog = ({
     };
     
     const handleBoxSubmit = (boxData: EventBoxFormData) => {
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             let updatedBoxes: EventBox[];
             const boxId = editingBox?.id || `box_${Date.now()}`;
@@ -159,7 +154,7 @@ const ManageEventDialog = ({
     };
     
     const handleBatchBoxSubmit = (batchData: BatchBoxFormData) => {
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             const newBoxes: EventBox[] = [];
             for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
@@ -181,7 +176,7 @@ const ManageEventDialog = ({
     };
 
     const handleBoxDelete = (boxId: string) => {
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             const updatedBoxes = (prev.eventBoxes || []).filter(b => b.id !== boxId);
             return { ...prev, eventBoxes: updatedBoxes };
@@ -193,7 +188,7 @@ const ManageEventDialog = ({
         const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
         if (!promoterData) return;
 
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             
             let updatedAssignments = [...(prev.assignedPromoters || [])];
@@ -219,7 +214,7 @@ const ManageEventDialog = ({
 
 
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
@@ -234,7 +229,7 @@ const ManageEventDialog = ({
     };
 
     const handleAddCommissionRule = (promoterId: string) => {
-        setLocalEventState(prev => {
+        setEditingEvent(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
@@ -253,7 +248,7 @@ const ManageEventDialog = ({
     };
     
     const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
-         setLocalEventState(prev => {
+         setEditingEvent(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
@@ -268,14 +263,14 @@ const ManageEventDialog = ({
     
     const { toast } = useToast();
 
-    if (!isManageEventDialogOpen || !localEventState) return null;
+    if (!isManageEventDialogOpen || !editingEvent) return null;
 
     return (
         <>
             <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${editingEvent.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
@@ -284,9 +279,9 @@ const ManageEventDialog = ({
                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
-                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                                    <TabsTrigger value="boxes">Boxes ({localEventState.eventBoxes?.length || 0})</TabsTrigger>
-                                    <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(editingEvent.ticketTypes) || 'Ilimitado'})</TabsTrigger>
+                                    <TabsTrigger value="boxes">Boxes ({editingEvent.eventBoxes?.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="promoters">Promotores ({editingEvent.assignedPromoters?.length || 0})</TabsTrigger>
                                 </TabsList>
                             </Tabs>
                         </div>
@@ -303,7 +298,7 @@ const ManageEventDialog = ({
                                   <CardContent>
                                     <BusinessEventForm 
                                         ref={detailsFormRef}
-                                        event={localEventState} 
+                                        event={editingEvent} 
                                         isSubmitting={isSubmitting}
                                     />
                                   </CardContent>
@@ -321,7 +316,7 @@ const ManageEventDialog = ({
                                      <Table>
                                          <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                          <TableBody>
-                                             {(localEventState.ticketTypes || []).map(ticket => (
+                                             {(editingEvent.ticketTypes || []).map(ticket => (
                                                  <TableRow key={ticket.id}>
                                                      <TableCell>{ticket.name}</TableCell>
                                                      <TableCell>{ticket.cost.toFixed(2)}</TableCell>
@@ -341,7 +336,7 @@ const ManageEventDialog = ({
                                          </TableBody>
                                      </Table>
                                      </div>
-                                      {(!localEventState.ticketTypes || localEventState.ticketTypes.length === 0) && (
+                                      {(!editingEvent.ticketTypes || editingEvent.ticketTypes.length === 0) && (
                                         <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
                                       )}
                                  </CardContent>
@@ -361,7 +356,7 @@ const ManageEventDialog = ({
                                             
                                             {/* Mobile View for Boxes */}
                                             <div className="md:hidden space-y-4 mt-4">
-                                                {(localEventState.eventBoxes || []).map(box => (
+                                                {(editingEvent.eventBoxes || []).map(box => (
                                                     <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
                                                         "bg-green-500/10 border-green-300": box.status === 'available',
                                                         "bg-blue-500/10 border-blue-300": box.status === 'reserved',
@@ -401,7 +396,7 @@ const ManageEventDialog = ({
                                                 <Table>
                                                     <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                                     <TableBody>
-                                                        {(localEventState.eventBoxes || []).map(box => (
+                                                        {(editingEvent.eventBoxes || []).map(box => (
                                                             <TableRow key={box.id}>
                                                                 <TableCell>{box.name}</TableCell>
                                                                 <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
@@ -425,7 +420,7 @@ const ManageEventDialog = ({
                                                 </Table>
                                             </div>
 
-                                            {(!localEventState.eventBoxes || localEventState.eventBoxes.length === 0) && (
+                                            {(!editingEvent.eventBoxes || editingEvent.eventBoxes.length === 0) && (
                                                 <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
                                             )}
                                         </CardContent>
@@ -442,7 +437,7 @@ const ManageEventDialog = ({
                                             <Label className="font-semibold">Promotores del Negocio</Label>
                                             <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
                                                 {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
-                                                    const isChecked = (localEventState.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                    const isChecked = (editingEvent.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
                                                     return (
                                                         <div key={promoter.platformUserUid} className="flex items-center space-x-2">
                                                             <Checkbox
@@ -458,8 +453,8 @@ const ManageEventDialog = ({
                                         </div>
 
                                         <div className="space-y-4">
-                                          <h4 className="font-semibold">Promotores Asignados ({localEventState.assignedPromoters?.length || 0})</h4>
-                                          {(localEventState.assignedPromoters || []).map(assignment => (
+                                          <h4 className="font-semibold">Promotores Asignados ({editingEvent.assignedPromoters?.length || 0})</h4>
+                                          {(editingEvent.assignedPromoters || []).map(assignment => (
                                               <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
                                                   <div className="flex justify-between items-center">
                                                       <p className="font-medium">{assignment.promoterName}</p>
@@ -480,7 +475,7 @@ const ManageEventDialog = ({
                                                   </div>
                                               </div>
                                           ))}
-                                          {(!localEventState.assignedPromoters || localEventState.assignedPromoters.length === 0) && (
+                                          {(!editingEvent.assignedPromoters || editingEvent.assignedPromoters.length === 0) && (
                                               <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
                                           )}
                                         </div>
@@ -492,7 +487,7 @@ const ManageEventDialog = ({
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !localEventState.name}>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !editingEvent.name}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>
@@ -531,7 +526,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
-                        existingBoxes={localEventState.eventBoxes}
+                        existingBoxes={editingEvent.eventBoxes}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -988,6 +983,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
