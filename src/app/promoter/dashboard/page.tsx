@@ -195,7 +195,7 @@ export default function PromoterDashboardPage() {
 
   if (loadingAuth || loadingProfile || isLoading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100dvh-150px)]">
+      <div className="flex justify-center items-center h-[calc(100dvh-150px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-3 text-muted-foreground">Cargando dashboard del promotor...</p>
       </div>
@@ -215,8 +215,8 @@ export default function PromoterDashboardPage() {
           <CardContent className="p-4 space-y-4">
              <div className="space-y-4">
                 <StatCard title="Negocios asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
-                <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} iconColor="text-blue-600" />
-                <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} iconColor="text-orange-600" />
+                <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
+                <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} iconColor="text-blue-600" />
                 <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesUsedByPromoter} icon={CheckCircle} iconColor="text-green-600" />
              </div>
 
@@ -292,8 +292,8 @@ export default function PromoterDashboardPage() {
       <div className="hidden md:block space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Negocios asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
-          <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} iconColor="text-blue-600" />
-          <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} iconColor="text-orange-600" />
+          <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
+          <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} iconColor="text-blue-600" />
           <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesUsedByPromoter} icon={CheckCircle} iconColor="text-green-600" />
         </div>
 
