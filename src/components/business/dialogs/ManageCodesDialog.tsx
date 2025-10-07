@@ -356,55 +356,53 @@ export function ManageCodesDialog({
             <p className="ml-3 text-muted-foreground">Cargando códigos...</p>
           </div>
         ) : processedAndGroupedCodes.length > 0 ? (
-          <ScrollArea className="h-[50vh] border rounded-md">
-            <div className="overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                    <TableRow className="text-sm">
-                        <TableHead className="w-[140px] px-2 py-2">Código</TableHead>
-                        <TableHead className="w-[110px] px-2 py-2 text-center">Estado</TableHead>
-                        {!isPromoterView && <TableHead className="w-[120px] px-2 py-2 text-center">Creado por</TableHead>}
-                        <TableHead className="w-[120px] px-2 py-2 text-center">Fecha canje</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {processedAndGroupedCodes.map((item) => {
-                        if (item.isBatch && item.codesInBatch && item.batchId) {
-                        const isExpanded = !!expandedBatches[item.batchId];
-                        return (
-                            <React.Fragment key={item.id}>
-                            <TableRow 
-                                className="border-b hover:bg-muted/30 cursor-pointer data-[state=open]:bg-muted/30"
-                                onClick={() => toggleBatchExpansion(item.batchId!)}
-                                data-state={isExpanded ? "open" : "closed"}
-                            >
-                                <TableCell colSpan={isPromoterView ? 3 : 4} className="py-2 px-3 text-xs">
-                                <div className="flex items-center justify-between group w-full">
-                                    <div className="flex items-center">
-                                    {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold">Lote de {item.codesInBatch.length} códigos</span>
-                                        {!isPromoterView && <span className="text-muted-foreground text-[11px]">Creado por: {item.generatedByName}</span>}
-                                    </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0">
-                                    <Button variant="ghost" size="xs" className="text-xs h-auto py-1 px-1.5" onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}><WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir lote ({item.codesInBatch!.length})</Button>
-                                    </div>
+          <div className="overflow-x-auto h-[50vh] border rounded-md">
+            <Table>
+                <TableHeader>
+                <TableRow className="text-sm">
+                    <TableHead className="w-[140px] px-2 py-2">Código</TableHead>
+                    <TableHead className="w-[110px] px-2 py-2 text-center">Estado</TableHead>
+                    {!isPromoterView && <TableHead className="w-[120px] px-2 py-2 text-center">Creado por</TableHead>}
+                    <TableHead className="w-[120px] px-2 py-2 text-center">Fecha canje</TableHead>
+                </TableRow>
+                </TableHeader>
+                <TableBody>
+                {processedAndGroupedCodes.map((item) => {
+                    if (item.isBatch && item.codesInBatch && item.batchId) {
+                    const isExpanded = !!expandedBatches[item.batchId];
+                    return (
+                        <React.Fragment key={item.id}>
+                        <TableRow 
+                            className="border-b hover:bg-muted/30 cursor-pointer data-[state=open]:bg-muted/30"
+                            onClick={() => toggleBatchExpansion(item.batchId!)}
+                            data-state={isExpanded ? "open" : "closed"}
+                        >
+                            <TableCell colSpan={isPromoterView ? 3 : 4} className="py-2 px-3 text-xs">
+                            <div className="flex items-center justify-between group w-full">
+                                <div className="flex items-center">
+                                {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
+                                <div className="flex flex-col">
+                                    <span className="font-semibold">Lote de {item.codesInBatch.length} códigos</span>
+                                    {!isPromoterView && <span className="text-muted-foreground text-[11px]">Creado por: {item.generatedByName}</span>}
                                 </div>
-                                </TableCell>
-                            </TableRow>
-                            {isExpanded && item.codesInBatch.map(code => renderCodeRow(code, true, item.batchId))}
-                            </React.Fragment>
-                        );
-                        } else if (item.singleCode) {
-                        return renderCodeRow(item.singleCode, false);
-                        }
-                        return null;
-                    })}
-                    </TableBody>
-                </Table>
-            </div>
-          </ScrollArea>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                <Button variant="ghost" size="xs" className="text-xs h-auto py-1 px-1.5" onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}><WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir lote ({item.codesInBatch!.length})</Button>
+                                </div>
+                            </div>
+                            </TableCell>
+                        </TableRow>
+                        {isExpanded && item.codesInBatch.map(code => renderCodeRow(code, true, item.batchId))}
+                        </React.Fragment>
+                    );
+                    } else if (item.singleCode) {
+                    return renderCodeRow(item.singleCode, false);
+                    }
+                    return null;
+                })}
+                </TableBody>
+            </Table>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
             <p>No hay códigos generados para esta campaña.</p>
