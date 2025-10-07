@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 
 interface PromoterDashboardStats {
   totalBusinessesAssigned: number;
@@ -62,7 +63,6 @@ export default function PromoterDashboardPage() {
     try {
         const promoterUid = userProfile.uid;
         
-        // 1. Fetch business links for this promoter to get assignment dates
         const linksQuery = query(collection(db, "businessPromoterLinks"), where("platformUserUid", "==", promoterUid));
         const linksSnap = await getDocs(linksQuery);
         const promoterLinks = linksSnap.docs.map(doc => ({id: doc.id, ...doc.data()}) as BusinessPromoterLink);
@@ -73,12 +73,10 @@ export default function PromoterDashboardPage() {
             return;
         }
 
-        // 2. Fetch details for the assigned businesses
         const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
         const businessesSnap = await getDocs(businessesQuery);
         const businessesMap = new Map(businessesSnap.docs.map(doc => [doc.id, doc.data() as Business]));
 
-        // 3. Create "New Assignment" activities
         const allActivities: ActivityItem[] = promoterLinks.map(link => {
             const businessName = businessesMap.get(link.businessId)?.name || 'Negocio Desconocido';
             return {
@@ -94,7 +92,6 @@ export default function PromoterDashboardPage() {
             };
         });
 
-        // 4. Fetch entities and process code-related activities
         const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "in", businessIds));
         const entitiesSnap = await getDocs(entitiesQuery);
         const allEntities = entitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BusinessManagedEntity);
@@ -158,14 +155,12 @@ export default function PromoterDashboardPage() {
             performanceMap.set(entity.businessId, businessPerf);
         });
 
-        // 5. Sort all activities chronologically and set state
         const sortedActivities = allActivities
-            .filter(a => a.date) // Ensure activity has a valid date
+            .filter(a => a.date) 
             .sort((a, b) => b.date.getTime() - a.date.getTime())
             .slice(0, 5);
         setRecentActivities(sortedActivities);
 
-        // 6. Set performance and general stats
         const performanceData: BusinessPerformance[] = [];
         performanceMap.forEach((perf, bizId) => {
             performanceData.push({
@@ -214,91 +209,171 @@ export default function PromoterDashboardPage() {
         Dashboard
       </h1>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Negocios asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
-        <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
-        <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} />
-        <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesUsedByPromoter} icon={CheckCircle} />
+      {/* --- Mobile View: All in one card --- */}
+      <div className="md:hidden">
+        <Card className="shadow-lg">
+          <CardContent className="p-4 space-y-4">
+             <div className="space-y-4">
+                <StatCard title="Negocios asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
+                <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
+                <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} />
+                <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesUsedByPromoter} icon={CheckCircle} />
+             </div>
+
+            <Separator/>
+
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight mb-2">Actividad Reciente</h3>
+              {recentActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivities.map(activity => (
+                    <div key={activity.id} className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                            activity.type === 'new_assignment' ? 'bg-purple-100' :
+                            activity.type === 'code_redeemed' ? 'bg-blue-100' : 
+                            'bg-green-100'
+                        }`}>
+                          <activity.icon className={`h-5 w-5 ${
+                              activity.type === 'new_assignment' ? 'text-purple-600' :
+                              activity.type === 'code_redeemed' ? 'text-blue-600' : 
+                              'text-green-600'
+                          }`} />
+                        </div>
+                      </div>
+                      <div className="flex-grow">
+                        <p className="text-sm font-medium">{activity.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(activity.date, { addSuffix: true, locale: es })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="min-h-[100px] flex flex-col items-center justify-center text-center text-muted-foreground">
+                  <Info className="h-8 w-8 mb-2" />
+                  <p>Aún no hay actividad reciente.</p>
+                </div>
+              )}
+            </div>
+
+            <Separator/>
+
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight mb-2">Rendimiento por Negocio</h3>
+              {businessPerformance.length > 0 ? (
+                <div className="space-y-2">
+                    {businessPerformance.map(biz => (
+                      <Card key={biz.businessId} className="bg-muted/50">
+                        <CardHeader className="p-3">
+                          <CardTitle className="text-base">{biz.businessName}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 text-xs grid grid-cols-3 gap-1">
+                          <div className="text-center"><strong>{biz.codesCreated}</strong><p>Creados</p></div>
+                          <div className="text-center"><strong>{biz.qrGenerated}</strong><p>Generados</p></div>
+                          <div className="text-center"><strong>{biz.qrUsed}</strong><p>Usados</p></div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+              ) : (
+                 <div className="min-h-[100px] flex flex-col items-center justify-center text-center text-muted-foreground">
+                    <Info className="h-8 w-8 mb-2" />
+                    <p>No hay datos de rendimiento.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Actividad Reciente</CardTitle>
-          <CardDescription>Últimos vínculos y actividad de tus códigos en la plataforma.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {recentActivities.length > 0 ? (
-            <div className="space-y-4">
-              {recentActivities.map(activity => (
-                <div key={activity.id} className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        activity.type === 'new_assignment' ? 'bg-purple-100' :
-                        activity.type === 'code_redeemed' ? 'bg-blue-100' : 
-                        'bg-green-100'
-                    }`}>
-                      <activity.icon className={`h-5 w-5 ${
-                          activity.type === 'new_assignment' ? 'text-purple-600' :
-                          activity.type === 'code_redeemed' ? 'text-blue-600' : 
-                          'text-green-600'
-                      }`} />
+      {/* --- Desktop View: Separate cards --- */}
+      <div className="hidden md:block space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Negocios asignados" value={promoterStats.totalBusinessesAssigned} icon={Building} />
+          <StatCard title="Códigos creados por ti" value={promoterStats.totalCodesGeneratedByPromoter} icon={QrCode} />
+          <StatCard title="QRs generados con tus códigos" value={promoterStats.qrGeneratedWithPromoterCodes} icon={ScanLine} />
+          <StatCard title="QRs usados por tus clientes" value={promoterStats.totalCodesUsedByPromoter} icon={CheckCircle} />
+        </div>
+
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>Actividad Reciente</CardTitle>
+            <CardDescription>Últimos vínculos y actividad de tus códigos en la plataforma.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentActivities.length > 0 ? (
+              <div className="space-y-4">
+                {recentActivities.map(activity => (
+                  <div key={activity.id} className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          activity.type === 'new_assignment' ? 'bg-purple-100' :
+                          activity.type === 'code_redeemed' ? 'bg-blue-100' : 
+                          'bg-green-100'
+                      }`}>
+                        <activity.icon className={`h-5 w-5 ${
+                            activity.type === 'new_assignment' ? 'text-purple-600' :
+                            activity.type === 'code_redeemed' ? 'text-blue-600' : 
+                            'text-green-600'
+                        }`} />
+                      </div>
+                    </div>
+                    <div className="flex-grow">
+                      <p className="text-sm font-medium">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(activity.date, { addSuffix: true, locale: es })}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex-grow">
-                    <p className="text-sm font-medium">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(activity.date, { addSuffix: true, locale: es })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
-              <Info className="h-12 w-12 text-primary/60 mb-3" />
-              <p className="text-muted-foreground">Aún no hay actividad reciente para mostrar.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Rendimiento por Negocio</CardTitle>
-          <CardDescription>Resumen de tus códigos por cada negocio asignado.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {businessPerformance.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Negocio</TableHead>
-                  <TableHead className="text-center">Códigos creados</TableHead>
-                  <TableHead className="text-center">QRs generados</TableHead>
-                  <TableHead className="text-center">QRs usados</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {businessPerformance.map(biz => (
-                  <TableRow key={biz.businessId}>
-                    <TableCell className="font-medium">{biz.businessName}</TableCell>
-                    <TableCell className="text-center">{biz.codesCreated}</TableCell>
-                    <TableCell className="text-center">{biz.qrGenerated}</TableCell>
-                    <TableCell className="text-center">{biz.qrUsed}</TableCell>
-                  </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          ) : (
-             <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
-              <Info className="h-12 w-12 text-primary/60 mb-3" />
-              <p className="text-muted-foreground">No hay datos de rendimiento para mostrar.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            ) : (
+              <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
+                <Info className="h-12 w-12 text-primary/60 mb-3" />
+                <p className="text-muted-foreground">Aún no hay actividad reciente para mostrar.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>Rendimiento por Negocio</CardTitle>
+            <CardDescription>Resumen de tus códigos por cada negocio asignado.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {businessPerformance.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Negocio</TableHead>
+                    <TableHead className="text-center">Códigos creados</TableHead>
+                    <TableHead className="text-center">QRs generados</TableHead>
+                    <TableHead className="text-center">QRs usados</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {businessPerformance.map(biz => (
+                    <TableRow key={biz.businessId}>
+                      <TableCell className="font-medium">{biz.businessName}</TableCell>
+                      <TableCell className="text-center">{biz.codesCreated}</TableCell>
+                      <TableCell className="text-center">{biz.qrGenerated}</TableCell>
+                      <TableCell className="text-center">{biz.qrUsed}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+               <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
+                <Info className="h-12 w-12 text-primary/60 mb-3" />
+                <p className="text-muted-foreground">No hay datos de rendimiento para mostrar.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
-
-    
