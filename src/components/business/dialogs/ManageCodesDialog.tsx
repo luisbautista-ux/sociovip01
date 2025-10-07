@@ -5,6 +5,7 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { BusinessManagedEntity, GeneratedCode, Business } from "@/lib/types";
@@ -279,6 +280,34 @@ export function ManageCodesDialog({
 
   if (!entity) return null; 
 
+  const renderCodeCard = (code: GeneratedCode | undefined, isInsideBatch = false) => {
+      if (!code || !code.id) return null;
+      return (
+          <Card key={`card-${code.id}`} className="p-3 text-sm">
+              <div className="flex justify-between items-start">
+                  <span className="font-mono font-semibold">{code.value}</span>
+                  <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status] || 'outline'} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status] || code.status}</Badge>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                  {!isPromoterView && <div><strong>Creado por:</strong> {code.generatedByName || 'N/A'}</div>}
+                  <div><strong>Fecha Canje:</strong> {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}</div>
+              </div>
+              <div className="flex gap-2 mt-2">
+                 <Button variant="ghost" size="xs" className="h-auto py-1 px-1.5 text-green-600 hover:bg-green-100" onClick={() => handleShareIndividualCode(code.value)}><WhatsAppIcon className="h-4 w-4" /></Button>
+                  <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="xs" className="h-auto py-1 px-1.5 text-destructive hover:bg-destructive/10" disabled={code.status !== 'available'}><Trash2 className="h-4 w-4"/></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader><UIAlertDialogTitle>Eliminar Código</UIAlertDialogTitle><UIDialogDescription>¿Seguro que quieres eliminar el código {code.value}? Esta acción no se puede deshacer.</UIDialogDescription></AlertDialogHeader>
+                        <UIAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteCode(code.id)} className="bg-destructive">Eliminar</AlertDialogAction></UIAlertDialogFooter>
+                      </AlertDialogContent>
+                  </AlertDialog>
+              </div>
+          </Card>
+      );
+  };
+
   const renderCodeRow = (code: GeneratedCode | undefined, isInsideBatch = false, batchId?: string) => {
     if (!code || !code.id) {
         console.warn("ManageCodesDialog: Attempted to render a code without a valid ID.", code);
@@ -356,64 +385,86 @@ export function ManageCodesDialog({
           </div>
         ) : processedAndGroupedCodes.length > 0 ? (
           <ScrollArea className="h-[50vh] border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow className="text-sm">
-                  <TableHead className="w-[140px] px-2 py-2">Código</TableHead>
-                  <TableHead className="w-[110px] px-2 py-2 text-center">Estado</TableHead>
-                  {!isPromoterView && <TableHead className="w-[120px] px-2 py-2 text-center">Creado por</TableHead>}
-                  <TableHead className="w-[120px] px-2 py-2 text-center">Fecha canje</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {processedAndGroupedCodes.map((item) => {
-                  if (item.isBatch && item.codesInBatch && item.batchId) {
-                    const isExpanded = !!expandedBatches[item.batchId];
-                    const nonAvailableCount = item.codesInBatch.filter(c => c.status !== 'available').length;
-                    
-                    return (
-                      <React.Fragment key={item.id}>
-                        <TableRow 
-                            className="border-b hover:bg-muted/30 cursor-pointer data-[state=open]:bg-muted/30"
-                            onClick={() => toggleBatchExpansion(item.batchId!)}
-                            data-state={isExpanded ? "open" : "closed"}
-                        >
-                          <TableCell colSpan={isPromoterView ? 3 : 4} className="py-2 px-3 text-xs">
-                             <div className="flex items-center justify-between group w-full">
-                              <div className="flex items-center">
-                                {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
-                                <div className="flex flex-col">
-                                    <span className="font-semibold">Lote de {item.codesInBatch.length} códigos</span>
-                                    {!isPromoterView && <span className="text-muted-foreground text-[11px]">Creado por: {item.generatedByName}</span>}
+            {/* VISTA MÓVIL (TARJETAS) */}
+            <div className="md:hidden p-2 space-y-2">
+              {processedAndGroupedCodes.map(item => {
+                if (item.isBatch && item.codesInBatch && item.batchId) {
+                  return (
+                    <Card key={item.id} className="bg-muted/30">
+                      <div className="p-3">
+                        <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleBatchExpansion(item.batchId!)}>
+                           <div>
+                                <p className="font-semibold">Lote de {item.codesInBatch.length} códigos</p>
+                                {!isPromoterView && <p className="text-xs text-muted-foreground">Creado por: {item.generatedByName}</p>}
+                           </div>
+                           {expandedBatches[item.batchId!] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </div>
+                         <Button size="xs" variant="outline" className="mt-2 text-xs h-auto py-1 px-1.5" onClick={() => handleShareBatchCodes(item.codesInBatch)}><WhatsAppIcon className="h-4 w-4 mr-1"/> Compartir Lote</Button>
+                      </div>
+                      {expandedBatches[item.batchId!] && (
+                        <div className="p-3 border-t space-y-2">
+                          {item.codesInBatch.map(code => renderCodeCard(code, true))}
+                        </div>
+                      )}
+                    </Card>
+                  )
+                }
+                return renderCodeCard(item.singleCode);
+              })}
+            </div>
+
+            {/* VISTA DESKTOP (TABLA) */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-sm">
+                    <TableHead className="w-[140px] px-2 py-2">Código</TableHead>
+                    <TableHead className="w-[110px] px-2 py-2 text-center">Estado</TableHead>
+                    {!isPromoterView && <TableHead className="w-[120px] px-2 py-2 text-center">Creado por</TableHead>}
+                    <TableHead className="w-[120px] px-2 py-2 text-center">Fecha canje</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {processedAndGroupedCodes.map((item) => {
+                    if (item.isBatch && item.codesInBatch && item.batchId) {
+                      const isExpanded = !!expandedBatches[item.batchId];
+                      return (
+                        <React.Fragment key={item.id}>
+                          <TableRow 
+                              className="border-b hover:bg-muted/30 cursor-pointer data-[state=open]:bg-muted/30"
+                              onClick={() => toggleBatchExpansion(item.batchId!)}
+                              data-state={isExpanded ? "open" : "closed"}
+                          >
+                            <TableCell colSpan={isPromoterView ? 3 : 4} className="py-2 px-3 text-xs">
+                              <div className="flex items-center justify-between group w-full">
+                                <div className="flex items-center">
+                                  {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
+                                  <div className="flex flex-col">
+                                      <span className="font-semibold">Lote de {item.codesInBatch.length} códigos</span>
+                                      {!isPromoterView && <span className="text-muted-foreground text-[11px]">Creado por: {item.generatedByName}</span>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Button variant="ghost" size="xs" className="text-xs h-auto py-1 px-1.5" onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}><WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir lote ({item.codesInBatch!.length})</Button>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    className="text-xs h-auto py-1 px-1.5"
-                                    onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}
-                                >
-                                    <WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir lote ({item.codesInBatch!.length})
-                                </Button>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {isExpanded && item.codesInBatch.map(code => renderCodeRow(code, true, item.batchId))}
-                      </React.Fragment>
-                    );
-                  } else if (item.singleCode) {
-                    return renderCodeRow(item.singleCode, false);
-                  }
-                  return null;
-                })}
-              </TableBody>
-            </Table>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && item.codesInBatch.map(code => renderCodeRow(code, true, item.batchId))}
+                        </React.Fragment>
+                      );
+                    } else if (item.singleCode) {
+                      return renderCodeRow(item.singleCode, false);
+                    }
+                    return null;
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </ScrollArea>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
-            <p>No has generado códigos para esta entidad aún.</p>
+            <p>No hay códigos generados para esta campaña.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>
           </div>
         )}
