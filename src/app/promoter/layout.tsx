@@ -242,7 +242,6 @@ export default function PromoterLayout({
 
       {/* Contenedor principal */}
       <div className="flex flex-col flex-1 h-dvh">
-        
         {/* Header Móvil */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:hidden shrink-0">
           <div className="flex items-center gap-3">
