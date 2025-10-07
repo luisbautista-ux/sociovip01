@@ -27,6 +27,7 @@ import { es } from "date-fns/locale";
 import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import NextImage from "next/image";
+import { useToast } from "@/hooks/use-toast";
 
 const promotionFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -63,6 +64,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   
   const [previewUrl, setPreviewUrl] = useState<string | null>(promotion?.imageUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const form = useForm<PromotionFormValues>({
     resolver: zodResolver(promotionFormSchema),
@@ -100,7 +102,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        form.setError("imageFile", { message: "El archivo debe ser menor a 5MB."});
+        toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
       form.setValue("imageFile", file);
@@ -269,4 +271,8 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {promotion ? "Guardar Cambios" : "Crear Promoción"}
           </Button>
-        
+        </DialogFooter>
+      </form>
+    </Form>
+  );
+}
