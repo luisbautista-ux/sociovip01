@@ -241,10 +241,10 @@ export default function PromoterLayout({
       </div>
 
       {/* Contenedor principal */}
-      <div className="relative flex flex-grow flex-col pb-[5.5rem] md:pb-0">
+      <div className="flex flex-col flex-1 h-dvh">
         
         {/* Header Móvil */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:hidden shrink-0">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
               <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterDisplayNameMobile} />
@@ -274,7 +274,7 @@ export default function PromoterLayout({
         </header>
 
         {/* Contenido principal */}
-        <main className="flex-1 w-full max-w-full overflow-y-auto p-4 sm:p-6">
+        <main className="flex-1 w-full overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6">
           {children}
         </main>
 
