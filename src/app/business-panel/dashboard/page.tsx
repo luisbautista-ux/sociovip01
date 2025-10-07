@@ -213,8 +213,8 @@ export default function BusinessDashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Promociones Activas" value={stats.activeEntities} icon={Ticket} />
         <StatCard title="Códigos Creados" value={stats.totalCodesCreated} icon={QrCodeLucide} />
-        <StatCard title="QRs Generados" value={stats.totalCodesRedeemed} icon={TicketCheck} />
-        <StatCard title="QR Validados (Asistencia)" value={stats.totalCodesUsed} icon={ScanSearch} />
+        <StatCard title="QRs Generados" value={stats.totalCodesRedeemed} icon={ScanLine} iconColor="text-blue-600" />
+        <StatCard title="QR Validados (Asistencia)" value={stats.totalCodesUsed} icon={CheckCircle} iconColor="text-green-600" />
       </div>
 
       <Card className="shadow-lg">
