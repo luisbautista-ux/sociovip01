@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, UserCircle, Upload } from "lucide-react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const profileFormSchema = z.object({
@@ -75,6 +75,7 @@ export default function PromoterProfilePage() {
     setIsSubmitting(true);
     
     let uploadedPhotoURL = userProfile?.photoURL || "";
+    const oldPhotoURL = userProfile?.photoURL; // Save old URL for deletion
 
     try {
       if (selectedFile) {
@@ -90,6 +91,20 @@ export default function PromoterProfilePage() {
         phone: values.phone || null,
         photoURL: uploadedPhotoURL || null,
       });
+
+      // After successful update, delete old photo if a new one was uploaded and there was an old one.
+      if (selectedFile && oldPhotoURL) {
+        try {
+          const oldPhotoRef = ref(storage, oldPhotoURL);
+          await deleteObject(oldPhotoRef);
+          console.log("Old profile photo deleted successfully.");
+        } catch (deleteError: any) {
+          // Log deletion error but don't fail the whole operation for the user
+          if (deleteError.code !== 'storage/object-not-found') {
+            console.error("Failed to delete old profile photo:", deleteError);
+          }
+        }
+      }
 
       // After successful update, refresh the user profile in context
       if (refreshUserProfile) {
