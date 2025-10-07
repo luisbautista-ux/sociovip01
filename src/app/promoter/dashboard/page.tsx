@@ -200,9 +200,9 @@ export default function PromoterDashboardPage() {
 
   if (loadingAuth || loadingProfile || isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-full">
+      <div className="flex items-center justify-center h-[calc(100dvh-150px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-muted-foreground">Cargando dashboard del promotor...</p>
+        <p className="ml-3 text-muted-foreground">Cargando dashboard del promotor...</p>
       </div>
     );
   }
