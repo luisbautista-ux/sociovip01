@@ -97,10 +97,7 @@ export function calculateMaxAttendance(ticketTypes: TicketType[] | undefined): n
 
 // Helper function to sanitize an object for Firestore by converting undefined to null
 export function sanitizeObjectForFirestore(obj: any): any {
-  // If the object is a Firestore special type (like a FieldValue for serverTimestamp), return it directly.
-  if (obj && typeof obj.isEqual === 'function') {
-    // This is a crude way to detect FieldValue types like serverTimestamp() or Timestamp.
-    // A more robust check might be needed if other object types have `isEqual`.
+  if (obj instanceof Timestamp || obj instanceof FieldValue) {
     return obj;
   }
 
