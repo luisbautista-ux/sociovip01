@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -43,44 +42,46 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 const ManageEventDialog = ({
     isManageEventDialogOpen,
     setIsManageEventDialogOpen,
-    editingEvent,
-    setEditingEvent, // Pass the setter function
+    editingEvent: initialEditingEvent,
     isDuplicating,
-    isSubmitting,
     availablePromoters,
     handleSaveEvent,
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
     editingEvent: BusinessManagedEntity | null;
-    setEditingEvent: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
     isDuplicating: boolean;
-    isSubmitting: boolean;
     availablePromoters: BusinessPromoterLink[];
-    handleSaveEvent: (event: BusinessManagedEntity | null) => void;
+    handleSaveEvent: (event: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => void;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
     const [formState, setFormState] = useState({ isValid: false });
 
+    // Use internal state for the event object to manage changes across tabs
+    const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(initialEditingEvent);
+    
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
     const [isBoxFormOpen, setIsBoxFormOpen] = useState(false);
     const [editingBox, setEditingBox] = useState<EventBox | null>(null);
     const [isBatchBoxFormOpen, setIsBatchBoxFormOpen] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const boxStatusTranslations: Record<EventBox['status'], string> = {
         available: 'Disponible',
         reserved: 'Reservado',
         sold: 'Vendido',
     };
-
+    
     useEffect(() => {
-        if (isManageEventDialogOpen && editingEvent) {
-            setActiveTab("details");
-        }
-    }, [isManageEventDialogOpen, editingEvent]);
+      setEditingEvent(initialEditingEvent);
+      if (isManageEventDialogOpen) {
+          setActiveTab("details");
+      }
+    }, [initialEditingEvent, isManageEventDialogOpen]);
+
 
     const handleSaveChanges = async () => {
         if (!detailsFormRef.current || !editingEvent) return;
@@ -92,13 +93,12 @@ const ManageEventDialog = ({
         }
 
         const detailsData = detailsFormRef.current.getValues();
-
-        const finalEventData = {
-            ...editingEvent,
-            ...detailsData
-        } as BusinessManagedEntity;
-        
-        handleSaveEvent(finalEventData);
+        setIsSubmitting(true);
+        try {
+          await handleSaveEvent(editingEvent, detailsData);
+        } finally {
+          setIsSubmitting(false);
+        }
     };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
@@ -263,14 +263,6 @@ const ManageEventDialog = ({
         });
     };
 
-    const handleDetailsChange = useCallback((newDetails: EventDetailsFormValues) => {
-        setEditingEvent(prevEvent => {
-            if (!prevEvent) return null;
-            // Merge new details from the form into the existing event state
-            return { ...prevEvent, ...newDetails };
-        });
-    }, [setEditingEvent]);
-
     const { toast } = useToast();
 
     if (!isManageEventDialogOpen || !editingEvent) return null;
@@ -310,7 +302,6 @@ const ManageEventDialog = ({
                                         ref={detailsFormRef}
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
-                                        onFormChange={handleDetailsChange}
                                         onStateChange={setFormState}
                                     />
                                   </CardContent>
@@ -498,7 +489,7 @@ const ManageEventDialog = ({
                     </div>
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
-                        <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                        <Button variant="outline" onClick={() => { setIsManageEventDialogOpen(false); setEditingEvent(null); }} disabled={isSubmitting}>Cancelar</Button>
                         <Button onClick={handleSaveChanges} disabled={isSubmitting || !formState.isValid}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
@@ -696,7 +687,7 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null) => {
+  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => {
       if(!currentBusinessId) {
           toast({title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive"});
           return;
@@ -705,14 +696,14 @@ export default function BusinessEventsPage() {
           toast({title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive"});
           return;
       }
-      setIsSubmitting(true);
       
       const payload = {
-        ...eventDataToSave,
+        ...eventDataToSave, // Contains ticketTypes, eventBoxes, assignedPromoters
+        ...detailsData, // Contains name, description, dates, etc. from form
         businessId: currentBusinessId,
         type: 'event' as 'event',
-        startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
-        endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
+        startDate: Timestamp.fromDate(new Date(detailsData.startDate)),
+        endDate: Timestamp.fromDate(new Date(detailsData.endDate)),
       };
       
       try {
@@ -726,12 +717,11 @@ export default function BusinessEventsPage() {
               toast({title: "Evento Creado", description: `El evento "${payload.name}" ha sido creado.`});
           }
           setIsManageEventDialogOpen(false);
+          setEditingEvent(null);
           if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
       } catch (error: any) {
           toast({title: "Error al Guardar", description: error.message, variant: "destructive"});
           console.error("Error saving event:", error);
-      } finally {
-          setIsSubmitting(false);
       }
   };
 
@@ -939,9 +929,7 @@ export default function BusinessEventsPage() {
         isManageEventDialogOpen={isManageEventDialogOpen}
         setIsManageEventDialogOpen={setIsManageEventDialogOpen}
         editingEvent={editingEvent}
-        setEditingEvent={setEditingEvent}
         isDuplicating={isDuplicating}
-        isSubmitting={isSubmitting}
         availablePromoters={availablePromoters}
         handleSaveEvent={handleSaveEvent}
       />
@@ -993,23 +981,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
