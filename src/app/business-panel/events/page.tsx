@@ -302,6 +302,9 @@ const ManageEventDialog = ({
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
                                         onStateChange={setFormState}
+                                        onFormChange={(updatedDetails) => {
+                                            setEditingEvent(prev => prev ? { ...prev, ...updatedDetails } : null);
+                                        }}
                                     />
                                   </CardContent>
                                 </Card>
@@ -985,6 +988,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
