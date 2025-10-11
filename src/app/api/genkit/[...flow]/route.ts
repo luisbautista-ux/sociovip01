@@ -1,7 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -22,11 +21,11 @@ import {
   where,
   Timestamp,
   doc,
-  getDoc,
   updateDoc,
   addDoc,
   serverTimestamp,
   limit,
+  getDoc,
   runTransaction,
   arrayUnion
 } from "firebase/firestore";
@@ -61,8 +60,8 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogDescription as UIDialogDescription,
+  DialogTitle as UIDialogTitleComponent,
+  DialogDescription as UIDialogDescriptionComponent,
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -81,15 +80,17 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as UIDialogDescription,
   AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
-  AlertDialogTitle as UIAlertDialogTitleAliased,
+  AlertDialogTitle as UIAlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import React from "react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SocioVipLogo } from "@/components/icons";
+
 
 // --- Helpers robustos para códigos ---
 const normalizeCode = (v: unknown) =>
@@ -157,11 +158,11 @@ type NewQrClientFormData = z.infer<typeof newQrClientSchema>;
 
 export default function BusinessPublicPage() {
   const pathname = usePathname();
-  const businessIdFromParams = React.useMemo(() => {
+  const customUrlPath = React.useMemo(() => {
     if (!pathname) return undefined;
-    const parts = pathname.split("/").filter(Boolean); // ["business", "{id}", ...]
-    const i = parts.indexOf("business");
-    return i !== -1 && parts[i + 1] ? parts[i + 1] : undefined;
+    const parts = pathname.split("/").filter(Boolean); // ["b", "{slug}", ...]
+    const i = parts.indexOf("b");
+    return i !== -1 && parts[i + 1] ? decodeURIComponent(parts[i + 1]) : undefined;
   }, [pathname]);
 
 
@@ -172,9 +173,8 @@ export default function BusinessPublicPage() {
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   const [promotions, setPromotions] = useState<BusinessManagedEntity[]>([]);
   const [allEvents, setAllEvents] = useState<BusinessManagedEntity[]>([]);
-  const [isLoadingPage, setIsLoadingPage] = useState(true);
-  const [pageError, setPageError] = useState<string | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
 
   const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
@@ -190,10 +190,11 @@ export default function BusinessPublicPage() {
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
   const [isConsultingDni, setIsConsultingDni] = useState(false);
 
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const dniForm = useForm<DniFormValues>({ 
-    resolver: zodResolver(DniEntrySchema), 
-    defaultValues: { docType: 'dni', docNumber: "" } 
+  const dniForm = useForm<DniFormValues>({
+    resolver: zodResolver(DniEntrySchema),
+    defaultValues: { docType: 'dni', docNumber: "" },
   });
   const watchedDocType = dniForm.watch('docType');
 
@@ -202,55 +203,45 @@ export default function BusinessPublicPage() {
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
 
-  const fetchBusinessDataById = useCallback(
-    async (id: string) => {
-      setIsLoadingPage(true);
-      setPageError(null);
+  const fetchBusinessDataByCustomUrl = useCallback(async () => {
+    if (!customUrlPath || typeof customUrlPath !== "string") {
+      setError("URL de negocio inválida.");
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        const businessDocRef = doc(db, "businesses", id);
-        const businessSnap = await getDoc(businessDocRef);
+    try {
+      const businessQuery = query(
+        collection(db, "businesses"),
+        where("customUrlPath", "==", customUrlPath.toLowerCase().trim()),
+        limit(1)
+      );
+      const businessSnap = await getDocs(businessQuery);
 
-        if (!businessSnap.exists()) {
-          setPageError(`Negocio no encontrado. ID: ${id}`);
-          setBusinessDetails(null);
-          setPromotions([]);
-          setAllEvents([]);
-          setIsLoadingPage(false);
-          return;
-        }
-
-        const bizData = businessSnap.data();
+      if (businessSnap.empty) {
+        setError("Negocio no encontrado. Verifica que la URL sea correcta.");
+        setBusinessDetails(null);
+        setPromotions([]);
+        setAllEvents([]);
+      } else {
+        const businessDoc = businessSnap.docs[0];
+        const bizData = businessDoc.data();
         const fetchedBusiness: Business = {
-          id: businessSnap.id,
+          id: businessDoc.id,
           name: bizData.name || "Nombre de Negocio Desconocido",
           contactEmail: bizData.contactEmail || "",
           joinDate: anyToDate(bizData.joinDate)?.toISOString() || new Date().toISOString(),
-          customUrlPath: bizData.customUrlPath || undefined,
+          customUrlPath: bizData.customUrlPath || customUrlPath,
           logoUrl: bizData.logoUrl || undefined,
           publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
           slogan: bizData.slogan || undefined,
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
-          publicAddress: bizData.publicAddress || undefined,
-          ruc: bizData.ruc,
-          razonSocial: bizData.razonSocial,
-          department: bizData.department,
-          province: bizData.province,
-          district: bizData.district,
-          address: bizData.address,
-          managerName: bizData.managerName,
-          managerDni: bizData.managerDni,
-          businessType: bizData.businessType,
           primaryColor: bizData.primaryColor || '#B080D0',
           secondaryColor: bizData.secondaryColor || '#8E5EA2',
         };
-
-        if (fetchedBusiness.customUrlPath && fetchedBusiness.customUrlPath.trim() !== "") {
-          router.replace(`/b/${fetchedBusiness.customUrlPath.trim()}`);
-          return;
-        }
-
         setBusinessDetails(fetchedBusiness);
 
         const entitiesQuery = query(
@@ -264,6 +255,7 @@ export default function BusinessPublicPage() {
 
         entitiesSnapshot.forEach((docSnap) => {
           const entityData = docSnap.data();
+
           const entity: BusinessManagedEntity = {
             id: docSnap.id,
             businessId: entityData.businessId,
@@ -301,34 +293,36 @@ export default function BusinessPublicPage() {
         });
         
         setPromotions(
-          currentPromotions.filter(p => isEntityCurrentlyActivatable(p)).sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime())
+          currentPromotions.filter(p => isEntityCurrentlyActivatable(p)).sort(
+            (a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()
+          )
         );
-
         setAllEvents(
-          events.sort((a,b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
+          events.sort(
+            (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+          )
         );
-
-      } catch (err: any) {
-        setPageError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
-        setBusinessDetails(null);
-        setPromotions([]);
-        setAllEvents([]);
-      } finally {
-        setIsLoadingPage(false);
       }
-    },
-    [router]
-  );
+    } catch (err: any) {
+      setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
+      setBusinessDetails(null);
+      setPromotions([]);
+      setAllEvents([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [customUrlPath]);
 
   useEffect(() => {
-    if (businessIdFromParams) {
-      fetchBusinessDataById(businessIdFromParams);
-    } else {
-      setPageError("ID de negocio no especificado en la URL.");
-      setIsLoadingPage(false);
+    if (typeof customUrlPath === "string" && customUrlPath.trim() !== "") {
+      fetchBusinessDataByCustomUrl();
+    } else if (typeof customUrlPath === "string" && customUrlPath.trim() === "") {
+      setError("URL de negocio inválida.");
+      setIsLoading(false);
     }
-  }, [businessIdFromParams, fetchBusinessDataById]);
-  
+  }, [customUrlPath, fetchBusinessDataByCustomUrl]);
+
+
 const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
   const codeToValidate = normalizeCode(codeInputValue);
 
@@ -390,18 +384,18 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     setIsLoadingQrFlow(false);
   }
 };
-  
-const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
-  if (!activeEntityForQr || !validatedCodeObject || !businessDetails?.id) {
-      toast({ title: "Error interno", description: "Falta información clave para continuar (entidad, código o negocio).", variant: "destructive" });
-      return;
-  }
-  setIsLoadingQrFlow(true);
-  const docNumberCleaned = data.docNumber.trim();
-  setEnteredDni(docNumberCleaned);
 
-  try {
-      const response = await fetch('/api/redeem-code', {
+const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
+    if (!activeEntityForQr || !validatedCodeObject || !businessDetails?.id) {
+        toast({ title: "Error interno", description: "Falta información clave para continuar (entidad, código o negocio).", variant: "destructive" });
+        return;
+    }
+    setIsLoadingQrFlow(true);
+    const docNumberCleaned = data.docNumber.trim();
+    setEnteredDni(docNumberCleaned);
+
+    try {
+        const response = await fetch('/api/redeem-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -412,54 +406,54 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             })
         });
 
-      const result = await response.json();
+        const result = await response.json();
 
-      if (!response.ok) {
-          throw new Error(result.error || 'Ocurrió un error en el servidor.');
-      }
-      
-      if (result.action === 'newUser') {
-          newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: docNumberCleaned });
-          setCurrentStepInModal("newUserForm");
+        if (!response.ok) {
+            throw new Error(result.error || 'Ocurrió un error en el servidor.');
+        }
 
-          if (data.docType === 'dni') {
-              setIsConsultingDni(true);
-              try {
-                  const dniApiResponse = await fetch('/api/public/consult-document', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ docNumber: docNumberCleaned, docType: 'dni' }),
-                  });
-                  if (dniApiResponse.ok) {
-                      const dniData = await dniApiResponse.json();
-                      
-                      const names = dniData.nombres || "";
-                      const surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
+        if (result.action === 'newUser') {
+            newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: docNumberCleaned });
+            setCurrentStepInModal("newUserForm");
+            
+            if (data.docType === 'dni') {
+                setIsConsultingDni(true);
+                try {
+                    const dniApiResponse = await fetch('/api/admin/consult-dni', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dni: docNumberCleaned }),
+                    });
+                    if (dniApiResponse.ok) {
+                        const dniData = await dniApiResponse.json();
+                        
+                        const names = dniData.nombres || "";
+                        const surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
 
-                      newQrClientForm.setValue('name', names);
-                      newQrClientForm.setValue('surname', surnames);
+                        newQrClientForm.setValue('name', names);
+                        newQrClientForm.setValue('surname', surnames);
 
-                      if (dniData.fechaNacimiento) {
-                          const [day, month, year] = dniData.fechaNacimiento.split('/');
-                          if (day && month && year) {
-                              const dob = new Date(`${year}-${month}-${day}T00:00:00`);
-                              if (!isNaN(dob.getTime())) {
-                                  newQrClientForm.setValue('dob', dob);
-                              }
-                          }
-                      }
-                  } else {
-                     console.warn(`DNI consultation failed with status ${dniApiResponse.status}.`);
-                  }
-              } catch (e) {
-                  console.warn("DNI consultation API call failed, user will fill manually.", e);
-              } finally {
-                  setIsConsultingDni(false);
-              }
-          }
-      } else if (result.action === 'userExists') {
+                        if (dniData.fechaNacimiento) {
+                            const [day, month, year] = dniData.fechaNacimiento.split('/');
+                            if (day && month && year) {
+                                const dob = new Date(`${year}-${month}-${day}T00:00:00`);
+                                if (!isNaN(dob.getTime())) {
+                                    newQrClientForm.setValue('dob', dob);
+                                }
+                            }
+                        }
+                    } else {
+                       console.warn(`DNI consultation failed with status ${dniApiResponse.status}.`);
+                    }
+                } catch (e) {
+                    console.warn("DNI consultation API call failed, user will fill manually.", e);
+                } finally {
+                    setIsConsultingDni(false);
+                }
+            }
+        } else if (result.action === 'userExists') {
             const clientForQr: QrClient = result.clientData;
-            const qrCodeDetails: QrCodeData["promotion"] = {
+             const qrCodeDetails: QrCodeData["promotion"] = {
                 id: activeEntityForQr.id,
                 title: activeEntityForQr.name,
                 description: activeEntityForQr.description,
@@ -474,31 +468,30 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
             setShowDniModal(false);
             setPageViewState("qrDisplay");
-            toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
-      }
-
-  } catch (e: any) {
-      toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
-      resetQrFlow();
-  } finally {
-      setIsLoadingQrFlow(false);
-  }
+             toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
+        }
+    } catch (e: any) {
+        toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
+        resetQrFlow();
+    } finally {
+        setIsLoadingQrFlow(false);
+    }
 };
-  
-const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (formData) => {
-  if (!activeEntityForQr || !validatedCodeObject || !enteredDni || !businessDetails) {
-    toast({ title: "Error interno", description: "Falta información para registrar cliente.", variant: "destructive" });
-    return;
-  }
 
-  if (formData.dni.trim() !== enteredDni.trim()) {
+const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (formData) => {
+    if (!activeEntityForQr || !validatedCodeObject || !enteredDni || !businessDetails) {
+      toast({ title: "Error interno", description: "Falta información para registrar cliente.", variant: "destructive" });
+      return;
+    }
+    
+    if (formData.dni.trim() !== enteredDni.trim()) {
       toast({ title: "Inconsistencia de DNI", description: "El DNI del formulario no coincide. Por favor, reinicia el proceso.", variant: "destructive" });
       return;
-  }
-  
-  setIsLoadingQrFlow(true);
-  try {
-      const response = await fetch('/api/redeem-code', {
+    }
+
+    setIsLoadingQrFlow(true);
+    try {
+        const response = await fetch('/api/redeem-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -514,43 +507,44 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 }
             })
         });
-      
-      const result = await response.json();
-      if (!response.ok) {
-          throw new Error(result.error || 'Ocurrió un error al registrar el nuevo cliente.');
-      }
-    
-    const clientForQr: QrClient = result.clientData;
-    const qrCodeDetails: QrCodeData["promotion"] = {
-      id: activeEntityForQr.id,
-      title: activeEntityForQr.name,
-      description: activeEntityForQr.description,
-      validUntil: activeEntityForQr.endDate,
-      imageUrl: activeEntityForQr.imageUrl || "",
-      promoCode: validatedCodeObject.value,
-      qrValue: validatedCodeObject.id, // THE QR VALUE IS THE UNIQUE ID OF THE CODE
-      aiHint: activeEntityForQr.aiHint || "",
-      type: activeEntityForQr.type,
-      termsAndConditions: activeEntityForQr.termsAndConditions,
-    };
 
-    setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
-    setShowDniModal(false);
-    setPageViewState("qrDisplay");
-    toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
-  } catch (e: any) {
-    toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
-    resetQrFlow();
-  } finally {
-    setIsLoadingQrFlow(false);
-  }
-};
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Ocurrió un error al registrar el nuevo cliente.');
+        }
+
+        const clientForQr: QrClient = result.clientData;
+        const qrCodeDetails: QrCodeData["promotion"] = {
+            id: activeEntityForQr.id,
+            title: activeEntityForQr.name,
+            description: activeEntityForQr.description,
+            validUntil: activeEntityForQr.endDate,
+            imageUrl: activeEntityForQr.imageUrl || "",
+            promoCode: validatedCodeObject.value,
+            qrValue: validatedCodeObject.id,
+            aiHint: activeEntityForQr.aiHint || "",
+            type: activeEntityForQr.type,
+            termsAndConditions: activeEntityForQr.termsAndConditions,
+        };
+  
+        setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
+        setShowDniModal(false);
+        setPageViewState("qrDisplay");
+        toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
+
+    } catch (e: any) {
+      toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
+      resetQrFlow();
+    } finally {
+      setIsLoadingQrFlow(false);
+    }
+  };
+
 
   useEffect(() => {
     const generateQrImage = async () => {
       if (pageViewState === "qrDisplay" && qrData?.promotion.qrValue) {
         try {
-          // The QR content is now the unique ID of the code object.
           const dataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { width: 250, errorCorrectionLevel: "H", margin: 2 });
           setGeneratedQrDataUrl(dataUrl);
         } catch (err) {
@@ -829,13 +823,14 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   const showPromotions = (view === 'all' || view === 'promotions') && promotions.length > 0;
   const showEvents = (view === 'all' || view === 'events') && allEvents.length > 0;
-  const noContentToShow = !isLoadingPage && (
+  const noContentToShow = !isLoading && (
     (view === 'all' && promotions.length === 0 && allEvents.length === 0) ||
     (view === 'promotions' && promotions.length === 0) ||
     (view === 'events' && allEvents.length === 0)
   );
 
-  if (isLoadingPage) {
+
+  if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
@@ -846,29 +841,31 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     );
   }
 
-  if (pageError) {
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
           <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-destructive">{pageError}</h1>
-          <p className="text-muted-foreground mt-2">Ruta intentada: /business/{businessIdFromParams}</p>
+          <h1 className="text-3xl font-bold text-destructive">{error}</h1>
+          <p className="text-muted-foreground mt-2">Ruta intentada: /b/{customUrlPath}</p>
           <Link href="/" passHref>
-            <Button variant="outline" className="mt-6">Volver al Inicio</Button>
+            <Button variant="outline" className="mt-6">
+              Volver a la Página Principal
+            </Button>
           </Link>
         </div>
       </div>
     );
   }
 
-  if (!businessDetails && !isLoadingPage) {
+  if (!businessDetails && !isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
         <div className="flex flex-col items-center justify-center flex-grow pt-12">
           <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
           <p className="text-muted-foreground mt-2">
-            El negocio con el ID "{businessIdFromParams}" no existe o ha sido movido.
+            La página del negocio con la URL "/b/{customUrlPath}" no existe o la URL es incorrecta.
           </p>
           <Link href="/" passHref>
             <Button variant="outline" className="mt-6">
@@ -899,10 +896,10 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
               />
             )}
-              <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
-              {businessDetails.slogan && (
-                <p className="text-xs text-white/80 ml-3">{businessDetails.slogan}</p>
-              )}
+            <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
+            {businessDetails.slogan && (
+              <p className="text-xs text-white/80 ml-3">{businessDetails.slogan}</p>
+            )}
           </div>
         </header>
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
@@ -946,7 +943,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 variant="outline"
                 className="w-full sm:flex-1 font-bold border-2 p-0 hover:bg-gradient-to-r from-primary hover:to-accent hover:text-primary-foreground"
               >
-                <div className="text-foreground" style={{
+                 <div className="text-foreground" style={{
                     border: '2px solid transparent',
                     backgroundImage: `linear-gradient(white, white), linear-gradient(to right, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor})`,
                     backgroundOrigin: 'border-box',
@@ -1057,8 +1054,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           </div>
         </div>
       </div>
-
-       <div className="sticky top-16 z-10" style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
+      
+      <div className="sticky top-16 z-10" style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-start h-12 gap-6">
                 <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
@@ -1128,7 +1125,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={event.aiHint || "party concert"}
                     />
-                    {isPast(new Date(event.endDate)) && (
+                     {isPast(new Date(event.endDate)) && (
                        <div className="absolute inset-0 bg-black/30" />
                      )}
                   </div>
@@ -1220,14 +1217,14 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
+            <UIDialogTitleComponent>
               {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
-            </DialogTitle>
-            <UIDialogDescription>
+            </UIDialogTitleComponent>
+            <UIDialogDescriptionComponent>
               {currentStepInModal === "enterDni"
                 ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
                 : "Necesitamos algunos datos para generar tu QR."}
-            </UIDialogDescription>
+            </UIDialogDescriptionComponent>
           </DialogHeader>
           {currentStepInModal === "enterDni" ? (
             <Form {...dniForm}>
@@ -1338,7 +1335,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         style={{
                             backgroundSize: '400% 400%',
                             animation: 'gradient-animation 15s ease infinite',
-                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
+                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
                         }}
                     >
                         <Loader2 className="h-8 w-8 animate-spin mb-3"/>
