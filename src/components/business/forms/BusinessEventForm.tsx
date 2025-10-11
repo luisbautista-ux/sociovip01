@@ -67,10 +67,11 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
+  onFormChange: (values: EventDetailsFormValues) => void;
   onValidationChange: (isValid: boolean) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onValidationChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, onFormChange, isSubmitting = false, onValidationChange }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onChange",
@@ -88,8 +89,13 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     },
   });
 
+  const watchedValues = form.watch();
   const { formState: { isValid } } = form;
 
+  useEffect(() => {
+    onFormChange(watchedValues);
+  }, [watchedValues, onFormChange]);
+  
   useEffect(() => {
     onValidationChange(isValid);
   }, [isValid, onValidationChange]);
