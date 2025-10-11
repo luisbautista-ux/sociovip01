@@ -97,10 +97,11 @@ const ManageEventDialog = ({
         }
         
         // Final merge before saving
+        const detailsValues = detailsFormRef.current.getValues();
         const finalEventData: BusinessManagedEntity = {
           ...editingEvent,
-          ...(detailsFormRef.current.getValues()),
-          maxAttendance: detailsFormRef.current.getValues().unlimitedAttendance ? 0 : detailsFormRef.current.getValues().maxAttendance,
+          ...detailsValues,
+          maxAttendance: detailsValues.unlimitedAttendance ? 0 : detailsValues.maxAttendance,
         };
         
         setIsSubmitting(true);
@@ -111,6 +112,16 @@ const ManageEventDialog = ({
         }
     };
 
+    const handleDetailsChange = useCallback((detailsData: EventDetailsFormValues) => {
+        setEditingEvent(prevEvent => {
+            if (!prevEvent) return null;
+            // Merge new details into the existing event state
+            return {
+                ...prevEvent,
+                ...detailsData,
+            };
+        });
+    }, []);
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
         setEditingEvent(prev => {
@@ -312,6 +323,7 @@ const ManageEventDialog = ({
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
                                         onValidationChange={setIsDetailsFormValid}
+                                        onFormChange={handleDetailsChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -991,5 +1003,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
-    

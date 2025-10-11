@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useImperativeHandle, useEffect } from "react";
@@ -68,9 +67,10 @@ interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
   onValidationChange: (isValid: boolean) => void;
+  onFormChange: (data: EventDetailsFormValues) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onValidationChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onValidationChange, onFormChange }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onChange",
@@ -93,6 +93,16 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   useEffect(() => {
     onValidationChange(isValid);
   }, [isValid, onValidationChange]);
+  
+  // Watch for form changes and notify the parent
+  const watchedValues = form.watch();
+  useEffect(() => {
+      const subscription = form.watch((values) => {
+          onFormChange(values as EventDetailsFormValues);
+      });
+      return () => subscription.unsubscribe();
+  }, [form, onFormChange]);
+
 
   useImperativeHandle(ref, () => ({
     getValues: () => {
@@ -291,5 +301,3 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
-
-    
