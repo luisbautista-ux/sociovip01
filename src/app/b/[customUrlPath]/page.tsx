@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -1337,7 +1336,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         style={{
                             backgroundSize: '400% 400%',
                             animation: 'gradient-animation 15s ease infinite',
-                            backgroundImage: `linear-gradient(-45deg, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
+                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
                         }}
                     >
                         <Loader2 className="h-8 w-8 animate-spin mb-3"/>
@@ -1505,3 +1504,4 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
 
     
+
