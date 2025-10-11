@@ -435,22 +435,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   if (dniApiResponse.ok) {
                       const dniData = await dniApiResponse.json();
                       
-                      let names = dniData.nombres || "";
-                      let surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
+                      const names = dniData.nombres || "";
+                      const surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
 
-                      if (!names && !surnames && dniData.nombreCompleto) {
-                          const nameParts = dniData.nombreCompleto.split(' ').filter(Boolean);
-                           if (nameParts.length >= 3) { // Asume A_Paterno, A_Materno, Nombre(s)
-                                surnames = `${nameParts[0]} ${nameParts[1]}`;
-                                names = nameParts.slice(2).join(' ');
-                            } else if (nameParts.length === 2) { // Asume A_Paterno, Nombre
-                                surnames = nameParts[0];
-                                names = nameParts[1];
-                            } else { // Fallback
-                                names = nameParts[0] || '';
-                            }
-                      }
-                      
                       newQrClientForm.setValue('name', names);
                       newQrClientForm.setValue('surname', surnames);
 
@@ -1518,3 +1505,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
 
 
+
+
+    
