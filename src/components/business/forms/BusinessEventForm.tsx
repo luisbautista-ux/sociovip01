@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useImperativeHandle, useEffect } from "react";
@@ -69,10 +68,9 @@ interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
   onStateChange: (state: { isValid: boolean }) => void;
-  onFormChange: (data: EventDetailsFormValues) => void; 
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onStateChange, onFormChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onStateChange }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onChange", // Validate on change to update button state
@@ -104,13 +102,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   
   const isUnlimited = form.watch("unlimitedAttendance");
   const { isValid } = form.formState;
-
-  // Watch for form changes and pass them up
-  const watchedValues = form.watch();
-  useEffect(() => {
-    onFormChange(watchedValues);
-  }, [watchedValues, onFormChange]);
-
 
   useEffect(() => {
     onStateChange({ isValid });
