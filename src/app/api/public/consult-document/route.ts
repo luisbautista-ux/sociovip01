@@ -1,10 +1,9 @@
-
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 const ConsultDocumentSchema = z.object({
-  docType: z.enum(['dni', 'ce']),
   docNumber: z.string().min(7, 'El documento debe tener al menos 7 dígitos.'),
+  docType: z.enum(['dni', 'ce']),
 });
 
 interface NombresResponse {
@@ -27,14 +26,20 @@ export async function POST(request: Request) {
     const validation = ConsultDocumentSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json({ error: 'Datos inválidos.', details: validation.error.flatten() }, { status: 400 });
+      return NextResponse.json({ error: 'Documento inválido.', details: validation.error.flatten() }, { status: 400 });
     }
 
     const { docNumber, docType } = validation.data;
     
-    // Solo se consultará externamente si es un DNI de 8 dígitos
+    // Si no es DNI, no podemos consultar, pero no es un error, simplemente no hay datos que devolver.
     if (docType !== 'dni' || docNumber.length !== 8) {
-        return NextResponse.json({ error: "La consulta externa solo está disponible para DNI de 8 dígitos." }, { status: 400 });
+      return NextResponse.json({
+        nombreCompleto: "",
+        nombres: "",
+        apellidoPaterno: "",
+        apellidoMaterno: "",
+        fechaNacimiento: ""
+      });
     }
 
     let nombreCompleto = "";
@@ -98,6 +103,8 @@ export async function POST(request: Request) {
             if (dataFecha.success && dataFecha.data?.fechaNacimiento) {
                 if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataFecha.data.fechaNacimiento)) {
                     fechaNacimiento = dataFecha.data.fechaNacimiento;
+                } else {
+                    console.warn(`API Route (consult-document): formato de fecha de nacimiento inválido: ${dataFecha.data.fechaNacimiento}`);
                 }
             }
         }
@@ -110,6 +117,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ 
+        nombreCompleto, 
         nombres,
         apellidoPaterno,
         apellidoMaterno,

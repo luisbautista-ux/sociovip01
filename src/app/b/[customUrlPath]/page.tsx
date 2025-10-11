@@ -421,10 +421,10 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             if (data.docType === 'dni') {
                 setIsConsultingDni(true);
                 try {
-                    const dniApiResponse = await fetch('/api/admin/consult-dni', {
+                    const dniApiResponse = await fetch('/api/public/consult-document', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ dni: docNumberCleaned }),
+                        body: JSON.stringify({ docNumber: docNumberCleaned, docType: 'dni' }),
                     });
                     if (dniApiResponse.ok) {
                         const dniData = await dniApiResponse.json();
@@ -1505,5 +1505,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
 
     
+
 
 

@@ -431,23 +431,23 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       body: JSON.stringify({ docNumber: docNumberCleaned, docType: 'dni' }),
                   });
                   if (dniApiResponse.ok) {
-                      const dniData = await dniApiResponse.json();
-                      
-                      const names = dniData.nombres || "";
-                      const surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
+                    const dniData = await dniApiResponse.json();
+                    
+                    const names = dniData.nombres || "";
+                    const surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
 
-                      newQrClientForm.setValue('name', names);
-                      newQrClientForm.setValue('surname', surnames);
+                    newQrClientForm.setValue('name', names);
+                    newQrClientForm.setValue('surname', surnames);
 
-                      if (dniData.fechaNacimiento) {
-                          const [day, month, year] = dniData.fechaNacimiento.split('/');
-                          if (day && month && year) {
-                              const dob = new Date(`${year}-${month}-${day}T00:00:00`);
-                              if (!isNaN(dob.getTime())) {
-                                  newQrClientForm.setValue('dob', dob);
-                              }
-                          }
-                      }
+                    if (dniData.fechaNacimiento) {
+                        const [day, month, year] = dniData.fechaNacimiento.split('/');
+                        if (day && month && year) {
+                            const dob = new Date(`${year}-${month}-${day}T00:00:00`);
+                            if (!isNaN(dob.getTime())) {
+                                newQrClientForm.setValue('dob', dob);
+                            }
+                        }
+                    }
                   } else {
                      console.warn(`DNI consultation failed with status ${dniApiResponse.status}.`);
                   }
