@@ -68,10 +68,9 @@ interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
   onStateChange: (state: { isValid: boolean }) => void;
-  onBlurSave: (data: EventDetailsFormValues) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onStateChange, onBlurSave }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onStateChange }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onChange", // Validate on change to update button state
@@ -100,13 +99,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     trigger: () => form.trigger(),
     formState: form.formState,
   }));
-
-  // Effect to save data when the component unmounts (e.g., tab switch)
-  useEffect(() => {
-    return () => {
-      onBlurSave(form.getValues());
-    };
-  }, [onBlurSave, form]);
   
   const isUnlimited = form.watch("unlimitedAttendance");
   const { isValid } = form.formState;

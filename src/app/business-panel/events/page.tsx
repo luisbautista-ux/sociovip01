@@ -262,13 +262,6 @@ const ManageEventDialog = ({
         });
     };
 
-    const handleFormDetailsBlurSave = useCallback((data: EventDetailsFormValues) => {
-        setEditingEvent(prev => {
-            if (!prev) return null;
-            return { ...prev, ...data };
-        });
-    }, [setEditingEvent]);
-    
     const { toast } = useToast();
 
     if (!isManageEventDialogOpen || !editingEvent) return null;
@@ -309,7 +302,6 @@ const ManageEventDialog = ({
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
                                         onStateChange={setFormState}
-                                        onBlurSave={handleFormDetailsBlurSave}
                                     />
                                   </CardContent>
                                 </Card>
@@ -993,6 +985,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
