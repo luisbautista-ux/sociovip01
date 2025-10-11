@@ -61,8 +61,8 @@ const ManageEventDialog = ({
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
 
-    // Use internal state for the event object to manage changes across tabs
     const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(initialEditingEvent);
+    const [isDetailsFormValid, setIsDetailsFormValid] = useState(false);
     
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
@@ -93,13 +93,18 @@ const ManageEventDialog = ({
         const detailsAreValid = await detailsFormRef.current.trigger();
         if (!detailsAreValid) {
             toast({ title: "Revisa los campos", description: "Hay errores en el formulario de detalles.", variant: "destructive" });
-            setActiveTab("details"); // Switch to details tab if there are errors
+            setActiveTab("details");
             return;
         }
         
-        // Get latest values from form and merge them into the state
         const detailsData = detailsFormRef.current.getValues();
-        const finalEventData = { ...editingEvent, ...detailsData };
+        
+        // Final merge before saving
+        const finalEventData: BusinessManagedEntity = {
+          ...editingEvent,
+          ...detailsData,
+          maxAttendance: detailsData.unlimitedAttendance ? 0 : detailsData.maxAttendance,
+        };
         
         setIsSubmitting(true);
         try {
@@ -309,6 +314,7 @@ const ManageEventDialog = ({
                                         ref={detailsFormRef}
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
+                                        onValidationChange={setIsDetailsFormValid}
                                     />
                                   </CardContent>
                                 </Card>
@@ -496,7 +502,7 @@ const ManageEventDialog = ({
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={() => { setIsManageEventDialogOpen(false); setEditingEvent(null); }} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={handleSaveChanges} disabled={isSubmitting}>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !isDetailsFormValid}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>

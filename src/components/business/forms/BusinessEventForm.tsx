@@ -67,9 +67,10 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
+  onValidationChange: (isValid: boolean) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onValidationChange }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onChange",
@@ -86,6 +87,12 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       aiHint: event?.aiHint || "",
     },
   });
+
+  const { formState: { isValid } } = form;
+
+  useEffect(() => {
+    onValidationChange(isValid);
+  }, [isValid, onValidationChange]);
 
   useImperativeHandle(ref, () => ({
     getValues: () => {
