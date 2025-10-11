@@ -85,17 +85,7 @@ const ManageEventDialog = ({
           setActiveTab("details");
       }
     }, [initialEditingEvent, isManageEventDialogOpen]);
-
-    const handleDetailsChange = useCallback((formValues: EventDetailsFormValues) => {
-        setEditingEvent(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                ...formValues,
-            };
-        });
-    }, []);
-
+    
     const handleSaveChanges = async () => {
         if (!detailsFormRef.current || !editingEvent) return;
         
@@ -109,7 +99,8 @@ const ManageEventDialog = ({
         // Final merge before saving
         const finalEventData: BusinessManagedEntity = {
           ...editingEvent,
-          maxAttendance: editingEvent.unlimitedAttendance ? 0 : editingEvent.maxAttendance,
+          ...(detailsFormRef.current.getValues()),
+          maxAttendance: detailsFormRef.current.getValues().unlimitedAttendance ? 0 : detailsFormRef.current.getValues().maxAttendance,
         };
         
         setIsSubmitting(true);
@@ -319,7 +310,6 @@ const ManageEventDialog = ({
                                     <BusinessEventForm 
                                         ref={detailsFormRef}
                                         event={editingEvent} 
-                                        onFormChange={handleDetailsChange}
                                         isSubmitting={isSubmitting}
                                         onValidationChange={setIsDetailsFormValid}
                                     />
@@ -1002,3 +992,4 @@ export default function BusinessEventsPage() {
   );
 }
 
+    
