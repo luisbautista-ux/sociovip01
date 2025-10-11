@@ -428,19 +428,21 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                     });
                     if (dniApiResponse.ok) {
                         const dniData = await dniApiResponse.json();
-                        let fullName = dniData.nombreCompleto || "";
+                        
                         let name = dniData.nombres || "";
                         let surname = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
-                        
-                        if (!name && !surname && fullName) {
-                           const nameParts = fullName.split(' ');
-                           if (nameParts.length > 2) {
-                               surname = `${nameParts.pop()} ${nameParts.pop()}`.trim();
-                               name = nameParts.join(' ');
-                           } else {
-                               surname = nameParts.pop() || '';
-                               name = nameParts.join(' ');
-                           }
+
+                        if (dniData.nombreCompleto && (!name || !surname)) {
+                            const nameParts = dniData.nombreCompleto.split(' ').filter(Boolean);
+                            if (nameParts.length > 2) {
+                                surname = nameParts.slice(-2).join(' ');
+                                name = nameParts.slice(0, -2).join(' ');
+                            } else if (nameParts.length === 2) {
+                                surname = nameParts[1];
+                                name = nameParts[0];
+                            } else {
+                                name = nameParts[0] || '';
+                            }
                         }
 
                         newQrClientForm.setValue('name', name);
@@ -1501,6 +1503,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
 
 
 
