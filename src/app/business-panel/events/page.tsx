@@ -61,7 +61,8 @@ const ManageEventDialog = ({
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
-    
+    const [formState, setFormState] = useState({ isValid: false });
+
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
@@ -300,6 +301,7 @@ const ManageEventDialog = ({
                                         ref={detailsFormRef}
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
+                                        onStateChange={setFormState}
                                     />
                                   </CardContent>
                                 </Card>
@@ -487,7 +489,7 @@ const ManageEventDialog = ({
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !editingEvent.name}>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !formState.isValid}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>
@@ -983,6 +985,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 

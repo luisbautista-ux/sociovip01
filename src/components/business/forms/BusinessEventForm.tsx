@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useImperativeHandle } from "react";
+import React, { useImperativeHandle, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -61,16 +62,19 @@ export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 export interface EventDetailsFormRef {
   getValues: () => EventDetailsFormValues;
   trigger: () => Promise<boolean>;
+  formState: UseFormReturn<EventDetailsFormValues>['formState'];
 }
 
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
+  onStateChange: (state: { isValid: boolean }) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onStateChange }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
+    mode: "onChange", // Validate on change to update button state
     defaultValues: {
       name: event?.name || "",
       description: event?.description || "",
@@ -94,9 +98,15 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       };
     },
     trigger: () => form.trigger(),
+    formState: form.formState,
   }));
   
   const isUnlimited = form.watch("unlimitedAttendance");
+  const { isValid } = form.formState;
+
+  useEffect(() => {
+    onStateChange({ isValid });
+  }, [isValid, onStateChange]);
 
   React.useEffect(() => {
     if (isUnlimited) {
