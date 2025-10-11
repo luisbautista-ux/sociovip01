@@ -434,30 +434,33 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                   });
                   if (dniApiResponse.ok) {
                       const dniData = await dniApiResponse.json();
-                      let name = dniData.nombres || "";
-                      let surname = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
+                      
+                      let names = dniData.nombres || "";
+                      let surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
 
-                      if (dniData.nombreCompleto && (!name || !surname)) {
-                          const nameParts = dniData.nombreCompleto.split(' ').filter(Boolean);
-                          if (nameParts.length > 2) {
-                              surname = nameParts.slice(-2).join(' ');
-                              name = nameParts.slice(0, -2).join(' ');
-                          } else if (nameParts.length === 2) {
-                              surname = nameParts[1];
-                              name = nameParts[0];
-                          } else {
-                              name = nameParts[0] || '';
-                          }
+                      if (!names && !surnames && dniData.nombreCompleto) {
+                        const nameParts = dniData.nombreCompleto.split(' ').filter(Boolean);
+                        if (nameParts.length >= 3) {
+                          surnames = `${nameParts[0]} ${nameParts[1]}`;
+                          names = nameParts.slice(2).join(' ');
+                        } else if (nameParts.length === 2) {
+                          surnames = nameParts[0];
+                          names = nameParts[1];
+                        } else {
+                          names = nameParts[0] || '';
+                        }
                       }
                       
-                      newQrClientForm.setValue('name', name);
-                      newQrClientForm.setValue('surname', surname);
+                      newQrClientForm.setValue('name', names);
+                      newQrClientForm.setValue('surname', surnames);
 
                       if (dniData.fechaNacimiento) {
                           const [day, month, year] = dniData.fechaNacimiento.split('/');
-                          const dob = new Date(`${year}-${month}-${day}`);
-                          if (!isNaN(dob.getTime())) {
-                              newQrClientForm.setValue('dob', dob);
+                          if (day && month && year) {
+                              const dob = new Date(`${year}-${month}-${day}T00:00:00`);
+                              if (!isNaN(dob.getTime())) {
+                                  newQrClientForm.setValue('dob', dob);
+                              }
                           }
                       }
                   }
@@ -1505,6 +1508,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
 
 
 
