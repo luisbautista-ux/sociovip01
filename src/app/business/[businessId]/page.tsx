@@ -439,16 +439,16 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                       let surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
 
                       if (!names && !surnames && dniData.nombreCompleto) {
-                        const nameParts = dniData.nombreCompleto.split(' ').filter(Boolean);
-                        if (nameParts.length >= 3) {
-                          surnames = `${nameParts[0]} ${nameParts[1]}`;
-                          names = nameParts.slice(2).join(' ');
-                        } else if (nameParts.length === 2) {
-                          surnames = nameParts[0];
-                          names = nameParts[1];
-                        } else {
-                          names = nameParts[0] || '';
-                        }
+                          const nameParts = dniData.nombreCompleto.split(' ').filter(Boolean);
+                           if (nameParts.length >= 3) { // Asume A_Paterno, A_Materno, Nombre(s)
+                                surnames = `${nameParts[0]} ${nameParts[1]}`;
+                                names = nameParts.slice(2).join(' ');
+                            } else if (nameParts.length === 2) { // Asume A_Paterno, Nombre
+                                surnames = nameParts[0];
+                                names = nameParts[1];
+                            } else { // Fallback
+                                names = nameParts[0] || '';
+                            }
                       }
                       
                       newQrClientForm.setValue('name', names);
@@ -463,9 +463,11 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                               }
                           }
                       }
+                  } else {
+                     console.warn(`DNI consultation failed with status ${dniApiResponse.status}.`);
                   }
               } catch (e) {
-                  console.warn("DNI consultation failed, user will fill manually.", e);
+                  console.warn("DNI consultation API call failed, user will fill manually.", e);
               } finally {
                   setIsConsultingDni(false);
               }
@@ -1508,6 +1510,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 }
 
     
+
 
 
 
