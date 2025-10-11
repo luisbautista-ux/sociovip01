@@ -87,6 +87,7 @@ const ManageEventDialog = ({
         const isValid = await detailsFormRef.current.trigger();
         if (!isValid) {
             toast({ title: "Revisa los campos", description: "Hay errores en el formulario de detalles.", variant: "destructive" });
+            setActiveTab("details"); // Switch to details tab if there are errors
             return;
         }
 
@@ -265,6 +266,7 @@ const ManageEventDialog = ({
     const handleDetailsChange = useCallback((newDetails: EventDetailsFormValues) => {
         setEditingEvent(prevEvent => {
             if (!prevEvent) return null;
+            // Merge new details from the form into the existing event state
             return { ...prevEvent, ...newDetails };
         });
     }, [setEditingEvent]);
@@ -993,6 +995,8 @@ export default function BusinessEventsPage() {
 }
 
     
+
+
 
 
 
