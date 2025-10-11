@@ -52,11 +52,10 @@ const ManageEventDialog = ({
     editingEvent: BusinessManagedEntity | null;
     isDuplicating: boolean;
     availablePromoters: BusinessPromoterLink[];
-    handleSaveEvent: (event: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => void;
+    handleSaveEvent: (event: BusinessManagedEntity | null) => void;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
-    const [formState, setFormState] = useState({ isValid: false });
 
     // Use internal state for the event object to manage changes across tabs
     const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(initialEditingEvent);
@@ -91,15 +90,23 @@ const ManageEventDialog = ({
             setActiveTab("details"); // Switch to details tab if there are errors
             return;
         }
-
+        
+        // Get latest values from form and merge them into the state
         const detailsData = detailsFormRef.current.getValues();
+        const finalEventData = { ...editingEvent, ...detailsData };
+        
         setIsSubmitting(true);
         try {
-          await handleSaveEvent(editingEvent, detailsData);
+          await handleSaveEvent(finalEventData);
         } finally {
           setIsSubmitting(false);
         }
     };
+    
+    const handleDetailsChange = (newDetails: Partial<EventDetailsFormValues>) => {
+      setEditingEvent(prev => prev ? { ...prev, ...newDetails } : null);
+    };
+
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
         setEditingEvent(prev => {
@@ -266,6 +273,8 @@ const ManageEventDialog = ({
     const { toast } = useToast();
 
     if (!isManageEventDialogOpen || !editingEvent) return null;
+    
+    const formState = detailsFormRef.current?.formState;
 
     return (
         <>
@@ -302,7 +311,7 @@ const ManageEventDialog = ({
                                         ref={detailsFormRef}
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
-                                        onStateChange={setFormState}
+                                        onFormChange={handleDetailsChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -490,7 +499,7 @@ const ManageEventDialog = ({
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={() => { setIsManageEventDialogOpen(false); setEditingEvent(null); }} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !formState.isValid}>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>
@@ -687,7 +696,7 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => {
+  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null) => {
       if(!currentBusinessId) {
           toast({title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive"});
           return;
@@ -698,12 +707,11 @@ export default function BusinessEventsPage() {
       }
       
       const payload = {
-        ...eventDataToSave, // Contains ticketTypes, eventBoxes, assignedPromoters
-        ...detailsData, // Contains name, description, dates, etc. from form
+        ...eventDataToSave, 
         businessId: currentBusinessId,
         type: 'event' as 'event',
-        startDate: Timestamp.fromDate(new Date(detailsData.startDate)),
-        endDate: Timestamp.fromDate(new Date(detailsData.endDate)),
+        startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
+        endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
       };
       
       try {

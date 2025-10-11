@@ -67,13 +67,13 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
-  onStateChange: (state: { isValid: boolean }) => void;
+  onFormChange: (data: Partial<EventDetailsFormValues>) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onStateChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onFormChange }, ref) => {
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
-    mode: "onChange", // Validate on change to update button state
+    mode: "onChange",
     defaultValues: {
       name: event?.name || "",
       description: event?.description || "",
@@ -100,12 +100,13 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     formState: form.formState,
   }));
   
-  const isUnlimited = form.watch("unlimitedAttendance");
-  const { isValid } = form.formState;
+  const watchedValues = form.watch();
 
   useEffect(() => {
-    onStateChange({ isValid });
-  }, [isValid, onStateChange]);
+    onFormChange(watchedValues);
+  }, [watchedValues, onFormChange]);
+  
+  const isUnlimited = form.watch("unlimitedAttendance");
 
   React.useEffect(() => {
     if (isUnlimited) {
