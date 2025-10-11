@@ -262,6 +262,13 @@ const ManageEventDialog = ({
         });
     };
 
+    const handleDetailsChange = useCallback((newDetails: EventDetailsFormValues) => {
+        setEditingEvent(prevEvent => {
+            if (!prevEvent) return null;
+            return { ...prevEvent, ...newDetails };
+        });
+    }, [setEditingEvent]);
+
     const { toast } = useToast();
 
     if (!isManageEventDialogOpen || !editingEvent) return null;
@@ -301,6 +308,7 @@ const ManageEventDialog = ({
                                         ref={detailsFormRef}
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
+                                        onFormChange={handleDetailsChange}
                                         onStateChange={setFormState}
                                     />
                                   </CardContent>
@@ -985,6 +993,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
