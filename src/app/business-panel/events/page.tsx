@@ -44,20 +44,20 @@ const ManageEventDialog = ({
     isManageEventDialogOpen,
     setIsManageEventDialogOpen,
     editingEvent,
+    setEditingEvent, // Pass the setter function
     isDuplicating,
     isSubmitting,
     availablePromoters,
     handleSaveEvent,
-    setEditingEvent,
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
     editingEvent: BusinessManagedEntity | null;
+    setEditingEvent: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
     isDuplicating: boolean;
     isSubmitting: boolean;
     availablePromoters: BusinessPromoterLink[];
     handleSaveEvent: (event: BusinessManagedEntity | null) => void;
-    setEditingEvent: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
@@ -261,6 +261,13 @@ const ManageEventDialog = ({
             return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
+
+    const handleFormDetailsBlurSave = useCallback((data: EventDetailsFormValues) => {
+        setEditingEvent(prev => {
+            if (!prev) return null;
+            return { ...prev, ...data };
+        });
+    }, [setEditingEvent]);
     
     const { toast } = useToast();
 
@@ -302,6 +309,7 @@ const ManageEventDialog = ({
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
                                         onStateChange={setFormState}
+                                        onBlurSave={handleFormDetailsBlurSave}
                                     />
                                   </CardContent>
                                 </Card>
@@ -929,11 +937,11 @@ export default function BusinessEventsPage() {
         isManageEventDialogOpen={isManageEventDialogOpen}
         setIsManageEventDialogOpen={setIsManageEventDialogOpen}
         editingEvent={editingEvent}
+        setEditingEvent={setEditingEvent}
         isDuplicating={isDuplicating}
         isSubmitting={isSubmitting}
         availablePromoters={availablePromoters}
         handleSaveEvent={handleSaveEvent}
-        setEditingEvent={setEditingEvent}
       />
 
       {selectedEntityForCreatingCodes && userProfile && (
@@ -985,6 +993,7 @@ export default function BusinessEventsPage() {
 }
 
     
+
 
 
 
