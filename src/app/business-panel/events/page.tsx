@@ -46,13 +46,17 @@ const ManageEventDialog = ({
     isDuplicating,
     availablePromoters,
     handleSaveEvent,
+    isSubmitting,
+    setIsSubmitting,
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
     editingEvent: BusinessManagedEntity | null;
     isDuplicating: boolean;
     availablePromoters: BusinessPromoterLink[];
-    handleSaveEvent: (event: BusinessManagedEntity | null) => void;
+    handleSaveEvent: (event: BusinessManagedEntity | null) => Promise<void>;
+    isSubmitting: boolean;
+    setIsSubmitting: (isSubmitting: boolean) => void;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
@@ -66,7 +70,8 @@ const ManageEventDialog = ({
     const [isBoxFormOpen, setIsBoxFormOpen] = useState(false);
     const [editingBox, setEditingBox] = useState<EventBox | null>(null);
     const [isBatchBoxFormOpen, setIsBatchBoxFormOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    const { toast } = useToast();
 
     const boxStatusTranslations: Record<EventBox['status'], string> = {
         available: 'Disponible',
@@ -84,8 +89,9 @@ const ManageEventDialog = ({
 
     const handleSaveChanges = async () => {
         if (!detailsFormRef.current || !editingEvent) return;
-        const isValid = await detailsFormRef.current.trigger();
-        if (!isValid) {
+        
+        const detailsAreValid = await detailsFormRef.current.trigger();
+        if (!detailsAreValid) {
             toast({ title: "Revisa los campos", description: "Hay errores en el formulario de detalles.", variant: "destructive" });
             setActiveTab("details"); // Switch to details tab if there are errors
             return;
@@ -101,10 +107,6 @@ const ManageEventDialog = ({
         } finally {
           setIsSubmitting(false);
         }
-    };
-    
-    const handleDetailsChange = (newDetails: Partial<EventDetailsFormValues>) => {
-      setEditingEvent(prev => prev ? { ...prev, ...newDetails } : null);
     };
 
 
@@ -270,11 +272,7 @@ const ManageEventDialog = ({
         });
     };
 
-    const { toast } = useToast();
-
     if (!isManageEventDialogOpen || !editingEvent) return null;
-    
-    const formState = detailsFormRef.current?.formState;
 
     return (
         <>
@@ -311,7 +309,6 @@ const ManageEventDialog = ({
                                         ref={detailsFormRef}
                                         event={editingEvent} 
                                         isSubmitting={isSubmitting}
-                                        onFormChange={handleDetailsChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -940,6 +937,8 @@ export default function BusinessEventsPage() {
         isDuplicating={isDuplicating}
         availablePromoters={availablePromoters}
         handleSaveEvent={handleSaveEvent}
+        isSubmitting={isSubmitting}
+        setIsSubmitting={setIsSubmitting}
       />
 
       {selectedEntityForCreatingCodes && userProfile && (
