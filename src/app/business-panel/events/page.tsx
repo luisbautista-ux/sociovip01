@@ -128,12 +128,12 @@ const ManageEventDialog = ({
             if (!prev) return null;
             let updatedTicketTypes: TicketType[];
             const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
-            const newOrUpdatedTicket: TicketType = {
+            const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
                 ...ticketData,
                 id: ticketId,
                 eventId: prev.id,
                 businessId: prev.businessId,
-            };
+            }) as TicketType;
 
             if (editingTicket) {
                 updatedTicketTypes = (prev.ticketTypes || []).map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t);
@@ -159,12 +159,12 @@ const ManageEventDialog = ({
             if (!prev) return null;
             let updatedBoxes: EventBox[];
             const boxId = editingBox?.id || `box_${Date.now()}`;
-            const newOrUpdatedBox: EventBox = {
+            const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
                 ...boxData,
                 id: boxId,
                 eventId: prev.id,
                 businessId: prev.businessId,
-            };
+            }) as EventBox;
 
             if (editingBox) {
                 updatedBoxes = (prev.eventBoxes || []).map(b => b.id === editingBox.id ? newOrUpdatedBox : b);
@@ -182,7 +182,7 @@ const ManageEventDialog = ({
             if (!prev) return null;
             const newBoxes: EventBox[] = [];
             for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
-                newBoxes.push({
+                newBoxes.push(sanitizeObjectForFirestore({
                     id: `box_batch_${Date.now()}_${i}`,
                     eventId: prev.id,
                     businessId: prev.businessId,
@@ -191,7 +191,7 @@ const ManageEventDialog = ({
                     description: batchData.description,
                     capacity: batchData.capacity,
                     status: 'available',
-                });
+                }) as EventBox);
             }
             const updatedBoxes = [...(prev.eventBoxes || []), ...newBoxes];
             return { ...prev, eventBoxes: updatedBoxes };
