@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
@@ -120,11 +119,12 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   
   const isUnlimited = form.watch("unlimitedAttendance");
 
-  // Este useEffect causaba el bucle. Lo corregimos para que solo se ejecute cuando `isUnlimited` cambia.
   useEffect(() => {
     if (isUnlimited) {
-      form.setValue("maxAttendance", 0);
-      onDetailsChange({ maxAttendance: 0 });
+      if (form.getValues("maxAttendance") !== 0) {
+        form.setValue("maxAttendance", 0);
+        onDetailsChange({ maxAttendance: 0 });
+      }
     }
   }, [isUnlimited, form, onDetailsChange]);
 
@@ -163,7 +163,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><span className="font-bold">Nombre del Evento</span> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} onBlur={() => onDetailsChange({ name: field.value })} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} value={field.value || ''} onBlur={() => onDetailsChange({ name: field.value })} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -174,7 +174,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><strong>Descripción</strong> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Textarea placeholder="Detalles del evento..." {...field} onBlur={() => onDetailsChange({ description: field.value })} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del evento..." {...field} value={field.value || ''} onBlur={() => onDetailsChange({ description: field.value })} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -185,7 +185,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><strong>Términos y Condiciones (Opcional)</strong></FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} onBlur={() => onDetailsChange({ termsAndConditions: field.value })} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ''} onBlur={() => onDetailsChange({ termsAndConditions: field.value })} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -272,7 +272,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                         placeholder="100"
                         className="no-spinner"
                         {...field}
-                        value={field.value ?? ""} 
+                        value={field.value ?? ''} 
                         onBlur={() => onDetailsChange({ maxAttendance: form.getValues("maxAttendance") })}
                         onChange={e => {
                             const val = e.target.value;

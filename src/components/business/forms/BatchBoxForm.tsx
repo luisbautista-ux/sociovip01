@@ -55,7 +55,7 @@ export function BatchBoxForm({ existingBoxes = [], onSubmit, onCancel, isSubmitt
     if (selectedBox) {
       form.setValue("cost", selectedBox.cost);
       form.setValue("capacity", selectedBox.capacity);
-      form.setValue("description", selectedBox.description);
+      form.setValue("description", selectedBox.description || "");
       
       // Intelligent prefix suggestion
       const nameParts = selectedBox.name.split(' ');

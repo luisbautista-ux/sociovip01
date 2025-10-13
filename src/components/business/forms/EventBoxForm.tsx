@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -122,7 +123,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
                   type="number" 
                   placeholder="8" 
                   {...field} 
-                  value={field.value === undefined || field.value === null ? '' : field.value}
+                  value={field.value ?? ''}
                   onChange={e => {
                     const val = e.target.value;
                     const numVal = parseInt(val, 10);
