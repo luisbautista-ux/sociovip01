@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -18,9 +19,9 @@ import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListCheck
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db, storage } from "@/lib/firebase";
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, Business, EventBoxFormData, BatchBoxFormData } from "@/lib/types";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, Business, EventBoxFormData, BatchBoxFormData, CommissionRule, BusinessPromoterLink } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -60,7 +61,8 @@ const ManageEventDialog = ({
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
 
-    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(initialEditingEvent);
+    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
@@ -78,10 +80,14 @@ const ManageEventDialog = ({
     };
     
     useEffect(() => {
-      setCurrentEventData(initialEditingEvent);
-      if (isManageEventDialogOpen) {
-          setActiveTab("details");
-      }
+        if (isManageEventDialogOpen && initialEditingEvent) {
+            setCurrentEventData(initialEditingEvent);
+            setImagePreviewUrl(initialEditingEvent.imageUrl || null);
+            setActiveTab("details");
+        } else if (!isManageEventDialogOpen) {
+            setCurrentEventData(null);
+            setImagePreviewUrl(null);
+        }
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleSaveChanges = async () => {
@@ -104,6 +110,13 @@ const ManageEventDialog = ({
         
         await handleSaveEvent(finalEventData, detailsValues);
     };
+
+    const handleDetailsChange = useCallback((newDetails: EventDetailsFormValues) => {
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, ...newDetails };
+        });
+    }, []);
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
         setCurrentEventData(prev => {
@@ -304,6 +317,9 @@ const ManageEventDialog = ({
                                         ref={detailsFormRef}
                                         event={currentEventData} 
                                         isSubmitting={isSubmitting}
+                                        onFormChange={handleDetailsChange}
+                                        onImageChange={setImagePreviewUrl}
+                                        imagePreviewUrl={imagePreviewUrl}
                                     />
                                   </CardContent>
                                 </Card>
@@ -710,7 +726,7 @@ export default function BusinessEventsPage() {
 
       try {
         let finalImageUrl = eventDataToSave.imageUrl || "";
-        const oldImageUrl = !isNewEntity ? eventDataToSave.imageUrl : null;
+        const oldImageUrl = !isNewEntity && eventDataToSave.imageUrl ? eventDataToSave.imageUrl : null;
         
         if (detailsFormValues.imageFile) {
             toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
@@ -1020,4 +1036,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-

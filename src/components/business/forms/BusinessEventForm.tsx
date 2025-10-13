@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
+import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -70,11 +71,13 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
+  onFormChange: (data: EventDetailsFormValues) => void;
+  onImageChange: (url: string | null) => void;
+  imagePreviewUrl: string | null;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onFormChange, onImageChange, imagePreviewUrl }, ref) => {
   const { toast } = useToast();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(event?.imageUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<EventDetailsFormValues>({
@@ -95,9 +98,15 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     },
   });
 
+  const watchedValues = form.watch();
+
+  useEffect(() => {
+    onFormChange(watchedValues);
+  }, [watchedValues, onFormChange]);
+  
   useEffect(() => {
     if (event) {
-        setPreviewUrl(event.imageUrl || null);
+        onImageChange(event.imageUrl || null);
         form.reset({
             name: event.name || "",
             description: event.description || "",
@@ -112,7 +121,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             aiHint: event.aiHint || "",
         });
     }
-  }, [event, form]);
+  }, [event, form, onImageChange]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -122,7 +131,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         return;
       }
       form.setValue("imageFile", file);
-      setPreviewUrl(URL.createObjectURL(file));
+      onImageChange(URL.createObjectURL(file));
     }
   };
   
@@ -152,8 +161,8 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <div className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center">
-            {previewUrl ? (
-              <NextImage src={previewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
+            {imagePreviewUrl ? (
+              <NextImage src={imagePreviewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
             ) : (
               <div className="text-muted-foreground flex flex-col items-center">
                 <ImageIcon className="h-10 w-10" />
