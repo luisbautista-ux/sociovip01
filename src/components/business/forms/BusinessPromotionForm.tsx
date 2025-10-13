@@ -202,7 +202,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
               <NextImage src={previewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
             )}
             {imageToCrop && (
-                <div className="w-full h-full absolute inset-0">
+                <div className="w-full h-full absolute inset-0 z-10">
                     <ReactCrop
                         crop={crop}
                         onChange={c => setCrop(c)}
