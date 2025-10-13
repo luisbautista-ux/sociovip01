@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useImperativeHandle, useEffect, useRef } from "react";
+import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -20,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
-import { CalendarIcon, ImageIcon } from "lucide-react";
+import { CalendarIcon, ImageIcon, Upload } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, isBefore, startOfDay, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
@@ -38,8 +39,7 @@ const eventDetailsFormSchema = z.object({
   unlimitedAttendance: z.boolean().default(true),
   maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
   isActive: z.boolean().default(true),
-  imageUrl: z.string().optional(),
-  imageFile: z.custom<File | null>(() => true).optional(), // For new uploads
+  imageFile: z.custom<File | null>(() => true).optional(),
   aiHint: z.string().optional(),
 }).refine(data => {
     if (!data.startDate || !data.endDate) return true; 
@@ -59,7 +59,8 @@ const eventDetailsFormSchema = z.object({
   path: ["maxAttendance"],
 });
 
-export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
+export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema> & { imageUrl?: string };
+
 
 export interface EventDetailsFormRef {
   getValues: () => EventDetailsFormValues;
@@ -68,35 +69,51 @@ export interface EventDetailsFormRef {
 }
 
 interface BusinessEventFormProps {
-  event: BusinessManagedEntity; 
+  event: BusinessManagedEntity | null; 
   isSubmitting?: boolean;
-  onDetailsChange: (detailsValues: EventDetailsFormValues, imageFile: File | null, previewUrl: string | null) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onDetailsChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onChange",
-    defaultValues: {
-      name: event?.name || "",
-      description: event?.description || "",
-      termsAndConditions: event?.termsAndConditions || "",
-      startDate: anyToDate(event?.startDate) ?? new Date(),
-      endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
-      unlimitedAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null || event.maxAttendance === 0,
-      maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
-      isActive: event?.isActive === undefined ? true : event.isActive,
-      imageUrl: event?.imageUrl || "",
-      imageFile: (event as any).imageFile || null,
-      aiHint: event?.aiHint || "",
-    },
   });
   
-  const formValues = form.watch();
+  useEffect(() => {
+    if (event) {
+        const unlimited = event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0;
+        form.reset({
+            name: event.name || "",
+            description: event.description || "",
+            termsAndConditions: event.termsAndConditions || "",
+            startDate: anyToDate(event.startDate) ?? new Date(),
+            endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+            unlimitedAttendance: unlimited,
+            maxAttendance: unlimited ? undefined : event.maxAttendance,
+            isActive: event.isActive === undefined ? true : event.isActive,
+            imageFile: (event as any).imageFile || null,
+            aiHint: event.aiHint || "",
+        });
+        setImagePreviewUrl(event.imageUrl || null);
+    }
+  }, [event, form]);
 
+  useImperativeHandle(ref, () => ({
+    getValues: () => {
+        const formValues = form.getValues();
+        return {
+            ...formValues,
+            imageUrl: imagePreviewUrl || undefined,
+        };
+    },
+    trigger: () => form.trigger(),
+    formState: form.formState,
+  }));
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -104,20 +121,11 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      onDetailsChange(form.getValues(), file, URL.createObjectURL(file));
+      form.setValue("imageFile", file, { shouldValidate: true });
+      setImagePreviewUrl(URL.createObjectURL(file));
     }
   };
   
-  useImperativeHandle(ref, () => ({
-    getValues: () => form.getValues(),
-    trigger: () => form.trigger(),
-    formState: form.formState,
-  }));
-  
-  useEffect(() => {
-    onDetailsChange(formValues, form.getValues('imageFile'), event.imageUrl || null);
-  }, [formValues, onDetailsChange, event.imageUrl, form]);
-
   const isUnlimited = form.watch("unlimitedAttendance");
 
   React.useEffect(() => {
@@ -125,8 +133,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       form.setValue("maxAttendance", 0);
     }
   }, [isUnlimited, form]);
-
-  const imagePreviewUrl = (event as any).imageUrl || null;
 
   return (
     <Form {...form}>
@@ -314,3 +320,4 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
+
