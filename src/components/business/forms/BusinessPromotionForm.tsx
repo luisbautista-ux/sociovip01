@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2, Crop } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -28,6 +28,9 @@ import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/typ
 import { DialogFooter } from "@/components/ui/dialog";
 import NextImage from "next/image";
 import { useToast } from "@/hooks/use-toast";
+import ReactCrop, { type Crop as ReactCropType, centerCrop, makeAspectCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
+
 
 const promotionFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -62,7 +65,12 @@ interface BusinessPromotionFormProps {
 
 export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitting = false }: BusinessPromotionFormProps) {
   
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState<ReactCropType>();
+  const [completedCrop, setCompletedCrop] = useState<ReactCropType>();
   const [previewUrl, setPreviewUrl] = useState<string | null>(promotion?.imageUrl || null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -84,6 +92,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   useEffect(() => {
     if (promotion) {
       setPreviewUrl(promotion.imageUrl || null);
+      setImageToCrop(null); // Reset cropper on new promotion
       form.reset({
         name: promotion.name || "",
         description: promotion.description || "",
@@ -105,10 +114,75 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      form.setValue("imageFile", file);
-      setPreviewUrl(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImageToCrop(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    const crop = centerCrop(
+      makeAspectCrop({ unit: '%', width: 100 }, 16 / 9, width, height),
+      width,
+      height
+    );
+    setCrop(crop);
+  };
+  
+  async function getCroppedImg(
+      image: HTMLImageElement,
+      crop: ReactCropType,
+      fileName: string
+    ): Promise<File | null> {
+      const canvas = document.createElement("canvas");
+      const scaleX = image.naturalWidth / image.width;
+      const scaleY = image.naturalHeight / image.height;
+      canvas.width = crop.width * scaleX;
+      canvas.height = crop.height * scaleY;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        return null;
+      }
+
+      ctx.drawImage(
+        image,
+        crop.x * scaleX,
+        crop.y * scaleY,
+        crop.width * scaleX,
+        crop.height * scaleY,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            resolve(null);
+            return;
+          }
+          const croppedFile = new File([blob], fileName, { type: blob.type });
+          resolve(croppedFile);
+        }, "image/jpeg", 0.9); 
+      });
+    }
+
+  const handleApplyCrop = async () => {
+    if (completedCrop && imgRef.current) {
+        const croppedFile = await getCroppedImg(imgRef.current, completedCrop, "cropped-image.jpg");
+        if(croppedFile) {
+            form.setValue("imageFile", croppedFile);
+            setPreviewUrl(URL.createObjectURL(croppedFile));
+            setImageToCrop(null); // Close cropper UI
+        }
+    }
+  }
+
 
   const handleSubmit = (values: PromotionFormValues) => {
     const dataToSubmit: BusinessPromotionFormData = {
@@ -124,9 +198,23 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <div className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center">
-            {previewUrl ? (
+            {previewUrl && !imageToCrop && (
               <NextImage src={previewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
-            ) : (
+            )}
+            {imageToCrop && (
+                <div className="w-full h-full absolute inset-0">
+                    <ReactCrop
+                        crop={crop}
+                        onChange={c => setCrop(c)}
+                        onComplete={c => setCompletedCrop(c)}
+                        aspect={16 / 9}
+                        className="h-full w-full"
+                    >
+                        <img ref={imgRef} src={imageToCrop} alt="Recortar imagen" onLoad={onImageLoad} className="object-contain h-full w-full" />
+                    </ReactCrop>
+                </div>
+            )}
+            {!previewUrl && !imageToCrop && (
               <div className="text-muted-foreground flex flex-col items-center">
                 <ImageIcon className="h-10 w-10" />
                 <span className="text-sm mt-1">Vista Previa</span>
@@ -140,9 +228,17 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             className="hidden"
             accept="image/png, image/jpeg, image/webp"
           />
-          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
-             Cambiar Imagen
-          </Button>
+          {imageToCrop ? (
+              <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setImageToCrop(null)}>Cancelar Recorte</Button>
+                  <Button type="button" onClick={handleApplyCrop}><Crop className="mr-2 h-4 w-4"/>Aceptar Recorte</Button>
+              </div>
+          ) : (
+             <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
+                 Cambiar Imagen
+            </Button>
+          )}
+
           <FormMessage>{form.formState.errors.imageFile?.message}</FormMessage>
         </div>
 
