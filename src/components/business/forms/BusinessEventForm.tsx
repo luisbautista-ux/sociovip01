@@ -106,13 +106,14 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     formState: form.formState,
   }));
   
-  const watchedValues = form.watch();
   useEffect(() => {
     const subscription = form.watch((value) => {
-      onDetailsChange(value);
+      if (!isSubmitting) {
+        onDetailsChange(value);
+      }
     });
     return () => subscription.unsubscribe();
-  }, [form.watch, onDetailsChange]);
+  }, [form.watch, onDetailsChange, isSubmitting]);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,7 +194,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><strong>Términos y Condiciones (Opcional)</strong></FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ''} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -256,7 +257,9 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={field.onChange}
+                      onCheckedChange={(isChecked) => {
+                          field.onChange(isChecked);
+                      }}
                       disabled={isSubmitting}
                     />
                   </FormControl>
