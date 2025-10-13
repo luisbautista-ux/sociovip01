@@ -354,8 +354,10 @@ export interface BusinessEventFormData {
   startDate: Date;
   endDate: Date;
   maxAttendance?: number;
+  unlimitedAttendance?: boolean;
   isActive: boolean;
   imageUrl?: string;
+  imageFile?: File | null;
   aiHint?: string;
   termsAndConditions?: string;
 }
@@ -452,3 +454,5 @@ export interface InitialDataForPromoterLink {
   existingLink?: BusinessPromoterLink; 
   existingPlatformUserPromoter?: PlatformUser; 
   qrClientData?: QrClient; 
+  socioVipData?: SocioVipMember;
+}

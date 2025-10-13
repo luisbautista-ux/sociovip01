@@ -17,9 +17,10 @@ import {
 import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc } from "firebase/firestore";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, BusinessPromoterLink, CommissionRule, Business, EventBoxFormData, BatchBoxFormData } from "@/lib/types";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, Business, EventBoxFormData, BatchBoxFormData } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -47,22 +48,19 @@ const ManageEventDialog = ({
     availablePromoters,
     handleSaveEvent,
     isSubmitting,
-    setIsSubmitting,
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
     editingEvent: BusinessManagedEntity | null;
     isDuplicating: boolean;
     availablePromoters: BusinessPromoterLink[];
-    handleSaveEvent: (event: BusinessManagedEntity | null) => Promise<void>;
+    handleSaveEvent: (event: BusinessManagedEntity | null, detailsFormValues: EventDetailsFormValues) => Promise<void>;
     isSubmitting: boolean;
-    setIsSubmitting: (isSubmitting: boolean) => void;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
 
-    const [editingEvent, setEditingEvent] = useState<BusinessManagedEntity | null>(initialEditingEvent);
-    const [isDetailsFormValid, setIsDetailsFormValid] = useState(false);
+    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(initialEditingEvent);
     
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
@@ -80,14 +78,14 @@ const ManageEventDialog = ({
     };
     
     useEffect(() => {
-      setEditingEvent(initialEditingEvent);
+      setCurrentEventData(initialEditingEvent);
       if (isManageEventDialogOpen) {
           setActiveTab("details");
       }
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleSaveChanges = async () => {
-        if (!detailsFormRef.current || !editingEvent) return;
+        if (!detailsFormRef.current || !currentEventData) return;
         
         const detailsAreValid = await detailsFormRef.current.trigger();
         if (!detailsAreValid) {
@@ -96,35 +94,19 @@ const ManageEventDialog = ({
             return;
         }
         
-        // Final merge before saving
         const detailsValues = detailsFormRef.current.getValues();
+        
         const finalEventData: BusinessManagedEntity = {
-          ...editingEvent,
+          ...currentEventData,
           ...detailsValues,
           maxAttendance: detailsValues.unlimitedAttendance ? 0 : detailsValues.maxAttendance,
         };
         
-        setIsSubmitting(true);
-        try {
-          await handleSaveEvent(finalEventData);
-        } finally {
-          setIsSubmitting(false);
-        }
+        await handleSaveEvent(finalEventData, detailsValues);
     };
 
-    const handleDetailsChange = useCallback((detailsData: EventDetailsFormValues) => {
-        setEditingEvent(prevEvent => {
-            if (!prevEvent) return null;
-            // Merge new details into the existing event state
-            return {
-                ...prevEvent,
-                ...detailsData,
-            };
-        });
-    }, []);
-
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             let updatedTicketTypes: TicketType[];
             const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
@@ -147,7 +129,7 @@ const ManageEventDialog = ({
     };
     
     const handleTicketDelete = (ticketId: string) => {
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedTicketTypes = (prev.ticketTypes || []).filter(t => t.id !== ticketId);
             return { ...prev, ticketTypes: updatedTicketTypes };
@@ -155,7 +137,7 @@ const ManageEventDialog = ({
     };
     
     const handleBoxSubmit = (boxData: EventBoxFormData) => {
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             let updatedBoxes: EventBox[];
             const boxId = editingBox?.id || `box_${Date.now()}`;
@@ -178,7 +160,7 @@ const ManageEventDialog = ({
     };
     
     const handleBatchBoxSubmit = (batchData: BatchBoxFormData) => {
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const newBoxes: EventBox[] = [];
             for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
@@ -200,7 +182,7 @@ const ManageEventDialog = ({
     };
 
     const handleBoxDelete = (boxId: string) => {
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedBoxes = (prev.eventBoxes || []).filter(b => b.id !== boxId);
             return { ...prev, eventBoxes: updatedBoxes };
@@ -212,7 +194,7 @@ const ManageEventDialog = ({
         const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
         if (!promoterData) return;
 
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             
             let updatedAssignments = [...(prev.assignedPromoters || [])];
@@ -238,7 +220,7 @@ const ManageEventDialog = ({
 
 
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
@@ -253,7 +235,7 @@ const ManageEventDialog = ({
     };
 
     const handleAddCommissionRule = (promoterId: string) => {
-        setEditingEvent(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
@@ -272,7 +254,7 @@ const ManageEventDialog = ({
     };
     
     const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
-         setEditingEvent(prev => {
+         setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
@@ -285,14 +267,14 @@ const ManageEventDialog = ({
         });
     };
 
-    if (!isManageEventDialogOpen || !editingEvent) return null;
+    if (!isManageEventDialogOpen || !currentEventData) return null;
 
     return (
         <>
-            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
+            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setCurrentEventData(null); setIsManageEventDialogOpen(isOpen); }}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${editingEvent.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogTitle>{currentEventData?.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
@@ -301,9 +283,9 @@ const ManageEventDialog = ({
                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
-                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(editingEvent.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                                    <TabsTrigger value="boxes">Boxes ({editingEvent.eventBoxes?.length || 0})</TabsTrigger>
-                                    <TabsTrigger value="promoters">Promotores ({editingEvent.assignedPromoters?.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(currentEventData.ticketTypes) || 'Ilimitado'})</TabsTrigger>
+                                    <TabsTrigger value="boxes">Boxes ({currentEventData.eventBoxes?.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="promoters">Promotores ({currentEventData.assignedPromoters?.length || 0})</TabsTrigger>
                                 </TabsList>
                             </Tabs>
                         </div>
@@ -320,10 +302,8 @@ const ManageEventDialog = ({
                                   <CardContent>
                                     <BusinessEventForm 
                                         ref={detailsFormRef}
-                                        event={editingEvent} 
+                                        event={currentEventData} 
                                         isSubmitting={isSubmitting}
-                                        onValidationChange={setIsDetailsFormValid}
-                                        onFormChange={handleDetailsChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -340,7 +320,7 @@ const ManageEventDialog = ({
                                      <Table>
                                          <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                          <TableBody>
-                                             {(editingEvent.ticketTypes || []).map(ticket => (
+                                             {(currentEventData.ticketTypes || []).map(ticket => (
                                                  <TableRow key={ticket.id}>
                                                      <TableCell>{ticket.name}</TableCell>
                                                      <TableCell>{ticket.cost.toFixed(2)}</TableCell>
@@ -360,7 +340,7 @@ const ManageEventDialog = ({
                                          </TableBody>
                                      </Table>
                                      </div>
-                                      {(!editingEvent.ticketTypes || editingEvent.ticketTypes.length === 0) && (
+                                      {(!currentEventData.ticketTypes || currentEventData.ticketTypes.length === 0) && (
                                         <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
                                       )}
                                  </CardContent>
@@ -380,7 +360,7 @@ const ManageEventDialog = ({
                                             
                                             {/* Mobile View for Boxes */}
                                             <div className="md:hidden space-y-4 mt-4">
-                                                {(editingEvent.eventBoxes || []).map(box => (
+                                                {(currentEventData.eventBoxes || []).map(box => (
                                                     <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
                                                         "bg-green-500/10 border-green-300": box.status === 'available',
                                                         "bg-blue-500/10 border-blue-300": box.status === 'reserved',
@@ -420,7 +400,7 @@ const ManageEventDialog = ({
                                                 <Table>
                                                     <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                                     <TableBody>
-                                                        {(editingEvent.eventBoxes || []).map(box => (
+                                                        {(currentEventData.eventBoxes || []).map(box => (
                                                             <TableRow key={box.id}>
                                                                 <TableCell>{box.name}</TableCell>
                                                                 <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
@@ -444,7 +424,7 @@ const ManageEventDialog = ({
                                                 </Table>
                                             </div>
 
-                                            {(!editingEvent.eventBoxes || editingEvent.eventBoxes.length === 0) && (
+                                            {(!currentEventData.eventBoxes || currentEventData.eventBoxes.length === 0) && (
                                                 <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
                                             )}
                                         </CardContent>
@@ -461,7 +441,7 @@ const ManageEventDialog = ({
                                             <Label className="font-semibold">Promotores del Negocio</Label>
                                             <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
                                                 {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
-                                                    const isChecked = (editingEvent.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                    const isChecked = (currentEventData.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
                                                     return (
                                                         <div key={promoter.platformUserUid} className="flex items-center space-x-2">
                                                             <Checkbox
@@ -477,8 +457,8 @@ const ManageEventDialog = ({
                                         </div>
 
                                         <div className="space-y-4">
-                                          <h4 className="font-semibold">Promotores Asignados ({editingEvent.assignedPromoters?.length || 0})</h4>
-                                          {(editingEvent.assignedPromoters || []).map(assignment => (
+                                          <h4 className="font-semibold">Promotores Asignados ({currentEventData.assignedPromoters?.length || 0})</h4>
+                                          {(currentEventData.assignedPromoters || []).map(assignment => (
                                               <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
                                                   <div className="flex justify-between items-center">
                                                       <p className="font-medium">{assignment.promoterName}</p>
@@ -499,7 +479,7 @@ const ManageEventDialog = ({
                                                   </div>
                                               </div>
                                           ))}
-                                          {(!editingEvent.assignedPromoters || editingEvent.assignedPromoters.length === 0) && (
+                                          {(!currentEventData.assignedPromoters || currentEventData.assignedPromoters.length === 0) && (
                                               <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
                                           )}
                                         </div>
@@ -510,8 +490,8 @@ const ManageEventDialog = ({
                     </div>
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
-                        <Button variant="outline" onClick={() => { setIsManageEventDialogOpen(false); setEditingEvent(null); }} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={handleSaveChanges} disabled={isSubmitting || !isDetailsFormValid}>
+                        <Button variant="outline" onClick={() => { setIsManageEventDialogOpen(false); setCurrentEventData(null); }} disabled={isSubmitting}>Cancelar</Button>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>
@@ -550,7 +530,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
-                        existingBoxes={editingEvent.eventBoxes}
+                        existingBoxes={currentEventData.eventBoxes}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -658,17 +638,13 @@ export default function BusinessEventsPage() {
     setIsSubmitting(false);
     setIsDuplicating(duplicate);
     if (duplicate && event) {
-        const { id, createdAt, maxAttendance, generatedCodes, ...eventToDuplicate } = event;
+        const { id, createdAt, ...eventToDuplicate } = event;
         setEditingEvent({
             ...eventToDuplicate,
             id: '',
             name: `${event.name} (Copia)`,
             isActive: true,
             createdAt: undefined,
-            maxAttendance: event.maxAttendance, // Keep maxAttendance
-            ticketTypes: event.ticketTypes || [],
-            eventBoxes: event.eventBoxes || [],
-            assignedPromoters: event.assignedPromoters || [],
             generatedCodes: [],
         });
     } else if (event) { // Editing existing event
@@ -695,11 +671,21 @@ export default function BusinessEventsPage() {
     setIsManageEventDialogOpen(true);
   };
   
-  const handleDeleteEvent = async (eventId: string, eventName: string) => {
+  const handleDeleteEvent = async (eventToDelete: BusinessManagedEntity) => {
     setIsSubmitting(true);
     try {
-        await deleteDoc(doc(db, "businessEntities", eventId));
-        toast({ title: "Evento Eliminado", description: `El evento "${eventName}" ha sido eliminado.`, variant: "destructive" });
+        await deleteDoc(doc(db, "businessEntities", eventToDelete.id));
+        toast({ title: "Evento Eliminado", description: `El evento "${eventToDelete.name}" ha sido eliminado.`, variant: "destructive" });
+        if (eventToDelete.imageUrl && eventToDelete.imageUrl.includes("firebase")) {
+            try {
+                const imageRef = ref(storage, eventToDelete.imageUrl);
+                await deleteObject(imageRef);
+            } catch (deleteError: any) {
+                if (deleteError.code !== 'storage/object-not-found') {
+                    console.warn("Could not delete event image:", deleteError);
+                }
+            }
+        }
         if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
     } catch (error: any) {
         toast({ title: "Error al Eliminar", description: error.message, variant: "destructive" });
@@ -708,7 +694,7 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null) => {
+  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null, detailsFormValues: EventDetailsFormValues) => {
       if(!currentBusinessId) {
           toast({title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive"});
           return;
@@ -717,31 +703,63 @@ export default function BusinessEventsPage() {
           toast({title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive"});
           return;
       }
+      setIsSubmitting(true);
       
-      const payload = {
-        ...eventDataToSave, 
-        businessId: currentBusinessId,
-        type: 'event' as 'event',
-        startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
-        endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
-      };
-      
+      const isNewEntity = !eventDataToSave.id || isDuplicating;
+      const entityId = isNewEntity ? doc(collection(db, "businessEntities")).id : eventDataToSave.id;
+
       try {
-          if(eventDataToSave.id && !isDuplicating) {
-              const { id, createdAt, ...updateData } = payload;
-              await updateDoc(doc(db, "businessEntities", id), sanitizeObjectForFirestore(updateData));
-              toast({title: "Evento Actualizado", description: "Los cambios se han guardado correctamente."});
-          } else {
-              const { id, ...createData } = payload;
-              await addDoc(collection(db, "businessEntities"), {...createData, createdAt: serverTimestamp()});
-              toast({title: "Evento Creado", description: `El evento "${payload.name}" ha sido creado.`});
-          }
-          setIsManageEventDialogOpen(false);
-          setEditingEvent(null);
-          if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
+        let finalImageUrl = eventDataToSave.imageUrl || "";
+        const oldImageUrl = !isNewEntity ? eventDataToSave.imageUrl : null;
+        
+        if (detailsFormValues.imageFile) {
+            toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
+            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${detailsFormValues.imageFile.name}`);
+            const uploadResult = await uploadBytes(storageRef, detailsFormValues.imageFile);
+            finalImageUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        const payload = {
+            ...eventDataToSave,
+            ...detailsFormValues, 
+            imageUrl: finalImageUrl,
+            imageFile: undefined, // Ensure file object is not sent to Firestore
+            businessId: currentBusinessId,
+            type: 'event' as 'event',
+            startDate: Timestamp.fromDate(new Date(detailsFormValues.startDate)),
+            endDate: Timestamp.fromDate(new Date(detailsFormValues.endDate)),
+            maxAttendance: detailsFormValues.unlimitedAttendance ? 0 : detailsFormValues.maxAttendance,
+        };
+      
+        if (isNewEntity) {
+            const { id, ...createData } = payload;
+            await setDoc(doc(db, "businessEntities", entityId), { ...sanitizeObjectForFirestore(createData), createdAt: serverTimestamp() });
+            toast({title: "Evento Creado", description: `El evento "${payload.name}" ha sido creado.`});
+        } else {
+            const { id, createdAt, ...updateData } = payload;
+            await updateDoc(doc(db, "businessEntities", id), sanitizeObjectForFirestore(updateData));
+            toast({title: "Evento Actualizado", description: "Los cambios se han guardado correctamente."});
+        }
+
+        if (detailsFormValues.imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
+            try {
+              const oldImageRef = ref(storage, oldImageUrl);
+              await deleteObject(oldImageRef);
+            } catch (deleteError: any) {
+              if (deleteError.code !== 'storage/object-not-found') {
+                console.warn("Could not delete old event image:", deleteError);
+              }
+            }
+        }
+          
+        setIsManageEventDialogOpen(false);
+        setEditingEvent(null);
+        if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
       } catch (error: any) {
           toast({title: "Error al Guardar", description: error.message, variant: "destructive"});
           console.error("Error saving event:", error);
+      } finally {
+          setIsSubmitting(false);
       }
   };
 
@@ -884,7 +902,7 @@ export default function BusinessEventsPage() {
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
-                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
                               </DropdownMenuContent>
@@ -932,7 +950,7 @@ export default function BusinessEventsPage() {
                               <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                               <AlertDialogContent>
                               <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
-                              <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                              <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                               </AlertDialogContent>
                           </AlertDialog>
                         </TableCell>
@@ -953,7 +971,6 @@ export default function BusinessEventsPage() {
         availablePromoters={availablePromoters}
         handleSaveEvent={handleSaveEvent}
         isSubmitting={isSubmitting}
-        setIsSubmitting={setIsSubmitting}
       />
 
       {selectedEntityForCreatingCodes && userProfile && (
@@ -1003,3 +1020,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+

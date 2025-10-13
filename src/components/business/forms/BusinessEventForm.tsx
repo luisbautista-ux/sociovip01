@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useImperativeHandle, useEffect } from "react";
+import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -21,10 +22,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
 import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
-import { format, parseISO, startOfDay, isBefore, isEqual } from "date-fns";
+import { format, isBefore, startOfDay, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
+import NextImage from "next/image";
+import { useToast } from "@/hooks/use-toast";
 
 const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -35,7 +38,8 @@ const eventDetailsFormSchema = z.object({
   unlimitedAttendance: z.boolean().default(true),
   maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
   isActive: z.boolean().default(true),
-  imageUrl: z.string().url("Debe ser una URL válida.").optional().or(z.literal("")),
+  imageUrl: z.string().optional(),
+  imageFile: z.custom<File | null>(() => true).optional(), // For new uploads
   aiHint: z.string().optional(),
 }).refine(data => {
     if (!data.startDate || !data.endDate) return true; 
@@ -66,11 +70,13 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
-  onValidationChange: (isValid: boolean) => void;
-  onFormChange: (data: EventDetailsFormValues) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onValidationChange, onFormChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false }, ref) => {
+  const { toast } = useToast();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(event?.imageUrl || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onChange",
@@ -84,26 +90,42 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
+      imageFile: null,
       aiHint: event?.aiHint || "",
     },
   });
 
-  const { formState: { isValid } } = form;
-  
   useEffect(() => {
-    onValidationChange(isValid);
-  }, [isValid, onValidationChange]);
+    if (event) {
+        setPreviewUrl(event.imageUrl || null);
+        form.reset({
+            name: event.name || "",
+            description: event.description || "",
+            termsAndConditions: event.termsAndConditions || "",
+            startDate: anyToDate(event.startDate) ?? new Date(),
+            endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+            unlimitedAttendance: event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0,
+            maxAttendance: event.maxAttendance === undefined || event.maxAttendance === null ? undefined : event.maxAttendance,
+            isActive: event.isActive === undefined ? true : event.isActive,
+            imageUrl: event.imageUrl || "",
+            imageFile: null,
+            aiHint: event.aiHint || "",
+        });
+    }
+  }, [event, form]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
+        return;
+      }
+      form.setValue("imageFile", file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
   
-  // Watch for form changes and notify the parent
-  const watchedValues = form.watch();
-  useEffect(() => {
-      const subscription = form.watch((values) => {
-          onFormChange(values as EventDetailsFormValues);
-      });
-      return () => subscription.unsubscribe();
-  }, [form, onFormChange]);
-
-
   useImperativeHandle(ref, () => ({
     getValues: () => {
       const formValues = form.getValues();
@@ -127,6 +149,31 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   return (
     <Form {...form}>
       <form className="space-y-4 overflow-y-auto">
+        
+        <div className="flex flex-col items-center justify-center mb-4 space-y-3">
+          <div className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center">
+            {previewUrl ? (
+              <NextImage src={previewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
+            ) : (
+              <div className="text-muted-foreground flex flex-col items-center">
+                <ImageIcon className="h-10 w-10" />
+                <span className="text-sm mt-1">Vista Previa</span>
+              </div>
+            )}
+          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            accept="image/png, image/jpeg, image/webp"
+          />
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
+             Cambiar Imagen
+          </Button>
+          <FormMessage>{form.formState.errors.imageFile?.message}</FormMessage>
+        </div>
+        
         <FormField
           control={form.control}
           name="name"
@@ -257,26 +304,10 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 
         <FormField
           control={form.control}
-          name="imageUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>URL de Imagen</strong> (Opcional)</FormLabel>
-              <FormControl>
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  <Input placeholder="https://ejemplo.com/imagen_evento.png" {...field} value={field.value || ""} disabled={isSubmitting} />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-         <FormField
-          control={form.control}
           name="aiHint"
           render={({ field }) => (
             <FormItem>
-              <FormLabel><strong>Palabras Clave para Imagen (si URL está vacía)</strong></FormLabel>
+              <FormLabel><strong>Palabras Clave para Imagen (Opcional)</strong></FormLabel>
               <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
