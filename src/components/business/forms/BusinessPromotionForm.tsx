@@ -198,29 +198,26 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <div className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center">
-            {previewUrl && !imageToCrop && (
+            {imageToCrop ? (
+                <ReactCrop
+                    crop={crop}
+                    onChange={c => setCrop(c)}
+                    onComplete={c => setCompletedCrop(c)}
+                    aspect={16 / 9}
+                    className="max-w-full max-h-full"
+                >
+                    <img ref={imgRef} src={imageToCrop} alt="Recortar imagen" onLoad={onImageLoad} className="object-contain h-full" />
+                </ReactCrop>
+            ) : previewUrl ? (
               <NextImage src={previewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
-            )}
-            {imageToCrop && (
-                <div className="w-full h-full absolute inset-0 z-10">
-                    <ReactCrop
-                        crop={crop}
-                        onChange={c => setCrop(c)}
-                        onComplete={c => setCompletedCrop(c)}
-                        aspect={16 / 9}
-                        className="h-full w-full"
-                    >
-                        <img ref={imgRef} src={imageToCrop} alt="Recortar imagen" onLoad={onImageLoad} className="object-contain h-full w-full" />
-                    </ReactCrop>
-                </div>
-            )}
-            {!previewUrl && !imageToCrop && (
+            ) : (
               <div className="text-muted-foreground flex flex-col items-center">
                 <ImageIcon className="h-10 w-10" />
                 <span className="text-sm mt-1">Vista Previa</span>
               </div>
             )}
           </div>
+
           <input
             type="file"
             ref={fileInputRef}
@@ -228,6 +225,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             className="hidden"
             accept="image/png, image/jpeg, image/webp"
           />
+
           {imageToCrop ? (
               <div className="flex gap-2">
                   <Button type="button" variant="outline" onClick={() => setImageToCrop(null)}>Cancelar Recorte</Button>
