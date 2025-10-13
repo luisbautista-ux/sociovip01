@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
+import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -100,18 +100,19 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     }
   }, [event, form]);
 
-  // Expose form methods via ref
   useImperativeHandle(ref, () => ({
     getValues: () => form.getValues(),
     trigger: () => form.trigger(),
     formState: form.formState,
   }));
   
-  // Watch for form changes and notify parent
   const watchedValues = form.watch();
   useEffect(() => {
-      onDetailsChange(watchedValues);
-  }, [watchedValues, onDetailsChange]);
+    const subscription = form.watch((value) => {
+      onDetailsChange(value);
+    });
+    return () => subscription.unsubscribe();
+  }, [form.watch, onDetailsChange]);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -255,9 +256,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={(checked) => {
-                          field.onChange(Boolean(checked));
-                      }}
+                      onCheckedChange={field.onChange}
                       disabled={isSubmitting}
                     />
                   </FormControl>
