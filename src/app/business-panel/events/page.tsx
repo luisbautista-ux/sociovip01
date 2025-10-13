@@ -12,7 +12,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
-  DialogDescription as UIDialogDescriptionComponent, // Renamed to avoid conflict
+  DialogDescription as UIDialogDescriptionComponent,
   DialogFooter
 } from "@/components/ui/dialog";
 import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box } from "lucide-react";
@@ -40,11 +40,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 
-// Helper component extracted to the top level of the file
 const ManageEventDialog = ({
     isManageEventDialogOpen,
     setIsManageEventDialogOpen,
-    editingEvent: initialEditingEvent, // Renamed to avoid confusion
+    editingEvent: initialEditingEvent, 
     isDuplicating,
     availablePromoters,
     onSave,
@@ -61,8 +60,9 @@ const ManageEventDialog = ({
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
 
-    // State for all data managed in the dialog, including details
-    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(initialEditingEvent);
+    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
     
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
@@ -81,15 +81,35 @@ const ManageEventDialog = ({
     useEffect(() => {
         if (isManageEventDialogOpen && initialEditingEvent) {
             setCurrentEventData(initialEditingEvent);
+            setImageFile(null);
+            setImagePreviewUrl(initialEditingEvent.imageUrl || null);
             setActiveTab("details");
         }
     }, [initialEditingEvent, isManageEventDialogOpen]);
-
+    
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
         setCurrentEventData(prev => {
             if (!prev) return null;
-            return { ...prev, ...newDetails };
+            // Prevent infinite loop by checking for actual changes
+            const hasChanged = Object.keys(newDetails).some(key => {
+                const keyTyped = key as keyof EventDetailsFormValues;
+                // Deep comparison for dates
+                if (newDetails[keyTyped] instanceof Date && prev[keyTyped] instanceof Date) {
+                    return newDetails[keyTyped]?.getTime() !== prev[keyTyped]?.getTime();
+                }
+                return prev[keyTyped] !== newDetails[keyTyped];
+            });
+
+            if (hasChanged) {
+                 return { ...prev, ...newDetails };
+            }
+            return prev;
         });
+
+        if (newDetails.imageFile) {
+            setImageFile(newDetails.imageFile);
+            setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
+        }
     }, []);
     
     const handleSaveChanges = async () => {
@@ -111,14 +131,13 @@ const ManageEventDialog = ({
         }
         
         const latestDetailsValues = detailsFormRef.current.getValues();
-        const imageFileToUpload = latestDetailsValues.imageFile || null;
 
         const finalEventData: BusinessManagedEntity = {
             ...currentEventData,
-            ...latestDetailsValues, // Ensure latest values from the form are included
+            ...latestDetailsValues, 
         };
 
-        await onSave(finalEventData, imageFileToUpload);
+        await onSave(finalEventData, imageFile);
     };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
@@ -316,6 +335,7 @@ const ManageEventDialog = ({
                                         event={currentEventData} 
                                         isSubmitting={isSubmitting}
                                         onDetailsChange={handleDetailsChange}
+                                        imagePreviewUrl={imagePreviewUrl}
                                     />
                                   </CardContent>
                                 </Card>
@@ -370,7 +390,6 @@ const ManageEventDialog = ({
                                                 <Button onClick={() => setIsBatchBoxFormOpen(true)} variant="outline"><Box className="h-4 w-4 mr-2"/>Crear en Lote</Button>
                                             </div>
                                             
-                                            {/* Mobile View for Boxes */}
                                             <div className="md:hidden space-y-4 mt-4">
                                                 {eventBoxes.map(box => (
                                                     <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
@@ -407,7 +426,6 @@ const ManageEventDialog = ({
                                                 ))}
                                             </div>
 
-                                            {/* Desktop View for Boxes */}
                                             <div className="hidden md:block mt-4 overflow-x-auto">
                                                 <Table>
                                                     <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
@@ -658,9 +676,9 @@ export default function BusinessEventsPage() {
             createdAt: undefined,
             generatedCodes: [],
         });
-    } else if (event) { // Editing existing event
+    } else if (event) {
       setEditingEvent(event);
-    } else { // Creating a new event from scratch
+    } else { 
       const now = new Date();
       const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       setEditingEvent({
@@ -735,8 +753,6 @@ export default function BusinessEventsPage() {
             endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
             maxAttendance: eventDataToSave.maxAttendance || 0,
         };
-        // Remove file object before sending to firestore
-        delete (payload as any).imageFile;
       
         if (isNewEntity) {
             const { id, ...createData } = payload;
@@ -1027,6 +1043,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
-
-

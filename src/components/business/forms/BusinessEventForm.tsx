@@ -59,8 +59,7 @@ const eventDetailsFormSchema = z.object({
   path: ["maxAttendance"],
 });
 
-export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema> & { imageUrl?: string };
-
+export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
 
 export interface EventDetailsFormRef {
   getValues: () => EventDetailsFormValues;
@@ -72,16 +71,16 @@ interface BusinessEventFormProps {
   event: BusinessManagedEntity | null; 
   isSubmitting?: boolean;
   onDetailsChange: (newDetails: Partial<EventDetailsFormValues>) => void;
+  imagePreviewUrl: string | null;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onDetailsChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onDetailsChange, imagePreviewUrl }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
-    mode: "onChange",
+    mode: "onBlur",
   });
   
   useEffect(() => {
@@ -96,21 +95,14 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             unlimitedAttendance: unlimited,
             maxAttendance: unlimited ? undefined : event.maxAttendance,
             isActive: event.isActive === undefined ? true : event.isActive,
-            imageFile: (event as any).imageFile || null,
+            imageFile: null,
             aiHint: event.aiHint || "",
         });
-        setImagePreviewUrl(event.imageUrl || null);
     }
   }, [event, form]);
 
   useImperativeHandle(ref, () => ({
-    getValues: () => {
-        const formValues = form.getValues();
-        return {
-            ...formValues,
-            imageUrl: imagePreviewUrl || undefined,
-        };
-    },
+    getValues: () => form.getValues(),
     trigger: () => form.trigger(),
     formState: form.formState,
   }));
@@ -122,25 +114,18 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      form.setValue("imageFile", file, { shouldValidate: true });
-      const preview = URL.createObjectURL(file);
-      setImagePreviewUrl(preview);
       onDetailsChange({ imageFile: file });
     }
   };
   
   const isUnlimited = form.watch("unlimitedAttendance");
 
-  const formValues = form.watch();
-  useEffect(() => {
-      onDetailsChange(formValues);
-  }, [formValues, onDetailsChange]);
-
   React.useEffect(() => {
     if (isUnlimited) {
       form.setValue("maxAttendance", 0);
+      onDetailsChange({ maxAttendance: 0 });
     }
-  }, [isUnlimited, form]);
+  }, [isUnlimited, form, onDetailsChange]);
 
   return (
     <Form {...form}>
@@ -176,7 +161,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><span className="font-bold">Nombre del Evento</span> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} onBlur={() => onDetailsChange({ name: field.value })} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -187,7 +172,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><strong>Descripción</strong> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Textarea placeholder="Detalles del evento..." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Detalles del evento..." {...field} onBlur={() => onDetailsChange({ description: field.value })} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -198,7 +183,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><strong>Términos y Condiciones (Opcional)</strong></FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} onBlur={() => onDetailsChange({ termsAndConditions: field.value })} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -220,7 +205,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus />
+                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); onDetailsChange({ startDate: date }); }} locale={es} initialFocus />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
@@ -243,7 +228,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} locale={es} initialFocus />
+                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); onDetailsChange({ endDate: date }); }} disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} locale={es} initialFocus />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
@@ -261,7 +246,11 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={field.onChange}
+                      onCheckedChange={(checked) => {
+                          const isChecked = Boolean(checked);
+                          field.onChange(isChecked);
+                          onDetailsChange({ unlimitedAttendance: isChecked });
+                      }}
                       disabled={isSubmitting}
                     />
                   </FormControl>
@@ -282,6 +271,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                         className="no-spinner"
                         {...field}
                         value={field.value ?? ""} 
+                        onBlur={() => onDetailsChange({ maxAttendance: form.getValues("maxAttendance") })}
                         onChange={e => {
                             const val = e.target.value;
                             field.onChange(val === "" ? undefined : Number(val));
@@ -304,7 +294,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><strong>Palabras Clave para Imagen (Opcional)</strong></FormLabel>
-              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} onBlur={() => onDetailsChange({ aiHint: field.value })} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
           )}
@@ -318,7 +308,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                 <FormLabel><strong>Activar Evento</strong> <span className="text-destructive">*</span></FormLabel>
                 <FormMessage />
               </div>
-              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
+              <FormControl><Switch checked={field.value} onCheckedChange={(checked) => { field.onChange(checked); onDetailsChange({ isActive: checked }); }} disabled={isSubmitting} /></FormControl>
             </FormItem>
           )}
         />
@@ -328,5 +318,3 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
-
-
