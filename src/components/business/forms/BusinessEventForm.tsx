@@ -71,12 +71,12 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
-  onFormChange: (data: EventDetailsFormValues) => void;
-  onImageChange: (url: string | null) => void;
   imagePreviewUrl: string | null;
+  onImageChange: (url: string | null) => void;
+  onFormChange: (data: EventDetailsFormValues) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onFormChange, onImageChange, imagePreviewUrl }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, imagePreviewUrl, onImageChange, onFormChange }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -101,12 +101,12 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   const watchedValues = form.watch();
 
   useEffect(() => {
+    // This effect now passes the full form data up, including the file
     onFormChange(watchedValues);
   }, [watchedValues, onFormChange]);
   
   useEffect(() => {
     if (event) {
-        onImageChange(event.imageUrl || null);
         form.reset({
             name: event.name || "",
             description: event.description || "",
@@ -117,11 +117,11 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             maxAttendance: event.maxAttendance === undefined || event.maxAttendance === null ? undefined : event.maxAttendance,
             isActive: event.isActive === undefined ? true : event.isActive,
             imageUrl: event.imageUrl || "",
-            imageFile: null,
+            imageFile: (event as any).imageFile || null, // Propagate file if it exists
             aiHint: event.aiHint || "",
         });
     }
-  }, [event, form, onImageChange]);
+  }, [event, form]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -130,7 +130,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      form.setValue("imageFile", file);
+      form.setValue("imageFile", file, { shouldValidate: true });
       onImageChange(URL.createObjectURL(file));
     }
   };
