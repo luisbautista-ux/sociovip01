@@ -12,7 +12,7 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
-  DialogDescription,
+  DialogDescription as UIDialogDescriptionComponent, // Renamed to avoid conflict
   DialogFooter
 } from "@/components/ui/dialog";
 import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box } from "lucide-react";
@@ -28,7 +28,7 @@ import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BusinessEventForm, type EventDetailsFormRef, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 import { BatchBoxForm } from '@/components/business/forms/BatchBoxForm';
@@ -44,7 +44,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 const ManageEventDialog = ({
     isManageEventDialogOpen,
     setIsManageEventDialogOpen,
-    editingEvent: initialEditingEvent,
+    editingEvent: initialEditingEvent, // Renamed to avoid confusion
     isDuplicating,
     availablePromoters,
     onSave,
@@ -61,12 +61,9 @@ const ManageEventDialog = ({
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
 
-    // States for data managed in other tabs
-    const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
-    const [eventBoxes, setEventBoxes] = useState<EventBox[]>([]);
-    const [assignedPromoters, setAssignedPromoters] = useState<EventPromoterAssignment[]>([]);
-
-    // States for forms within the dialog
+    // State for all data managed in the dialog, including details
+    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(initialEditingEvent);
+    
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
     const [isBoxFormOpen, setIsBoxFormOpen] = useState(false);
@@ -81,23 +78,30 @@ const ManageEventDialog = ({
         sold: 'Vendido',
     };
     
-    // Sync the internal states when the dialog opens
     useEffect(() => {
         if (isManageEventDialogOpen && initialEditingEvent) {
-            setTicketTypes(initialEditingEvent.ticketTypes || []);
-            setEventBoxes(initialEditingEvent.eventBoxes || []);
-            setAssignedPromoters(initialEditingEvent.assignedPromoters || []);
+            setCurrentEventData(initialEditingEvent);
             setActiveTab("details");
-        } else if (!isManageEventDialogOpen) {
-            // Reset states when closing
-            setTicketTypes([]);
-            setEventBoxes([]);
-            setAssignedPromoters([]);
         }
     }, [initialEditingEvent, isManageEventDialogOpen]);
+
+    const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, ...newDetails };
+        });
+    }, []);
     
     const handleSaveChanges = async () => {
-        if (!detailsFormRef.current || !initialEditingEvent) return;
+        if (!currentEventData) {
+            toast({ title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive" });
+            return;
+        }
+
+        if (!detailsFormRef.current) {
+             toast({ title: "Error", description: "El formulario de detalles no está listo.", variant: "destructive" });
+             return;
+        }
         
         const detailsAreValid = await detailsFormRef.current.trigger();
         if (!detailsAreValid) {
@@ -106,18 +110,15 @@ const ManageEventDialog = ({
             return;
         }
         
-        const detailsValues = detailsFormRef.current.getValues();
+        const latestDetailsValues = detailsFormRef.current.getValues();
+        const imageFileToUpload = latestDetailsValues.imageFile || null;
 
-        // Combine all data sources for the final payload
         const finalEventData: BusinessManagedEntity = {
-            ...initialEditingEvent, // Base data (id, businessId, etc.)
-            ...detailsValues,       // Latest data from the details form
-            ticketTypes,
-            eventBoxes,
-            assignedPromoters,
+            ...currentEventData,
+            ...latestDetailsValues, // Ensure latest values from the form are included
         };
 
-        await onSave(finalEventData, detailsValues.imageFile || null);
+        await onSave(finalEventData, imageFileToUpload);
     };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
@@ -125,14 +126,17 @@ const ManageEventDialog = ({
         const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
             ...ticketData,
             id: ticketId,
-            eventId: initialEditingEvent?.id || '',
-            businessId: initialEditingEvent?.businessId || '',
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
         }) as TicketType;
 
-        setTicketTypes(prev => {
-            return editingTicket
-                ? prev.map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t)
-                : [...prev, newOrUpdatedTicket];
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const existingTickets = prev.ticketTypes || [];
+            const updatedTickets = editingTicket
+                ? existingTickets.map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t)
+                : [...existingTickets, newOrUpdatedTicket];
+            return { ...prev, ticketTypes: updatedTickets };
         });
 
         setIsTicketFormOpen(false);
@@ -140,7 +144,10 @@ const ManageEventDialog = ({
     };
     
     const handleTicketDelete = (ticketId: string) => {
-        setTicketTypes(prev => prev.filter(t => t.id !== ticketId));
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, ticketTypes: (prev.ticketTypes || []).filter(t => t.id !== ticketId) };
+        });
     };
     
     const handleBoxSubmit = (boxData: EventBoxFormData) => {
@@ -148,14 +155,17 @@ const ManageEventDialog = ({
         const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
             ...boxData,
             id: boxId,
-            eventId: initialEditingEvent?.id || '',
-            businessId: initialEditingEvent?.businessId || '',
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
         }) as EventBox;
         
-        setEventBoxes(prev => {
-            return editingBox
-                ? prev.map(b => b.id === editingBox.id ? newOrUpdatedBox : b)
-                : [...prev, newOrUpdatedBox];
+         setCurrentEventData(prev => {
+            if (!prev) return null;
+            const existingBoxes = prev.eventBoxes || [];
+            const updatedBoxes = editingBox
+                ? existingBoxes.map(b => b.id === editingBox.id ? newOrUpdatedBox : b)
+                : [...existingBoxes, newOrUpdatedBox];
+            return { ...prev, eventBoxes: updatedBoxes };
         });
         
         setIsBoxFormOpen(false);
@@ -167,8 +177,8 @@ const ManageEventDialog = ({
         for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
             newBoxes.push(sanitizeObjectForFirestore({
                 id: `box_batch_${Date.now()}_${i}`,
-                eventId: initialEditingEvent?.id || '',
-                businessId: initialEditingEvent?.businessId || '',
+                eventId: currentEventData?.id || '',
+                businessId: currentEventData?.businessId || '',
                 name: `${batchData.prefix} ${i}`,
                 cost: batchData.cost,
                 description: batchData.description,
@@ -176,41 +186,47 @@ const ManageEventDialog = ({
                 status: 'available',
             }) as EventBox);
         }
-        setEventBoxes(prev => [...prev, ...newBoxes]);
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, eventBoxes: [...(prev.eventBoxes || []), ...newBoxes] };
+        });
         setIsBatchBoxFormOpen(false);
     };
 
     const handleBoxDelete = (boxId: string) => {
-        setEventBoxes(prev => prev.filter(b => b.id !== boxId));
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, eventBoxes: (prev.eventBoxes || []).filter(b => b.id !== boxId) };
+        });
     };
 
     const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
         const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
         if (!promoterData) return;
 
-        setAssignedPromoters(prev => {
-            let updatedAssignments = [...prev];
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            let updatedAssignments = [...(prev.assignedPromoters || [])];
             if (isChecked) {
-                const isAlreadyAssigned = updatedAssignments.some(p => p.promoterProfileId === promoterId);
-                if (!isAlreadyAssigned) {
-                    const newAssignment: EventPromoterAssignment = {
+                if (!updatedAssignments.some(p => p.promoterProfileId === promoterId)) {
+                    updatedAssignments.push({
                         promoterProfileId: promoterData.platformUserUid!,
                         promoterName: promoterData.promoterName,
                         promoterEmail: promoterData.promoterEmail,
                         commissionRules: [],
-                    };
-                    updatedAssignments.push(newAssignment);
+                    });
                 }
             } else {
                 updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
             }
-            return updatedAssignments;
+            return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
 
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
-        setAssignedPromoters(prev => {
-            return prev.map(p => {
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
                     const updatedRules = [...(p.commissionRules || [])];
                     if (updatedRules[ruleIndex]) {
@@ -220,12 +236,14 @@ const ManageEventDialog = ({
                 }
                 return p;
             });
+            return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
 
     const handleAddCommissionRule = (promoterId: string) => {
-        setAssignedPromoters(prev => {
-            return prev.map(p => {
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
                     const newRule: CommissionRule = {
                         id: `rule_${Date.now()}`,
@@ -237,31 +255,38 @@ const ManageEventDialog = ({
                 }
                 return p;
             });
+             return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
     
     const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
-        setAssignedPromoters(prev => {
-            return prev.map(p => {
+       setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
                     return { ...p, commissionRules: (p.commissionRules || []).filter(r => r.id !== ruleId) };
                 }
                 return p;
             });
+            return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
     
-    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(ticketTypes), [ticketTypes]);
+    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
 
-    if (!isManageEventDialogOpen || !initialEditingEvent) return null;
+    if (!isManageEventDialogOpen || !currentEventData) return null;
+
+    const assignedPromoters = currentEventData.assignedPromoters || [];
+    const ticketTypes = currentEventData.ticketTypes || [];
+    const eventBoxes = currentEventData.eventBoxes || [];
 
     return (
         <>
             <Dialog open={isManageEventDialogOpen} onOpenChange={setIsManageEventDialogOpen}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{initialEditingEvent.id && !isDuplicating ? `Editar Evento: ${initialEditingEvent.name}` : "Crear Nuevo Evento"}</DialogTitle>
-                        <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
+                        <DialogTitle>{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <UIDialogDescriptionComponent>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</UIDialogDescriptionComponent>
                     </DialogHeader>
                     
                     <div className="px-6 border-b shrink-0">
@@ -288,8 +313,9 @@ const ManageEventDialog = ({
                                   <CardContent>
                                     <BusinessEventForm 
                                         ref={detailsFormRef}
-                                        event={initialEditingEvent} 
+                                        event={currentEventData} 
                                         isSubmitting={isSubmitting}
+                                        onDetailsChange={handleDetailsChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -316,7 +342,7 @@ const ManageEventDialog = ({
                                                          <AlertDialog>
                                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                                                             <AlertDialogContent>
-                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><UIDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</AlertDialogDescription></AlertDialogHeader>
                                                                 <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                             </AlertDialogContent>
                                                          </AlertDialog>
@@ -370,7 +396,7 @@ const ManageEventDialog = ({
                                                                     <AlertDialog>
                                                                         <AlertDialogTrigger asChild><DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem></AlertDialogTrigger>
                                                                         <AlertDialogContent>
-                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><AlertDialogDescription>Se eliminará el box "{box.name}".</AlertDialogDescription></AlertDialogHeader>
                                                                             <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                                         </AlertDialogContent>
                                                                     </AlertDialog>
@@ -399,7 +425,7 @@ const ManageEventDialog = ({
                                                                     <AlertDialog>
                                                                         <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                                                                         <AlertDialogContent>
-                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><UIDialogDescription>Se eliminará el box "{box.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><AlertDialogDescription>Se eliminará el box "{box.name}".</AlertDialogDescription></AlertDialogHeader>
                                                                             <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                                         </AlertDialogContent>
                                                                     </AlertDialog>
@@ -515,7 +541,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
-                        existingBoxes={eventBoxes}
+                        existingBoxes={currentEventData?.eventBoxes || []}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -882,7 +908,7 @@ export default function BusinessEventsPage() {
                                         </DropdownMenuItem>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
+                                        <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
                                         <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
@@ -930,7 +956,7 @@ export default function BusinessEventsPage() {
                           <AlertDialog>
                               <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                               <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
+                              <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
                               <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                               </AlertDialogContent>
                           </AlertDialog>
@@ -1001,5 +1027,6 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 

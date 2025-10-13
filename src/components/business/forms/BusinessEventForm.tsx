@@ -71,9 +71,10 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity | null; 
   isSubmitting?: boolean;
+  onDetailsChange: (newDetails: Partial<EventDetailsFormValues>) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onDetailsChange }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -122,11 +123,18 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         return;
       }
       form.setValue("imageFile", file, { shouldValidate: true });
-      setImagePreviewUrl(URL.createObjectURL(file));
+      const preview = URL.createObjectURL(file);
+      setImagePreviewUrl(preview);
+      onDetailsChange({ imageFile: file });
     }
   };
   
   const isUnlimited = form.watch("unlimitedAttendance");
+
+  const formValues = form.watch();
+  useEffect(() => {
+      onDetailsChange(formValues);
+  }, [formValues, onDetailsChange]);
 
   React.useEffect(() => {
     if (isUnlimited) {
@@ -320,4 +328,5 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
+
 
