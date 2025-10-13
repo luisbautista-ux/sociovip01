@@ -221,25 +221,14 @@ export default function BusinessPromotionsPage() {
       let finalImageUrl = editingPromotion?.imageUrl || "";
       const isNewEntity = !editingPromotion || !editingPromotion.id || isDuplicating;
       const entityId = isNewEntity ? doc(collection(db, "businessEntities")).id : editingPromotion.id;
+      
+      const oldImageUrl = !isNewEntity && editingPromotion?.imageUrl ? editingPromotion.imageUrl : null;
 
       if (data.imageFile) {
-        const oldImageUrl = !isNewEntity ? editingPromotion.imageUrl : null;
-        
         toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
         const storageRef = ref(storage, `promotion-images/${currentBusinessId}/${entityId}/${data.imageFile.name}`);
         const uploadResult = await uploadBytes(storageRef, data.imageFile);
         finalImageUrl = await getDownloadURL(uploadResult.ref);
-
-        if (oldImageUrl && oldImageUrl.includes("firebase")) {
-          try {
-            const oldImageRef = ref(storage, oldImageUrl);
-            await deleteObject(oldImageRef);
-          } catch (deleteError: any) {
-            if (deleteError.code !== 'storage/object-not-found') {
-              console.warn("Could not delete old promotion image:", deleteError);
-            }
-          }
-        }
       }
 
       const promotionPayloadBase = {
@@ -274,6 +263,18 @@ export default function BusinessPromotionsPage() {
       } else {
         await updateDoc(doc(db, "businessEntities", entityId), sanitizedPayload);
         toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
+      }
+      
+      // Delete old image after successful DB update
+      if (data.imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
+        try {
+          const oldImageRef = ref(storage, oldImageUrl);
+          await deleteObject(oldImageRef);
+        } catch (deleteError: any) {
+          if (deleteError.code !== 'storage/object-not-found') {
+            console.warn("Could not delete old promotion image, but DB was updated:", deleteError);
+          }
+        }
       }
 
       setShowCreateEditPromotionModal(false);
@@ -795,3 +796,4 @@ export default function BusinessPromotionsPage() {
 }
 
     
+
