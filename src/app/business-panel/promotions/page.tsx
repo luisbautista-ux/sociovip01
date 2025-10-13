@@ -286,17 +286,28 @@ export default function BusinessPromotionsPage() {
     }
   };
   
-  const handleDeletePromotion = async (promotionId: string, promotionName?: string) => {
-    if (isSubmitting) return;
-     if (!currentBusinessId) {
-        toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
-        setIsSubmitting(false);
-        return;
+  const handleDeletePromotion = async (promotionToDelete: BusinessManagedEntity) => {
+    if (isSubmitting || !currentBusinessId) {
+      toast({ title: "Error", description: "Operación no permitida o ID de negocio no disponible.", variant: "destructive" });
+      return;
     }
     setIsSubmitting(true);
     try {
-      await deleteDoc(doc(db, "businessEntities", promotionId));
-      toast({ title: "Promoción Eliminada", description: `La promoción "${promotionName || 'seleccionada'}" ha sido eliminada.`, variant: "destructive" });
+      await deleteDoc(doc(db, "businessEntities", promotionToDelete.id));
+      toast({ title: "Promoción Eliminada", description: `La promoción "${promotionToDelete.name || 'seleccionada'}" ha sido eliminada.`, variant: "destructive" });
+
+      if (promotionToDelete.imageUrl && promotionToDelete.imageUrl.includes("firebase")) {
+        try {
+          const imageRef = ref(storage, promotionToDelete.imageUrl);
+          await deleteObject(imageRef);
+        } catch (deleteError: any) {
+          if (deleteError.code !== 'storage/object-not-found') {
+            console.warn("Could not delete promotion image:", deleteError);
+            toast({ title: "Aviso", description: "La promoción fue eliminada, pero no se pudo borrar la imagen asociada.", variant: "default" });
+          }
+        }
+      }
+
       if (currentBusinessId) fetchBusinessData(currentBusinessId); 
     } catch (error: any) {
       toast({ title: "Error al Eliminar", description: `No se pudo eliminar la promoción. ${error.message}`, variant: "destructive"});
@@ -545,7 +556,7 @@ export default function BusinessPromotionsPage() {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><AlertDialogDescription>Se eliminará la promoción "{promo.name}".</AlertDialogDescription></AlertDialogHeader>
-                                    <UIAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePromotion(promo.id!, promo.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></UIAlertDialogFooter>
+                                    <UIAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePromotion(promo)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></UIAlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
                               </DropdownMenuContent>
@@ -654,7 +665,7 @@ export default function BusinessPromotionsPage() {
                                           <UIAlertDialogFooter>
                                               <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                                               <AlertDialogAction
-                                                  onClick={() => handleDeletePromotion(promo.id!, promo.name)}
+                                                  onClick={() => handleDeletePromotion(promo)}
                                                   className="bg-destructive hover:bg-destructive/90"
                                                   disabled={isSubmitting}
                                               >
@@ -796,4 +807,5 @@ export default function BusinessPromotionsPage() {
 }
 
     
+
 
