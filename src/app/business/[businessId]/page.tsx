@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -1085,7 +1086,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"}
                       alt={promo.name}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={promo.aiHint || "discount offer"}
                     />
@@ -1124,7 +1124,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
                       alt={event.name}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={event.aiHint || "party concert"}
                     />

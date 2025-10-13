@@ -1084,7 +1084,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"}
                       alt={promo.name}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={promo.aiHint || "discount offer"}
                     />
@@ -1123,7 +1122,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
                       alt={event.name}
                       fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
                       data-ai-hint={event.aiHint || "party concert"}
                     />
@@ -1337,7 +1335,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         style={{
                             backgroundSize: '400% 400%',
                             animation: 'gradient-animation 15s ease infinite',
-                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
+                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
                         }}
                     >
                         <Loader2 className="h-8 w-8 animate-spin mb-3"/>
@@ -1492,19 +1490,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
-    
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
