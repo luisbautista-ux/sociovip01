@@ -70,11 +70,10 @@ export interface EventDetailsFormRef {
 interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
-  imagePreviewUrl: string | null;
-  onImageChange: (file: File | null, previewUrl: string | null) => void;
+  onDetailsChange: (detailsValues: EventDetailsFormValues, imageFile: File | null, previewUrl: string | null) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, imagePreviewUrl, onImageChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onDetailsChange }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,28 +90,12 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       maxAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null ? undefined : event.maxAttendance,
       isActive: event?.isActive === undefined ? true : event.isActive,
       imageUrl: event?.imageUrl || "",
-      imageFile: null,
+      imageFile: (event as any).imageFile || null,
       aiHint: event?.aiHint || "",
     },
   });
-
-  useEffect(() => {
-    if (event) {
-        form.reset({
-            name: event.name || "",
-            description: event.description || "",
-            termsAndConditions: event.termsAndConditions || "",
-            startDate: anyToDate(event.startDate) ?? new Date(),
-            endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
-            unlimitedAttendance: event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0,
-            maxAttendance: event.maxAttendance === undefined || event.maxAttendance === null ? undefined : event.maxAttendance,
-            isActive: event.isActive === undefined ? true : event.isActive,
-            imageUrl: event.imageUrl || "",
-            imageFile: (event as any).imageFile || null,
-            aiHint: event.aiHint || "",
-        });
-    }
-  }, [event, form]);
+  
+  const formValues = form.watch();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,23 +104,20 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      form.setValue("imageFile", file, { shouldValidate: true });
-      onImageChange(file, URL.createObjectURL(file));
+      onDetailsChange(form.getValues(), file, URL.createObjectURL(file));
     }
   };
   
   useImperativeHandle(ref, () => ({
-    getValues: () => {
-      const formValues = form.getValues();
-      return {
-        ...formValues,
-        maxAttendance: formValues.unlimitedAttendance ? 0 : formValues.maxAttendance,
-      };
-    },
+    getValues: () => form.getValues(),
     trigger: () => form.trigger(),
     formState: form.formState,
   }));
   
+  useEffect(() => {
+    onDetailsChange(formValues, form.getValues('imageFile'), event.imageUrl || null);
+  }, [formValues, onDetailsChange, event.imageUrl, form]);
+
   const isUnlimited = form.watch("unlimitedAttendance");
 
   React.useEffect(() => {
@@ -145,6 +125,8 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       form.setValue("maxAttendance", 0);
     }
   }, [isUnlimited, form]);
+
+  const imagePreviewUrl = (event as any).imageUrl || null;
 
   return (
     <Form {...form}>

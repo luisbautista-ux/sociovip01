@@ -47,7 +47,7 @@ const ManageEventDialog = ({
     editingEvent: initialEditingEvent,
     isDuplicating,
     availablePromoters,
-    handleSaveEvent,
+    onSave, // Changed from handleSaveEvent to onSave
     isSubmitting,
 }: {
     isManageEventDialogOpen: boolean;
@@ -55,18 +55,14 @@ const ManageEventDialog = ({
     editingEvent: BusinessManagedEntity | null;
     isDuplicating: boolean;
     availablePromoters: BusinessPromoterLink[];
-    handleSaveEvent: (event: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => Promise<void>;
+    onSave: (event: BusinessManagedEntity, imageFile: File | null) => Promise<void>; // Updated signature
     isSubmitting: boolean;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
 
-    const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
-    const [eventBoxes, setEventBoxes] = useState<EventBox[]>([]);
-    const [assignedPromoters, setAssignedPromoters] = useState<EventPromoterAssignment[]>([]);
-
-    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-    const [imageFile, setImageFile] = useState<File | null>(null);
+    // This state now holds ALL data for the event being edited, including unsaved changes from all tabs
+    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(initialEditingEvent);
     
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
@@ -83,26 +79,31 @@ const ManageEventDialog = ({
         sold: 'Vendido',
     };
     
+    // Sync the internal state when the initial event prop changes (e.g., opening the dialog)
     useEffect(() => {
         if (isManageEventDialogOpen && initialEditingEvent) {
-            setTicketTypes(initialEditingEvent.ticketTypes || []);
-            setEventBoxes(initialEditingEvent.eventBoxes || []);
-            setAssignedPromoters(initialEditingEvent.assignedPromoters || []);
-            setImagePreviewUrl(initialEditingEvent.imageUrl || null);
-            setImageFile(null); // Reset file on new open
+            setCurrentEventData(initialEditingEvent);
             setActiveTab("details");
         } else if (!isManageEventDialogOpen) {
-            // Reset all states when dialog closes
-            setTicketTypes([]);
-            setEventBoxes([]);
-            setAssignedPromoters([]);
-            setImagePreviewUrl(null);
-            setImageFile(null);
+            setCurrentEventData(null);
         }
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
+    // Callback to receive updates from the BusinessEventForm (details tab)
+    const handleDetailsChange = useCallback((detailsValues: EventDetailsFormValues, imageFile: File | null, previewUrl: string | null) => {
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                ...detailsValues,
+                imageUrl: previewUrl || prev.imageUrl, // Keep preview URL in sync
+                imageFile: imageFile, // Store the file object itself
+            } as BusinessManagedEntity;
+        });
+    }, []);
+
     const handleSaveChanges = async () => {
-        if (!detailsFormRef.current || !initialEditingEvent) return;
+        if (!detailsFormRef.current || !currentEventData) return;
         
         const detailsAreValid = await detailsFormRef.current.trigger();
         if (!detailsAreValid) {
@@ -111,20 +112,8 @@ const ManageEventDialog = ({
             return;
         }
         
-        const detailsValues = detailsFormRef.current.getValues();
-        
-        const finalEventData: BusinessManagedEntity = {
-          ...initialEditingEvent,
-          ...detailsValues,
-          maxAttendance: detailsValues.unlimitedAttendance ? 0 : detailsValues.maxAttendance,
-          ticketTypes: ticketTypes,
-          eventBoxes: eventBoxes,
-          assignedPromoters: assignedPromoters,
-          imageUrl: imagePreviewUrl || initialEditingEvent.imageUrl,
-          imageFile: imageFile,
-        } as BusinessManagedEntity;
-        
-        await handleSaveEvent(finalEventData, detailsValues);
+        // Final data object to save is already in currentEventData
+        await onSave(currentEventData, (currentEventData as any).imageFile || null);
     };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
@@ -132,21 +121,28 @@ const ManageEventDialog = ({
         const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
             ...ticketData,
             id: ticketId,
-            eventId: initialEditingEvent?.id || '',
-            businessId: initialEditingEvent?.businessId || '',
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
         }) as TicketType;
 
-        if (editingTicket) {
-            setTicketTypes(prev => prev.map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t));
-        } else {
-            setTicketTypes(prev => [...prev, newOrUpdatedTicket]);
-        }
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const existingTickets = prev.ticketTypes || [];
+            const updatedTickets = editingTicket
+                ? existingTickets.map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t)
+                : [...existingTickets, newOrUpdatedTicket];
+            return { ...prev, ticketTypes: updatedTickets };
+        });
+
         setIsTicketFormOpen(false);
         setEditingTicket(null);
     };
     
     const handleTicketDelete = (ticketId: string) => {
-        setTicketTypes(prev => prev.filter(t => t.id !== ticketId));
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, ticketTypes: (prev.ticketTypes || []).filter(t => t.id !== ticketId) };
+        });
     };
     
     const handleBoxSubmit = (boxData: EventBoxFormData) => {
@@ -154,15 +150,19 @@ const ManageEventDialog = ({
         const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
             ...boxData,
             id: boxId,
-            eventId: initialEditingEvent?.id || '',
-            businessId: initialEditingEvent?.businessId || '',
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
         }) as EventBox;
-
-        if (editingBox) {
-            setEventBoxes(prev => prev.map(b => b.id === editingBox.id ? newOrUpdatedBox : b));
-        } else {
-            setEventBoxes(prev => [...prev, newOrUpdatedBox]);
-        }
+        
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const existingBoxes = prev.eventBoxes || [];
+            const updatedBoxes = editingBox
+                ? existingBoxes.map(b => b.id === editingBox.id ? newOrUpdatedBox : b)
+                : [...existingBoxes, newOrUpdatedBox];
+            return { ...prev, eventBoxes: updatedBoxes };
+        });
+        
         setIsBoxFormOpen(false);
         setEditingBox(null);
     };
@@ -172,8 +172,8 @@ const ManageEventDialog = ({
         for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
             newBoxes.push(sanitizeObjectForFirestore({
                 id: `box_batch_${Date.now()}_${i}`,
-                eventId: initialEditingEvent?.id || '',
-                businessId: initialEditingEvent?.businessId || '',
+                eventId: currentEventData?.id || '',
+                businessId: currentEventData?.businessId || '',
                 name: `${batchData.prefix} ${i}`,
                 cost: batchData.cost,
                 description: batchData.description,
@@ -181,20 +181,27 @@ const ManageEventDialog = ({
                 status: 'available',
             }) as EventBox);
         }
-        setEventBoxes(prev => [...prev, ...newBoxes]);
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, eventBoxes: [...(prev.eventBoxes || []), ...newBoxes] };
+        });
         setIsBatchBoxFormOpen(false);
     };
 
     const handleBoxDelete = (boxId: string) => {
-        setEventBoxes(prev => prev.filter(b => b.id !== boxId));
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, eventBoxes: (prev.eventBoxes || []).filter(b => b.id !== boxId) };
+        });
     };
 
     const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
         const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
         if (!promoterData) return;
 
-        setAssignedPromoters(prev => {
-            let updatedAssignments = [...prev];
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            let updatedAssignments = [...(prev.assignedPromoters || [])];
             if (isChecked) {
                 const isAlreadyAssigned = updatedAssignments.some(p => p.promoterProfileId === promoterId);
                 if (!isAlreadyAssigned) {
@@ -209,59 +216,69 @@ const ManageEventDialog = ({
             } else {
                 updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
             }
-            return updatedAssignments;
+            return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
 
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
-        setAssignedPromoters(prev => prev.map(p => {
-            if (p.promoterProfileId === promoterId) {
-                const updatedRules = [...p.commissionRules!];
-                updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
-                return { ...p, commissionRules: updatedRules };
-            }
-            return p;
-        }));
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const updatedRules = [...(p.commissionRules || [])];
+                    if (updatedRules[ruleIndex]) {
+                        updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
+                    }
+                    return { ...p, commissionRules: updatedRules };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
     };
 
     const handleAddCommissionRule = (promoterId: string) => {
-        setAssignedPromoters(prev => prev.map(p => {
-            if (p.promoterProfileId === promoterId) {
-                const newRule: CommissionRule = {
-                    id: `rule_${Date.now()}`,
-                    appliesTo: 'event_general',
-                    commissionType: 'fixed',
-                    commissionValue: 0,
-                };
-                return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
-            }
-            return p;
-        }));
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    const newRule: CommissionRule = {
+                        id: `rule_${Date.now()}`,
+                        appliesTo: 'event_general',
+                        commissionType: 'fixed',
+                        commissionValue: 0,
+                    };
+                    return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
     };
     
     const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
-         setAssignedPromoters(prev => prev.map(p => {
-            if (p.promoterProfileId === promoterId) {
-                const updatedRules = (p.commissionRules || []).filter(r => r.id !== ruleId);
-                return { ...p, commissionRules: updatedRules };
-            }
-            return p;
-        }));
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    return { ...p, commissionRules: (p.commissionRules || []).filter(r => r.id !== ruleId) };
+                }
+                return p;
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
     };
     
-    const handleDetailsImageChange = useCallback((file: File | null, previewUrl: string | null) => {
-        setImageFile(file);
-        setImagePreviewUrl(previewUrl);
-    }, []);
+    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
 
-    if (!isManageEventDialogOpen || !initialEditingEvent) return null;
+    if (!isManageEventDialogOpen || !currentEventData) return null;
 
     return (
         <>
             <Dialog open={isManageEventDialogOpen} onOpenChange={setIsManageEventDialogOpen}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{initialEditingEvent?.id && !isDuplicating ? `Editar Evento: ${initialEditingEvent.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogTitle>{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
@@ -270,9 +287,9 @@ const ManageEventDialog = ({
                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
-                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                                    <TabsTrigger value="boxes">Boxes ({eventBoxes.length || 0})</TabsTrigger>
-                                    <TabsTrigger value="promoters">Promotores ({assignedPromoters.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="tickets">Entradas ({maxAttendanceFromTickets || 'Ilimitado'})</TabsTrigger>
+                                    <TabsTrigger value="boxes">Boxes ({currentEventData.eventBoxes?.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="promoters">Promotores ({currentEventData.assignedPromoters?.length || 0})</TabsTrigger>
                                 </TabsList>
                             </Tabs>
                         </div>
@@ -289,10 +306,9 @@ const ManageEventDialog = ({
                                   <CardContent>
                                     <BusinessEventForm 
                                         ref={detailsFormRef}
-                                        event={initialEditingEvent} 
+                                        event={currentEventData} 
                                         isSubmitting={isSubmitting}
-                                        imagePreviewUrl={imagePreviewUrl}
-                                        onImageChange={handleDetailsImageChange}
+                                        onDetailsChange={handleDetailsChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -309,7 +325,7 @@ const ManageEventDialog = ({
                                      <Table>
                                          <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                          <TableBody>
-                                             {ticketTypes.map(ticket => (
+                                             {(currentEventData.ticketTypes || []).map(ticket => (
                                                  <TableRow key={ticket.id}>
                                                      <TableCell>{ticket.name}</TableCell>
                                                      <TableCell>{ticket.cost.toFixed(2)}</TableCell>
@@ -329,7 +345,7 @@ const ManageEventDialog = ({
                                          </TableBody>
                                      </Table>
                                      </div>
-                                      {ticketTypes.length === 0 && (
+                                      {(currentEventData.ticketTypes || []).length === 0 && (
                                         <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
                                       )}
                                  </CardContent>
@@ -349,7 +365,7 @@ const ManageEventDialog = ({
                                             
                                             {/* Mobile View for Boxes */}
                                             <div className="md:hidden space-y-4 mt-4">
-                                                {eventBoxes.map(box => (
+                                                {(currentEventData.eventBoxes || []).map(box => (
                                                     <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
                                                         "bg-green-500/10 border-green-300": box.status === 'available',
                                                         "bg-blue-500/10 border-blue-300": box.status === 'reserved',
@@ -389,7 +405,7 @@ const ManageEventDialog = ({
                                                 <Table>
                                                     <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                                     <TableBody>
-                                                        {eventBoxes.map(box => (
+                                                        {(currentEventData.eventBoxes || []).map(box => (
                                                             <TableRow key={box.id}>
                                                                 <TableCell>{box.name}</TableCell>
                                                                 <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
@@ -413,7 +429,7 @@ const ManageEventDialog = ({
                                                 </Table>
                                             </div>
 
-                                            {eventBoxes.length === 0 && (
+                                            {(currentEventData.eventBoxes || []).length === 0 && (
                                                 <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
                                             )}
                                         </CardContent>
@@ -430,7 +446,7 @@ const ManageEventDialog = ({
                                             <Label className="font-semibold">Promotores del Negocio</Label>
                                             <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
                                                 {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
-                                                    const isChecked = assignedPromoters.some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                    const isChecked = (currentEventData.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
                                                     return (
                                                         <div key={promoter.platformUserUid} className="flex items-center space-x-2">
                                                             <Checkbox
@@ -446,8 +462,8 @@ const ManageEventDialog = ({
                                         </div>
 
                                         <div className="space-y-4">
-                                          <h4 className="font-semibold">Promotores Asignados ({assignedPromoters.length || 0})</h4>
-                                          {assignedPromoters.map(assignment => (
+                                          <h4 className="font-semibold">Promotores Asignados ({(currentEventData.assignedPromoters || []).length || 0})</h4>
+                                          {(currentEventData.assignedPromoters || []).map(assignment => (
                                               <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
                                                   <div className="flex justify-between items-center">
                                                       <p className="font-medium">{assignment.promoterName}</p>
@@ -467,7 +483,7 @@ const ManageEventDialog = ({
                                                   </div>
                                               </div>
                                           ))}
-                                          {assignedPromoters.length === 0 && (
+                                          {(currentEventData.assignedPromoters || []).length === 0 && (
                                               <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
                                           )}
                                         </div>
@@ -518,7 +534,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
-                        existingBoxes={eventBoxes}
+                        existingBoxes={currentEventData.eventBoxes || []}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -682,13 +698,9 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => {
+  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity, imageFile: File | null) => {
       if(!currentBusinessId) {
           toast({title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive"});
-          return;
-      }
-       if(!eventDataToSave) {
-          toast({title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive"});
           return;
       }
       setIsSubmitting(true);
@@ -700,22 +712,21 @@ export default function BusinessEventsPage() {
         let finalImageUrl = eventDataToSave.imageUrl || "";
         const oldImageUrl = !isNewEntity && editingEvent?.imageUrl ? editingEvent.imageUrl : null;
         
-        if (detailsData.imageFile) {
+        if (imageFile) {
             toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
-            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${detailsData.imageFile.name}`);
-            const uploadResult = await uploadBytes(storageRef, detailsData.imageFile);
+            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${imageFile.name}`);
+            const uploadResult = await uploadBytes(storageRef, imageFile);
             finalImageUrl = await getDownloadURL(uploadResult.ref);
         }
 
         const payload = {
             ...eventDataToSave,
-            ...detailsData,
             imageUrl: finalImageUrl,
             businessId: currentBusinessId,
             type: 'event' as 'event',
-            startDate: Timestamp.fromDate(new Date(detailsData.startDate)),
-            endDate: Timestamp.fromDate(new Date(detailsData.endDate)),
-            maxAttendance: detailsData.unlimitedAttendance ? 0 : detailsData.maxAttendance,
+            startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
+            endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
+            maxAttendance: eventDataToSave.maxAttendance || 0,
         };
         // Remove file object before sending to firestore
         delete (payload as any).imageFile;
@@ -730,7 +741,7 @@ export default function BusinessEventsPage() {
             toast({title: "Evento Actualizado", description: "Los cambios se han guardado correctamente."});
         }
 
-        if (detailsData.imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
+        if (imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
             try {
               const oldImageRef = ref(storage, oldImageUrl);
               await deleteObject(oldImageRef);
@@ -958,7 +969,7 @@ export default function BusinessEventsPage() {
         editingEvent={editingEvent}
         isDuplicating={isDuplicating}
         availablePromoters={availablePromoters}
-        handleSaveEvent={handleSaveEvent}
+        onSave={handleSaveEvent}
         isSubmitting={isSubmitting}
       />
 
@@ -1009,3 +1020,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
