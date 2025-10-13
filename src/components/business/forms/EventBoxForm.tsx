@@ -84,7 +84,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Box <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Box A1 (Escenario), Mesa VIP 5" {...field} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: Box A1 (Escenario), Mesa VIP 5" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
           )}

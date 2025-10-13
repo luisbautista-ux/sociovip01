@@ -120,12 +120,14 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   
   const isUnlimited = form.watch("unlimitedAttendance");
 
-  React.useEffect(() => {
+  // Este useEffect causaba el bucle. Lo corregimos para que solo se ejecute cuando `isUnlimited` cambia.
+  useEffect(() => {
     if (isUnlimited) {
       form.setValue("maxAttendance", 0);
       onDetailsChange({ maxAttendance: 0 });
     }
   }, [isUnlimited, form, onDetailsChange]);
+
 
   return (
     <Form {...form}>
@@ -294,7 +296,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           render={({ field }) => (
             <FormItem>
               <FormLabel><strong>Palabras Clave para Imagen (Opcional)</strong></FormLabel>
-              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} onBlur={() => onDetailsChange({ aiHint: field.value })} disabled={isSubmitting} /></FormControl>
+              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} onBlur={() => onDetailsChange({ aiHint: field.value })} disabled={isSubmitting} /></FormControl>
                <FormMessage />
             </FormItem>
           )}

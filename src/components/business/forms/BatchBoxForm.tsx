@@ -106,7 +106,7 @@ export function BatchBoxForm({ existingBoxes = [], onSubmit, onCancel, isSubmitt
         <FormField control={form.control} name="prefix" render={({ field }) => (
           <FormItem>
             <FormLabel>Prefijo del Nombre <span className="text-destructive">*</span></FormLabel>
-            <FormControl><Input placeholder="Ej: Mesa VIP, Lounge" {...field} disabled={isSubmitting} /></FormControl>
+            <FormControl><Input placeholder="Ej: Mesa VIP, Lounge" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
             <FormMessage />
           </FormItem>
         )}/>
