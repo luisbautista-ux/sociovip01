@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
+import React, { useImperativeHandle, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
@@ -21,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
-import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, ImageIcon } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, isBefore, startOfDay, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
@@ -72,11 +71,10 @@ interface BusinessEventFormProps {
   event: BusinessManagedEntity; 
   isSubmitting?: boolean;
   imagePreviewUrl: string | null;
-  onImageChange: (url: string | null) => void;
-  onFormChange: (data: EventDetailsFormValues) => void;
+  onImageChange: (file: File | null, previewUrl: string | null) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, imagePreviewUrl, onImageChange, onFormChange }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, imagePreviewUrl, onImageChange }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,13 +96,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     },
   });
 
-  const watchedValues = form.watch();
-
-  useEffect(() => {
-    // This effect now passes the full form data up, including the file
-    onFormChange(watchedValues);
-  }, [watchedValues, onFormChange]);
-  
   useEffect(() => {
     if (event) {
         form.reset({
@@ -117,21 +108,21 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             maxAttendance: event.maxAttendance === undefined || event.maxAttendance === null ? undefined : event.maxAttendance,
             isActive: event.isActive === undefined ? true : event.isActive,
             imageUrl: event.imageUrl || "",
-            imageFile: (event as any).imageFile || null, // Propagate file if it exists
+            imageFile: (event as any).imageFile || null,
             aiHint: event.aiHint || "",
         });
     }
   }, [event, form]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
       form.setValue("imageFile", file, { shouldValidate: true });
-      onImageChange(URL.createObjectURL(file));
+      onImageChange(file, URL.createObjectURL(file));
     }
   };
   

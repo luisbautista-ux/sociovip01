@@ -55,14 +55,18 @@ const ManageEventDialog = ({
     editingEvent: BusinessManagedEntity | null;
     isDuplicating: boolean;
     availablePromoters: BusinessPromoterLink[];
-    handleSaveEvent: (event: BusinessManagedEntity | null) => Promise<void>;
+    handleSaveEvent: (event: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => Promise<void>;
     isSubmitting: boolean;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const detailsFormRef = useRef<EventDetailsFormRef>(null);
 
-    const [eventData, setEventData] = useState<BusinessManagedEntity | null>(null);
+    const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
+    const [eventBoxes, setEventBoxes] = useState<EventBox[]>([]);
+    const [assignedPromoters, setAssignedPromoters] = useState<EventPromoterAssignment[]>([]);
+
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
     
     // States for forms within the dialog
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
@@ -81,17 +85,24 @@ const ManageEventDialog = ({
     
     useEffect(() => {
         if (isManageEventDialogOpen && initialEditingEvent) {
-            setEventData(initialEditingEvent);
+            setTicketTypes(initialEditingEvent.ticketTypes || []);
+            setEventBoxes(initialEditingEvent.eventBoxes || []);
+            setAssignedPromoters(initialEditingEvent.assignedPromoters || []);
             setImagePreviewUrl(initialEditingEvent.imageUrl || null);
+            setImageFile(null); // Reset file on new open
             setActiveTab("details");
         } else if (!isManageEventDialogOpen) {
-            setEventData(null);
+            // Reset all states when dialog closes
+            setTicketTypes([]);
+            setEventBoxes([]);
+            setAssignedPromoters([]);
             setImagePreviewUrl(null);
+            setImageFile(null);
         }
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleSaveChanges = async () => {
-        if (!detailsFormRef.current || !eventData) return;
+        if (!detailsFormRef.current || !initialEditingEvent) return;
         
         const detailsAreValid = await detailsFormRef.current.trigger();
         if (!detailsAreValid) {
@@ -103,108 +114,87 @@ const ManageEventDialog = ({
         const detailsValues = detailsFormRef.current.getValues();
         
         const finalEventData: BusinessManagedEntity = {
-          ...eventData,
+          ...initialEditingEvent,
           ...detailsValues,
           maxAttendance: detailsValues.unlimitedAttendance ? 0 : detailsValues.maxAttendance,
-        };
+          ticketTypes: ticketTypes,
+          eventBoxes: eventBoxes,
+          assignedPromoters: assignedPromoters,
+          imageUrl: imagePreviewUrl || initialEditingEvent.imageUrl,
+          imageFile: imageFile,
+        } as BusinessManagedEntity;
         
-        await handleSaveEvent(finalEventData);
+        await handleSaveEvent(finalEventData, detailsValues);
     };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
-        setEventData(prev => {
-            if (!prev) return null;
-            let updatedTicketTypes: TicketType[];
-            const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
-            const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
-                ...ticketData,
-                id: ticketId,
-                eventId: prev.id,
-                businessId: prev.businessId,
-            }) as TicketType;
+        const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
+        const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
+            ...ticketData,
+            id: ticketId,
+            eventId: initialEditingEvent?.id || '',
+            businessId: initialEditingEvent?.businessId || '',
+        }) as TicketType;
 
-            if (editingTicket) {
-                updatedTicketTypes = (prev.ticketTypes || []).map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t);
-            } else {
-                updatedTicketTypes = [...(prev.ticketTypes || []), newOrUpdatedTicket];
-            }
-            return { ...prev, ticketTypes: updatedTicketTypes };
-        });
+        if (editingTicket) {
+            setTicketTypes(prev => prev.map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t));
+        } else {
+            setTicketTypes(prev => [...prev, newOrUpdatedTicket]);
+        }
         setIsTicketFormOpen(false);
         setEditingTicket(null);
     };
     
     const handleTicketDelete = (ticketId: string) => {
-        setEventData(prev => {
-            if (!prev) return null;
-            const updatedTicketTypes = (prev.ticketTypes || []).filter(t => t.id !== ticketId);
-            return { ...prev, ticketTypes: updatedTicketTypes };
-        });
+        setTicketTypes(prev => prev.filter(t => t.id !== ticketId));
     };
     
     const handleBoxSubmit = (boxData: EventBoxFormData) => {
-        setEventData(prev => {
-            if (!prev) return null;
-            let updatedBoxes: EventBox[];
-            const boxId = editingBox?.id || `box_${Date.now()}`;
-            const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
-                ...boxData,
-                id: boxId,
-                eventId: prev.id,
-                businessId: prev.businessId,
-            }) as EventBox;
+        const boxId = editingBox?.id || `box_${Date.now()}`;
+        const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
+            ...boxData,
+            id: boxId,
+            eventId: initialEditingEvent?.id || '',
+            businessId: initialEditingEvent?.businessId || '',
+        }) as EventBox;
 
-            if (editingBox) {
-                updatedBoxes = (prev.eventBoxes || []).map(b => b.id === editingBox.id ? newOrUpdatedBox : b);
-            } else {
-                updatedBoxes = [...(prev.eventBoxes || []), newOrUpdatedBox];
-            }
-            return { ...prev, eventBoxes: updatedBoxes };
-        });
+        if (editingBox) {
+            setEventBoxes(prev => prev.map(b => b.id === editingBox.id ? newOrUpdatedBox : b));
+        } else {
+            setEventBoxes(prev => [...prev, newOrUpdatedBox]);
+        }
         setIsBoxFormOpen(false);
         setEditingBox(null);
     };
     
     const handleBatchBoxSubmit = (batchData: BatchBoxFormData) => {
-        setEventData(prev => {
-            if (!prev) return null;
-            const newBoxes: EventBox[] = [];
-            for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
-                newBoxes.push(sanitizeObjectForFirestore({
-                    id: `box_batch_${Date.now()}_${i}`,
-                    eventId: prev.id,
-                    businessId: prev.businessId,
-                    name: `${batchData.prefix} ${i}`,
-                    cost: batchData.cost,
-                    description: batchData.description,
-                    capacity: batchData.capacity,
-                    status: 'available',
-                }) as EventBox);
-            }
-            const updatedBoxes = [...(prev.eventBoxes || []), ...newBoxes];
-            return { ...prev, eventBoxes: updatedBoxes };
-        });
+        const newBoxes: EventBox[] = [];
+        for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
+            newBoxes.push(sanitizeObjectForFirestore({
+                id: `box_batch_${Date.now()}_${i}`,
+                eventId: initialEditingEvent?.id || '',
+                businessId: initialEditingEvent?.businessId || '',
+                name: `${batchData.prefix} ${i}`,
+                cost: batchData.cost,
+                description: batchData.description,
+                capacity: batchData.capacity,
+                status: 'available',
+            }) as EventBox);
+        }
+        setEventBoxes(prev => [...prev, ...newBoxes]);
         setIsBatchBoxFormOpen(false);
     };
 
     const handleBoxDelete = (boxId: string) => {
-        setEventData(prev => {
-            if (!prev) return null;
-            const updatedBoxes = (prev.eventBoxes || []).filter(b => b.id !== boxId);
-            return { ...prev, eventBoxes: updatedBoxes };
-        });
+        setEventBoxes(prev => prev.filter(b => b.id !== boxId));
     };
-
 
     const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
         const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
         if (!promoterData) return;
 
-        setEventData(prev => {
-            if (!prev) return null;
-            
-            let updatedAssignments = [...(prev.assignedPromoters || [])];
-
+        setAssignedPromoters(prev => {
+            let updatedAssignments = [...prev];
             if (isChecked) {
                 const isAlreadyAssigned = updatedAssignments.some(p => p.promoterProfileId === promoterId);
                 if (!isAlreadyAssigned) {
@@ -219,68 +209,59 @@ const ManageEventDialog = ({
             } else {
                 updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
             }
-
-            return { ...prev, assignedPromoters: updatedAssignments };
+            return updatedAssignments;
         });
     };
 
-
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
-        setEventData(prev => {
-            if (!prev) return null;
-            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                if (p.promoterProfileId === promoterId) {
-                    const updatedRules = [...p.commissionRules!];
-                    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
-                    return { ...p, commissionRules: updatedRules };
-                }
-                return p;
-            });
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
+        setAssignedPromoters(prev => prev.map(p => {
+            if (p.promoterProfileId === promoterId) {
+                const updatedRules = [...p.commissionRules!];
+                updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
+                return { ...p, commissionRules: updatedRules };
+            }
+            return p;
+        }));
     };
 
     const handleAddCommissionRule = (promoterId: string) => {
-        setEventData(prev => {
-            if (!prev) return null;
-            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                if (p.promoterProfileId === promoterId) {
-                    const newRule: CommissionRule = {
-                        id: `rule_${Date.now()}`,
-                        appliesTo: 'event_general',
-                        commissionType: 'fixed',
-                        commissionValue: 0,
-                    };
-                    return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
-                }
-                return p;
-            });
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
+        setAssignedPromoters(prev => prev.map(p => {
+            if (p.promoterProfileId === promoterId) {
+                const newRule: CommissionRule = {
+                    id: `rule_${Date.now()}`,
+                    appliesTo: 'event_general',
+                    commissionType: 'fixed',
+                    commissionValue: 0,
+                };
+                return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
+            }
+            return p;
+        }));
     };
     
     const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
-         setEventData(prev => {
-            if (!prev) return null;
-            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                if (p.promoterProfileId === promoterId) {
-                    const updatedRules = (p.commissionRules || []).filter(r => r.id !== ruleId);
-                    return { ...p, commissionRules: updatedRules };
-                }
-                return p;
-            });
-            return { ...prev, assignedPromoters: updatedAssignments };
-        });
+         setAssignedPromoters(prev => prev.map(p => {
+            if (p.promoterProfileId === promoterId) {
+                const updatedRules = (p.commissionRules || []).filter(r => r.id !== ruleId);
+                return { ...p, commissionRules: updatedRules };
+            }
+            return p;
+        }));
     };
+    
+    const handleDetailsImageChange = useCallback((file: File | null, previewUrl: string | null) => {
+        setImageFile(file);
+        setImagePreviewUrl(previewUrl);
+    }, []);
 
-    if (!isManageEventDialogOpen || !eventData) return null;
+    if (!isManageEventDialogOpen || !initialEditingEvent) return null;
 
     return (
         <>
-            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEventData(null); setIsManageEventDialogOpen(isOpen); }}>
+            <Dialog open={isManageEventDialogOpen} onOpenChange={setIsManageEventDialogOpen}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{eventData?.id && !isDuplicating ? `Editar Evento: ${eventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogTitle>{initialEditingEvent?.id && !isDuplicating ? `Editar Evento: ${initialEditingEvent.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
                     </DialogHeader>
                     
@@ -289,9 +270,9 @@ const ManageEventDialog = ({
                            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
-                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(eventData.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                                    <TabsTrigger value="boxes">Boxes ({eventData.eventBoxes?.length || 0})</TabsTrigger>
-                                    <TabsTrigger value="promoters">Promotores ({eventData.assignedPromoters?.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(ticketTypes) || 'Ilimitado'})</TabsTrigger>
+                                    <TabsTrigger value="boxes">Boxes ({eventBoxes.length || 0})</TabsTrigger>
+                                    <TabsTrigger value="promoters">Promotores ({assignedPromoters.length || 0})</TabsTrigger>
                                 </TabsList>
                             </Tabs>
                         </div>
@@ -308,10 +289,10 @@ const ManageEventDialog = ({
                                   <CardContent>
                                     <BusinessEventForm 
                                         ref={detailsFormRef}
-                                        event={eventData} 
+                                        event={initialEditingEvent} 
                                         isSubmitting={isSubmitting}
                                         imagePreviewUrl={imagePreviewUrl}
-                                        onImageChange={setImagePreviewUrl}
+                                        onImageChange={handleDetailsImageChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -328,7 +309,7 @@ const ManageEventDialog = ({
                                      <Table>
                                          <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                          <TableBody>
-                                             {(eventData.ticketTypes || []).map(ticket => (
+                                             {ticketTypes.map(ticket => (
                                                  <TableRow key={ticket.id}>
                                                      <TableCell>{ticket.name}</TableCell>
                                                      <TableCell>{ticket.cost.toFixed(2)}</TableCell>
@@ -348,7 +329,7 @@ const ManageEventDialog = ({
                                          </TableBody>
                                      </Table>
                                      </div>
-                                      {(!eventData.ticketTypes || eventData.ticketTypes.length === 0) && (
+                                      {ticketTypes.length === 0 && (
                                         <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
                                       )}
                                  </CardContent>
@@ -368,7 +349,7 @@ const ManageEventDialog = ({
                                             
                                             {/* Mobile View for Boxes */}
                                             <div className="md:hidden space-y-4 mt-4">
-                                                {(eventData.eventBoxes || []).map(box => (
+                                                {eventBoxes.map(box => (
                                                     <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
                                                         "bg-green-500/10 border-green-300": box.status === 'available',
                                                         "bg-blue-500/10 border-blue-300": box.status === 'reserved',
@@ -408,7 +389,7 @@ const ManageEventDialog = ({
                                                 <Table>
                                                     <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                                     <TableBody>
-                                                        {(eventData.eventBoxes || []).map(box => (
+                                                        {eventBoxes.map(box => (
                                                             <TableRow key={box.id}>
                                                                 <TableCell>{box.name}</TableCell>
                                                                 <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
@@ -432,7 +413,7 @@ const ManageEventDialog = ({
                                                 </Table>
                                             </div>
 
-                                            {(!eventData.eventBoxes || eventData.eventBoxes.length === 0) && (
+                                            {eventBoxes.length === 0 && (
                                                 <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
                                             )}
                                         </CardContent>
@@ -449,7 +430,7 @@ const ManageEventDialog = ({
                                             <Label className="font-semibold">Promotores del Negocio</Label>
                                             <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
                                                 {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
-                                                    const isChecked = (eventData.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                    const isChecked = assignedPromoters.some(p => p.promoterProfileId === promoter.platformUserUid);
                                                     return (
                                                         <div key={promoter.platformUserUid} className="flex items-center space-x-2">
                                                             <Checkbox
@@ -465,12 +446,11 @@ const ManageEventDialog = ({
                                         </div>
 
                                         <div className="space-y-4">
-                                          <h4 className="font-semibold">Promotores Asignados ({eventData.assignedPromoters?.length || 0})</h4>
-                                          {(eventData.assignedPromoters || []).map(assignment => (
+                                          <h4 className="font-semibold">Promotores Asignados ({assignedPromoters.length || 0})</h4>
+                                          {assignedPromoters.map(assignment => (
                                               <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
                                                   <div className="flex justify-between items-center">
                                                       <p className="font-medium">{assignment.promoterName}</p>
-                                                      {/* El promotor se desasigna desmarcando el checkbox de arriba */}
                                                   </div>
                                                   
                                                   <div className="space-y-2">
@@ -487,7 +467,7 @@ const ManageEventDialog = ({
                                                   </div>
                                               </div>
                                           ))}
-                                          {(!eventData.assignedPromoters || eventData.assignedPromoters.length === 0) && (
+                                          {assignedPromoters.length === 0 && (
                                               <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
                                           )}
                                         </div>
@@ -498,7 +478,7 @@ const ManageEventDialog = ({
                     </div>
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
-                        <Button variant="outline" onClick={() => { setIsManageEventDialogOpen(false); setEventData(null); }} disabled={isSubmitting}>Cancelar</Button>
+                        <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
                         <Button onClick={handleSaveChanges} disabled={isSubmitting}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
@@ -538,7 +518,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
-                        existingBoxes={eventData.eventBoxes}
+                        existingBoxes={eventBoxes}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -702,7 +682,7 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null) => {
+  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null, detailsData: EventDetailsFormValues) => {
       if(!currentBusinessId) {
           toast({title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive"});
           return;
@@ -718,26 +698,27 @@ export default function BusinessEventsPage() {
 
       try {
         let finalImageUrl = eventDataToSave.imageUrl || "";
-        const oldImageUrl = !isNewEntity && eventDataToSave.imageUrl ? eventDataToSave.imageUrl : null;
+        const oldImageUrl = !isNewEntity && editingEvent?.imageUrl ? editingEvent.imageUrl : null;
         
-        if (eventDataToSave.imageFile) {
+        if (detailsData.imageFile) {
             toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
-            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${eventDataToSave.imageFile.name}`);
-            const uploadResult = await uploadBytes(storageRef, eventDataToSave.imageFile);
+            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${detailsData.imageFile.name}`);
+            const uploadResult = await uploadBytes(storageRef, detailsData.imageFile);
             finalImageUrl = await getDownloadURL(uploadResult.ref);
         }
 
-        const { imageFile, ...restOfData } = eventDataToSave;
-
         const payload = {
-            ...restOfData,
+            ...eventDataToSave,
+            ...detailsData,
             imageUrl: finalImageUrl,
             businessId: currentBusinessId,
             type: 'event' as 'event',
-            startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
-            endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
-            maxAttendance: eventDataToSave.unlimitedAttendance ? 0 : eventDataToSave.maxAttendance,
+            startDate: Timestamp.fromDate(new Date(detailsData.startDate)),
+            endDate: Timestamp.fromDate(new Date(detailsData.endDate)),
+            maxAttendance: detailsData.unlimitedAttendance ? 0 : detailsData.maxAttendance,
         };
+        // Remove file object before sending to firestore
+        delete (payload as any).imageFile;
       
         if (isNewEntity) {
             const { id, ...createData } = payload;
@@ -749,7 +730,7 @@ export default function BusinessEventsPage() {
             toast({title: "Evento Actualizado", description: "Los cambios se han guardado correctamente."});
         }
 
-        if (eventDataToSave.imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
+        if (detailsData.imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
             try {
               const oldImageRef = ref(storage, oldImageUrl);
               await deleteObject(oldImageRef);
