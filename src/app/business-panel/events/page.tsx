@@ -88,20 +88,13 @@ const ManageEventDialog = ({
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
-      setCurrentEventData(prev => {
-        if (!prev) return null;
-        const updatedEvent = { ...prev, ...newDetails };
-        
-        // Handle image file updates specifically
-        if (newDetails.imageFile) {
-            setImageFile(newDetails.imageFile);
-            setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
-        } else if (newDetails.imageFile === null) { // Explicitly handle clearing the file
-            setImageFile(null);
-        }
-        
-        return updatedEvent;
-      });
+      // This function only updates local component state, it does not cause re-renders in the parent
+      if (newDetails.imageFile) {
+          setImageFile(newDetails.imageFile);
+          setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
+      } else if (newDetails.imageFile === null) {
+          setImageFile(null);
+      }
     }, []);
     
     const handleSaveChanges = async () => {
@@ -128,11 +121,16 @@ const ManageEventDialog = ({
     };
 
     const handleTabChange = async (newTab: string) => {
+        // When switching away from the details tab, get the latest form data
         if (activeTab === 'details' && detailsFormRef.current) {
             const formIsValid = await detailsFormRef.current.trigger();
             if (formIsValid) {
                 const currentDetails = detailsFormRef.current.getValues();
+                // Update the state in the parent dialog component
                 setCurrentEventData(prev => prev ? { ...prev, ...currentDetails } : null);
+            } else {
+                // If form is invalid, prevent tab switch
+                return;
             }
         }
         setActiveTab(newTab);
@@ -402,9 +400,9 @@ const ManageEventDialog = ({
                                                             <div className="text-muted-foreground">Costo:</div><div className="font-semibold">S/ {box.cost.toFixed(2)}</div>
                                                             <div className="text-muted-foreground">Capacidad:</div><div className="font-semibold">{box.capacity || 'N/A'}</div>
                                                             <div className="text-muted-foreground">Estado:</div>
-                                                            <div>
+                                                            <div className="flex flex-col">
                                                               <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
-                                                              {box.status !== 'available' && box.promoterName && <div className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</div>}
+                                                              {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
                                                             </div>
                                                         </CardContent>
                                                         <CardFooter className="p-2 bg-muted/50">
@@ -908,10 +906,10 @@ export default function BusinessEventsPage() {
                         <Button 
                             variant="gradient"
                             size="sm" 
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 w-full"
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs font-bold"
                             onClick={() => handleOpenManageEventDialog(event)}
                         >
-                            <Edit className="h-4 w-4 mr-2" /> Gestionar
+                            <Edit className="h-4 w-4 mr-2" /> Gestionar Evento
                         </Button>
                     </CardFooter>
                   </Card>
@@ -1027,4 +1025,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
