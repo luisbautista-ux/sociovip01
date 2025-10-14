@@ -70,14 +70,6 @@ export function CreateCodesDialog({
       setShowSuccess(false);
       setJustCreatedCodes([]);
       setIsCreating(false);
-
-      // Desenfocar el input para evitar la selección del texto por defecto
-      const timer = setTimeout(() => {
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
-      }, 1);
-      return () => clearTimeout(timer);
     }
   }, [open]);
 
@@ -174,7 +166,10 @@ export function CreateCodesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent 
+        className="sm:max-w-md"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             {showSuccess ? "Códigos Creados Exitosamente" : `Crear códigos para: ${entityName}`}
@@ -249,7 +244,7 @@ export function CreateCodesDialog({
           ) : (
             <>
               <Button variant="outline" onClick={handleCloseAndReset} disabled={isCreating || isSubmittingMain}>Cancelar</Button>
-              <Button onClick={handleCreateCodes} variant="gradient" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}>
+              <Button autoFocus onClick={handleCreateCodes} variant="gradient" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}>
                 {(isCreating || isSubmittingMain) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <PlusCircle className="mr-2 h-4 w-4" /> Crear códigos
               </Button>
