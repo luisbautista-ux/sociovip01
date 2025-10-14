@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -289,6 +288,7 @@ export default function BusinessPublicPage() {
               ? entityData.generatedCodes.map((gc: any) => sanitizeObjectForFirestore({ ...gc }))
               : [],
             imageUrl: entityData.imageUrl,
+            imageObjectPosition: entityData.imageObjectPosition,
             aiHint: entityData.aiHint,
             termsAndConditions: entityData.termsAndConditions,
             createdAt: anyToDate(entityData.createdAt)?.toISOString() || "",
@@ -1087,6 +1087,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       alt={promo.name}
                       fill
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+                      style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }}
                       data-ai-hint={promo.aiHint || "discount offer"}
                     />
                   </div>
@@ -1125,6 +1126,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       alt={event.name}
                       fill
                       className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+                      style={{ objectPosition: event.imageObjectPosition || '50% 50%' }}
                       data-ai-hint={event.aiHint || "party concert"}
                     />
                     {isPast(new Date(event.endDate)) && (

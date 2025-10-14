@@ -247,8 +247,8 @@ export function ManageCodesDialog({
       }
 
       const businessUrl = businessDetails?.customUrlPath
-          ? `https://sociosvip.app/b/${businessDetails.customUrlPath}`
-          : `https://sociosvip.app/business/${entity?.businessId}`;
+          ? `https://sociovip.app/b/${businessDetails.customUrlPath}`
+          : `https://sociovip.app/business/${entity?.businessId}`;
 
       const codesText = codes.join('\n');
       const message = `Genera tu entrada QR con tu código en:\n${businessUrl}\n\n${codesText}`;

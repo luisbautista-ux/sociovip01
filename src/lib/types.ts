@@ -1,4 +1,3 @@
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -218,6 +217,7 @@ export interface BusinessManagedEntity {
   usageLimit?: number; 
   isActive: boolean;
   imageUrl?: string;
+  imageObjectPosition?: string; // New: To store image focus point
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
@@ -344,6 +344,7 @@ export interface BusinessPromotionFormData {
   isActive: boolean;
   imageUrl?: string;
   imageFile?: File | null; // For file uploads
+  imageObjectPosition?: string; // For saving focus point
   aiHint?: string;
   termsAndConditions?: string;
 }

@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import * as React from "react";
@@ -124,6 +122,7 @@ export default function BusinessPromotionsPage() {
           usageLimit: data.usageLimit === undefined || data.usageLimit === null ? 0 : Number(data.usageLimit),
           isActive: data.isActive === undefined ? true : data.isActive,
           imageUrl: data.imageUrl || "",
+          imageObjectPosition: data.imageObjectPosition,
           aiHint: data.aiHint || "",
           generatedCodes: Array.isArray(data.generatedCodes) ? data.generatedCodes.map(gc => sanitizeObjectForFirestore(gc as GeneratedCode)) : [],
           createdAt: createdAtStr,
@@ -197,6 +196,7 @@ export default function BusinessPromotionsPage() {
         endDate: promoToDuplicate.endDate ? new Date(promoToDuplicate.endDate).toISOString() : oneWeekFromNow.toISOString(),
         usageLimit: promoToDuplicate.usageLimit === undefined ? 0 : promoToDuplicate.usageLimit,
         imageUrl: promoToDuplicate.imageUrl || "",
+        imageObjectPosition: promoToDuplicate.imageObjectPosition,
         aiHint: promoToDuplicate.aiHint || "",
         termsAndConditions: promoToDuplicate.termsAndConditions || "",
         ticketTypes: [], 
@@ -241,6 +241,7 @@ export default function BusinessPromotionsPage() {
         usageLimit: data.usageLimit === undefined || data.usageLimit === null || isNaN(Number(data.usageLimit)) ? 0 : Number(data.usageLimit),
         isActive: data.isActive,
         imageUrl: finalImageUrl,
+        imageObjectPosition: data.imageObjectPosition,
       };
 
       const fullPayloadForFirestore: Omit<BusinessManagedEntity, 'id' | 'createdAt'> & { createdAt?: any } = {

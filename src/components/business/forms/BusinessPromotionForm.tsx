@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon, Loader2, Crop } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -28,8 +27,6 @@ import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/typ
 import { DialogFooter } from "@/components/ui/dialog";
 import NextImage from "next/image";
 import { useToast } from "@/hooks/use-toast";
-import ReactCrop, { type Crop as ReactCropType, centerCrop, makeAspectCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
 
 
 const promotionFormSchema = z.object({
@@ -41,6 +38,7 @@ const promotionFormSchema = z.object({
   isActive: z.boolean().default(true),
   imageUrl: z.string().optional(),
   imageFile: z.custom<File | null>(() => true).optional(),
+  imageObjectPosition: z.string().optional(),
   termsAndConditions: z.string().optional(),
 }).refine(data => {
     if (data.startDate && data.endDate) {
@@ -65,12 +63,12 @@ interface BusinessPromotionFormProps {
 
 export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitting = false }: BusinessPromotionFormProps) {
   
-  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
-  const [crop, setCrop] = useState<ReactCropType>();
-  const [completedCrop, setCompletedCrop] = useState<ReactCropType>();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(promotion?.imageUrl || null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  
+  const [imageToAdjust, setImageToAdjust] = useState<string | null>(null);
+  const [objectPosition, setObjectPosition] = useState(promotion?.imageObjectPosition || '50% 50%');
+  const imgContainerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -85,14 +83,16 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       isActive: promotion?.isActive === undefined ? true : promotion.isActive,
       imageUrl: promotion?.imageUrl || "",
       imageFile: null,
+      imageObjectPosition: promotion?.imageObjectPosition || "50% 50%",
       termsAndConditions: promotion?.termsAndConditions || "",
     },
   });
 
   useEffect(() => {
     if (promotion) {
-      setPreviewUrl(promotion.imageUrl || null);
-      setImageToCrop(null); // Reset cropper on new promotion
+      const initialPosition = promotion.imageObjectPosition || '50% 50%';
+      setImageToAdjust(promotion.imageUrl || null);
+      setObjectPosition(initialPosition);
       form.reset({
         name: promotion.name || "",
         description: promotion.description || "",
@@ -102,6 +102,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         isActive: promotion.isActive === undefined ? true : promotion.isActive,
         imageUrl: promotion.imageUrl || "",
         imageFile: null,
+        imageObjectPosition: initialPosition,
         termsAndConditions: promotion.termsAndConditions || "",
       });
     }
@@ -116,78 +117,53 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       }
       const reader = new FileReader();
       reader.onload = () => {
-        setImageToCrop(reader.result as string);
+        setImageToAdjust(reader.result as string);
+        setObjectPosition('50% 50%'); // Reset position for new image
+        form.setValue("imageFile", file);
+        form.setValue("imageObjectPosition", '50% 50%');
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { width, height } = e.currentTarget;
-    const crop = centerCrop(
-      makeAspectCrop({ unit: '%', width: 100 }, 16 / 9, width, height),
-      width,
-      height
-    );
-    setCrop(crop);
+  const handleMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
+    e.preventDefault();
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (!isDragging.current || !imgContainerRef.current) return;
+    const container = imgContainerRef.current;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+
+    const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
+    
+    // Adjust sensitivity based on container size
+    const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
+    const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
+
+    const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
+    setObjectPosition(newPosition);
+    form.setValue("imageObjectPosition", newPosition);
+
+    dragStart.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
   };
   
-  async function getCroppedImg(
-      image: HTMLImageElement,
-      crop: ReactCropType,
-      fileName: string
-    ): Promise<File | null> {
-      const canvas = document.createElement("canvas");
-      const scaleX = image.naturalWidth / image.width;
-      const scaleY = image.naturalHeight / image.height;
-      canvas.width = crop.width * scaleX;
-      canvas.height = crop.height * scaleY;
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) {
-        return null;
-      }
-
-      ctx.drawImage(
-        image,
-        crop.x * scaleX,
-        crop.y * scaleY,
-        crop.width * scaleX,
-        crop.height * scaleY,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-
-      return new Promise((resolve) => {
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            resolve(null);
-            return;
-          }
-          const croppedFile = new File([blob], fileName, { type: blob.type });
-          resolve(croppedFile);
-        }, "image/jpeg", 0.9); 
-      });
-    }
-
-  const handleApplyCrop = async () => {
-    if (completedCrop && imgRef.current) {
-        const croppedFile = await getCroppedImg(imgRef.current, completedCrop, "cropped-image.jpg");
-        if(croppedFile) {
-            form.setValue("imageFile", croppedFile);
-            setPreviewUrl(URL.createObjectURL(croppedFile));
-            setImageToCrop(null); // Close cropper UI
-        }
-    }
-  }
-
+  const handleMouseLeave = () => {
+    isDragging.current = false;
+  };
 
   const handleSubmit = (values: PromotionFormValues) => {
     const dataToSubmit: BusinessPromotionFormData = {
         ...values,
         usageLimit: values.usageLimit === undefined || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
+        imageObjectPosition: objectPosition,
     };
     onSubmit(dataToSubmit);
   };
@@ -197,21 +173,23 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
-          <div className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden">
-            {imageToCrop ? (
-                <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                    <ReactCrop
-                        crop={crop}
-                        onChange={c => setCrop(c)}
-                        onComplete={c => setCompletedCrop(c)}
-                        aspect={16 / 9}
-                        className="h-full"
-                    >
-                        <img ref={imgRef} src={imageToCrop} alt="Recortar imagen" onLoad={onImageLoad} style={{ objectFit: 'contain', height: '100%', width: '100%' }} />
-                    </ReactCrop>
-                </div>
-            ) : previewUrl ? (
-              <NextImage src={previewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
+          <div 
+            ref={imgContainerRef}
+            className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+          >
+            {imageToAdjust ? (
+              <NextImage 
+                src={imageToAdjust} 
+                alt="Vista previa de la imagen" 
+                layout="fill" 
+                className="object-cover cursor-move"
+                style={{ objectPosition }}
+                onMouseDown={handleMouseDown}
+                draggable={false}
+              />
             ) : (
               <div className="text-muted-foreground flex flex-col items-center">
                 <ImageIcon className="h-10 w-10" />
@@ -228,18 +206,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             accept="image/png, image/jpeg, image/webp"
           />
           
-          <div className="flex gap-2">
-            {imageToCrop ? (
-              <>
-                <Button type="button" variant="outline" onClick={() => setImageToCrop(null)}>Cancelar Recorte</Button>
-                <Button type="button" onClick={handleApplyCrop}><Crop className="mr-2 h-4 w-4"/>Aceptar Recorte</Button>
-              </>
-            ) : (
-              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
-                  Cambiar Imagen
-              </Button>
-            )}
-          </div>
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
+              Cambiar Imagen
+          </Button>
 
           <FormMessage>{form.formState.errors.imageFile?.message}</FormMessage>
         </div>
@@ -374,4 +343,3 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     </Form>
   );
 }
-

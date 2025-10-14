@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -142,6 +141,7 @@ export default function HomePage() {
               alt={entity.name}
               fill
               className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+              style={{ objectPosition: entity.imageObjectPosition || '50% 50%' }}
               data-ai-hint={entity.aiHint || "discount offer"}
             />
           </div>
