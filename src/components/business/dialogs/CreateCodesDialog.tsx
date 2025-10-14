@@ -244,7 +244,7 @@ export function CreateCodesDialog({
           ) : (
             <>
               <Button variant="outline" onClick={handleCloseAndReset} disabled={isCreating || isSubmittingMain}>Cancelar</Button>
-              <Button autoFocus onClick={handleCreateCodes} variant="gradient" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}>
+              <Button onClick={handleCreateCodes} variant="gradient" disabled={isCreating || isSubmittingMain || !canCreateAnyCodes}>
                 {(isCreating || isSubmittingMain) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <PlusCircle className="mr-2 h-4 w-4" /> Crear códigos
               </Button>
