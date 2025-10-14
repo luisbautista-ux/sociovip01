@@ -2,7 +2,6 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,9 +31,9 @@ interface QrScannerProps {
 }
 
 const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRef = React.useRef<Html5Qrcode | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!scannerRef.current) {
         scannerRef.current = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
     }
@@ -92,20 +91,20 @@ QrScanner.displayName = "QrScanner";
 
 
 export default function LectorValidateQrPage() {
-  const [scannedCodeId, setScannedCodeId] = useState("");
-  const [foundEntity, setFoundEntity] = useState<BusinessManagedEntity | null>(null);
-  const [foundCode, setFoundCode] = useState<GeneratedCode | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [searchPerformed, setSearchPerformed] = useState(false);
-  const [isVipCandidate, setIsVipCandidate] = useState(false);
+  const [scannedCodeId, setScannedCodeId] = React.useState("");
+  const [foundEntity, setFoundEntity] = React.useState<BusinessManagedEntity | null>(null);
+  const [foundCode, setFoundCode] = React.useState<GeneratedCode | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [searchPerformed, setSearchPerformed] = React.useState(false);
+  const [isVipCandidate, setIsVipCandidate] = React.useState(false);
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const currentBusinessId = userProfile?.businessId;
-  const [isScannerActive, setIsScannerActive] = useState(false);
+  const [isScannerActive, setIsScannerActive] = React.useState(false);
   
-  const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
+  const [activeBusinessEntities, setActiveBusinessEntities] = React.useState<BusinessManagedEntity[]>([]);
 
-  const fetchActiveEntities = useCallback(async () => {
+  const fetchActiveEntities = React.useCallback(async () => {
     if (!currentBusinessId) return;
     try {
         const entitiesQuery = query(
@@ -121,12 +120,12 @@ export default function LectorValidateQrPage() {
     }
   }, [currentBusinessId]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchActiveEntities();
   }, [fetchActiveEntities]);
 
 
-  const findCodeInEntities = useCallback(async (codeIdToFind: string) => {
+  const findCodeInEntities = React.useCallback(async (codeIdToFind: string) => {
     if (!currentBusinessId) return;
 
     setIsLoading(true);
@@ -170,13 +169,13 @@ export default function LectorValidateQrPage() {
     }
   }, [currentBusinessId, toast]);
 
-  const handleScanSuccess = useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
+  const handleScanSuccess = React.useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
     setIsScannerActive(false); 
     toast({ title: "QR Escaneado", description: `Verificando código...` });
     findCodeInEntities(decodedText);
   }, [findCodeInEntities, toast]);
   
-  const handleScanFailure = useCallback((errorMessage: string, error: Html5QrcodeError) => {
+  const handleScanFailure = React.useCallback((errorMessage: string, error: Html5QrcodeError) => {
     // Silently ignore scan failures
   }, []);
 
