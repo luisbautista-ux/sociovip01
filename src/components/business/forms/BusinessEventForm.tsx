@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -20,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
-import { CalendarIcon, ImageIcon, Upload } from "lucide-react";
+import { CalendarIcon, ImageIcon, Upload, Move } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, isBefore, startOfDay, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
@@ -39,6 +38,7 @@ const eventDetailsFormSchema = z.object({
   maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
   isActive: z.boolean().default(true),
   imageFile: z.custom<File | null>(() => true).optional(),
+  imageObjectPosition: z.string().optional(), // Added for image positioning
   aiHint: z.string().optional(),
 }).refine(data => {
     if (!data.startDate || !data.endDate) return true; 
@@ -77,6 +77,11 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const imgContainerRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const [objectPosition, setObjectPosition] = useState(event?.imageObjectPosition || '50% 50%');
+
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onBlur",
@@ -85,6 +90,8 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   useEffect(() => {
     if (event) {
         const unlimited = event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0;
+        const initialPosition = event.imageObjectPosition || '50% 50%';
+        setObjectPosition(initialPosition);
         form.reset({
             name: event.name || "",
             description: event.description || "",
@@ -95,25 +102,30 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             maxAttendance: unlimited ? undefined : event.maxAttendance,
             isActive: event.isActive === undefined ? true : event.isActive,
             imageFile: null,
+            imageObjectPosition: initialPosition,
             aiHint: event.aiHint || "",
         });
     }
   }, [event, form]);
 
   useImperativeHandle(ref, () => ({
-    getValues: () => form.getValues(),
+    getValues: () => ({
+      ...form.getValues(),
+      imageObjectPosition: objectPosition, // Ensure the latest position is included
+    }),
     trigger: () => form.trigger(),
     formState: form.formState,
   }));
   
   useEffect(() => {
-    const subscription = form.watch((value) => {
-      if (!isSubmitting) {
+    const subscription = form.watch((value, { name }) => {
+      // Avoid calling onDetailsChange for imageObjectPosition since it's handled separately
+      if (name !== 'imageObjectPosition') {
         onDetailsChange(value);
       }
     });
     return () => subscription.unsubscribe();
-  }, [form.watch, onDetailsChange, isSubmitting]);
+  }, [form.watch, onDetailsChange]);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,8 +135,41 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      onDetailsChange({ imageFile: file });
+      const newPosition = '50% 50%';
+      onDetailsChange({ imageFile: file, imageObjectPosition: newPosition });
+      setObjectPosition(newPosition);
     }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { e.preventDefault(); isDragging.current = true; dragStart.current = { x: e.clientX, y: e.clientY }; };
+  const handleMouseLeave = () => { isDragging.current = false; };
+  const handleMouseUp = () => { isDragging.current = false; onDetailsChange({ imageObjectPosition: objectPosition }); };
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging.current || !imgContainerRef.current) return;
+    const container = imgContainerRef.current;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
+    const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
+    const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
+    const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
+    setObjectPosition(newPosition);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => { if (e.touches.length === 1) { isDragging.current = true; dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } };
+  const handleTouchEnd = () => { isDragging.current = false; onDetailsChange({ imageObjectPosition: objectPosition }); };
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDragging.current || !imgContainerRef.current || e.touches.length !== 1) return;
+    const container = imgContainerRef.current;
+    const dx = e.touches[0].clientX - dragStart.current.x;
+    const dy = e.touches[0].clientY - dragStart.current.y;
+    const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
+    const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
+    const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
+    const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
+    setObjectPosition(newPosition);
+    dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
   
   const isUnlimited = form.watch("unlimitedAttendance");
@@ -143,9 +188,34 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       <form className="space-y-4 overflow-y-auto">
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
-          <div className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center">
+          <div 
+            ref={imgContainerRef}
+            className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
+            style={{ touchAction: 'none' }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             {imagePreviewUrl ? (
-              <NextImage src={imagePreviewUrl} alt="Vista previa de la imagen" layout="fill" objectFit="cover" className="rounded-md" />
+              <>
+                <NextImage 
+                  src={imagePreviewUrl} 
+                  alt="Vista previa de la imagen" 
+                  layout="fill" 
+                  className="object-cover pointer-events-none"
+                  style={{ objectPosition }}
+                  draggable={false}
+                  unoptimized={imagePreviewUrl.startsWith('blob:')}
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
+                  <Move className="h-8 w-8" />
+                  <span className="text-sm font-semibold mt-1">Arrastra para ajustar la imagen</span>
+                </div>
+              </>
             ) : (
               <div className="text-muted-foreground flex flex-col items-center">
                 <ImageIcon className="h-10 w-10" />

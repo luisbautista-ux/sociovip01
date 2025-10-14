@@ -88,28 +88,11 @@ const ManageEventDialog = ({
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
-        setCurrentEventData(prev => {
-            if (!prev) return null;
-            // Prevent infinite loop by checking for actual changes
-            const hasChanged = Object.keys(newDetails).some(key => {
-                const keyTyped = key as keyof EventDetailsFormValues;
-                // Deep comparison for dates
-                if (newDetails[keyTyped] instanceof Date && prev[keyTyped] instanceof Date) {
-                    return newDetails[keyTyped]?.getTime() !== prev[keyTyped]?.getTime();
-                }
-                return prev[keyTyped] !== newDetails[keyTyped];
-            });
-
-            if (hasChanged) {
-                 return { ...prev, ...newDetails };
-            }
-            return prev;
-        });
-
-        if (newDetails.imageFile) {
-            setImageFile(newDetails.imageFile);
-            setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
-        }
+      setCurrentEventData(prev => prev ? { ...prev, ...newDetails } : null);
+      if (newDetails.imageFile) {
+        setImageFile(newDetails.imageFile);
+        setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
+      }
     }, []);
     
     const handleSaveChanges = async () => {
