@@ -544,14 +544,14 @@ export default function BusinessPromotionsPage() {
                             </div>
                           </div>
                         </CardContent>
-                        <CardFooter className="p-2 bg-muted/50">
+                        <CardFooter className="p-2 bg-muted/50 justify-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
-                                variant="default"
-                                className="w-full justify-center bg-green-600 hover:bg-green-700"
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700 text-white px-6"
                               >
-                                Acciones <MoreVertical className="ml-auto h-5 w-5" />
+                                Acciones
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
