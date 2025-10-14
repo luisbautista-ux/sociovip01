@@ -141,7 +141,6 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
 
     const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
     
-    // Adjust sensitivity based on container size
     const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
     const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
 
@@ -161,7 +160,6 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.preventDefault();
     if (e.touches.length === 1) {
       isDragging.current = true;
       dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -207,6 +205,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           <div 
             ref={imgContainerRef}
             className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
+            style={{ touchAction: 'none' }} // This is the crucial fix for mobile
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
