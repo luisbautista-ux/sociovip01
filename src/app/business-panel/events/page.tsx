@@ -121,15 +121,12 @@ const ManageEventDialog = ({
     };
 
     const handleTabChange = async (newTab: string) => {
-        // When switching away from the details tab, get the latest form data
         if (activeTab === 'details' && detailsFormRef.current) {
             const formIsValid = await detailsFormRef.current.trigger();
             if (formIsValid) {
                 const currentDetails = detailsFormRef.current.getValues();
-                // Update the state in the parent dialog component
                 setCurrentEventData(prev => prev ? { ...prev, ...currentDetails } : null);
             } else {
-                // If form is invalid, prevent tab switch
                 return;
             }
         }
@@ -864,7 +861,7 @@ export default function BusinessEventsPage() {
       </div>
 
       {!currentBusinessId && !isLoading ? (
-          <Card><CardHeader><AlertDialogTitle className="text-destructive">Negocio no identificado</AlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-destructive">Negocio no identificado</CardTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
       ) : isLoading ? (
           <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
       ) : events.length === 0 ? (
@@ -903,14 +900,51 @@ export default function BusinessEventsPage() {
                         </div>
                     </CardContent>
                     <CardFooter className="p-2 bg-muted/50 justify-center">
-                        <Button 
-                            variant="gradient"
-                            size="sm" 
-                            className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs font-bold"
-                            onClick={() => handleOpenManageEventDialog(event)}
-                        >
-                            <Edit className="h-4 w-4 mr-2" /> Gestionar Evento
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs font-bold w-full max-w-xs">
+                                    Acciones
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Gestionar Evento
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
+                                    <QrCodeIcon className="h-4 w-4 mr-2" />
+                                    Crear Códigos
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
+                                    <ListChecks className="h-4 w-4 mr-2" />
+                                    Ver Códigos
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event, true)}>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Duplicar Evento
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Eliminar
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+                                            <AlertDialogDescription>Se eliminará el evento "{event.name}".</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <ShadcnAlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                                        </ShadcnAlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </CardFooter>
                   </Card>
                 )
@@ -1025,6 +1059,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
