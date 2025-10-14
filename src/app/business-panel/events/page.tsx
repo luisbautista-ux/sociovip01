@@ -88,19 +88,23 @@ const ManageEventDialog = ({
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
-      setCurrentEventData(prev => prev ? { ...prev, ...newDetails } : null);
-      if (newDetails.imageFile) {
-        setImageFile(newDetails.imageFile);
-        setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
-      }
+      setCurrentEventData(prev => {
+        if (!prev) return null;
+        const updatedEvent = { ...prev, ...newDetails };
+        
+        // Handle image file updates specifically
+        if (newDetails.imageFile) {
+            setImageFile(newDetails.imageFile);
+            setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
+        } else if (newDetails.imageFile === null) { // Explicitly handle clearing the file
+            setImageFile(null);
+        }
+        
+        return updatedEvent;
+      });
     }, []);
     
     const handleSaveChanges = async () => {
-        if (!currentEventData) {
-            toast({ title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive" });
-            return;
-        }
-
         if (!detailsFormRef.current) {
              toast({ title: "Error", description: "El formulario de detalles no está listo.", variant: "destructive" });
              return;
@@ -116,11 +120,19 @@ const ManageEventDialog = ({
         const latestDetailsValues = detailsFormRef.current.getValues();
 
         const finalEventData: BusinessManagedEntity = {
-            ...currentEventData,
+            ...currentEventData!,
             ...latestDetailsValues, 
         };
 
         await onSave(finalEventData, imageFile);
+    };
+
+    const handleTabChange = (newTab: string) => {
+        if (activeTab === 'details' && detailsFormRef.current) {
+            const currentDetails = detailsFormRef.current.getValues();
+            setCurrentEventData(prev => prev ? { ...prev, ...currentDetails } : null);
+        }
+        setActiveTab(newTab);
     };
 
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
@@ -293,7 +305,7 @@ const ManageEventDialog = ({
                     
                     <div className="px-6 border-b shrink-0">
                         <div className="overflow-x-auto">
-                           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                                 <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
                                     <TabsTrigger value="tickets">Entradas ({maxAttendanceFromTickets || 'Ilimitado'})</TabsTrigger>

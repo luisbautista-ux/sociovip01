@@ -117,17 +117,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     formState: form.formState,
   }));
   
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      // Avoid calling onDetailsChange for imageObjectPosition since it's handled separately
-      if (name !== 'imageObjectPosition') {
-        onDetailsChange(value);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form.watch, onDetailsChange]);
-
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
