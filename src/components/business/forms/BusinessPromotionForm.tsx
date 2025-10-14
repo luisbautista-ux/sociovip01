@@ -127,13 +127,13 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     isDragging.current = true;
     dragStart.current = { x: e.clientX, y: e.clientY };
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging.current || !imgContainerRef.current) return;
     const container = imgContainerRef.current;
     const dx = e.clientX - dragStart.current.x;
@@ -160,6 +160,36 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     isDragging.current = false;
   };
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      isDragging.current = true;
+      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDragging.current || !imgContainerRef.current || e.touches.length !== 1) return;
+    const container = imgContainerRef.current;
+    const dx = e.touches[0].clientX - dragStart.current.x;
+    const dy = e.touches[0].clientY - dragStart.current.y;
+
+    const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
+    
+    const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
+    const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
+
+    const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
+    setObjectPosition(newPosition);
+    form.setValue("imageObjectPosition", newPosition);
+
+    dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+
+  const handleTouchEnd = () => {
+    isDragging.current = false;
+  };
+
   const handleSubmit = (values: PromotionFormValues) => {
     const dataToSubmit: BusinessPromotionFormData = {
         ...values,
@@ -176,10 +206,14 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <div 
             ref={imgContainerRef}
-            className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
+            className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
+            onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             {imageToAdjust ? (
               <>
@@ -187,10 +221,10 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
                   src={imageToAdjust} 
                   alt="Vista previa de la imagen" 
                   layout="fill" 
-                  className="object-cover cursor-move"
+                  className="object-cover pointer-events-none"
                   style={{ objectPosition }}
-                  onMouseDown={handleMouseDown}
                   draggable={false}
+                  unoptimized // Important for data URLs
                 />
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
                     <Move className="h-8 w-8" />
