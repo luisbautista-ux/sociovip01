@@ -160,7 +160,7 @@ export default function LoginPage() {
                 </CardTitle>
               </CardHeader>
 
-              <CardContent className="pb-2">
+              <CardContent className="pb-6">
                 <Card className="bg-white/90 rounded-xl shadow-md">
                   <CardHeader className="py-6">
                     <div className="w-full flex justify-center mb-4">
@@ -172,7 +172,7 @@ export default function LoginPage() {
                     </CardDescription>
                   </CardHeader>
 
-                  <CardContent className="pb-2">
+                  <CardContent className="pb-6">
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleLogin)} className="space-y-5">
                         <FormField

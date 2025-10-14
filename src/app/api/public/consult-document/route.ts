@@ -7,7 +7,8 @@ const ConsultDocumentSchema = z.object({
 });
 
 interface NombresResponse {
-  mensaje?: string;
+  success?: boolean;
+  data?: { message?: string };
 }
 
 interface FechaData {
@@ -31,7 +32,6 @@ export async function POST(request: Request) {
 
     const { docNumber, docType } = validation.data;
     
-    // Si no es DNI, no podemos consultar, pero no es un error, simplemente no hay datos que devolver.
     if (docType !== 'dni' || docNumber.length !== 8) {
       return NextResponse.json({
         nombreCompleto: "",
@@ -48,26 +48,29 @@ export async function POST(request: Request) {
     let apellidoMaterno = "";
     let fechaNacimiento = "";
 
-    // 1. Obtener Nombres y Apellidos
+    // ✅ 1. Obtener Nombres y Apellidos (actualizado con el endpoint funcional)
     try {
-        const endpointNombres = "https://dniperu.com/querySelector";
+        const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', docNumber);
-        formNombres.append('Buscar', 'Buscar');
+        formNombres.append('company', '');
+        formNombres.append('action', 'buscar_nombres');
+        formNombres.append('security', '9e85fb2b2e'); // Token actualizado
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Referer': 'https://dniperu.com/',
+                'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
             },
             body: formNombres.toString(),
         });
         
         if (responseNombres.ok) {
             const dataNombres = await responseNombres.json() as NombresResponse;
-            if (dataNombres.mensaje) {
-                const lineas = dataNombres.mensaje.split('\n');
+            const mensaje = dataNombres.data?.message;
+            if (mensaje) {
+                const lineas = mensaje.split('\n');
                 lineas.forEach(linea => {
                     if (linea.startsWith("Nombres:")) nombres = linea.replace("Nombres:", "").trim();
                     else if (linea.startsWith("Apellido Paterno:")) apellidoPaterno = linea.replace("Apellido Paterno:", "").trim();
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
         formFecha.append('dni', docNumber);
         formFecha.append('company', '');
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', '6f1f72771e');
+        formFecha.append('security', '6d46935f67');
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',

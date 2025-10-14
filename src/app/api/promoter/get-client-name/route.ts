@@ -26,27 +26,29 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     return userDoc.data() as PlatformUser;
 }
 
-// Función auxiliar para consultar la API de DNI externa de forma segura desde el backend
+// ✅ Versión corregida: usa el endpoint actual (buscar_nombres)
 async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string } | null> {
     try {
-        const endpointNombres = "https://dniperu.com/querySelector";
+        const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
-        formNombres.append('Buscar', 'Buscar');
+        formNombres.append('company', '');
+        formNombres.append('action', 'buscar_nombres');
+        formNombres.append('security', '9e85fb2b2e'); // token estable (puede actualizarse si cambia)
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Referer': 'https://dniperu.com/',
+                'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
             },
             body: formNombres.toString(),
         });
         
         if (responseNombres.ok) {
-            const dataNombres = await responseNombres.json();
-            if (dataNombres.mensaje) {
-                const lineas = dataNombres.mensaje.split('\n');
+            const data = await responseNombres.json();
+            if (data.success && data.data?.message) {
+                const lineas = data.data.message.split('\n');
                 let nombres = "";
                 let apellidoPaterno = "";
                 let apellidoMaterno = "";
@@ -96,10 +98,9 @@ export async function GET(request: Request) {
     const qrClientSnap = await qrClientQuery.get();
     if (!qrClientSnap.empty) {
         const client = qrClientSnap.docs[0].data();
-        console.log('qrClient data:', client);  // Verificar los datos obtenidos de la base de datos
         return NextResponse.json({
             name: `${client.name} ${client.surname}`.trim(),
-            phone: client.phone || "No disponible",  // Si no hay teléfono, devuelve "No disponible"
+            phone: client.phone || "No disponible",
         });
     }
 
@@ -108,10 +109,9 @@ export async function GET(request: Request) {
     const socioVipSnap = await socioVipQuery.get();
     if (!socioVipSnap.empty) {
         const socio = socioVipSnap.docs[0].data();
-        console.log('socioVip data:', socio);  // Verificar los datos obtenidos de la base de datos
         return NextResponse.json({
             name: `${socio.name} ${socio.surname}`.trim(),
-            phone: socio.phone || "No disponible",  // Si no hay teléfono, devuelve "No disponible"
+            phone: socio.phone || "No disponible",
         });
     }
 
@@ -131,9 +131,9 @@ export async function GET(request: Request) {
     let errorMessage = error.message || 'Error interno del servidor.';
 
     if (errorMessage.includes('No se proporcionó un token') || errorMessage.includes('Perfil del solicitante no encontrado')) {
-        status = 403; // Forbidden
+        status = 403;
     } else if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
-        status = 401; // Unauthorized
+        status = 401;
         errorMessage = 'Token de sesión inválido o expirado.';
     }
     
