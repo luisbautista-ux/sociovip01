@@ -127,10 +127,13 @@ const ManageEventDialog = ({
         await onSave(finalEventData, imageFile);
     };
 
-    const handleTabChange = (newTab: string) => {
+    const handleTabChange = async (newTab: string) => {
         if (activeTab === 'details' && detailsFormRef.current) {
-            const currentDetails = detailsFormRef.current.getValues();
-            setCurrentEventData(prev => prev ? { ...prev, ...currentDetails } : null);
+            const formIsValid = await detailsFormRef.current.trigger();
+            if (formIsValid) {
+                const currentDetails = detailsFormRef.current.getValues();
+                setCurrentEventData(prev => prev ? { ...prev, ...currentDetails } : null);
+            }
         }
         setActiveTab(newTab);
     };
@@ -894,37 +897,39 @@ export default function BusinessEventsPage() {
                             </Badge>
                         </div>
                     </CardContent>
-                    <CardFooter className="p-2 bg-muted/50">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="w-full justify-center">
-                                    Acciones <MoreVertical className="ml-2 h-4 w-4"/>
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                               <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
-                                  <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
-                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos ({event.generatedCodes?.length || 0})
-                                </DropdownMenuItem>
-                               <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
-                                  <Edit className="h-4 w-4 mr-2" /> Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator/>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
-                                            <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                                        </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
-                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                              </DropdownMenuContent>
-                        </DropdownMenu>
+                    <CardFooter className="p-2 bg-muted/50 flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground pl-2">Acciones</span>
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                  <MoreVertical className="h-5 w-5"/>
+                                  <span className="sr-only">Abrir menú de acciones</span>
+                              </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                             <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
+                                <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
+                                  <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos ({event.generatedCodes?.length || 0})
+                              </DropdownMenuItem>
+                             <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
+                                <Edit className="h-4 w-4 mr-2" /> Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator/>
+                              <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                          <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                      </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                      <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                                      <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                  </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                      </DropdownMenu>
                     </CardFooter>
                   </Card>
                 )

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -542,27 +543,33 @@ export default function BusinessPromotionsPage() {
                             </div>
                           </div>
                         </CardContent>
-                        <CardFooter className="p-2 bg-muted/50">
-                          <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" className="w-full justify-center">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuItem onClick={() => openCreateCodesDialog(promo)} disabled={!isActivatable}><QrCodeIcon className="h-4 w-4 mr-2"/>Crear Códigos</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openViewCodesDialog(promo)}><ListChecks className="h-4 w-4 mr-2"/>Ver Códigos</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo)}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openStatsModal(promo)}><BarChart3 className="h-4 w-4 mr-2"/>Estadísticas</DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo, true)}><Copy className="h-4 w-4 mr-2"/>Duplicar</DropdownMenuItem>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><AlertDialogDescription>Se eliminará la promoción "{promo.name}".</AlertDialogDescription></AlertDialogHeader>
-                                    <UIAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePromotion(promo)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></UIAlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </DropdownMenuContent>
-                          </DropdownMenu>
+                        <CardFooter className="p-2 bg-muted/50 flex items-center justify-between">
+                            <span className="text-sm font-medium text-muted-foreground pl-2">Acciones</span>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                        <MoreVertical className="h-5 w-5"/>
+                                        <span className="sr-only">Abrir menú de acciones</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem onClick={() => openCreateCodesDialog(promo)} disabled={!isActivatable}><QrCodeIcon className="h-4 w-4 mr-2"/>Crear Códigos</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openViewCodesDialog(promo)}><ListChecks className="h-4 w-4 mr-2"/>Ver Códigos</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo)}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openStatsModal(promo)}><BarChart3 className="h-4 w-4 mr-2"/>Estadísticas</DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo, true)}><Copy className="h-4 w-4 mr-2"/>Duplicar</DropdownMenuItem>
+                                    <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader><UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle><AlertDialogDescription>Se eliminará la promoción "{promo.name}".</AlertDialogDescription></AlertDialogHeader>
+                                        <UIAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePromotion(promo)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></UIAlertDialogFooter>
+                                    </AlertDialogContent>
+                                    </AlertDialog>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </CardFooter>
                       </Card>
                     )
