@@ -88,7 +88,6 @@ const ManageEventDialog = ({
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
-      // This function only updates local component state, it does not cause re-renders in the parent
       if (newDetails.imageFile) {
           setImageFile(newDetails.imageFile);
           setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
@@ -902,7 +901,7 @@ export default function BusinessEventsPage() {
                     <CardFooter className="p-2 bg-muted/50 justify-center">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs font-bold w-full max-w-xs">
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs font-bold">
                                     Acciones
                                 </Button>
                             </DropdownMenuTrigger>
@@ -1059,6 +1058,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
