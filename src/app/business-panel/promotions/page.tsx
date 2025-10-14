@@ -547,10 +547,7 @@ export default function BusinessPromotionsPage() {
                         <CardFooter className="p-2 bg-muted/50 justify-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white px-6"
-                              >
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8">
                                 Acciones
                               </Button>
                             </DropdownMenuTrigger>
@@ -820,7 +817,7 @@ export default function BusinessPromotionsPage() {
                 } else {
                     toast({
                         title: "Acción no permitida",
-                        description: "Esta promoción no está activa o está fuera de su periodo de vigencia.",
+                        description: `Esta ${currentEntity.type === 'event' ? 'evento' : 'promoción'} no está activa o está fuera de su periodo de vigencia.`,
                         variant: "destructive"
                     });
                 }

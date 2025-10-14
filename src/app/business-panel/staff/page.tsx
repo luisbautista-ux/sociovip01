@@ -350,10 +350,7 @@ export default function BusinessStaffPage() {
                   <CardFooter className="p-2 bg-muted/50 justify-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white px-6"
-                        >
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8">
                           Acciones
                         </Button>
                       </DropdownMenuTrigger>
@@ -493,20 +490,11 @@ export default function BusinessStaffPage() {
 
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Usuario ya Existente</UIAlertDialogTitle>
-            <AlertDialogDescription>El documento <span className="font-semibold">{existingPlatformUserToEdit?.dni}</span> ya está registrado para <span className="font-semibold">{existingPlatformUserToEdit?.name}</span>. Si no está en tu lista de personal, puede estar asignado a otro negocio. Contacta al Super Admin si necesitas reasignarlo. No puedes crear un duplicado.</AlertDialogDescription>
-          </AlertDialogHeader>
+          <AlertDialogHeader><UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Usuario ya Existente</UIAlertDialogTitle><AlertDialogDescription>El documento <span className="font-semibold">{existingPlatformUserToEdit?.dni}</span> ya está registrado para <span className="font-semibold">{existingPlatformUserToEdit?.name}</span>. Si no está en tu lista de personal, puede estar asignado a otro negocio. Contacta al Super Admin si necesitas reasignarlo. No puedes crear un duplicado.</AlertDialogDescription></AlertDialogHeader>
           <ShadcnAlertDialogFooter><AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Entendido</AlertDialogCancel></ShadcnAlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
-
-
-
-
-
-
 

@@ -53,10 +53,7 @@ export function PromoterMobileCards({ promoters, onToggleStatus, onViewDetails, 
             <CardFooter className="p-2 bg-muted/50 justify-center">
                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white px-6"
-                    >
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8">
                         Acciones
                     </Button>
                 </DropdownMenuTrigger>
