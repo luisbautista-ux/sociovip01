@@ -401,7 +401,11 @@ const ManageEventDialog = ({
                                                         <CardContent className="p-3 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
                                                             <div className="text-muted-foreground">Costo:</div><div className="font-semibold">S/ {box.cost.toFixed(2)}</div>
                                                             <div className="text-muted-foreground">Capacidad:</div><div className="font-semibold">{box.capacity || 'N/A'}</div>
-                                                            <div className="text-muted-foreground">Estado:</div><div><Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge></div>
+                                                            <div className="text-muted-foreground">Estado:</div>
+                                                            <div>
+                                                              <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
+                                                              {box.status !== 'available' && box.promoterName && <div className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</div>}
+                                                            </div>
                                                         </CardContent>
                                                         <CardFooter className="p-2 bg-muted/50">
                                                             <DropdownMenu>
@@ -434,7 +438,10 @@ const ManageEventDialog = ({
                                                                 <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
                                                                 <TableCell>{box.capacity || 'N/A'}</TableCell>
                                                                 <TableCell>
-                                                                    <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
+                                                                    <div className="flex flex-col">
+                                                                        <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
+                                                                        {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
+                                                                    </div>
                                                                 </TableCell>
                                                                 <TableCell className="text-right">
                                                                     <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
@@ -898,36 +905,14 @@ export default function BusinessEventsPage() {
                         </div>
                     </CardContent>
                     <CardFooter className="p-2 bg-muted/50 justify-center">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8">
-                                  Acciones
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
-                                  <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
-                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos ({event.generatedCodes?.length || 0})
-                                </DropdownMenuItem>
-                               <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
-                                  <Edit className="h-4 w-4 mr-2" /> Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator/>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
-                                            <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                                        </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
-                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button 
+                            variant="gradient"
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 w-full"
+                            onClick={() => handleOpenManageEventDialog(event)}
+                        >
+                            <Edit className="h-4 w-4 mr-2" /> Gestionar
+                        </Button>
                     </CardFooter>
                   </Card>
                 )
@@ -965,7 +950,7 @@ export default function BusinessEventsPage() {
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Códigos</Button>
-                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Codigos ({event.generatedCodes?.length || 0})</Button>
+                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
                           <AlertDialog>
                               <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
@@ -1042,3 +1027,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
