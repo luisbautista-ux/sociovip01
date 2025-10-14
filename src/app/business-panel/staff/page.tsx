@@ -350,7 +350,12 @@ export default function BusinessStaffPage() {
                   <CardFooter className="p-2 bg-muted/50">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="w-full justify-center">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button>
+                        <Button
+                          variant="default"
+                          className="w-full justify-center bg-green-600 hover:bg-green-700"
+                        >
+                          Acciones <MoreVertical className="ml-auto h-5 w-5" />
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem onClick={() => { setEditingUser(staff); setShowUserFormModal(true); }} disabled={isSubmitting}>
@@ -444,7 +449,7 @@ export default function BusinessStaffPage() {
               <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
                 <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel>
                     <FormControl>
-                        <RadioGroup onValueChange={(value) => { field.onChange(value); dniEntryForm.setValue('docNumber', ''); dniEntryForm.clearErrors('docNumber'); }} defaultValue={field.value} className="grid grid-cols-2 gap-2">
+                        <RadioGroup onValueChange={(value) => { field.onChange(value); dniEntryForm.setValue('docNumber', ''); form.clearErrors('docNumber'); }} defaultValue={field.value} className="grid grid-cols-2 gap-2">
                             <FormItem className="flex items-center space-x-3 space-y-0">
                                 <Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}>
                                     <FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI
@@ -498,6 +503,7 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
 
 
 

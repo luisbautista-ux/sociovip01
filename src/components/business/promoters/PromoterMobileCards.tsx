@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -51,7 +52,14 @@ export function PromoterMobileCards({ promoters, onToggleStatus, onViewDetails, 
             </CardContent>
             <CardFooter className="p-2 bg-muted/50">
                <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="ghost" className="w-full">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button></DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="default"
+                        className="w-full justify-center bg-green-600 hover:bg-green-700"
+                    >
+                        Acciones <MoreVertical className="ml-auto h-5 w-5" />
+                    </Button>
+                </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuItem 
                       onClick={() => onOpenPaymentDialog({ uid: promoter.platformUserUid!, name: promoter.promoterName, pendingAmount: promoter.pendingAmount })}

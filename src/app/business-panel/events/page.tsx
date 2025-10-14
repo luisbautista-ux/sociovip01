@@ -897,38 +897,39 @@ export default function BusinessEventsPage() {
                             </Badge>
                         </div>
                     </CardContent>
-                    <CardFooter className="p-2 bg-muted/50 flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground pl-2">Acciones</span>
+                    <CardFooter className="p-2 bg-muted/50">
                       <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                  <MoreVertical className="h-5 w-5"/>
-                                  <span className="sr-only">Abrir menú de acciones</span>
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                             <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
-                                <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
-                                  <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos ({event.generatedCodes?.length || 0})
-                              </DropdownMenuItem>
-                             <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
-                                <Edit className="h-4 w-4 mr-2" /> Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator/>
-                              <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
-                                          <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                                      </DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                      <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
-                                      <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                                  </AlertDialogContent>
-                              </AlertDialog>
-                            </DropdownMenuContent>
+                        <DropdownMenuTrigger asChild>
+                           <Button
+                              variant="default"
+                              className="w-full justify-center bg-green-600 hover:bg-green-700"
+                            >
+                              Acciones <MoreVertical className="ml-auto h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                           <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
+                              <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
+                                <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos ({event.generatedCodes?.length || 0})
+                            </DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
+                              <Edit className="h-4 w-4 mr-2" /> Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator/>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                        <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                    </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription></AlertDialogHeader>
+                                    <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
                       </DropdownMenu>
                     </CardFooter>
                   </Card>
@@ -1036,6 +1037,7 @@ export default function BusinessEventsPage() {
           }}
           isPromoterView={false} 
           currentUserProfileName={userProfile.name}
+          currentUserProfileUid={userProfile.uid}
           businessPersonalPhone={businessDetails?.personalPhone}
         />
       )}
