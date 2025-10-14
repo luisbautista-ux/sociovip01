@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2, Move } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -175,21 +176,27 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <div 
             ref={imgContainerRef}
-            className="w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
+            className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
           >
             {imageToAdjust ? (
-              <NextImage 
-                src={imageToAdjust} 
-                alt="Vista previa de la imagen" 
-                layout="fill" 
-                className="object-cover cursor-move"
-                style={{ objectPosition }}
-                onMouseDown={handleMouseDown}
-                draggable={false}
-              />
+              <>
+                <NextImage 
+                  src={imageToAdjust} 
+                  alt="Vista previa de la imagen" 
+                  layout="fill" 
+                  className="object-cover cursor-move"
+                  style={{ objectPosition }}
+                  onMouseDown={handleMouseDown}
+                  draggable={false}
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
+                    <Move className="h-8 w-8" />
+                    <span className="text-sm font-semibold mt-1">Arrastra para ajustar la imagen</span>
+                </div>
+              </>
             ) : (
               <div className="text-muted-foreground flex flex-col items-center">
                 <ImageIcon className="h-10 w-10" />
