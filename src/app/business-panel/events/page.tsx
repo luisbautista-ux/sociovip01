@@ -401,10 +401,12 @@ const ManageEventDialog = ({
                                                               {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
                                                             </div>
                                                         </CardContent>
-                                                        <CardFooter className="p-2 bg-muted/50">
+                                                        <CardFooter className="p-2 bg-muted/50 justify-center">
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger asChild>
-                                                                    <Button variant="ghost" size="sm" className="w-full justify-center text-xs h-auto py-1">Acciones <MoreVertical className="ml-1 h-4 w-4"/></Button>
+                                                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs">
+                                                                        Acciones
+                                                                    </Button>
                                                                 </DropdownMenuTrigger>
                                                                 <DropdownMenuContent>
                                                                     <DropdownMenuItem onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
@@ -1058,6 +1060,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
