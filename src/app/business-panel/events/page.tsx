@@ -88,13 +88,11 @@ const ManageEventDialog = ({
             setImagePreviewUrl(initialEditingEvent.imageUrl || null);
             setActiveTab("details");
             
-            // Guardar una "foto" del estado inicial para comparar después
             initialDataSnapshot.current = JSON.stringify(initialEditingEvent);
-            setHasUnsavedChanges(false); // Resetear estado de cambios
+            setHasUnsavedChanges(false);
         }
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
-    // Efecto para detectar cambios
     useEffect(() => {
         if (currentEventData && initialDataSnapshot.current) {
             const currentDataString = JSON.stringify(currentEventData);
@@ -108,7 +106,7 @@ const ManageEventDialog = ({
         if (newDetails.imageFile) {
             setImageFile(newDetails.imageFile);
             setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
-        } else if (newDetails.imageFile === null) { // Explicitly handle image removal
+        } else if (newDetails.imageFile === null) {
             setImageFile(null);
             setImagePreviewUrl(null);
         }
@@ -578,7 +576,7 @@ const ManageEventDialog = ({
                             Has realizado cambios que no se han guardado. ¿Estás seguro de que quieres cerrar y descartar estos cambios?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
+                    <ShadcnAlertDialogFooter>
                         <AlertDialogCancel>No, continuar editando</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => {
@@ -589,7 +587,7 @@ const ManageEventDialog = ({
                         >
                             Sí, descartar
                         </AlertDialogAction>
-                    </AlertDialogFooter>
+                    </ShadcnAlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
             <Dialog open={isTicketFormOpen} onOpenChange={setIsTicketFormOpen}>
@@ -1124,6 +1122,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
