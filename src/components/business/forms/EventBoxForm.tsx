@@ -33,6 +33,9 @@ const eventBoxFormSchema = z.object({
   ownerDni: z.string().optional().refine(val => !val || (val.length >= 7 && val.length <= 15), {
     message: "DNI/CE del dueño debe tener entre 7 y 15 caracteres si se ingresa.",
   }),
+  ownerPhone: z.string().optional().refine(val => !val || /^9\d{8}$/.test(val), {
+    message: "El celular debe tener 9 dígitos y empezar con 9.",
+  }),
 });
 
 type EventBoxFormValues = z.infer<typeof eventBoxFormSchema>;
@@ -56,6 +59,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       promoterName: eventBox?.promoterName || "",
       ownerName: eventBox?.ownerName || "",
       ownerDni: eventBox?.ownerDni || "",
+      ownerPhone: eventBox?.ownerPhone || "",
     },
   });
 
@@ -69,6 +73,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       promoterName: eventBox?.promoterName || "",
       ownerName: eventBox?.ownerName || "",
       ownerDni: eventBox?.ownerDni || "",
+      ownerPhone: eventBox?.ownerPhone || "",
     });
   }, [eventBox, form]);
 
@@ -165,6 +170,17 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
             <FormItem>
               <FormLabel>DNI/CE Dueño del Box </FormLabel>
               <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+         <FormField
+          control={form.control}
+          name="ownerPhone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Celular Dueño del Box </FormLabel>
+              <FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isSubmitting} maxLength={9}/></FormControl>
               <FormMessage />
             </FormItem>
           )}

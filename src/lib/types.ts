@@ -414,6 +414,7 @@ export interface EventBoxFormData {
   promoterName?: string;
   ownerName?: string;
   ownerDni?: string;
+  ownerPhone?: string;
 }
 
 export interface BatchBoxFormData {
@@ -457,3 +458,5 @@ export interface InitialDataForPromoterLink {
   qrClientData?: QrClient; 
   socioVipData?: SocioVipMember;
 }
+
+```
