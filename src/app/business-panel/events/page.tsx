@@ -164,9 +164,10 @@ const ManageEventDialog = ({
     const handleBoxSubmit = (boxData: EventBoxFormData) => {
         const boxId = editingBox?.id || `box_${Date.now()}`;
         
-        let finalBoxData: EventBoxFormData = {...boxData};
+        let finalBoxData: Omit<EventBox, 'id' | 'eventId' | 'businessId'> = {...boxData};
+        
         if (boxData.status === 'available') {
-            finalBoxData = {
+             finalBoxData = {
                 ...boxData,
                 promoterName: "",
                 ownerName: "",
@@ -414,17 +415,15 @@ const ManageEventDialog = ({
                                                             </div>
                                                             {box.ownerName && (
                                                                 <>
-                                                                  <div className="col-span-2 mt-2 pt-2 border-t text-muted-foreground flex items-center">
-                                                                    <User size={14} className="mr-1.5" />Dueño: <span className="font-medium text-foreground ml-1">{box.ownerName}</span>
-                                                                  </div>
-                                                                  <div className="col-span-2 text-muted-foreground flex items-center">
-                                                                    <User size={14} className="mr-1.5 opacity-0" />DNI/CE: <span className="font-medium text-foreground ml-1">{box.ownerDni}</span>
-                                                                  </div>
-                                                                  {box.ownerPhone && (
+                                                                    <div className="col-span-2 mt-2 pt-2 border-t text-muted-foreground flex items-center">
+                                                                        <User size={14} className="mr-1.5" />Dueño: <span className="font-medium text-foreground ml-1">{box.ownerName}</span>
+                                                                    </div>
+                                                                    <div className="col-span-2 text-muted-foreground flex items-center">
+                                                                        <User size={14} className="mr-1.5 opacity-0" />DNI/CE: <span className="font-medium text-foreground ml-1">{box.ownerDni}</span>
+                                                                    </div>
                                                                     <div className="col-span-2 text-muted-foreground flex items-center">
                                                                       <Phone size={14} className="mr-1.5" />Celular: <span className="font-medium text-foreground ml-1">{box.ownerPhone}</span>
                                                                     </div>
-                                                                  )}
                                                                 </>
                                                             )}
                                                         </CardContent>
