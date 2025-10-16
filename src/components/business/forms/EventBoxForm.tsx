@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -62,6 +62,17 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       ownerPhone: eventBox?.ownerPhone || "",
     },
   });
+
+  const watchedStatus = form.watch("status");
+
+  useEffect(() => {
+    if (watchedStatus === 'available') {
+      form.setValue('promoterName', '');
+      form.setValue('ownerName', '');
+      form.setValue('ownerDni', '');
+      form.setValue('ownerPhone', '');
+    }
+  }, [watchedStatus, form]);
 
   React.useEffect(() => {
     form.reset({
@@ -152,6 +163,29 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
         
         <FormField
           control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Estado <span className="text-destructive">*</span></FormLabel>
+              <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un estado" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="available">Disponible</SelectItem>
+                  <SelectItem value="reserved">Reservado</SelectItem>
+                  <SelectItem value="sold">Vendido</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
           name="promoterName"
           render={({ field }) => (
             <FormItem>
@@ -194,29 +228,6 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
             <FormItem>
               <FormLabel>Celular Dueño del Box </FormLabel>
               <FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isSubmitting} maxLength={9}/></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="status"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Estado <span className="text-destructive">*</span></FormLabel>
-              <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona un estado" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="available">Disponible</SelectItem>
-                  <SelectItem value="reserved">Reservado</SelectItem>
-                  <SelectItem value="sold">Vendido</SelectItem>
-                </SelectContent>
-              </Select>
               <FormMessage />
             </FormItem>
           )}
