@@ -58,8 +58,7 @@ const ManageEventDialog = ({
     isSubmitting: boolean;
 }) => {
     const [activeTab, setActiveTab] = useState("details");
-    const detailsFormRef = useRef<EventDetailsFormRef>(null);
-
+    
     const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(null);
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -69,6 +68,10 @@ const ManageEventDialog = ({
     const [isBoxFormOpen, setIsBoxFormOpen] = useState(false);
     const [editingBox, setEditingBox] = useState<EventBox | null>(null);
     const [isBatchBoxFormOpen, setIsBatchBoxFormOpen] = useState(false);
+
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [showUnsavedChangesAlert, setShowUnsavedChangesAlert] = useState(false);
+    const initialDataSnapshot = useRef<string | null>(null);
     
     const { toast } = useToast();
 
@@ -84,9 +87,22 @@ const ManageEventDialog = ({
             setImageFile(null);
             setImagePreviewUrl(initialEditingEvent.imageUrl || null);
             setActiveTab("details");
+            
+            // Guardar una "foto" del estado inicial para comparar después
+            initialDataSnapshot.current = JSON.stringify(initialEditingEvent);
+            setHasUnsavedChanges(false); // Resetear estado de cambios
         }
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
+    // Efecto para detectar cambios
+    useEffect(() => {
+        if (currentEventData && initialDataSnapshot.current) {
+            const currentDataString = JSON.stringify(currentEventData);
+            setHasUnsavedChanges(currentDataString !== initialDataSnapshot.current);
+        }
+    }, [currentEventData]);
+
+
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
         setCurrentEventData(prev => prev ? { ...prev, ...newDetails } : null);
         if (newDetails.imageFile) {
@@ -98,38 +114,22 @@ const ManageEventDialog = ({
         }
     }, []);
 
-    const handleSaveChanges = async () => {
-        if (!detailsFormRef.current) {
-            // Even if the form is not visible, we can still proceed if the data is in our state.
-            if (currentEventData) {
-                await onSave(currentEventData, imageFile);
-            } else {
-                toast({ title: "Error", description: "No hay datos del evento para guardar.", variant: "destructive" });
-            }
-            return;
+     const handleSaveChanges = async () => {
+        if (currentEventData) {
+            await onSave(currentEventData, imageFile);
+        } else {
+            toast({ title: "Error", description: "No hay datos del evento para guardar.", variant: "destructive" });
         }
-
-        const detailsAreValid = await detailsFormRef.current.trigger();
-        if (!detailsAreValid) {
-            toast({ title: "Revisa los campos", description: "Hay errores en la pestaña de Detalles.", variant: "destructive" });
-            setActiveTab("details");
-            return;
-        }
-
-        // Get final values from the form to ensure they are the latest
-        const latestDetailsValues = detailsFormRef.current.getValues();
-        const finalEventData: BusinessManagedEntity = {
-            ...currentEventData!,
-            ...latestDetailsValues,
-        };
-
-        await onSave(finalEventData, imageFile);
     };
 
-    const handleTabChange = async (newTab: string) => {
-        setActiveTab(newTab);
+    const handleAttemptClose = () => {
+        if (hasUnsavedChanges) {
+            setShowUnsavedChangesAlert(true);
+        } else {
+            setIsManageEventDialogOpen(false);
+        }
     };
-
+    
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
         const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
         const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
@@ -159,7 +159,7 @@ const ManageEventDialog = ({
         });
     };
     
-    const handleBoxSubmit = (boxData: EventBoxFormData) => {
+     const handleBoxSubmit = (boxData: EventBoxFormData) => {
         const boxId = editingBox?.id || `box_${Date.now()}`;
         
         let finalBoxData: Omit<EventBox, 'id' | 'eventId' | 'businessId'> = {...boxData};
@@ -181,7 +181,7 @@ const ManageEventDialog = ({
             businessId: currentEventData?.businessId || '',
         }) as EventBox;
         
-        setCurrentEventData(prev => {
+         setCurrentEventData(prev => {
             if (!prev) return null;
             const existingBoxes = prev.eventBoxes || [];
             const updatedBoxes = editingBox
@@ -304,7 +304,7 @@ const ManageEventDialog = ({
 
     return (
         <>
-            <Dialog open={isManageEventDialogOpen} onOpenChange={setIsManageEventDialogOpen}>
+            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) handleAttemptClose(); }}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
                         <DialogTitle>{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
@@ -313,7 +313,7 @@ const ManageEventDialog = ({
                     
                     <div className="px-6 border-b shrink-0">
                         <div className="overflow-x-auto">
-                           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+                           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                                 <TabsList className="w-max">
                                     <TabsTrigger value="details">Detalles</TabsTrigger>
                                     <TabsTrigger value="tickets">Entradas ({maxAttendanceFromTickets || 'Ilimitado'})</TabsTrigger>
@@ -334,7 +334,6 @@ const ManageEventDialog = ({
                                   </CardHeader>
                                   <CardContent>
                                     <BusinessEventForm 
-                                        ref={detailsFormRef}
                                         event={currentEventData} 
                                         isSubmitting={isSubmitting}
                                         onDetailsChange={handleDetailsChange}
@@ -411,7 +410,7 @@ const ManageEventDialog = ({
                                                               <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
                                                               {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
                                                             </div>
-                                                            {box.ownerName && (
+                                                             {box.ownerName && (
                                                                 <>
                                                                     <div className="col-span-2 mt-2 pt-2 border-t text-muted-foreground flex items-center">
                                                                         <User size={14} className="mr-1.5" />Dueño: <span className="font-medium text-foreground ml-1">{box.ownerName}</span>
@@ -562,7 +561,7 @@ const ManageEventDialog = ({
                     </div>
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
-                        <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                        <Button variant="outline" onClick={handleAttemptClose} disabled={isSubmitting}>Cancelar</Button>
                         <Button onClick={handleSaveChanges} disabled={isSubmitting}>
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
@@ -570,6 +569,29 @@ const ManageEventDialog = ({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={showUnsavedChangesAlert} onOpenChange={setShowUnsavedChangesAlert}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Has realizado cambios que no se han guardado. ¿Estás seguro de que quieres cerrar y descartar estos cambios?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>No, continuar editando</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setShowUnsavedChangesAlert(false);
+                                setIsManageEventDialogOpen(false);
+                            }}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Sí, descartar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <Dialog open={isTicketFormOpen} onOpenChange={setIsTicketFormOpen}>
               <DialogContent>
                 <DialogHeader>
@@ -1102,6 +1124,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
