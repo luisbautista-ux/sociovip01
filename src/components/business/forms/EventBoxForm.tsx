@@ -63,17 +63,6 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
     },
   });
 
-  const watchedStatus = form.watch("status");
-
-  useEffect(() => {
-    if (watchedStatus === 'available') {
-      form.setValue('promoterName', '');
-      form.setValue('ownerName', '');
-      form.setValue('ownerDni', '');
-      form.setValue('ownerPhone', '');
-    }
-  }, [watchedStatus, form]);
-
   React.useEffect(() => {
     form.reset({
       name: eventBox?.name || "",
@@ -89,7 +78,14 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
   }, [eventBox, form]);
 
   const handleSubmit = (values: EventBoxFormValues) => {
-    onSubmit(values);
+    const dataToSubmit = { ...values };
+    if (dataToSubmit.status === 'available') {
+      dataToSubmit.promoterName = "";
+      dataToSubmit.ownerName = "";
+      dataToSubmit.ownerDni = "";
+      dataToSubmit.ownerPhone = "";
+    }
+    onSubmit(dataToSubmit);
   };
 
   return (
