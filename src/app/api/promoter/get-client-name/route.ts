@@ -34,7 +34,7 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         formNombres.append('dni4', dni);
         formNombres.append('company', '');
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '9e85fb2b2e'); // token estable (puede actualizarse si cambia)
+        formNombres.append('security', '51193e58f5'); // token estable (puede actualizarse si cambia)
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',

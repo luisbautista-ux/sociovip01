@@ -15,7 +15,7 @@ import {
   DialogDescription as UIDialogDescriptionComponent,
   DialogFooter
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box, User, Phone } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db, storage } from "@/lib/firebase";
@@ -400,6 +400,12 @@ const ManageEventDialog = ({
                                                               <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
                                                               {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
                                                             </div>
+                                                            {box.ownerName && (
+                                                                <>
+                                                                    <div className="col-span-2 mt-2 pt-2 border-t text-muted-foreground flex items-center"><User size={14} className="mr-1.5"/>Dueño: <span className="font-medium text-foreground ml-1">{box.ownerName} ({box.ownerDni})</span></div>
+                                                                    {box.ownerPhone && <div className="col-span-2 text-muted-foreground flex items-center"><Phone size={14} className="mr-1.5"/>Celular: <span className="font-medium text-foreground ml-1">{box.ownerPhone}</span></div>}
+                                                                </>
+                                                            )}
                                                         </CardContent>
                                                         <CardFooter className="p-2 bg-muted/50 justify-center">
                                                             <DropdownMenu>
@@ -426,7 +432,16 @@ const ManageEventDialog = ({
 
                                             <div className="hidden md:block mt-4 overflow-x-auto">
                                                 <Table>
-                                                    <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Capacidad</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                                                    <TableHeader>
+                                                      <TableRow>
+                                                        <TableHead>Nombre</TableHead>
+                                                        <TableHead>Costo (S/)</TableHead>
+                                                        <TableHead>Capacidad</TableHead>
+                                                        <TableHead>Estado</TableHead>
+                                                        <TableHead>Dueño del Box</TableHead>
+                                                        <TableHead className="text-right">Acciones</TableHead>
+                                                      </TableRow>
+                                                    </TableHeader>
                                                     <TableBody>
                                                         {eventBoxes.map(box => (
                                                             <TableRow key={box.id}>
@@ -438,6 +453,15 @@ const ManageEventDialog = ({
                                                                         <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
                                                                         {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
                                                                     </div>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {box.ownerName ? (
+                                                                        <div className="text-xs">
+                                                                            <p className="font-semibold">{box.ownerName}</p>
+                                                                            <p className="text-muted-foreground">DNI: {box.ownerDni}</p>
+                                                                            <p className="text-muted-foreground">Cel: {box.ownerPhone || 'N/A'}</p>
+                                                                        </div>
+                                                                    ) : "N/A"}
                                                                 </TableCell>
                                                                 <TableCell className="text-right">
                                                                     <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
@@ -1060,6 +1084,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
