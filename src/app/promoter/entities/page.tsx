@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { QrCode, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search, ScanLine, CheckCircle } from "lucide-react";
+import { QrCode, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search, ScanLine, CheckCircle, Phone, User as UserIcon } from "lucide-react";
 import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox, QrClient, SocioVipMember } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -574,18 +574,15 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     const { toast } = useToast();
 
     const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
+    const isSoldByMe = box.status === 'sold' && box.promoterId === userProfile?.uid;
     const canManage = box.status === 'available' || isReservedByMe;
     
     const getBadgeContent = () => {
         if (box.status === 'available') return 'Disponible';
         if (isReservedByMe) return 'Reservado por ti';
         if (box.status === 'reserved') return 'Reservado';
-        if (box.status === 'sold') {
-            if (box.promoterId === userProfile?.uid) {
-                return 'Vendido por ti';
-            }
-            return `Vendido`;
-        }
+        if (isSoldByMe) return 'Vendido por ti';
+        if (box.status === 'sold') return 'Vendido';
         return box.status;
     };
 
@@ -663,8 +660,25 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                     <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
                     <p className="text-2xl font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
                 </div>
-                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500 text-white': box.status === 'available', 'bg-blue-600 text-white': isReservedByMe, 'bg-gray-500 text-white': (box.status === 'sold' || box.status === 'reserved') && !isReservedByMe })}>{getBadgeContent()}</Badge>
+                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500 text-white': box.status === 'available', 'bg-blue-600 text-white': isReservedByMe, 'bg-purple-600 text-white': isSoldByMe, 'bg-gray-500 text-white': (box.status === 'sold' || box.status === 'reserved') && !isReservedByMe && !isSoldByMe })}>{getBadgeContent()}</Badge>
             </div>
+
+            {(isSoldByMe || isReservedByMe) && (
+                <div className="pt-3 border-t text-sm space-y-1">
+                    <p className="font-semibold">Información del Cliente:</p>
+                    <div className="text-muted-foreground flex items-center">
+                        <UserIcon size={14} className="mr-1.5"/>Dueño: <span className="font-medium text-foreground ml-1">{box.ownerName}</span>
+                    </div>
+                    <div className="text-muted-foreground flex items-center">
+                        <UserIcon size={14} className="mr-1.5 opacity-0"/>DNI/CE: <span className="font-medium text-foreground ml-1">{box.ownerDni}</span>
+                    </div>
+                    {box.ownerPhone && 
+                        <div className="text-muted-foreground flex items-center">
+                            <Phone size={14} className="mr-1.5"/>Celular: <span className="font-medium text-foreground ml-1">{box.ownerPhone}</span>
+                        </div>
+                    }
+                </div>
+            )}
             
             {canManage && (
                 <div className="space-y-3 pt-3 border-t">
