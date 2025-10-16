@@ -101,7 +101,7 @@ const ManageEventDialog = ({
              toast({ title: "Error", description: "El formulario de detalles no está listo.", variant: "destructive" });
              return;
         }
-        
+
         const detailsAreValid = await detailsFormRef.current.trigger();
         if (!detailsAreValid) {
             toast({ title: "Revisa los campos", description: "Hay errores en el formulario de detalles.", variant: "destructive" });
@@ -126,7 +126,7 @@ const ManageEventDialog = ({
                 const currentDetails = detailsFormRef.current.getValues();
                 setCurrentEventData(prev => prev ? { ...prev, ...currentDetails } : null);
             } else {
-                return;
+                return; // Do not switch tab if details form is invalid
             }
         }
         setActiveTab(newTab);
@@ -1104,4 +1104,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
