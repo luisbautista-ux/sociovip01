@@ -83,29 +83,57 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 overflow-y-auto py-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nombre del Box <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Box A1 (Escenario), Mesa VIP 5" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="cost"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Costo (S/) <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input type="number" placeholder="500.00" {...field} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-3 py-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem className="md:col-span-2">
+                <FormLabel>Nombre del Box <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input placeholder="Ej: Box A1 (Escenario), Mesa VIP 5" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="cost"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Costo (S/) <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input type="number" placeholder="500.00" {...field} disabled={isSubmitting} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="capacity"
+            render={({ field }) => (
+              <FormItem>
+                  <FormLabel>Capacidad (Personas)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="8" 
+                      {...field} 
+                      value={field.value ?? ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const numVal = parseInt(val, 10);
+                        field.onChange(val === "" ? undefined : (isNaN(numVal) ? undefined : numVal));
+                      }} 
+                      disabled={isSubmitting} />
+                  </FormControl>
+                  <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        
         <FormField
           control={form.control}
           name="description"
@@ -117,29 +145,11 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="capacity"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Capacidad (Personas)</FormLabel>
-              <FormControl>
-                <Input 
-                  type="number" 
-                  placeholder="8" 
-                  {...field} 
-                  value={field.value ?? ''}
-                  onChange={e => {
-                    const val = e.target.value;
-                    const numVal = parseInt(val, 10);
-                    field.onChange(val === "" ? undefined : (isNaN(numVal) ? undefined : numVal));
-                  }} 
-                  disabled={isSubmitting} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        
+        <div className="space-y-2 pt-4 border-t">
+            <h4 className="text-sm font-medium text-muted-foreground">Detalles de Asignación</h4>
+        </div>
+        
         <FormField
           control={form.control}
           name="promoterName"
@@ -151,30 +161,33 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
             </FormItem>
           )}
         />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+            control={form.control}
+            name="ownerName"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Nombre Dueño del Box </FormLabel>
+                <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={form.control}
+            name="ownerDni"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>DNI/CE Dueño del Box </FormLabel>
+                <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        </div>
+
         <FormField
-          control={form.control}
-          name="ownerName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nombre Dueño del Box </FormLabel>
-              <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-              <FormDescription className="text-xs">Si el box es reservado por un cliente específico.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="ownerDni"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>DNI/CE Dueño del Box </FormLabel>
-              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-         <FormField
           control={form.control}
           name="ownerPhone"
           render={({ field }) => (
@@ -185,6 +198,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="status"
