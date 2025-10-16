@@ -577,6 +577,9 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     const isSoldByMe = box.status === 'sold' && box.promoterId === userProfile?.uid;
     const canManage = box.status === 'available' || isReservedByMe;
     
+    const isValidPhone = (phone: string) => /^9\d{8}$/.test(phone);
+    const canSubmit = !isSubmitting && ownerName && ownerDni && isValidPhone(ownerPhone);
+
     const getBadgeContent = () => {
         if (box.status === 'available') return 'Disponible';
         if (isReservedByMe) return 'Reservado por ti';
@@ -585,7 +588,6 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         if (box.status === 'sold') return 'Vendido';
         return box.status;
     };
-
 
     useEffect(() => {
         setOwnerDni(box.ownerDni || "");
@@ -704,7 +706,7 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                     </div>
 
                     <div className="space-y-1">
-                        <Label htmlFor={`dni-${box.id}`} className="text-xs">Número de Documento del dueño</Label>
+                        <Label htmlFor={`dni-${box.id}`} className="text-xs">Número de Documento del dueño <span className="text-destructive">*</span></Label>
                         <div className="flex gap-2">
                             <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => {
                                 const val = e.target.value.replace(/[^0-9]/g, '');
@@ -717,19 +719,20 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                         </div>
                     </div>
                      <div className="space-y-1">
-                        <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular del dueño</Label>
+                        <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular del dueño <span className="text-destructive">*</span></Label>
                         <Input id={`phone-${box.id}`} type="tel" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/[^0-9]/g, '').slice(0,9))} placeholder="987654321" maxLength={9} disabled={isSubmitting} />
+                        {!isValidPhone(ownerPhone) && ownerPhone.length > 0 && <p className="text-xs text-destructive mt-1">Debe ser un celular válido de 9 dígitos.</p>}
                     </div>
                      <div className="space-y-1">
-                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre del dueño</Label>
+                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre del dueño <span className="text-destructive">*</span></Label>
                         <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
                     </div>
                     <div className="flex gap-2 justify-end pt-2">
                        {box.status === 'available' && (
-                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'reserved')} disabled={isSubmitting || !ownerName || !ownerDni}>Reservar</Button>
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'reserved')} disabled={!canSubmit}>Reservar</Button>
                        )}
                        {isReservedByMe && (
-                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'sold')} disabled={isSubmitting || !ownerName || !ownerDni}>Marcar como Vendido</Button>
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'sold')} disabled={!canSubmit}>Marcar como Vendido</Button>
                        )}
                     </div>
                 </div>
