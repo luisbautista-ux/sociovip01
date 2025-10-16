@@ -578,7 +578,9 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
     const canManage = box.status === 'available' || isReservedByMe;
     
     const isValidPhone = (phone: string) => /^9\d{8}$/.test(phone);
-    const canSubmit = !isSubmitting && ownerName && ownerDni && isValidPhone(ownerPhone);
+    const isValidDni = ownerDni.length >= 8 && ownerDni.length <= 20;
+    const canSubmit = !isSubmitting && ownerName && isValidDni && isValidPhone(ownerPhone);
+
 
     const getBadgeContent = () => {
         if (box.status === 'available') return 'Disponible';
@@ -712,16 +714,17 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
                                 const val = e.target.value.replace(/[^0-9]/g, '');
                                 const maxLength = docType === 'dni' ? 8 : 20;
                                 setOwnerDni(val.slice(0, maxLength));
-                            }} placeholder={docType === 'dni' ? "8 dígitos" : "7-20 dígitos"} disabled={isSubmitting || isDniLoading} />
+                            }} placeholder={docType === 'dni' ? "8 dígitos" : "8-20 dígitos"} disabled={isSubmitting || isDniLoading} />
                             <Button size="icon" variant="outline" onClick={handleVerifyDni} disabled={isSubmitting || isDniLoading || !ownerDni}>
                                 {isDniLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
                             </Button>
                         </div>
+                         {!isValidDni && ownerDni.length > 0 && <p className="text-xs text-destructive mt-1">Debe tener entre 8 y 20 dígitos.</p>}
                     </div>
                      <div className="space-y-1">
                         <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular del dueño <span className="text-destructive">*</span></Label>
                         <Input id={`phone-${box.id}`} type="tel" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/[^0-9]/g, '').slice(0,9))} placeholder="987654321" maxLength={9} disabled={isSubmitting} />
-                        {!isValidPhone(ownerPhone) && ownerPhone.length > 0 && <p className="text-xs text-destructive mt-1">Debe ser un celular válido de 9 dígitos.</p>}
+                        {!isValidPhone(ownerPhone) && ownerPhone.length > 0 && <p className="text-xs text-destructive mt-1">Debe ser un celular válido de 9 dígitos que empiece con 9.</p>}
                     </div>
                      <div className="space-y-1">
                         <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre del dueño <span className="text-destructive">*</span></Label>
