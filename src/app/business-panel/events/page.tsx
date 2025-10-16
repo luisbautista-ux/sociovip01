@@ -88,47 +88,45 @@ const ManageEventDialog = ({
     }, [initialEditingEvent, isManageEventDialogOpen]);
     
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
-      if (newDetails.imageFile) {
-          setImageFile(newDetails.imageFile);
-          setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
-      } else if (newDetails.imageFile === null) {
-          setImageFile(null);
-      }
+        setCurrentEventData(prev => prev ? { ...prev, ...newDetails } : null);
+        if (newDetails.imageFile) {
+            setImageFile(newDetails.imageFile);
+            setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
+        } else if (newDetails.imageFile === null) { // Explicitly handle image removal
+            setImageFile(null);
+            setImagePreviewUrl(null);
+        }
     }, []);
-    
+
     const handleSaveChanges = async () => {
         if (!detailsFormRef.current) {
-             toast({ title: "Error", description: "El formulario de detalles no está listo.", variant: "destructive" });
-             return;
+            // Even if the form is not visible, we can still proceed if the data is in our state.
+            if (currentEventData) {
+                await onSave(currentEventData, imageFile);
+            } else {
+                toast({ title: "Error", description: "No hay datos del evento para guardar.", variant: "destructive" });
+            }
+            return;
         }
 
         const detailsAreValid = await detailsFormRef.current.trigger();
         if (!detailsAreValid) {
-            toast({ title: "Revisa los campos", description: "Hay errores en el formulario de detalles.", variant: "destructive" });
+            toast({ title: "Revisa los campos", description: "Hay errores en la pestaña de Detalles.", variant: "destructive" });
             setActiveTab("details");
             return;
         }
-        
-        const latestDetailsValues = detailsFormRef.current.getValues();
 
+        // Get final values from the form to ensure they are the latest
+        const latestDetailsValues = detailsFormRef.current.getValues();
         const finalEventData: BusinessManagedEntity = {
             ...currentEventData!,
-            ...latestDetailsValues, 
+            ...latestDetailsValues,
         };
 
         await onSave(finalEventData, imageFile);
     };
 
     const handleTabChange = async (newTab: string) => {
-        if (activeTab === 'details' && detailsFormRef.current) {
-            const formIsValid = await detailsFormRef.current.trigger();
-            if (formIsValid) {
-                const currentDetails = detailsFormRef.current.getValues();
-                setCurrentEventData(prev => prev ? { ...prev, ...currentDetails } : null);
-            } else {
-                return; // Do not switch tab if details form is invalid
-            }
-        }
         setActiveTab(newTab);
     };
 
@@ -1104,5 +1102,6 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 

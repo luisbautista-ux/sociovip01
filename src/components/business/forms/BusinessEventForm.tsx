@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -107,6 +108,17 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         });
     }
   }, [event, form]);
+
+  // This effect listens to form value changes and propagates them up
+  useEffect(() => {
+    const subscription = form.watch((value, { name, type }) => {
+      if (type === 'change') {
+        onDetailsChange(value);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onDetailsChange]);
+
 
   useImperativeHandle(ref, () => ({
     getValues: () => ({
