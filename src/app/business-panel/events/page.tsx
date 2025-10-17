@@ -103,19 +103,6 @@ const ManageEventDialog = ({
     }, [currentEventData]);
 
 
-    const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
-        setCurrentEventData(prev => {
-            if (!prev) return null;
-            return { ...prev, ...newDetails } as BusinessManagedEntity;
-        });
-
-        if (newDetails.imageFile) {
-            setImageFile(newDetails.imageFile);
-        } else if (newDetails.imageFile === null) {
-            setImageFile(null);
-        }
-    }, []);
-
      const handleSaveChanges = async () => {
         if (currentEventData) {
             await onSave(currentEventData, imageFile);
@@ -386,7 +373,8 @@ const ManageEventDialog = ({
                                     <BusinessEventForm 
                                         event={currentEventData} 
                                         isSubmitting={isSubmitting}
-                                        onDetailsChange={handleDetailsChange}
+                                        setCurrentEventData={setCurrentEventData}
+                                        setImageFile={setImageFile}
                                     />
                                   </CardContent>
                                 </Card>
@@ -1222,14 +1210,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
