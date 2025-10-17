@@ -64,6 +64,9 @@ export default function BusinessAnalyticsPage() {
       const mostRecentActiveEntity = sortedEntities.find(isEntityCurrentlyActivatable);
       if (mostRecentActiveEntity) {
         setSelectedEntityId(mostRecentActiveEntity.id);
+      } else if (sortedEntities.length > 0) {
+        // If no active entity, select the most recently created one
+        setSelectedEntityId(sortedEntities[0].id);
       }
 
 
