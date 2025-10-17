@@ -72,6 +72,9 @@ const ManageEventDialog = ({
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [showUnsavedChangesAlert, setShowUnsavedChangesAlert] = useState(false);
     const initialDataSnapshot = useRef<string | null>(null);
+
+    const [batchCommissionValue, setBatchCommissionValue] = useState<number | string>("");
+    const [batchCommissionDesc, setBatchCommissionDesc] = useState("");
     
     const { toast } = useToast();
 
@@ -83,12 +86,13 @@ const ManageEventDialog = ({
     
     useEffect(() => {
         if (isManageEventDialogOpen && initialEditingEvent) {
-            setCurrentEventData(initialEditingEvent);
+            const sanitizedInitialEvent = sanitizeObjectForFirestore({ ...initialEditingEvent }) as BusinessManagedEntity;
+            setCurrentEventData(sanitizedInitialEvent);
             setImageFile(null);
             setImagePreviewUrl(initialEditingEvent.imageUrl || null);
             setActiveTab("details");
             
-            initialDataSnapshot.current = JSON.stringify(initialEditingEvent);
+            initialDataSnapshot.current = JSON.stringify(sanitizedInitialEvent);
             setHasUnsavedChanges(false);
         }
     }, [initialEditingEvent, isManageEventDialogOpen]);
@@ -171,7 +175,6 @@ const ManageEventDialog = ({
                 ownerPhone: "",
             };
         }
-
         const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
             ...finalBoxData,
             id: boxId,
@@ -292,7 +295,56 @@ const ManageEventDialog = ({
         });
     };
     
+    const handleSelectAllPromoters = (isChecked: boolean) => {
+        if (!isChecked) {
+            // Deselect all
+            setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: [] } : null);
+        } else {
+            // Select all
+            const allAssignments: EventPromoterAssignment[] = availablePromoters.map(promoter => ({
+                promoterProfileId: promoter.platformUserUid!,
+                promoterName: promoter.promoterName,
+                promoterEmail: promoter.promoterEmail,
+                commissionRules: [],
+            }));
+            setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: allAssignments } : null);
+        }
+    };
+
+    const applyBatchCommission = () => {
+        const commissionValue = Number(batchCommissionValue);
+        if (isNaN(commissionValue)) {
+            toast({ title: "Error", description: "El monto de la comisión debe ser un número.", variant: "destructive" });
+            return;
+        }
+
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                const newRule: CommissionRule = {
+                    id: `rule_batch_${Date.now()}`,
+                    appliesTo: 'event_general',
+                    commissionType: 'fixed',
+                    commissionValue: commissionValue,
+                    description: batchCommissionDesc,
+                };
+                return { ...p, commissionRules: [newRule] }; // Replaces existing rules
+            });
+            return { ...prev, assignedPromoters: updatedAssignments };
+        });
+
+        toast({ title: "Éxito", description: `Comisión aplicada a ${currentEventData?.assignedPromoters?.length || 0} promotor(es).` });
+    };
+
     const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
+    
+    const allPromotersSelected = useMemo(() => {
+        return availablePromoters.length > 0 && currentEventData?.assignedPromoters?.length === availablePromoters.length;
+    }, [currentEventData?.assignedPromoters, availablePromoters]);
+
+    const somePromotersSelected = useMemo(() => {
+        return (currentEventData?.assignedPromoters?.length ?? 0) > 0 && !allPromotersSelected;
+    }, [currentEventData?.assignedPromoters, allPromotersSelected]);
 
     if (!isManageEventDialogOpen || !currentEventData) return null;
 
@@ -510,33 +562,67 @@ const ManageEventDialog = ({
                                         <div>
                                             <Label className="font-semibold">Promotores del Negocio</Label>
                                             <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
-                                                {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
-                                                    const isChecked = assignedPromoters.some(p => p.promoterProfileId === promoter.platformUserUid);
-                                                    return (
-                                                        <div key={promoter.platformUserUid} className="flex items-center space-x-2">
-                                                            <Checkbox
-                                                                id={`promoter-${promoter.platformUserUid}`}
-                                                                checked={isChecked}
-                                                                onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter.platformUserUid!, Boolean(checked))}
-                                                            />
-                                                            <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
-                                                        </div>
-                                                    );
-                                                }) : <p className="text-sm text-muted-foreground">No hay promotores vinculados a tu negocio.</p>}
+                                                {availablePromoters.length > 0 ? (
+                                                  <>
+                                                    <div className="flex items-center space-x-2 border-b pb-2 mb-2">
+                                                        <Checkbox
+                                                            id="select-all-promoters"
+                                                            checked={allPromotersSelected}
+                                                            onCheckedChange={handleSelectAllPromoters}
+                                                            data-state={somePromotersSelected ? 'indeterminate' : (allPromotersSelected ? 'checked' : 'unchecked')}
+                                                        />
+                                                        <Label htmlFor="select-all-promoters" className="font-medium">Seleccionar Todos</Label>
+                                                    </div>
+                                                    {availablePromoters.map(promoter => {
+                                                        const isChecked = assignedPromoters.some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                        return (
+                                                            <div key={promoter.platformUserUid} className="flex items-center space-x-2">
+                                                                <Checkbox
+                                                                    id={`promoter-${promoter.platformUserUid}`}
+                                                                    checked={isChecked}
+                                                                    onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter.platformUserUid!, Boolean(checked))}
+                                                                />
+                                                                <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                  </>
+                                                ) : <p className="text-sm text-muted-foreground">No hay promotores vinculados a tu negocio.</p>}
                                             </div>
                                         </div>
+
+                                        {assignedPromoters.length > 0 && (
+                                            <div className="space-y-3 p-4 border rounded-md bg-muted/50">
+                                                <h4 className="font-semibold">Aplicar Comisión Grupal</h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    <Input 
+                                                        type="number" 
+                                                        placeholder="Monto (ej: 5)" 
+                                                        value={batchCommissionValue} 
+                                                        onChange={(e) => setBatchCommissionValue(e.target.value)}
+                                                    />
+                                                    <Input 
+                                                        placeholder="Descripción (ej: por entrada general)" 
+                                                        value={batchCommissionDesc} 
+                                                        onChange={(e) => setBatchCommissionDesc(e.target.value)}
+                                                        className="sm:col-span-2"
+                                                    />
+                                                </div>
+                                                <Button size="sm" onClick={applyBatchCommission}>Aplicar a todos los seleccionados</Button>
+                                            </div>
+                                        )}
 
                                         <div className="space-y-4">
                                           <h4 className="font-semibold">Promotores Asignados ({assignedPromoters.length})</h4>
                                           {assignedPromoters.map(assignment => (
-                                              <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
+                                              <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
                                                   <div className="flex justify-between items-center">
                                                       <p className="font-medium">{assignment.promoterName}</p>
                                                   </div>
                                                   
                                                   <div className="space-y-2">
                                                       {(assignment.commissionRules || []).map((rule, index) => (
-                                                          <div key={rule.id} className="flex items-center gap-2 bg-background p-2 rounded-md border">
+                                                          <div key={rule.id} className="flex items-center gap-2 bg-muted/50 p-2 rounded-md border">
                                                               <div className="flex-grow grid grid-cols-2 gap-2">
                                                                   <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
                                                                   <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
@@ -1122,6 +1208,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
