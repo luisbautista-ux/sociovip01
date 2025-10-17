@@ -106,11 +106,17 @@ const ManageEventDialog = ({
 
 
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
-        setCurrentEventData(prev => prev ? { ...prev, ...newDetails } : null);
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            // Preserve existing imageUrl if a new file isn't being uploaded
+            const updatedDetails = { ...prev.imageUrl, ...newDetails };
+            return { ...prev, ...updatedDetails };
+        });
+
         if (newDetails.imageFile) {
             setImageFile(newDetails.imageFile);
             setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
-        } else if (newDetails.imageFile === null) {
+        } else if (newDetails.imageFile === null) { // Explicitly clearing the image
             setImageFile(null);
             setImagePreviewUrl(null);
         }
@@ -1223,6 +1229,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
