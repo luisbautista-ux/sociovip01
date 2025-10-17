@@ -77,15 +77,16 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
   const watchedStatus = form.watch("status");
 
   useEffect(() => {
-    if (watchedStatus !== 'available' && !form.getValues('promoterName') && userProfile?.name) {
-        form.setValue('promoterName', userProfile.name);
-    } else if (watchedStatus === 'available') {
-        form.setValue('promoterName', '');
-        form.setValue('ownerName', '');
-        form.setValue('ownerDni', '');
-        form.setValue('ownerPhone', '');
+    // This effect runs when the status changes.
+    const initialStatus = eventBox?.status || 'available';
+    
+    // If the status is being changed FROM 'available' TO 'reserved' or 'sold'
+    if (initialStatus === 'available' && (watchedStatus === 'reserved' || watchedStatus === 'sold')) {
+      if (!form.getValues('promoterName') && userProfile?.name) {
+          form.setValue('promoterName', userProfile.name);
+      }
     }
-  }, [watchedStatus, form, userProfile?.name]);
+  }, [watchedStatus, eventBox?.status, form, userProfile?.name]);
   
   const handleVerifyDni = async () => {
     const ownerDni = form.getValues('ownerDni');
