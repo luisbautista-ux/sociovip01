@@ -90,7 +90,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       form.setValue('ownerName', "");
       form.setValue('ownerDni', "");
       form.setValue('ownerPhone', "");
-    } else if ((initialStatus === 'available' || !eventBox?.promoterName) && (watchedStatus === 'reserved' || watchedStatus === 'sold')) {
+    } else if (initialStatus === 'available' && (watchedStatus === 'reserved' || watchedStatus === 'sold')) {
       // If status is being changed FROM 'available' TO 'reserved' or 'sold',
       // and there's no promoter yet, fill it with the current user.
       if (!form.getValues('promoterName') && userProfile?.name) {
@@ -134,6 +134,17 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
   };
 
   const handleSubmit = (values: EventBoxFormValues) => {
+    // Check if user is trying to save owner data while status is 'available'
+    if (values.status === 'available' && (values.ownerName || values.ownerDni || values.ownerPhone)) {
+        toast({
+            title: "Acción Requerida",
+            description: "Para guardar los datos del dueño, por favor cambia el estado a 'Reservado' o 'Vendido'.",
+            variant: "destructive",
+            duration: 7000
+        });
+        return; // Stop the submission
+    }
+
     let finalValues = { ...values };
     if (values.status === 'available') {
         finalValues = {
