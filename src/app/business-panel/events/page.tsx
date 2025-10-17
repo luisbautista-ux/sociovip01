@@ -60,7 +60,6 @@ const ManageEventDialog = ({
     const [activeTab, setActiveTab] = useState("details");
     
     const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(null);
-    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
     
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
@@ -89,7 +88,6 @@ const ManageEventDialog = ({
             const sanitizedInitialEvent = sanitizeObjectForFirestore({ ...initialEditingEvent }) as BusinessManagedEntity;
             setCurrentEventData(sanitizedInitialEvent);
             setImageFile(null);
-            setImagePreviewUrl(initialEditingEvent.imageUrl || null);
             setActiveTab("details");
             
             initialDataSnapshot.current = JSON.stringify(sanitizedInitialEvent);
@@ -108,30 +106,13 @@ const ManageEventDialog = ({
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
         setCurrentEventData(prev => {
             if (!prev) return null;
-            
-            const updatedEvent = { ...prev, ...newDetails };
-
-            // If a new image file is being uploaded, clear the old imageUrl
-            // so the new preview takes precedence.
-            if (newDetails.imageFile) {
-                updatedEvent.imageUrl = undefined;
-            } else {
-                // Otherwise, make sure we keep the existing imageUrl
-                updatedEvent.imageUrl = prev.imageUrl;
-            }
-
-            // Remove the temporary file object before saving to state
-            delete updatedEvent.imageFile;
-
-            return updatedEvent as BusinessManagedEntity;
+            return { ...prev, ...newDetails } as BusinessManagedEntity;
         });
 
         if (newDetails.imageFile) {
             setImageFile(newDetails.imageFile);
-            setImagePreviewUrl(URL.createObjectURL(newDetails.imageFile));
-        } else if (newDetails.imageFile === null) { // Explicitly clearing the image
+        } else if (newDetails.imageFile === null) {
             setImageFile(null);
-            setImagePreviewUrl(null);
         }
     }, []);
 
@@ -406,7 +387,6 @@ const ManageEventDialog = ({
                                         event={currentEventData} 
                                         isSubmitting={isSubmitting}
                                         onDetailsChange={handleDetailsChange}
-                                        imagePreviewUrl={imagePreviewUrl}
                                     />
                                   </CardContent>
                                 </Card>
@@ -1242,6 +1222,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 

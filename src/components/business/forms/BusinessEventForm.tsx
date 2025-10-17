@@ -71,17 +71,18 @@ interface BusinessEventFormProps {
   event: BusinessManagedEntity | null; 
   isSubmitting?: boolean;
   onDetailsChange: (newDetails: Partial<EventDetailsFormValues>) => void;
-  imagePreviewUrl: string | null;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onDetailsChange, imagePreviewUrl }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, onDetailsChange }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(event?.imageUrl || null);
+  const [objectPosition, setObjectPosition] = useState(event?.imageObjectPosition || '50% 50%');
 
   const imgContainerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
-  const [objectPosition, setObjectPosition] = useState(event?.imageObjectPosition || '50% 50%');
 
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
@@ -92,6 +93,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     if (event) {
         const unlimited = event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0;
         const initialPosition = event.imageObjectPosition || '50% 50%';
+        setImagePreviewUrl(event.imageUrl || null);
         setObjectPosition(initialPosition);
         form.reset({
             name: event.name || "",
@@ -109,21 +111,29 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     }
   }, [event, form]);
 
-  // This effect listens to form value changes and propagates them up
   useEffect(() => {
     const subscription = form.watch((value, { name, type }) => {
       if (type === 'change') {
-        onDetailsChange(value);
+        const allCurrentValues = form.getValues();
+        onDetailsChange(allCurrentValues);
       }
     });
     return () => subscription.unsubscribe();
   }, [form, onDetailsChange]);
 
+  useEffect(() => {
+    setObjectPosition(event?.imageObjectPosition || '50% 50%');
+  }, [event?.imageObjectPosition]);
+  
+  useEffect(() => {
+    setImagePreviewUrl(event?.imageUrl || null);
+  }, [event?.imageUrl]);
+
 
   useImperativeHandle(ref, () => ({
     getValues: () => ({
       ...form.getValues(),
-      imageObjectPosition: objectPosition, // Ensure the latest position is included
+      imageObjectPosition: objectPosition, 
     }),
     trigger: () => form.trigger(),
     formState: form.formState,
@@ -137,14 +147,17 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         return;
       }
       const newPosition = '50% 50%';
-      onDetailsChange({ imageFile: file, imageObjectPosition: newPosition });
+      form.setValue("imageFile", file, { shouldValidate: true });
+      form.setValue("imageObjectPosition", newPosition);
       setObjectPosition(newPosition);
+      setImagePreviewUrl(URL.createObjectURL(file));
+      onDetailsChange({ ...form.getValues(), imageFile: file, imageObjectPosition: newPosition });
     }
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { e.preventDefault(); isDragging.current = true; dragStart.current = { x: e.clientX, y: e.clientY }; };
-  const handleMouseLeave = () => { isDragging.current = false; };
-  const handleMouseUp = () => { isDragging.current = false; onDetailsChange({ imageObjectPosition: objectPosition }); };
+  const handleMouseLeave = () => { if (isDragging.current) { isDragging.current = false; onDetailsChange({ ...form.getValues(), imageObjectPosition: objectPosition }); }};
+  const handleMouseUp = () => { if (isDragging.current) { isDragging.current = false; onDetailsChange({ ...form.getValues(), imageObjectPosition: objectPosition }); }};
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging.current || !imgContainerRef.current) return;
     const container = imgContainerRef.current;
@@ -159,7 +172,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => { if (e.touches.length === 1) { isDragging.current = true; dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } };
-  const handleTouchEnd = () => { isDragging.current = false; onDetailsChange({ imageObjectPosition: objectPosition }); };
+  const handleTouchEnd = () => { if (isDragging.current) { isDragging.current = false; onDetailsChange({ ...form.getValues(), imageObjectPosition: objectPosition }); }};
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!isDragging.current || !imgContainerRef.current || e.touches.length !== 1) return;
     const container = imgContainerRef.current;
@@ -178,10 +191,11 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   useEffect(() => {
     if (isUnlimited) {
       if (form.getValues("maxAttendance") !== 0) {
-        form.setValue("maxAttendance", 0);
+        form.setValue("maxAttendance", 0, { shouldValidate: true });
+        onDetailsChange({ ...form.getValues(), maxAttendance: 0 });
       }
     }
-  }, [isUnlimited, form]);
+  }, [isUnlimited, form, onDetailsChange]);
 
 
   return (
