@@ -79,7 +79,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
   useEffect(() => {
     const initialStatus = eventBox?.status || 'available';
     
-    // When the modal opens for an available box, pre-fill promoter name.
+    // When the modal for an available box opens, pre-fill promoter name.
     if (initialStatus === 'available' && !eventBox?.promoterName && userProfile?.name) {
         form.setValue('promoterName', userProfile.name);
     }
@@ -87,7 +87,6 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
     // When status changes
     if (watchedStatus === 'available' && initialStatus !== 'available') {
       // If status is changed back to available, clear owner fields
-      form.setValue('promoterName', "");
       form.setValue('ownerName', "");
       form.setValue('ownerDni', "");
       form.setValue('ownerPhone', "");
@@ -107,7 +106,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
     setIsDniLoading(true);
     try {
         const idToken = await currentUser.getIdToken();
-        const response = await fetch(`/api/business-panel/get-client-by-dni?dni=${ownerDni}`, {
+        const response = await fetch(`/api/promoter/get-client-name?dni=${ownerDni}&docType=${docType}`, {
             headers: { 'Authorization': `Bearer ${idToken}` }
         });
 
