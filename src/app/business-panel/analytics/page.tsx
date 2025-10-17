@@ -221,7 +221,7 @@ export default function BusinessAnalyticsPage() {
                               }}
                             />
                             <Legend />
-                            <Bar dataKey="codesGenerated" fill="hsl(var(--secondary))" name="Códigos Creados" radius={[0, 4, 4, 0]} barSize={35} />
+                            <Bar dataKey="codesGenerated" fill="hsl(var(--secondary-foreground))" name="Códigos Creados" radius={[0, 4, 4, 0]} barSize={35} />
                             <Bar dataKey="qrGenerated" fill="hsl(var(--primary))" name="QRs Generados" radius={[0, 4, 4, 0]} barSize={35} />
                             <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="QRs Usados (en puerta)" radius={[0, 4, 4, 0]} barSize={35} />
                          </BarChart>
