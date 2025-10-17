@@ -1,4 +1,3 @@
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -321,7 +320,7 @@ export interface SocioVipMemberFormData {
   name: string;
   surname: string;
   phone: string;
-  dob: Date; d
+  dob: Date;
   email: string;
   address?: string;
   profession?: string;
@@ -346,11 +345,11 @@ export interface BusinessPromotionFormData {
   usageLimit?: number | string; // Allow string for empty input
   isActive: boolean;
   imageUrl?: string;
-  imageFile?: File | null; // For file uploads
-  imageObjectPosition?: string; // For saving focus point
-  aiHint?: string;
+  imageFile?: File | null;
+  imageObjectPosition?: string;
   termsAndConditions?: string;
   qrTemplateImageUrl?: string;
+  qrTemplateFile?: File | null;
 }
 
 export interface BusinessEventFormData {

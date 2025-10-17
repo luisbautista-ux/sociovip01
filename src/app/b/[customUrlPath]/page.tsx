@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -580,11 +581,14 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             if (qrData.promotion.qrTemplateImageUrl) {
                 try {
                     const templateImg = new Image();
-                    templateImg.crossOrigin = "anonymous";
+                    templateImg.crossOrigin = "anonymous"; // Important for loading images from other origins (like Firebase Storage)
                     templateImg.src = qrData.promotion.qrTemplateImageUrl;
                     await new Promise<void>((resolve, reject) => {
                         templateImg.onload = () => resolve();
-                        templateImg.onerror = () => reject(new Error('Failed to load template'));
+                        templateImg.onerror = (err) => {
+                            console.error("Template Image Load Error:", err);
+                            reject(new Error('Failed to load template'));
+                        };
                     });
                     canvas.width = templateImg.width;
                     canvas.height = templateImg.height;
@@ -609,14 +613,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         const isTemplateUsed = await drawTemplateOrGradient();
 
         if (!isTemplateUsed) {
-            // Logic for gradient background (existing logic)
-            // This part is simplified, you'd put your detailed gradient drawing logic here.
-            // For now, let's just place the QR and text.
+            // This fallback logic remains the same.
             const qrImage = new Image();
             qrImage.src = generatedQrDataUrl;
             await new Promise(resolve => qrImage.onload = resolve);
             ctx.drawImage(qrImage, (canvas.width - 200) / 2, 100, 200, 200);
-
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
             ctx.font = 'bold 24px Arial';
@@ -627,40 +628,42 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.fillText(qrData.promotion.title, canvas.width / 2, 400);
 
         } else {
-            // Logic when a template is used.
-            // This is a simplified example. You'll need to adjust X, Y coordinates,
-            // font sizes, and colors to match your template design.
+            // Template logic - adjusted for better positioning (example values)
             const qrImage = new Image();
             qrImage.src = generatedQrDataUrl;
             await new Promise(resolve => qrImage.onload = resolve);
 
-            // Example positions (you must adjust these)
-            const qrX = 250;
-            const qrY = 400;
-            const qrSize = 100;
+            // Example positions (you must adjust these based on your template design)
+            const qrX = (canvas.width - 150) / 2; // Centered QR
+            const qrY = 150;
+            const qrSize = 150;
             
-            const nameX = 250;
-            const nameY = 550;
-            
-            const dniX = 250;
-            const dniY = 570;
+            const nameY = 340;
+            const dniY = 370;
+            const promoTitleY = 420;
+            const validUntilY = 450;
 
-            // Draw QR code
-            ctx.fillStyle = 'white'; // White background for QR
+            // Draw QR code with a white background for better scannability
+            ctx.fillStyle = 'white';
             ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
             ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
 
             // Draw text
-            ctx.fillStyle = 'white'; // Color for the text
+            ctx.fillStyle = 'black'; // Adjust color for your template
             ctx.textAlign = 'center';
 
-            // Draw Name
-            ctx.font = 'bold 20px Arial';
-            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, nameX, nameY);
+            ctx.font = 'bold 24px Arial';
+            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, nameY);
 
-            // Draw DNI
+            ctx.font = '18px Arial';
+            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, dniY);
+            
+            ctx.font = 'bold 22px Arial';
+            ctx.fillText(qrData.promotion.title, canvas.width / 2, promoTitleY);
+
+            ctx.fillStyle = '#4A5568';
             ctx.font = '16px Arial';
-            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, dniX, dniY);
+            ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, validUntilY);
         }
         
         const dataUrl = canvas.toDataURL("image/png");

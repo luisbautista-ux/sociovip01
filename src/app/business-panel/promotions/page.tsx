@@ -131,7 +131,8 @@ export default function BusinessPromotionsPage() {
           ticketTypes: [], 
           eventBoxes: [],  
           assignedPromoters: [], 
-          maxAttendance: 0, 
+          maxAttendance: 0,
+          qrTemplateImageUrl: data.qrTemplateImageUrl || "",
         };
       });
       
@@ -222,16 +223,25 @@ export default function BusinessPromotionsPage() {
 
     try {
       let finalImageUrl = editingPromotion?.imageUrl || "";
+      let finalQrTemplateUrl = editingPromotion?.qrTemplateImageUrl || "";
       const isNewEntity = !editingPromotion || !editingPromotion.id || isDuplicating;
       const entityId = isNewEntity ? doc(collection(db, "businessEntities")).id : editingPromotion.id;
       
       const oldImageUrl = !isNewEntity && editingPromotion?.imageUrl ? editingPromotion.imageUrl : null;
+      const oldQrTemplateUrl = !isNewEntity && editingPromotion?.qrTemplateImageUrl ? editingPromotion.qrTemplateImageUrl : null;
 
       if (data.imageFile) {
-        toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
+        toast({ title: "Subiendo imagen principal...", description: "Por favor, espera." });
         const storageRef = ref(storage, `promotion-images/${currentBusinessId}/${entityId}/${data.imageFile.name}`);
         const uploadResult = await uploadBytes(storageRef, data.imageFile);
         finalImageUrl = await getDownloadURL(uploadResult.ref);
+      }
+      
+      if (data.qrTemplateFile) {
+        toast({ title: "Subiendo plantilla de QR...", description: "Por favor, espera." });
+        const templateStorageRef = ref(storage, `promotion-qr-templates/${currentBusinessId}/${entityId}/${data.qrTemplateFile.name}`);
+        const templateUploadResult = await uploadBytes(templateStorageRef, data.qrTemplateFile);
+        finalQrTemplateUrl = await getDownloadURL(templateUploadResult.ref);
       }
 
       const promotionPayloadBase = {
@@ -244,6 +254,7 @@ export default function BusinessPromotionsPage() {
         isActive: data.isActive,
         imageUrl: finalImageUrl,
         imageObjectPosition: data.imageObjectPosition,
+        qrTemplateImageUrl: finalQrTemplateUrl,
       };
 
       const fullPayloadForFirestore: Omit<BusinessManagedEntity, 'id' | 'createdAt'> & { createdAt?: any } = {
@@ -269,16 +280,11 @@ export default function BusinessPromotionsPage() {
         toast({ title: "Promoción Actualizada", description: `La promoción "${data.name}" ha sido actualizada.` });
       }
       
-      // Delete old image after successful DB update
       if (data.imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
-        try {
-          const oldImageRef = ref(storage, oldImageUrl);
-          await deleteObject(oldImageRef);
-        } catch (deleteError: any) {
-          if (deleteError.code !== 'storage/object-not-found') {
-            console.warn("Could not delete old promotion image, but DB was updated:", deleteError);
-          }
-        }
+        try { const oldImageRef = ref(storage, oldImageUrl); await deleteObject(oldImageRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete old promotion image:", e); }
+      }
+      if (data.qrTemplateFile && oldQrTemplateUrl && oldQrTemplateUrl.includes("firebase")) {
+        try { const oldTemplateRef = ref(storage, oldQrTemplateUrl); await deleteObject(oldTemplateRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete old QR template:", e); }
       }
 
       setShowCreateEditPromotionModal(false);
@@ -301,15 +307,10 @@ export default function BusinessPromotionsPage() {
       toast({ title: "Promoción Eliminada", description: `La promoción "${promotionToDelete.name || 'seleccionada'}" ha sido eliminada.`, variant: "destructive" });
 
       if (promotionToDelete.imageUrl && promotionToDelete.imageUrl.includes("firebase")) {
-        try {
-          const imageRef = ref(storage, promotionToDelete.imageUrl);
-          await deleteObject(imageRef);
-        } catch (deleteError: any) {
-          if (deleteError.code !== 'storage/object-not-found') {
-            console.warn("Could not delete promotion image:", deleteError);
-            toast({ title: "Aviso", description: "La promoción fue eliminada, pero no se pudo borrar la imagen asociada.", variant: "default" });
-          }
-        }
+        try { const imageRef = ref(storage, promotionToDelete.imageUrl); await deleteObject(imageRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete promotion image:", e); }
+      }
+      if (promotionToDelete.qrTemplateImageUrl && promotionToDelete.qrTemplateImageUrl.includes("firebase")) {
+        try { const templateRef = ref(storage, promotionToDelete.qrTemplateImageUrl); await deleteObject(templateRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete QR template image:", e); }
       }
 
       if (currentBusinessId) fetchBusinessData(currentBusinessId); 
@@ -518,7 +519,7 @@ export default function BusinessPromotionsPage() {
                 {/* Mobile View */}
                 <div className="md:hidden space-y-4">
                   {filteredPromotions.map(promo => {
-                    const codesRedeemedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
+                    const codesRedeemedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed' || c.status === 'used').length || 0;
                     const codesCreatedCount = promo.generatedCodes?.length || 0;
                     const isActivatable = isEntityCurrentlyActivatable(promo);
                     return(
@@ -539,7 +540,7 @@ export default function BusinessPromotionsPage() {
                             </div>
                             <div className="text-right text-xs">
                               <p>Creados: {codesCreatedCount}</p>
-                              <p>Usados: {codesRedeemedCount}</p>
+                              <p>Canjeados: {codesRedeemedCount}</p>
                               <p>Límite: {promo.usageLimit && promo.usageLimit > 0 ? promo.usageLimit : '∞'}</p>
                             </div>
                           </div>
@@ -624,15 +625,15 @@ export default function BusinessPromotionsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="min-w-[250px]">Promociones y Gestión</TableHead>
-                        <TableHead className="min-w-[220px]">QRs Promocionales</TableHead>
+                        <TableHead className="min-w-[250px]">Promoción y Gestión</TableHead>
+                        <TableHead className="min-w-[220px]">QRs y Códigos</TableHead>
                         <TableHead className="min-w-[180px]">Vigencia</TableHead>
                         <TableHead className="min-w-[180px] text-left">Acciones Adicionales</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredPromotions.length > 0 ? filteredPromotions.map((promo) => {
-                        const codesRedeemedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
+                        const codesRedeemedCount = promo.generatedCodes?.filter(c => c.status === 'redeemed' || c.status === 'used').length || 0;
                         const codesCreatedCount = promo.generatedCodes?.length || 0;
                         const isActivatable = isEntityCurrentlyActivatable(promo);
                         
@@ -685,10 +686,9 @@ export default function BusinessPromotionsPage() {
                           </TableCell>
                           <TableCell className="align-top py-3 text-xs">
                             <div className="flex flex-col">
-                                  <span>Códigos Creados ({codesCreatedCount})</span>
-                                  <span>QRs Generados (0)</span>
-                                  <span>QRs Usados ({codesRedeemedCount})</span>
-                                  <span>Límite de promociones ({promo.usageLimit && promo.usageLimit > 0 ? promo.usageLimit : 'Ilimitado'})</span>
+                                  <span>Códigos Creados: ({codesCreatedCount})</span>
+                                  <span>QRs Generados: ({codesRedeemedCount})</span>
+                                  <span>Límite de canjes: ({(promo.usageLimit && promo.usageLimit > 0) ? promo.usageLimit : 'Ilimitado'})</span>
                             </div>
                           </TableCell>
                           <TableCell className="align-top py-3 text-xs">
@@ -839,12 +839,13 @@ export default function BusinessPromotionsPage() {
             </ShadcnDialogHeader>
             <div className="space-y-3 py-4">
                 <p><strong>Códigos Creados:</strong> ({selectedPromotionForStats.generatedCodes?.length || 0})</p>
-                <p><strong>QRs Usados (Canjeados):</strong> ({selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0})</p>
-                <p><strong>Tasa de Canje:</strong> 
+                <p><strong>QRs Canjeados por Clientes:</strong> ({selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed' || c.status === 'used').length || 0})</p>
+                <p><strong>QRs Usados en Puerta:</strong> ({selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'used').length || 0})</p>
+                <p><strong>Tasa de Uso (Usados/Canjeados):</strong> 
                     {(() => {
-                        const total = selectedPromotionForStats.generatedCodes?.length || 0;
-                        const redeemed = selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed').length || 0;
-                        return total > 0 ? `${((redeemed / total) * 100).toFixed(1)}%` : '0%';
+                        const redeemed = selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'redeemed' || c.status === 'used').length || 0;
+                        const used = selectedPromotionForStats.generatedCodes?.filter(c => c.status === 'used').length || 0;
+                        return redeemed > 0 ? `${((used / redeemed) * 100).toFixed(1)}%` : '0%';
                     })()}
                 </p>
                   <p><strong>Límite de Canjes:</strong> ({(selectedPromotionForStats.usageLimit && selectedPromotionForStats.usageLimit > 0) ? selectedPromotionForStats.usageLimit : 'Ilimitado'})</p>
