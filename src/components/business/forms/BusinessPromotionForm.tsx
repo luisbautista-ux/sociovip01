@@ -41,6 +41,7 @@ const promotionFormSchema = z.object({
   imageFile: z.custom<File | null>(() => true).optional(),
   imageObjectPosition: z.string().optional(),
   termsAndConditions: z.string().optional(),
+  qrTemplateImageUrl: z.string().url("URL de plantilla inválida.").optional().or(z.literal("")),
 }).refine(data => {
     if (data.startDate && data.endDate) {
         const start = new Date(data.startDate.getFullYear(), data.startDate.getMonth(), data.startDate.getDate());
@@ -86,6 +87,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       imageFile: null,
       imageObjectPosition: promotion?.imageObjectPosition || "50% 50%",
       termsAndConditions: promotion?.termsAndConditions || "",
+      qrTemplateImageUrl: promotion?.qrTemplateImageUrl || "",
     },
   });
 
@@ -105,6 +107,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         imageFile: null,
         imageObjectPosition: initialPosition,
         termsAndConditions: promotion.termsAndConditions || "",
+        qrTemplateImageUrl: promotion.qrTemplateImageUrl || "",
       });
     }
   }, [promotion, form]);
@@ -359,6 +362,29 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           )}
         />
         
+        <FormField
+          control={form.control}
+          name="qrTemplateImageUrl"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>URL de Plantilla para QR (Opcional)</FormLabel>
+              <FormControl>
+                <Input
+                  type="url"
+                  placeholder="https://ejemplo.com/plantilla-qr.png"
+                  {...field}
+                  value={field.value || ""}
+                  disabled={isSubmitting}
+                />
+              </FormControl>
+              <FormDescription className="text-xs">
+                La imagen de fondo sobre la que se colocarán el QR y los datos del cliente.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="isActive"

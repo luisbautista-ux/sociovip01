@@ -1,3 +1,4 @@
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -13,6 +14,7 @@ export interface PromotionDetails {
   aiHint: string;
   type: 'promotion' | 'event';
   termsAndConditions?: string;
+  qrTemplateImageUrl?: string;
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'used' | 'expired';
@@ -231,6 +233,7 @@ export interface BusinessManagedEntity {
   businessLogoUrl?: string;
   businessCustomUrlPath?: string | null;
   createdAt?: string; 
+  qrTemplateImageUrl?: string;
 }
 
 export interface PromoterProfile { 
@@ -347,6 +350,7 @@ export interface BusinessPromotionFormData {
   imageObjectPosition?: string; // For saving focus point
   aiHint?: string;
   termsAndConditions?: string;
+  qrTemplateImageUrl?: string;
 }
 
 export interface BusinessEventFormData {
@@ -458,5 +462,3 @@ export interface InitialDataForPromoterLink {
   qrClientData?: QrClient; 
   socioVipData?: SocioVipMember;
 }
-
-```
