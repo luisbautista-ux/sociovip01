@@ -117,16 +117,20 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   useEffect(() => {
     const subscription = form.watch((value, { name, type }) => {
       if (type === 'change') {
-        const allCurrentValues = form.getValues();
-        setCurrentEventData(prev => prev ? { ...prev, ...allCurrentValues } : null);
+         setCurrentEventData(prev => {
+            if (!prev) return null;
+            const currentValues = form.getValues();
+            return {
+                ...prev,
+                ...currentValues,
+                startDate: currentValues.startDate.toISOString(),
+                endDate: currentValues.endDate.toISOString(),
+            };
+        });
       }
     });
     return () => subscription.unsubscribe();
   }, [form, setCurrentEventData]);
-
-  useEffect(() => {
-      setImagePreviewUrl(event?.imageUrl || null);
-  }, [event?.imageUrl]);
 
 
   useImperativeHandle(ref, () => ({
@@ -146,21 +150,20 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         return;
       }
       const newPosition = '50% 50%';
-      setImageFile(file);
+      setImageFile(file); // Update parent state with the file
+      setImagePreviewUrl(URL.createObjectURL(file)); // Update local preview
       setObjectPosition(newPosition);
-      setImagePreviewUrl(URL.createObjectURL(file));
-      
-      setCurrentEventData(prev => {
-          if (!prev) return null;
-          return {
-              ...prev,
-              ...form.getValues(),
-              imageUrl: '', // Clear old URL, new one will be generated on save
-              imageObjectPosition: newPosition,
-          };
-      });
+
+      // Update parent's event data
+      setCurrentEventData(prev => prev ? { 
+          ...prev, 
+          imageObjectPosition: newPosition,
+          // When a file is selected, we nullify the imageUrl so the logic in the parent component knows to upload a new one.
+          imageUrl: '', 
+      } : null);
     }
   };
+
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { e.preventDefault(); isDragging.current = true; dragStart.current = { x: e.clientX, y: e.clientY }; };
   const handleMouseLeave = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); setCurrentEventData(prev => prev ? {...prev, imageObjectPosition: objectPosition} : null); }};
