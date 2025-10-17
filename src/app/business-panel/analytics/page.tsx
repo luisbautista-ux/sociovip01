@@ -9,7 +9,7 @@ import { es } from "date-fns/locale";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
-import { anyToDate } from "@/lib/utils";
+import { anyToDate, isEntityCurrentlyActivatable } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,7 +52,20 @@ export default function BusinessAnalyticsPage() {
       const entitiesSnap = await getDocs(entitiesQuery);
       
       const fetchedEntities = entitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessManagedEntity));
-      setAllEntities(fetchedEntities);
+      
+      const sortedEntities = fetchedEntities.sort((a,b) => {
+        const dateA = anyToDate(a.createdAt)?.getTime() || 0;
+        const dateB = anyToDate(b.createdAt)?.getTime() || 0;
+        return dateB - dateA;
+      });
+      setAllEntities(sortedEntities);
+
+      // --- Set default selected entity ---
+      const mostRecentActiveEntity = sortedEntities.find(isEntityCurrentlyActivatable);
+      if (mostRecentActiveEntity) {
+        setSelectedEntityId(mostRecentActiveEntity.id);
+      }
+
 
       // --- Process General Stats (last 6 months) ---
       const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
@@ -72,8 +85,9 @@ export default function BusinessAnalyticsPage() {
         if (monthlyStats[monthKey]) {
           monthlyStats[monthKey].entitiesCreated += 1;
           if (entity.generatedCodes && Array.isArray(entity.generatedCodes)) {
-            monthlyStats[monthKey].qrCodesGenerated += entity.generatedCodes.length;
-            monthlyStats[monthKey].qrCodesUtilized += entity.generatedCodes.filter(c => c.status === 'redeemed' || c.status === 'used').length;
+            const redeemedOrUsed = entity.generatedCodes.filter(c => c.status === 'redeemed' || c.status === 'used').length;
+            monthlyStats[monthKey].qrCodesGenerated += redeemedOrUsed;
+            monthlyStats[monthKey].qrCodesUtilized += entity.generatedCodes.filter(c => c.status === 'used').length;
           }
         }
       });
@@ -175,12 +189,12 @@ export default function BusinessAnalyticsPage() {
           <CardDescription>Selecciona una actividad para ver su detalle de rendimiento.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-            <Select onValueChange={setSelectedEntityId} disabled={allEntities.length === 0}>
+            <Select onValueChange={setSelectedEntityId} value={selectedEntityId} disabled={allEntities.length === 0}>
                 <SelectTrigger>
                     <SelectValue placeholder={allEntities.length === 0 ? "No hay promociones o eventos para analizar" : "Selecciona una promoción o evento"} />
                 </SelectTrigger>
                 <SelectContent>
-                    {allEntities.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()).map(entity => (
+                    {allEntities.map(entity => (
                         <SelectItem key={entity.id} value={entity.id}>
                           <span className="flex items-center">{entity.type === 'event' ? <Calendar className="h-4 w-4 mr-2"/> : <Ticket className="h-4 w-4 mr-2"/>}{entity.name}</span>
                         </SelectItem>
