@@ -15,6 +15,7 @@ export interface PromotionDetails {
   type: 'promotion' | 'event';
   termsAndConditions?: string;
   qrTemplateImageUrl?: string;
+  qrTemplateLayout?: QrTemplateLayout; // Added for layout customization
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'used' | 'expired';
@@ -208,6 +209,14 @@ export interface EventBox {
   ownerPhone?: string;
 }
 
+export interface QrTemplateLayout {
+  qr: { x: number; y: number; size: number };
+  name: { x: number; y: number };
+  dni: { x: number; y: number };
+  promoTitle: { x: number; y: number };
+}
+
+
 export interface BusinessManagedEntity { 
   id: string; 
   businessId: string;
@@ -235,6 +244,7 @@ export interface BusinessManagedEntity {
   createdAt?: string; 
   qrTemplateImageUrl?: string;
   templateObjectPosition?: string; // New: To store template image focus point
+  qrTemplateLayout?: QrTemplateLayout; // Added for layout customization
 }
 
 export interface PromoterProfile { 
@@ -353,6 +363,7 @@ export interface BusinessPromotionFormData {
   termsAndConditions?: string;
   qrTemplateImageUrl?: string;
   qrTemplateFile?: File | null;
+  qrTemplateLayout?: QrTemplateLayout;
 }
 
 export interface BusinessEventFormData {

@@ -16,7 +16,7 @@ import {
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
 import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle, MoreVertical } from "lucide-react";
-import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode, Business } from "@/lib/types";
+import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode, Business, QrTemplateLayout } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -133,6 +133,8 @@ export default function BusinessPromotionsPage() {
           assignedPromoters: [], 
           maxAttendance: 0,
           qrTemplateImageUrl: data.qrTemplateImageUrl || "",
+          templateObjectPosition: data.templateObjectPosition,
+          qrTemplateLayout: data.qrTemplateLayout,
         };
       });
       
@@ -255,6 +257,8 @@ export default function BusinessPromotionsPage() {
         imageUrl: finalImageUrl,
         imageObjectPosition: data.imageObjectPosition,
         qrTemplateImageUrl: finalQrTemplateUrl,
+        templateObjectPosition: data.templateObjectPosition,
+        qrTemplateLayout: data.qrTemplateLayout,
       };
 
       const fullPayloadForFirestore: Omit<BusinessManagedEntity, 'id' | 'createdAt'> & { createdAt?: any } = {
@@ -284,7 +288,7 @@ export default function BusinessPromotionsPage() {
         try { const oldImageRef = ref(storage, oldImageUrl); await deleteObject(oldImageRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete old promotion image:", e); }
       }
       if (data.qrTemplateFile && oldQrTemplateUrl && oldQrTemplateUrl.includes("firebase")) {
-        try { const oldTemplateRef = ref(storage, oldQrTemplateUrl); await deleteObject(oldTemplateRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete old QR template:", e); }
+        try { const oldTemplateRef = ref(storage, oldQrTemplateUrl); await deleteObject(oldTemplateRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete old QR template image:", e); }
       }
 
       setShowCreateEditPromotionModal(false);

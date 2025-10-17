@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,11 +20,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon, Loader2, Move, Upload } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2, Move, Upload, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/types";
+import type { BusinessManagedEntity, BusinessPromotionFormData, QrTemplateLayout } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import NextImage from "next/image";
 import { useToast } from "@/hooks/use-toast";
@@ -45,7 +44,13 @@ const promotionFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   qrTemplateImageUrl: z.string().optional(),
   qrTemplateFile: z.custom<File | null>(() => true).optional(),
-  templateObjectPosition: z.string().optional(), // Added
+  templateObjectPosition: z.string().optional(),
+  qrTemplateLayout: z.object({
+    qr: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number() }),
+    name: z.object({ x: z.coerce.number(), y: z.coerce.number() }),
+    dni: z.object({ x: z.coerce.number(), y: z.coerce.number() }),
+    promoTitle: z.object({ x: z.coerce.number(), y: z.coerce.number() }),
+  }).optional(),
 }).refine(data => {
     if (data.startDate && data.endDate) {
         const start = new Date(data.startDate.getFullYear(), data.startDate.getMonth(), data.startDate.getDate());
@@ -96,6 +101,13 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     if (promotion) {
       const initialImgPos = promotion.imageObjectPosition || '50% 50%';
       const initialTmplPos = promotion.templateObjectPosition || '50% 50%';
+      const initialLayout = promotion.qrTemplateLayout || {
+        qr: { x: 190, y: 350, size: 80 },
+        name: { x: 190, y: 450 },
+        dni: { x: 190, y: 470 },
+        promoTitle: { x: 190, y: 500 },
+      };
+
       setObjectPosition(initialImgPos);
       setTemplateObjectPosition(initialTmplPos);
       setImagePreview(promotion.imageUrl || null);
@@ -115,6 +127,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         qrTemplateImageUrl: promotion.qrTemplateImageUrl || "",
         qrTemplateFile: null,
         templateObjectPosition: initialTmplPos,
+        qrTemplateLayout: initialLayout,
       });
     }
   }, [promotion, form]);
@@ -154,22 +167,31 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
 
         ctx.drawImage(templateImg, dx, dy, drawWidth, drawHeight);
 
-        // Draw example QR
-        const exampleQrDataUrl = await QRCode.toDataURL("SocioVipPreview", { width: 80, errorCorrectionLevel: "H", margin: 1 });
+        // Get layout from form values or use default
+        const layout = form.getValues('qrTemplateLayout') || {
+            qr: { x: 190, y: 350, size: 80 },
+            name: { x: 190, y: 450 },
+            dni: { x: 190, y: 470 },
+            promoTitle: { x: 190, y: 500 },
+        };
+
+        const exampleQrDataUrl = await QRCode.toDataURL("SocioVipPreview", { width: layout.qr.size, errorCorrectionLevel: "H", margin: 1 });
         const qrImage = new Image();
         qrImage.src = exampleQrDataUrl;
         await new Promise(resolve => (qrImage.onload = resolve));
-        ctx.drawImage(qrImage, canvas.width / 2 - 40, canvas.height * 0.4, 80, 80);
+        ctx.drawImage(qrImage, layout.qr.x - (layout.qr.size / 2), layout.qr.y - (layout.qr.size / 2), layout.qr.size, layout.qr.size);
 
-        // Draw example text
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
+        
         ctx.font = 'bold 16px Arial';
-        ctx.fillText("Nombre Apellido", canvas.width / 2, canvas.height * 0.6);
+        ctx.fillText("Nombre Apellido", layout.name.x, layout.name.y);
+        
         ctx.font = '12px Arial';
-        ctx.fillText("DNI: 12345678", canvas.width / 2, canvas.height * 0.65);
+        ctx.fillText("DNI: 12345678", layout.dni.x, layout.dni.y);
+        
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(formValues.name || "Nombre Promoción", canvas.width / 2, canvas.height * 0.72);
+        ctx.fillText(formValues.name || "Nombre Promoción", layout.promoTitle.x, layout.promoTitle.y);
         
     } else {
         ctx.fillStyle = '#e5e7eb'; // muted color
@@ -179,12 +201,12 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         ctx.font = '14px Arial';
         ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
     }
-}, [templatePreview, formValues.name]);
+}, [templatePreview, formValues.name, form.getValues('qrTemplateLayout')]);
 
 
   useEffect(() => {
     drawPreviewOnCanvas();
-  }, [drawPreviewOnCanvas]);
+  }, [drawPreviewOnCanvas, formValues]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'main' | 'template') => {
     const file = event.target.files?.[0];
@@ -251,6 +273,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       usageLimit: values.usageLimit === undefined || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
       imageObjectPosition: objectPosition,
       templateObjectPosition: templateObjectPosition,
+      qrTemplateLayout: values.qrTemplateLayout,
     });
   };
 
@@ -314,28 +337,35 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           <FormLabel className="self-start">Plantilla de QR (Opcional)</FormLabel>
           <div
             ref={templateContainerRef}
-            className="group w-full max-w-xs aspect-[9/16] relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
-            style={{ touchAction: 'none' }}
-            onMouseDown={(e) => handleDragStart(e)}
-            onMouseMove={(e) => handleDragMove(e, templateContainerRef, templateObjectPosition, setTemplateObjectPosition)}
-            onMouseUp={() => handleDragEnd("templateObjectPosition", templateObjectPosition)}
-            onMouseLeave={() => handleDragEnd("templateObjectPosition", templateObjectPosition)}
-            onTouchStart={(e) => handleDragStart(e)}
-            onTouchMove={(e) => handleDragMove(e, templateContainerRef, templateObjectPosition, setTemplateObjectPosition)}
-            onTouchEnd={() => handleDragEnd("templateObjectPosition", templateObjectPosition)}
+            className="group w-full max-w-xs aspect-[9/16] relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
           >
              <canvas ref={canvasRef} width={380} height={700} className="absolute inset-0 w-full h-full object-contain" />
-             {templatePreview && (
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
-                    <Move className="h-8 w-8" />
-                    <span className="text-sm font-semibold mt-1 text-center">Arrastra para ajustar la plantilla (si no encaja)</span>
-                </div>
-             )}
           </div>
           <input type="file" ref={templateImageInputRef} onChange={(e) => handleFileChange(e, 'template')} className="hidden" accept="image/png, image/jpeg, image/webp" />
           <Button type="button" variant="outline" onClick={() => templateImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> {templatePreview ? 'Cambiar' : 'Subir'} Plantilla</Button>
           <FormDescription className="text-xs">Imagen de fondo para el QR descargable (Formato Ticket).</FormDescription>
           <FormMessage>{form.formState.errors.qrTemplateFile?.message}</FormMessage>
+        </div>
+
+        <div className="space-y-4 pt-4 border-t mt-6">
+            <h4 className="flex items-center text-sm font-medium"><Settings className="h-4 w-4 mr-2"/>Ajustar Posiciones de Datos en Plantilla</h4>
+            <div className="grid grid-cols-2 gap-4">
+                 <FormField control={form.control} name="qrTemplateLayout.qr.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                 <FormField control={form.control} name="qrTemplateLayout.qr.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                 <FormField control={form.control} name="qrTemplateLayout.qr.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="qrTemplateLayout.name.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                <FormField control={form.control} name="qrTemplateLayout.name.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="qrTemplateLayout.dni.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                <FormField control={form.control} name="qrTemplateLayout.dni.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="qrTemplateLayout.promoTitle.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                <FormField control={form.control} name="qrTemplateLayout.promoTitle.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+            </div>
         </div>
         
         <FormField control={form.control} name="isActive" render={({ field }) => (
