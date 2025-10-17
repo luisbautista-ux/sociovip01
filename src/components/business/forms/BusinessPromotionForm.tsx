@@ -137,8 +137,6 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     if (templatePreview) {
         const templateImg = new Image();
         templateImg.crossOrigin = "anonymous";
@@ -148,26 +146,12 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             templateImg.onerror = reject;
         });
 
-        // Calculate aspect ratio to fit the template image within the canvas
-        const canvasAspectRatio = canvas.width / canvas.height;
-        const templateAspectRatio = templateImg.width / templateImg.height;
-        let drawWidth, drawHeight, dx, dy;
+        // Make canvas size match template image size
+        canvas.width = templateImg.width;
+        canvas.height = templateImg.height;
 
-        if (templateAspectRatio > canvasAspectRatio) {
-            drawWidth = canvas.width;
-            drawHeight = drawWidth / templateAspectRatio;
-            dx = 0;
-            dy = (canvas.height - drawHeight) / 2;
-        } else {
-            drawHeight = canvas.height;
-            drawWidth = drawHeight * templateAspectRatio;
-            dy = 0;
-            dx = (canvas.width - drawWidth) / 2;
-        }
+        ctx.drawImage(templateImg, 0, 0, templateImg.width, templateImg.height);
 
-        ctx.drawImage(templateImg, dx, dy, drawWidth, drawHeight);
-
-        // Get layout from form values or use default
         const layout = form.getValues('qrTemplateLayout') || {
             qr: { x: 190, y: 350, size: 80 },
             name: { x: 190, y: 450 },
@@ -179,6 +163,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         const qrImage = new Image();
         qrImage.src = exampleQrDataUrl;
         await new Promise(resolve => (qrImage.onload = resolve));
+        // Draw centered on X coordinate
         ctx.drawImage(qrImage, layout.qr.x - (layout.qr.size / 2), layout.qr.y - (layout.qr.size / 2), layout.qr.size, layout.qr.size);
 
         ctx.fillStyle = 'white';
@@ -194,6 +179,10 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         ctx.fillText(formValues.name || "Nombre Promoción", layout.promoTitle.x, layout.promoTitle.y);
         
     } else {
+        // Fallback view if no template is loaded
+        canvas.width = 380;
+        canvas.height = 700;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#e5e7eb'; // muted color
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#9ca3af'; // muted-foreground
@@ -201,7 +190,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         ctx.font = '14px Arial';
         ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
     }
-}, [templatePreview, formValues.name, form.getValues('qrTemplateLayout')]);
+  }, [templatePreview, formValues.name, form.getValues('qrTemplateLayout')]);
 
 
   useEffect(() => {
@@ -336,10 +325,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         <div className="flex flex-col items-center justify-center pt-4 border-t mt-6 space-y-3">
           <FormLabel className="self-start">Plantilla de QR (Opcional)</FormLabel>
           <div
-            ref={templateContainerRef}
-            className="group w-full max-w-xs aspect-[9/16] relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
+            className="group w-full max-w-xs relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
           >
-             <canvas ref={canvasRef} width={380} height={700} className="absolute inset-0 w-full h-full object-contain" />
+             <canvas ref={canvasRef} className="w-full h-auto" />
           </div>
           <input type="file" ref={templateImageInputRef} onChange={(e) => handleFileChange(e, 'template')} className="hidden" accept="image/png, image/jpeg, image/webp" />
           <Button type="button" variant="outline" onClick={() => templateImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> {templatePreview ? 'Cambiar' : 'Subir'} Plantilla</Button>

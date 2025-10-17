@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -402,7 +401,15 @@ const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEnti
     if (!docSnap.exists()) {
       throw new Error("La entidad ya no existe.");
     }
-    return { id: docSnap.id, ...docSnap.data() } as BusinessManagedEntity;
+    const data = docSnap.data();
+    // Ensure all nested date-like fields are properly converted.
+    return { 
+        id: docSnap.id, 
+        ...data,
+        startDate: anyToDate(data.startDate)?.toISOString() || "",
+        endDate: anyToDate(data.endDate)?.toISOString() || "",
+        createdAt: anyToDate(data.createdAt)?.toISOString(),
+    } as BusinessManagedEntity;
 };
   
 const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
@@ -578,17 +585,11 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
         promoTitle: { x: 190, y: 500 },
     };
 
-    const rawQrCodeDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, {
-      width: layout.qr.size,
-      errorCorrectionLevel: "H",
-      margin: 2,
-    });
-
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    let isTemplateUsed = false;
+    // Use template if available, otherwise use gradient
     if (qrData.promotion.qrTemplateImageUrl) {
         try {
             const templateImg = new Image();
@@ -596,18 +597,20 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
             templateImg.src = qrData.promotion.qrTemplateImageUrl;
             await new Promise<void>((resolve, reject) => {
                 templateImg.onload = () => resolve();
-                templateImg.onerror = () => reject(new Error('Failed to load template'));
+                templateImg.onerror = (err) => reject(new Error('Failed to load template image'));
             });
+            // Set canvas size to match template
             canvas.width = templateImg.width;
             canvas.height = templateImg.height;
-            ctx.drawImage(templateImg, 0, 0);
-            isTemplateUsed = true;
+            ctx.drawImage(templateImg, 0, 0, templateImg.width, templateImg.height);
         } catch (e) {
-            console.warn("Could not load QR template, falling back to gradient.", e);
+            console.warn("Could not load QR template, falling back to default.", e);
+            canvas.width = 380;
+            canvas.height = 700;
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
-    }
-    
-    if (!isTemplateUsed) {
+    } else {
         canvas.width = 380;
         canvas.height = 700;
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
@@ -617,12 +620,20 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
+    // Generate QR code
+    const rawQrCodeDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, {
+      width: layout.qr.size,
+      errorCorrectionLevel: "H",
+      margin: 1,
+    });
     const qrImage = new Image();
     qrImage.src = rawQrCodeDataUrl;
     await new Promise(resolve => qrImage.onload = resolve);
     
+    // Draw QR centered on its X coordinate
     ctx.drawImage(qrImage, layout.qr.x - (layout.qr.size / 2), layout.qr.y - (layout.qr.size / 2), layout.qr.size, layout.qr.size);
 
+    // Draw text
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     
@@ -836,7 +847,7 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
                   alt="Vale de consumo con código QR"
                   width={380}
                   height={700}
-                  className="mx-auto rounded-md"
+                  className="mx-auto rounded-md w-full h-auto"
                 />
               ) : (
                 <div className="h-[250px] w-full max-w-[380px] mx-auto flex items-center justify-center border rounded-md bg-muted text-muted-foreground">
