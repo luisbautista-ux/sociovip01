@@ -77,16 +77,28 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
   const watchedStatus = form.watch("status");
 
   useEffect(() => {
-    // This effect runs when the status changes.
     const initialStatus = eventBox?.status || 'available';
     
-    // If the status is being changed FROM 'available' TO 'reserved' or 'sold'
-    if (initialStatus === 'available' && (watchedStatus === 'reserved' || watchedStatus === 'sold')) {
+    // When the modal opens for an available box, pre-fill promoter name.
+    if (initialStatus === 'available' && !eventBox?.promoterName && userProfile?.name) {
+        form.setValue('promoterName', userProfile.name);
+    }
+    
+    // When status changes
+    if (watchedStatus === 'available' && initialStatus !== 'available') {
+      // If status is changed back to available, clear owner fields
+      form.setValue('promoterName', "");
+      form.setValue('ownerName', "");
+      form.setValue('ownerDni', "");
+      form.setValue('ownerPhone', "");
+    } else if ((initialStatus === 'available' || !eventBox?.promoterName) && (watchedStatus === 'reserved' || watchedStatus === 'sold')) {
+      // If status is being changed FROM 'available' TO 'reserved' or 'sold',
+      // and there's no promoter yet, fill it with the current user.
       if (!form.getValues('promoterName') && userProfile?.name) {
           form.setValue('promoterName', userProfile.name);
       }
     }
-  }, [watchedStatus, eventBox?.status, form, userProfile?.name]);
+  }, [watchedStatus, eventBox, userProfile, form]);
   
   const handleVerifyDni = async () => {
     const ownerDni = form.getValues('ownerDni');
