@@ -36,13 +36,34 @@ const eventBoxFormSchema = z.object({
   capacity: z.coerce.number().int().min(1, "La capacidad debe ser al menos 1.").optional().or(z.literal(undefined)),
   promoterName: z.string().optional(),
   ownerName: z.string().optional(),
-  ownerDni: z.string().optional().refine(val => !val || (val.length >= 7 && val.length <= 15), {
-    message: "DNI/CE del dueño debe tener entre 7 y 15 caracteres si se ingresa.",
-  }),
-  ownerPhone: z.string().optional().refine(val => !val || /^9\d{8}$/.test(val), {
-    message: "El celular debe tener 9 dígitos y empezar con 9.",
-  }),
+  ownerDni: z.string().optional(),
+  ownerPhone: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.status === 'reserved' || data.status === 'sold') {
+        if (!data.ownerName || data.ownerName.length < 3) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El nombre del dueño es obligatorio (mín. 3 caracteres).",
+                path: ["ownerName"],
+            });
+        }
+        if (!data.ownerDni || !/^\d{8,20}$/.test(data.ownerDni)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El DNI/CE es obligatorio y debe tener entre 8 y 20 dígitos numéricos.",
+                path: ["ownerDni"],
+            });
+        }
+        if (!data.ownerPhone || !/^9\d{8}$/.test(data.ownerPhone)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El celular es obligatorio (9 dígitos empezando con 9).",
+                path: ["ownerPhone"],
+            });
+        }
+    }
 });
+
 
 type EventBoxFormValues = z.infer<typeof eventBoxFormSchema>;
 
@@ -72,30 +93,29 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       ownerDni: eventBox?.ownerDni || "",
       ownerPhone: eventBox?.ownerPhone || "",
     },
+    mode: "onChange",
   });
 
   const watchedStatus = form.watch("status");
 
   useEffect(() => {
-    const initialStatus = eventBox?.status || 'available';
-    
-    // When the modal for an available box opens, pre-fill promoter name.
-    if (initialStatus === 'available' && !eventBox?.promoterName && userProfile?.name) {
-        form.setValue('promoterName', userProfile.name);
+    // Si el modal se abre para editar un box disponible Y el campo de vendedor está vacío, se autocompleta con el admin actual.
+    if (eventBox?.status === 'available' && !eventBox.promoterName && userProfile?.name) {
+      form.setValue('promoterName', userProfile.name, { shouldValidate: true });
     }
     
-    // When status changes
-    if (watchedStatus === 'available' && initialStatus !== 'available') {
-      // If status is changed back to available, clear owner fields
-      form.setValue('ownerName', "");
-      form.setValue('ownerDni', "");
-      form.setValue('ownerPhone', "");
-    } else if (initialStatus === 'available' && (watchedStatus === 'reserved' || watchedStatus === 'sold')) {
-      // If status is being changed FROM 'available' TO 'reserved' or 'sold',
-      // and there's no promoter yet, fill it with the current user.
-      if (!form.getValues('promoterName') && userProfile?.name) {
-          form.setValue('promoterName', userProfile.name);
+    // Si el estado cambia a 'disponible', limpiar los campos del dueño
+    if (watchedStatus === 'available') {
+      if (form.getValues('ownerName') || form.getValues('ownerDni') || form.getValues('ownerPhone')) {
+          form.setValue('ownerName', "");
+          form.setValue('ownerDni', "");
+          form.setValue('ownerPhone', "");
       }
+    } else { // Si cambia a 'reservado' o 'vendido'
+       // Si el campo de vendedor está vacío, se autocompleta con el admin actual
+       if (!form.getValues('promoterName') && userProfile?.name) {
+           form.setValue('promoterName', userProfile.name);
+       }
     }
   }, [watchedStatus, eventBox, userProfile, form]);
   
@@ -134,7 +154,6 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
   };
 
   const handleSubmit = (values: EventBoxFormValues) => {
-    // Check if user is trying to save owner data while status is 'available'
     if (values.status === 'available' && (values.ownerName || values.ownerDni || values.ownerPhone)) {
         toast({
             title: "Acción Requerida",
@@ -142,7 +161,7 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
             variant: "destructive",
             duration: 7000
         });
-        return; // Stop the submission
+        return; 
     }
 
     let finalValues = { ...values };
