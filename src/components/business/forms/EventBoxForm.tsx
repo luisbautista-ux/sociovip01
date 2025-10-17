@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -21,7 +20,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { EventBox, EventBoxFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+
 
 const eventBoxFormSchema = z.object({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
@@ -49,6 +54,11 @@ interface EventBoxFormProps {
 }
 
 export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = false }: EventBoxFormProps) {
+  const { userProfile, currentUser } = useAuth();
+  const { toast } = useToast();
+  const [isDniLoading, setIsDniLoading] = useState(false);
+  const [docType, setDocType] = useState<'dni' | 'ce'>('dni');
+
   const form = useForm<EventBoxFormValues>({
     resolver: zodResolver(eventBoxFormSchema),
     defaultValues: {
@@ -72,11 +82,60 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
       form.setValue("ownerName", "");
       form.setValue("ownerDni", "");
       form.setValue("ownerPhone", "");
+    } else {
+        // If the box is being reserved/sold and there's no promoter assigned, assign the current user.
+        if (!form.getValues('promoterName') && userProfile?.name) {
+            form.setValue('promoterName', userProfile.name);
+        }
     }
-  }, [watchedStatus, form]);
+  }, [watchedStatus, form, userProfile?.name]);
+  
+  const handleVerifyDni = async () => {
+    const ownerDni = form.getValues('ownerDni');
+    if (!ownerDni || !currentUser) return;
+    
+    setIsDniLoading(true);
+    try {
+        const idToken = await currentUser.getIdToken();
+        const response = await fetch(`/api/business-panel/get-client-by-dni?dni=${ownerDni}`, {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Error del servidor (${response.status})`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.name) {
+            form.setValue('ownerName', data.name);
+            if (data.phone) {
+                 form.setValue('ownerPhone', data.phone);
+            }
+            toast({ title: "Cliente Encontrado", description: `Se autocompletaron los datos para ${data.name}.` });
+        } else {
+            toast({ title: "No Encontrado", description: "No se encontró un cliente con ese DNI. Por favor, ingrese los datos manualmente.", variant: "default"});
+        }
+    } catch (error: any) {
+        toast({ title: "Error de Búsqueda", description: `No se pudo verificar el DNI. ${error.message}`, variant: "destructive"});
+    } finally {
+        setIsDniLoading(false);
+    }
+  };
 
   const handleSubmit = (values: EventBoxFormValues) => {
-    onSubmit(values);
+    let finalValues = { ...values };
+    if (values.status === 'available') {
+        finalValues = {
+            ...values,
+            promoterName: "",
+            ownerName: "",
+            ownerDni: "",
+            ownerPhone: "",
+        };
+    }
+    onSubmit(finalValues);
   };
 
   return (
@@ -181,6 +240,23 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
           )}
         />
         
+        <div className="space-y-1">
+            <FormLabel>DNI/CE Dueño del Box</FormLabel>
+            <div className="flex gap-2 items-start">
+                <div className="flex-grow">
+                    <FormField control={form.control} name="ownerDni" render={({ field }) => (
+                        <FormItem>
+                            <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available' || isDniLoading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}/>
+                </div>
+                 <Button type="button" size="icon" variant="outline" onClick={handleVerifyDni} disabled={isSubmitting || watchedStatus === 'available' || isDniLoading || !form.getValues('ownerDni')}>
+                    {isDniLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
+                 </Button>
+            </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
             control={form.control}
@@ -195,28 +271,17 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
             />
             <FormField
             control={form.control}
-            name="ownerDni"
+            name="ownerPhone"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>DNI/CE Dueño del Box </FormLabel>
-                <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} /></FormControl>
+                <FormLabel>Celular Dueño del Box </FormLabel>
+                <FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} maxLength={9}/></FormControl>
                 <FormMessage />
                 </FormItem>
             )}
             />
         </div>
 
-        <FormField
-          control={form.control}
-          name="ownerPhone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Celular Dueño del Box </FormLabel>
-              <FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} maxLength={9}/></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar

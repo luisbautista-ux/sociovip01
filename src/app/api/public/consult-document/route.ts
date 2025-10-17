@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         formNombres.append('dni4', docNumber);
         formNombres.append('company', '');
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '51193e58f5'); // Token actualizado
+        formNombres.append('security', '4550295f30'); // Token actualizado
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
         formFecha.append('dni', docNumber);
         formFecha.append('company', '');
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', 'd44b2bcdb8');
+        formFecha.append('security', 'e03845b5e5');
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',

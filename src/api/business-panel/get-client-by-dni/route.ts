@@ -59,7 +59,11 @@ export async function GET(request: Request) {
     const qrClientSnap = await qrClientQuery.get();
     if (!qrClientSnap.empty) {
         const client = qrClientSnap.docs[0].data();
-        return NextResponse.json({ name: `${client.name} ${client.surname}`.trim(), source: 'qrClient' });
+        return NextResponse.json({ 
+            name: `${client.name} ${client.surname}`.trim(), 
+            phone: client.phone || null,
+            source: 'qrClient' 
+        });
     }
 
     // 2. socioVipMembers
@@ -67,7 +71,11 @@ export async function GET(request: Request) {
     const socioVipSnap = await socioVipQuery.get();
     if (!socioVipSnap.empty) {
         const socio = socioVipSnap.docs[0].data();
-        return NextResponse.json({ name: `${socio.name} ${socio.surname}`.trim(), source: 'socioVip' });
+        return NextResponse.json({ 
+            name: `${socio.name} ${socio.surname}`.trim(),
+            phone: socio.phone || null,
+            source: 'socioVip'
+        });
     }
     
     return NextResponse.json({ name: null, message: "No se encontró cliente con ese DNI." }, { status: 200 });
