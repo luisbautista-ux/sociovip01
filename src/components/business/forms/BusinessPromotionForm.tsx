@@ -5,7 +5,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -29,6 +29,7 @@ import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/typ
 import { DialogFooter } from "@/components/ui/dialog";
 import NextImage from "next/image";
 import { useToast } from "@/hooks/use-toast";
+import QRCode from 'qrcode';
 
 
 const promotionFormSchema = z.object({
@@ -44,6 +45,7 @@ const promotionFormSchema = z.object({
   termsAndConditions: z.string().optional(),
   qrTemplateImageUrl: z.string().optional(),
   qrTemplateFile: z.custom<File | null>(() => true).optional(),
+  templateObjectPosition: z.string().optional(), // Added
 }).refine(data => {
     if (data.startDate && data.endDate) {
         const start = new Date(data.startDate.getFullYear(), data.startDate.getMonth(), data.startDate.getDate());
@@ -70,24 +72,32 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [templatePreview, setTemplatePreview] = useState<string | null>(null);
   const [objectPosition, setObjectPosition] = useState(promotion?.imageObjectPosition || '50% 50%');
+  const [templateObjectPosition, setTemplateObjectPosition] = useState(promotion?.templateObjectPosition || '50% 50%'); // New state for template position
   
   const imgContainerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
+  const templateContainerRef = useRef<HTMLDivElement>(null);
 
   const mainImageInputRef = useRef<HTMLInputElement>(null);
   const templateImageInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const form = useForm<PromotionFormValues>({
     resolver: zodResolver(promotionFormSchema),
     defaultValues: {},
   });
+  
+  const formValues = form.watch();
 
   useEffect(() => {
     if (promotion) {
-      const initialPosition = promotion.imageObjectPosition || '50% 50%';
-      setObjectPosition(initialPosition);
+      const initialImgPos = promotion.imageObjectPosition || '50% 50%';
+      const initialTmplPos = promotion.templateObjectPosition || '50% 50%';
+      setObjectPosition(initialImgPos);
+      setTemplateObjectPosition(initialTmplPos);
       setImagePreview(promotion.imageUrl || null);
       setTemplatePreview(promotion.qrTemplateImageUrl || null);
 
@@ -100,14 +110,82 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         isActive: promotion.isActive === undefined ? true : promotion.isActive,
         imageUrl: promotion.imageUrl || "",
         imageFile: null,
-        imageObjectPosition: initialPosition,
+        imageObjectPosition: initialImgPos,
         termsAndConditions: promotion.termsAndConditions || "",
         qrTemplateImageUrl: promotion.qrTemplateImageUrl || "",
         qrTemplateFile: null,
+        templateObjectPosition: initialTmplPos,
       });
     }
   }, [promotion, form]);
   
+  const drawPreviewOnCanvas = useCallback(async () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx || !canvas) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (templatePreview) {
+        const templateImg = new Image();
+        templateImg.crossOrigin = "anonymous";
+        templateImg.src = templatePreview;
+        await new Promise<void>((resolve, reject) => {
+            templateImg.onload = () => resolve();
+            templateImg.onerror = reject;
+        });
+
+        // Calculate aspect ratio to fit the template image within the canvas
+        const canvasAspectRatio = canvas.width / canvas.height;
+        const templateAspectRatio = templateImg.width / templateImg.height;
+        let drawWidth, drawHeight, dx, dy;
+
+        if (templateAspectRatio > canvasAspectRatio) {
+            drawWidth = canvas.width;
+            drawHeight = drawWidth / templateAspectRatio;
+            dx = 0;
+            dy = (canvas.height - drawHeight) / 2;
+        } else {
+            drawHeight = canvas.height;
+            drawWidth = drawHeight * templateAspectRatio;
+            dy = 0;
+            dx = (canvas.width - drawWidth) / 2;
+        }
+
+        ctx.drawImage(templateImg, dx, dy, drawWidth, drawHeight);
+
+        // Draw example QR
+        const exampleQrDataUrl = await QRCode.toDataURL("SocioVipPreview", { width: 80, errorCorrectionLevel: "H", margin: 1 });
+        const qrImage = new Image();
+        qrImage.src = exampleQrDataUrl;
+        await new Promise(resolve => (qrImage.onload = resolve));
+        ctx.drawImage(qrImage, canvas.width / 2 - 40, canvas.height * 0.4, 80, 80);
+
+        // Draw example text
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText("Nombre Apellido", canvas.width / 2, canvas.height * 0.6);
+        ctx.font = '12px Arial';
+        ctx.fillText("DNI: 12345678", canvas.width / 2, canvas.height * 0.65);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(formValues.name || "Nombre Promoción", canvas.width / 2, canvas.height * 0.72);
+        
+    } else {
+        ctx.fillStyle = '#e5e7eb'; // muted color
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#9ca3af'; // muted-foreground
+        ctx.textAlign = 'center';
+        ctx.font = '14px Arial';
+        ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
+    }
+}, [templatePreview, formValues.name]);
+
+
+  useEffect(() => {
+    drawPreviewOnCanvas();
+  }, [drawPreviewOnCanvas]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'main' | 'template') => {
     const file = event.target.files?.[0];
     if (file) {
@@ -124,41 +202,55 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           form.setValue("imageObjectPosition", '50% 50%');
         } else {
           setTemplatePreview(reader.result as string);
+          setTemplateObjectPosition('50% 50%');
           form.setValue("qrTemplateFile", file);
+          form.setValue("templateObjectPosition", '50% 50%');
         }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    isDragging.current = true;
-    dragStart.current = { x: e.clientX, y: e.clientY };
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      isDragging.current = true;
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      dragStart.current = { x: clientX, y: clientY };
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging.current || !imgContainerRef.current) return;
-    const container = imgContainerRef.current;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
-    const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
-    const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
-    const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
-    setObjectPosition(newPosition);
-    form.setValue("imageObjectPosition", newPosition);
-    dragStart.current = { x: e.clientX, y: e.clientY };
+  const handleDragMove = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>, containerRef: React.RefObject<HTMLDivElement>, currentPosition: string, setPosition: (pos: string) => void) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+      const container = containerRef.current;
+      const dx = clientX - dragStart.current.x;
+      const dy = clientY - dragStart.current.y;
+      const [currentX, currentY] = currentPosition.split(' ').map(p => parseFloat(p));
+      
+      const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
+      const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
+      const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
+      
+      setPosition(newPosition);
+      dragStart.current = { x: clientX, y: clientY };
   };
 
-  const handleMouseUp = () => { isDragging.current = false; };
-  const handleMouseLeave = () => { isDragging.current = false; };
+  const handleDragEnd = (fieldName: "imageObjectPosition" | "templateObjectPosition", position: string) => {
+      if (isDragging.current) {
+          isDragging.current = false;
+          form.setValue(fieldName, position);
+      }
+  };
+
 
   const handleSubmit = (values: PromotionFormValues) => {
     onSubmit({
       ...values,
       usageLimit: values.usageLimit === undefined || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
       imageObjectPosition: objectPosition,
+      templateObjectPosition: templateObjectPosition,
     });
   };
 
@@ -168,8 +260,17 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
-          <div ref={imgContainerRef} className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
-            style={{ touchAction: 'none' }} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}
+          <div 
+            ref={imgContainerRef} 
+            className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
+            style={{ touchAction: 'none' }} 
+            onMouseDown={(e) => handleDragStart(e)}
+            onMouseMove={(e) => handleDragMove(e, imgContainerRef, objectPosition, setObjectPosition)}
+            onMouseUp={() => handleDragEnd("imageObjectPosition", objectPosition)}
+            onMouseLeave={() => handleDragEnd("imageObjectPosition", objectPosition)}
+            onTouchStart={(e) => handleDragStart(e)}
+            onTouchMove={(e) => handleDragMove(e, imgContainerRef, objectPosition, setObjectPosition)}
+            onTouchEnd={() => handleDragEnd("imageObjectPosition", objectPosition)}
           >
             {imagePreview ? (
               <>
@@ -206,16 +307,31 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         </div>
         
         <FormField control={form.control} name="usageLimit" render={({ field }) => (
-            <FormItem><FormLabel>Límite de Usos</FormLabel><FormControl><Input type="number" placeholder="Ej: 100 (0 o vacío para ilimitado)" {...field} value={field.value ?? ""} onChange={e => field.onChange(value === "" ? undefined : Number(value))} disabled={isSubmitting} /></FormControl><FormDescription className="text-xs">Dejar vacío o 0 para usos ilimitados.</FormDescription><FormMessage /></FormItem>
+            <FormItem><FormLabel>Límite de Usos</FormLabel><FormControl><Input type="number" placeholder="Ej: 100 (0 o vacío para ilimitado)" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} disabled={isSubmitting} /></FormControl><FormDescription className="text-xs">Dejar vacío o 0 para usos ilimitados.</FormDescription><FormMessage /></FormItem>
         )}/>
         
         <div className="flex flex-col items-center justify-center pt-4 border-t mt-6 space-y-3">
           <FormLabel className="self-start">Plantilla de QR (Opcional)</FormLabel>
-          {templatePreview && (
-              <div className="w-full aspect-[9/16] max-w-xs relative rounded-md border bg-muted flex items-center justify-center overflow-hidden">
-                <NextImage src={templatePreview} alt="Vista previa de la plantilla" layout="fill" className="object-contain" unoptimized />
-              </div>
-          )}
+          <div
+            ref={templateContainerRef}
+            className="group w-full max-w-xs aspect-[9/16] relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
+            style={{ touchAction: 'none' }}
+            onMouseDown={(e) => handleDragStart(e)}
+            onMouseMove={(e) => handleDragMove(e, templateContainerRef, templateObjectPosition, setTemplateObjectPosition)}
+            onMouseUp={() => handleDragEnd("templateObjectPosition", templateObjectPosition)}
+            onMouseLeave={() => handleDragEnd("templateObjectPosition", templateObjectPosition)}
+            onTouchStart={(e) => handleDragStart(e)}
+            onTouchMove={(e) => handleDragMove(e, templateContainerRef, templateObjectPosition, setTemplateObjectPosition)}
+            onTouchEnd={() => handleDragEnd("templateObjectPosition", templateObjectPosition)}
+          >
+             <canvas ref={canvasRef} width={380} height={700} className="absolute inset-0 w-full h-full object-contain" />
+             {templatePreview && (
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
+                    <Move className="h-8 w-8" />
+                    <span className="text-sm font-semibold mt-1 text-center">Arrastra para ajustar la plantilla (si no encaja)</span>
+                </div>
+             )}
+          </div>
           <input type="file" ref={templateImageInputRef} onChange={(e) => handleFileChange(e, 'template')} className="hidden" accept="image/png, image/jpeg, image/webp" />
           <Button type="button" variant="outline" onClick={() => templateImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> {templatePreview ? 'Cambiar' : 'Subir'} Plantilla</Button>
           <FormDescription className="text-xs">Imagen de fondo para el QR descargable (Formato Ticket).</FormDescription>
@@ -237,4 +353,3 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     </Form>
   );
 }
-

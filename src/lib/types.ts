@@ -1,3 +1,4 @@
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -233,6 +234,7 @@ export interface BusinessManagedEntity {
   businessCustomUrlPath?: string | null;
   createdAt?: string; 
   qrTemplateImageUrl?: string;
+  templateObjectPosition?: string; // New: To store template image focus point
 }
 
 export interface PromoterProfile { 
@@ -347,6 +349,7 @@ export interface BusinessPromotionFormData {
   imageUrl?: string;
   imageFile?: File | null;
   imageObjectPosition?: string;
+  templateObjectPosition?: string;
   termsAndConditions?: string;
   qrTemplateImageUrl?: string;
   qrTemplateFile?: File | null;
