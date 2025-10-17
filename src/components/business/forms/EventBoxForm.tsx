@@ -79,6 +79,11 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
   useEffect(() => {
     if (watchedStatus !== 'available' && !form.getValues('promoterName') && userProfile?.name) {
         form.setValue('promoterName', userProfile.name);
+    } else if (watchedStatus === 'available') {
+        form.setValue('promoterName', '');
+        form.setValue('ownerName', '');
+        form.setValue('ownerDni', '');
+        form.setValue('ownerPhone', '');
     }
   }, [watchedStatus, form, userProfile?.name]);
   
@@ -231,61 +236,68 @@ export function EventBoxForm({ eventBox, onSubmit, onCancel, isSubmitting = fals
         />
         
         <div 
-          onClick={handleDisabledFieldsClick}
-          className={cn("space-y-4", watchedStatus === 'available' && "cursor-not-allowed opacity-60")}
+          className="relative space-y-4"
         >
-          <FormField
-            control={form.control}
-            name="promoterName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Vendedor Asignado </FormLabel>
-                <FormControl><Input placeholder="Nombre del promotor/vendedor" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          
-          <div className="space-y-1">
-              <FormLabel>DNI/CE Dueño del Box</FormLabel>
-              <div className="flex gap-2 items-start">
-                  <div className="flex-grow">
-                      <FormField control={form.control} name="ownerDni" render={({ field }) => (
-                          <FormItem>
-                              <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available' || isDniLoading} /></FormControl>
-                              <FormMessage />
-                          </FormItem>
-                      )}/>
-                  </div>
-                   <Button type="button" size="icon" variant="outline" onClick={handleVerifyDni} disabled={isSubmitting || watchedStatus === 'available' || isDniLoading || !form.getValues('ownerDni')}>
-                      {isDniLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
-                   </Button>
-              </div>
-          </div>
+          {watchedStatus === 'available' && (
+             <div 
+                className="absolute inset-0 z-10 cursor-not-allowed"
+                onClick={handleDisabledFieldsClick}
+             />
+          )}
+          <div className={cn(watchedStatus === 'available' && "opacity-50")}>
+            <FormField
+              control={form.control}
+              name="promoterName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Vendedor Asignado </FormLabel>
+                  <FormControl><Input placeholder="Nombre del promotor/vendedor" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <div className="space-y-1 mt-4">
+                <FormLabel>DNI/CE Dueño del Box</FormLabel>
+                <div className="flex gap-2 items-start">
+                    <div className="flex-grow">
+                        <FormField control={form.control} name="ownerDni" render={({ field }) => (
+                            <FormItem>
+                                <FormControl><Input placeholder="DNI/CE del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available' || isDniLoading} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}/>
+                    </div>
+                     <Button type="button" size="icon" variant="outline" onClick={handleVerifyDni} disabled={isSubmitting || watchedStatus === 'available' || isDniLoading || !form.getValues('ownerDni')}>
+                        {isDniLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
+                     </Button>
+                </div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-              control={form.control}
-              name="ownerName"
-              render={({ field }) => (
-                  <FormItem>
-                  <FormLabel>Nombre Dueño del Box </FormLabel>
-                  <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} /></FormControl>
-                  <FormMessage />
-                  </FormItem>
-              )}
-              />
-              <FormField
-              control={form.control}
-              name="ownerPhone"
-              render={({ field }) => (
-                  <FormItem>
-                  <FormLabel>Celular Dueño del Box </FormLabel>
-                  <FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} maxLength={9}/></FormControl>
-                  <FormMessage />
-                  </FormItem>
-              )}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <FormField
+                control={form.control}
+                name="ownerName"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Nombre Dueño del Box </FormLabel>
+                    <FormControl><Input placeholder="Nombre del cliente dueño" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} /></FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="ownerPhone"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Celular Dueño del Box </FormLabel>
+                    <FormControl><Input type="tel" placeholder="987654321" {...field} value={field.value || ""} disabled={isSubmitting || watchedStatus === 'available'} maxLength={9}/></FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
           </div>
         </div>
 
