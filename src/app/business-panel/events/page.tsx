@@ -61,6 +61,7 @@ const ManageEventDialog = ({
     
     const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
@@ -87,6 +88,7 @@ const ManageEventDialog = ({
         if (isManageEventDialogOpen && initialEditingEvent) {
             const sanitizedInitialEvent = sanitizeObjectForFirestore({ ...initialEditingEvent }) as BusinessManagedEntity;
             setCurrentEventData(sanitizedInitialEvent);
+            setImagePreviewUrl(sanitizedInitialEvent.imageUrl || null);
             setImageFile(null);
             setActiveTab("details");
             
@@ -323,6 +325,14 @@ const ManageEventDialog = ({
         toast({ title: "Éxito", description: `Comisión aplicada a ${currentEventData?.assignedPromoters?.length || 0} promotor(es).` });
     };
 
+    const handleImageFileChange = (file: File | null) => {
+        if (file) {
+            setImageFile(file);
+            setImagePreviewUrl(URL.createObjectURL(file));
+            setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null); // Clear imageUrl to prioritize file
+        }
+    };
+
     const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
     
     const allPromotersSelected = useMemo(() => {
@@ -374,7 +384,8 @@ const ManageEventDialog = ({
                                         event={currentEventData} 
                                         isSubmitting={isSubmitting}
                                         setCurrentEventData={setCurrentEventData}
-                                        setImageFile={setImageFile}
+                                        imagePreviewUrl={imagePreviewUrl}
+                                        onImageFileChange={handleImageFileChange}
                                     />
                                   </CardContent>
                                 </Card>
@@ -1210,3 +1221,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+

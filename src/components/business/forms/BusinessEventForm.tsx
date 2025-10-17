@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -38,26 +39,9 @@ const eventDetailsFormSchema = z.object({
   unlimitedAttendance: z.boolean().default(true),
   maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
   isActive: z.boolean().default(true),
-  imageFile: z.custom<File | null>(() => true).optional(),
   imageUrl: z.string().optional(),
   imageObjectPosition: z.string().optional(), // Added for image positioning
   aiHint: z.string().optional(),
-}).refine(data => {
-    if (!data.startDate || !data.endDate) return true; 
-    const start = startOfDay(data.startDate);
-    const end = startOfDay(data.endDate); 
-    return isEqual(end, start) || isBefore(start, end) ;
-}, {
-  message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
-  path: ["endDate"],
-}).refine(data => {
-    if (!data.unlimitedAttendance && (!data.maxAttendance || data.maxAttendance <= 0)) {
-        return false;
-    }
-    return true;
-}, {
-  message: "Si el aforo no es ilimitado, debes especificar un número mayor a 0.",
-  path: ["maxAttendance"],
 });
 
 export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
@@ -72,14 +56,14 @@ interface BusinessEventFormProps {
   event: BusinessManagedEntity | null; 
   isSubmitting?: boolean;
   setCurrentEventData: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
-  setImageFile: (file: File | null) => void;
+  imagePreviewUrl: string | null;
+  onImageFileChange: (file: File | null) => void;
 }
 
-export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, setCurrentEventData, setImageFile }, ref) => {
+export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, setCurrentEventData, imagePreviewUrl, onImageFileChange }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(event?.imageUrl || null);
   const [objectPosition, setObjectPosition] = useState(event?.imageObjectPosition || '50% 50%');
 
   const imgContainerRef = useRef<HTMLDivElement>(null);
@@ -95,7 +79,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     if (event) {
         const unlimited = event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0;
         const initialPosition = event.imageObjectPosition || '50% 50%';
-        setImagePreviewUrl(event.imageUrl || null);
         setObjectPosition(initialPosition);
         form.reset({
             name: event.name || "",
@@ -106,7 +89,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             unlimitedAttendance: unlimited,
             maxAttendance: unlimited ? undefined : event.maxAttendance,
             isActive: event.isActive === undefined ? true : event.isActive,
-            imageFile: null,
             imageUrl: event.imageUrl,
             imageObjectPosition: initialPosition,
             aiHint: event.aiHint || "",
@@ -115,7 +97,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   }, [event, form]);
 
   useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
+    const subscription = form.watch((values, { name, type }) => {
       if (type === 'change') {
          setCurrentEventData(prev => {
             if (!prev) return null;
@@ -150,17 +132,8 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         return;
       }
       const newPosition = '50% 50%';
-      setImageFile(file); // Update parent state with the file
-      setImagePreviewUrl(URL.createObjectURL(file)); // Update local preview
+      onImageFileChange(file); // Update parent state with the file
       setObjectPosition(newPosition);
-
-      // Update parent's event data
-      setCurrentEventData(prev => prev ? { 
-          ...prev, 
-          imageObjectPosition: newPosition,
-          // When a file is selected, we nullify the imageUrl so the logic in the parent component knows to upload a new one.
-          imageUrl: '', 
-      } : null);
     }
   };
 
