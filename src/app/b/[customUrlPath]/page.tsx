@@ -186,7 +186,7 @@ export default function BusinessPublicPage() {
   const [validatedCodeObject, setValidatedCodeObject] = useState<GeneratedCode | null>(null);
   const [enteredDni, setEnteredDni] = useState<string>("");
   const [qrData, setQrData] = useState<QrCodeData | null>(null);
-  const [generatedQrDataUrl, setGeneratedQrDataUrl] = useState<string | null>(null);
+  const [composedQrImageDataUrl, setComposedQrImageDataUrl] = useState<string | null>(null);
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
@@ -547,140 +547,124 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   };
 
 
-  useEffect(() => {
-    const generateQrImage = async () => {
-      if (pageViewState === "qrDisplay" && qrData?.promotion.qrValue) {
+const generateComposedQrImage = useCallback(async (): Promise<string | null> => {
+    if (!qrData || !qrData.user || !qrData.promotion || !businessDetails) {
+        return null;
+    }
+    
+    const rawQrCodeDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, {
+      width: 250,
+      errorCorrectionLevel: "H",
+      margin: 2,
+    });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    let isTemplateUsed = false;
+    if (qrData.promotion.qrTemplateImageUrl) {
         try {
-          const dataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { width: 250, errorCorrectionLevel: "H", margin: 2 });
-          setGeneratedQrDataUrl(dataUrl);
-        } catch (err) {
-          toast({ title: "Error", description: "No se pudo generar el código QR.", variant: "destructive" });
-          setGeneratedQrDataUrl(null);
+            const templateImg = new Image();
+            templateImg.crossOrigin = "anonymous";
+            templateImg.src = qrData.promotion.qrTemplateImageUrl;
+            await new Promise<void>((resolve, reject) => {
+                templateImg.onload = () => resolve();
+                templateImg.onerror = (err) => reject(new Error('Failed to load template'));
+            });
+            canvas.width = templateImg.width;
+            canvas.height = templateImg.height;
+            ctx.drawImage(templateImg, 0, 0);
+            isTemplateUsed = true;
+        } catch (e) {
+            console.warn("Could not load QR template, falling back to gradient.", e);
         }
+    }
+    
+    if (!isTemplateUsed) {
+        canvas.width = 380;
+        canvas.height = 700;
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradient.addColorStop(0, businessDetails.primaryColor || '#B080D0');
+        gradient.addColorStop(1, businessDetails.secondaryColor || '#8E5EA2');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    const qrImage = new Image();
+    qrImage.src = rawQrCodeDataUrl;
+    await new Promise(resolve => qrImage.onload = resolve);
+    
+    if (!isTemplateUsed) {
+        ctx.drawImage(qrImage, (canvas.width - 200) / 2, 100, 200, 200);
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, 330);
+        ctx.font = '18px Arial';
+        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, 360);
+        ctx.font = '20px Arial';
+        ctx.fillText(qrData.promotion.title, canvas.width / 2, 400);
+    } else {
+        const qrX = (canvas.width - 150) / 2;
+        const qrY = 150;
+        const qrSize = 150;
+        const nameY = 340;
+        const dniY = 370;
+        const promoTitleY = 420;
+        const validUntilY = 450;
+
+        ctx.fillStyle = 'white';
+        ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
+        ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
+
+        ctx.fillStyle = 'black';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, nameY);
+        ctx.font = '18px Arial';
+        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, dniY);
+        ctx.font = 'bold 22px Arial';
+        ctx.fillText(qrData.promotion.title, canvas.width / 2, promoTitleY);
+        ctx.fillStyle = '#4A5568';
+        ctx.font = '16px Arial';
+        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, validUntilY);
+    }
+    
+    return canvas.toDataURL("image/png");
+}, [qrData, businessDetails]);
+
+  useEffect(() => {
+    const generateAndSetImage = async () => {
+      if (pageViewState === "qrDisplay" && qrData) {
+        const composedImage = await generateComposedQrImage();
+        setComposedQrImageDataUrl(composedImage);
       } else {
-        setGeneratedQrDataUrl(null);
+        setComposedQrImageDataUrl(null);
       }
     };
-    generateQrImage();
-  }, [qrData, pageViewState, toast]);
+    generateAndSetImage();
+  }, [qrData, pageViewState, generateComposedQrImage]);
 
-    const handleSaveQrWithDetails = async () => {
-        if (!qrData || !qrData.user || !qrData.promotion || !generatedQrDataUrl || !businessDetails) {
-            toast({ title: "Error", description: "No hay datos de QR para guardar.", variant: "destructive" });
-            return;
-        }
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-            toast({ title: "Error", description: "No se pudo preparar la imagen para descarga.", variant: "destructive" });
-            return;
-        }
-
-        const drawTemplateOrGradient = async () => {
-            if (qrData.promotion.qrTemplateImageUrl) {
-                try {
-                    const templateImg = new Image();
-                    templateImg.crossOrigin = "anonymous"; // Important for loading images from other origins (like Firebase Storage)
-                    templateImg.src = qrData.promotion.qrTemplateImageUrl;
-                    await new Promise<void>((resolve, reject) => {
-                        templateImg.onload = () => resolve();
-                        templateImg.onerror = (err) => {
-                            console.error("Template Image Load Error:", err);
-                            reject(new Error('Failed to load template'));
-                        };
-                    });
-                    canvas.width = templateImg.width;
-                    canvas.height = templateImg.height;
-                    ctx.drawImage(templateImg, 0, 0);
-                    return true;
-                } catch (e) {
-                    console.warn("Could not load QR template, falling back to gradient.", e);
-                }
-            }
-            
-            // Fallback to gradient
-            canvas.width = 380;
-            canvas.height = 700; // A reasonable default height
-            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, businessDetails.primaryColor || '#B080D0');
-            gradient.addColorStop(1, businessDetails.secondaryColor || '#8E5EA2');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            return false;
-        };
-
-        const isTemplateUsed = await drawTemplateOrGradient();
-
-        if (!isTemplateUsed) {
-            // This fallback logic remains the same.
-            const qrImage = new Image();
-            qrImage.src = generatedQrDataUrl;
-            await new Promise(resolve => qrImage.onload = resolve);
-            ctx.drawImage(qrImage, (canvas.width - 200) / 2, 100, 200, 200);
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, 330);
-            ctx.font = '18px Arial';
-            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, 360);
-            ctx.font = '20px Arial';
-            ctx.fillText(qrData.promotion.title, canvas.width / 2, 400);
-
-        } else {
-            // Template logic - adjusted for better positioning (example values)
-            const qrImage = new Image();
-            qrImage.src = generatedQrDataUrl;
-            await new Promise(resolve => qrImage.onload = resolve);
-
-            // Example positions (you must adjust these based on your template design)
-            const qrX = (canvas.width - 150) / 2; // Centered QR
-            const qrY = 150;
-            const qrSize = 150;
-            
-            const nameY = 340;
-            const dniY = 370;
-            const promoTitleY = 420;
-            const validUntilY = 450;
-
-            // Draw QR code with a white background for better scannability
-            ctx.fillStyle = 'white';
-            ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
-            ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-
-            // Draw text
-            ctx.fillStyle = 'black'; // Adjust color for your template
-            ctx.textAlign = 'center';
-
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, nameY);
-
-            ctx.font = '18px Arial';
-            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, dniY);
-            
-            ctx.font = 'bold 22px Arial';
-            ctx.fillText(qrData.promotion.title, canvas.width / 2, promoTitleY);
-
-            ctx.fillStyle = '#4A5568';
-            ctx.font = '16px Arial';
-            ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, validUntilY);
-        }
-        
-        const dataUrl = canvas.toDataURL("image/png");
-        const linkElement = document.createElement("a");
-        linkElement.href = dataUrl;
-        const entityTypeForFilename = qrData.promotion.type === "event" ? "Evento" : "Promo";
-        linkElement.download = `SocioVIP_QR_${entityTypeForFilename}_${qrData.promotion.promoCode}.png`;
-        document.body.appendChild(linkElement);
-        linkElement.click();
-        document.body.removeChild(linkElement);
-        toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
-    };
+  const handleSaveQrWithDetails = async () => {
+    if (!composedQrImageDataUrl || !qrData) {
+        toast({ title: "Error", description: "No hay imagen de QR para guardar.", variant: "destructive" });
+        return;
+    }
+    const linkElement = document.createElement("a");
+    linkElement.href = composedQrImageDataUrl;
+    const entityTypeForFilename = qrData.promotion.type === "event" ? "Evento" : "Promo";
+    linkElement.download = `SocioVIP_QR_${entityTypeForFilename}_${qrData.promotion.promoCode}.png`;
+    document.body.appendChild(linkElement);
+    linkElement.click();
+    document.body.removeChild(linkElement);
+    toast({ title: "QR Guardado", description: "La imagen del QR con detalles se ha descargado." });
+  };
 
   const resetQrFlow = () => {
     setPageViewState("entityList");
     setQrData(null);
-    setGeneratedQrDataUrl(null);
+    setComposedQrImageDataUrl(null);
     setActiveEntityForQr(null);
     setValidatedCodeObject(null);
     setEnteredDni("");
@@ -845,31 +829,19 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {generatedQrDataUrl ? (
+              {composedQrImageDataUrl ? (
                 <NextImage
-                  src={generatedQrDataUrl}
-                  alt="Código QR"
-                  width={250}
-                  height={250}
-                  className="mx-auto border rounded-md shadow-md p-1 bg-white"
+                  src={composedQrImageDataUrl}
+                  alt="Vale de consumo con código QR"
+                  width={380}
+                  height={700}
+                  className="mx-auto rounded-md"
                 />
               ) : (
                 <div className="h-[250px] w-[250px] mx-auto flex items-center justify-center border rounded-md bg-muted text-muted-foreground">
-                  <Loader2 className="h-8 w-8 animate-spin" /> <span className="ml-2">Generando QR...</span>
+                  <Loader2 className="h-8 w-8 animate-spin" /> <span className="ml-2">Generando vale...</span>
                 </div>
               )}
-              <div className="text-center">
-                <p className="text-2xl font-semibold" style={{ color: businessDetails.primaryColor }}>
-                  Hola, {qrData.user.name} {qrData.user.surname}
-                </p>
-                <p className="text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
-              </div>
-              <div className="text-sm space-y-1 text-center border-t pt-3">
-                <p className="font-semibold">{activeEntityForQr.name}</p>
-                <p className="text-muted-foreground">
-                  Válido hasta: {format(parseISO(activeEntityForQr.endDate), "dd MMMM yyyy", { locale: es })}
-                </p>
-              </div>
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row gap-2">
               <Button
@@ -889,7 +861,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     alignItems: 'center',
                     justifyContent: 'center'
                 }}>
-                    <Download className="mr-2 h-4 w-4" /> Guardar QR
+                    <Download className="mr-2 h-4 w-4" /> Guardar Vale
                 </div>
               </Button>
               <Button 
