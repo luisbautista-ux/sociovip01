@@ -295,6 +295,7 @@ export default function BusinessPublicPage() {
             termsAndConditions: entityData.termsAndConditions,
             createdAt: anyToDate(entityData.createdAt)?.toISOString() || "",
             qrTemplateImageUrl: entityData.qrTemplateImageUrl,
+            qrTemplateLayout: entityData.qrTemplateLayout,
           };
 
           if (entity.type === 'promotion' && entity.isActive) {
@@ -475,6 +476,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 type: activeEntityForQr.type,
                 termsAndConditions: activeEntityForQr.termsAndConditions,
                 qrTemplateImageUrl: activeEntityForQr.qrTemplateImageUrl,
+                qrTemplateLayout: activeEntityForQr.qrTemplateLayout,
             };
             setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
             setShowDniModal(false);
@@ -538,6 +540,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
       type: activeEntityForQr.type,
       termsAndConditions: activeEntityForQr.termsAndConditions,
       qrTemplateImageUrl: activeEntityForQr.qrTemplateImageUrl,
+      qrTemplateLayout: activeEntityForQr.qrTemplateLayout,
     };
 
     setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
@@ -556,9 +559,16 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
     if (!qrData || !qrData.user || !qrData.promotion || !businessDetails) {
         return null;
     }
-    
+
+    const layout = qrData.promotion.qrTemplateLayout || {
+        qr: { x: 190, y: 350, size: 80 },
+        name: { x: 190, y: 450 },
+        dni: { x: 190, y: 470 },
+        promoTitle: { x: 190, y: 500 },
+    };
+
     const rawQrCodeDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, {
-      width: 250,
+      width: layout.qr.size,
       errorCorrectionLevel: "H",
       margin: 2,
     });
@@ -611,29 +621,19 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
         ctx.font = '20px Arial';
         ctx.fillText(qrData.promotion.title, canvas.width / 2, 400);
     } else {
-        const qrX = (canvas.width - 150) / 2;
-        const qrY = 150;
-        const qrSize = 150;
-        const nameY = 340;
-        const dniY = 370;
-        const promoTitleY = 420;
-        const validUntilY = 450;
+        ctx.drawImage(qrImage, layout.qr.x - (layout.qr.size / 2), layout.qr.y - (layout.qr.size / 2), layout.qr.size, layout.qr.size);
 
         ctx.fillStyle = 'white';
-        ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
-        ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
-
-        ctx.fillStyle = 'black';
         ctx.textAlign = 'center';
-        ctx.font = 'bold 24px Arial';
-        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, nameY);
-        ctx.font = '18px Arial';
-        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, dniY);
-        ctx.font = 'bold 22px Arial';
-        ctx.fillText(qrData.promotion.title, canvas.width / 2, promoTitleY);
-        ctx.fillStyle = '#4A5568';
-        ctx.font = '16px Arial';
-        ctx.fillText(`Válido hasta: ${format(parseISO(qrData.promotion.validUntil), "dd MMMM yyyy", { locale: es })}`, canvas.width / 2, validUntilY);
+        
+        ctx.font = 'bold 16px Arial';
+        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
+        
+        ctx.font = '12px Arial';
+        ctx.fillText(`DNI: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
+        
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
     }
     
     return canvas.toDataURL("image/png");
@@ -840,7 +840,7 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
                   className="mx-auto rounded-md"
                 />
               ) : (
-                <div className="h-[250px] w-[250px] mx-auto flex items-center justify-center border rounded-md bg-muted text-muted-foreground">
+                <div className="h-[250px] w-full max-w-[380px] mx-auto flex items-center justify-center border rounded-md bg-muted text-muted-foreground">
                   <Loader2 className="h-8 w-8 animate-spin" /> <span className="ml-2">Generando vale...</span>
                 </div>
               )}
