@@ -605,31 +605,19 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
     qrImage.src = rawQrCodeDataUrl;
     await new Promise(resolve => qrImage.onload = resolve);
     
-    if (!isTemplateUsed) {
-        ctx.drawImage(qrImage, (canvas.width - 200) / 2, 100, 200, 200);
-        ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 24px Arial';
-        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, canvas.width / 2, 330);
-        ctx.font = '18px Arial';
-        ctx.fillText(`DNI/CE: ${qrData.user.dni}`, canvas.width / 2, 360);
-        ctx.font = '20px Arial';
-        ctx.fillText(qrData.promotion.title, canvas.width / 2, 400);
-    } else {
-        ctx.drawImage(qrImage, layout.qr.x - (layout.qr.size / 2), layout.qr.y - (layout.qr.size / 2), layout.qr.size, layout.qr.size);
+    ctx.drawImage(qrImage, layout.qr.x - (layout.qr.size / 2), layout.qr.y - (layout.qr.size / 2), layout.qr.size, layout.qr.size);
 
-        ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
-        
-        ctx.font = 'bold 16px Arial';
-        ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
-        
-        ctx.font = '12px Arial';
-        ctx.fillText(`DNI: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
-        
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
-    }
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
+    
+    ctx.font = '12px Arial';
+    ctx.fillText(`DNI: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
+    
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
     
     return canvas.toDataURL("image/png");
 }, [qrData, businessDetails]);
