@@ -108,9 +108,22 @@ const ManageEventDialog = ({
     const handleDetailsChange = useCallback((newDetails: Partial<EventDetailsFormValues>) => {
         setCurrentEventData(prev => {
             if (!prev) return null;
-            // Preserve existing imageUrl if a new file isn't being uploaded
-            const updatedDetails = { ...prev.imageUrl, ...newDetails };
-            return { ...prev, ...updatedDetails };
+            
+            const updatedEvent = { ...prev, ...newDetails };
+
+            // If a new image file is being uploaded, clear the old imageUrl
+            // so the new preview takes precedence.
+            if (newDetails.imageFile) {
+                updatedEvent.imageUrl = undefined;
+            } else {
+                // Otherwise, make sure we keep the existing imageUrl
+                updatedEvent.imageUrl = prev.imageUrl;
+            }
+
+            // Remove the temporary file object before saving to state
+            delete updatedEvent.imageFile;
+
+            return updatedEvent as BusinessManagedEntity;
         });
 
         if (newDetails.imageFile) {
@@ -1229,6 +1242,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
