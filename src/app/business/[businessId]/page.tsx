@@ -395,6 +395,15 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     setIsLoadingQrFlow(false);
   }
 };
+
+const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEntity> => {
+    const entityRef = doc(db, "businessEntities", entityId);
+    const docSnap = await getDoc(entityRef);
+    if (!docSnap.exists()) {
+      throw new Error("La entidad ya no existe.");
+    }
+    return { id: docSnap.id, ...docSnap.data() } as BusinessManagedEntity;
+};
   
 const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
   if (!activeEntityForQr || !validatedCodeObject || !businessDetails?.id) {
@@ -463,20 +472,21 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
               }
           }
       } else if (result.action === 'userExists') {
+            const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
             const clientForQr: QrClient = result.clientData;
             const qrCodeDetails: QrCodeData["promotion"] = {
-                id: activeEntityForQr.id,
-                title: activeEntityForQr.name,
-                description: activeEntityForQr.description,
-                validUntil: activeEntityForQr.endDate,
-                imageUrl: activeEntityForQr.imageUrl || "",
+                id: freshEntityData.id,
+                title: freshEntityData.name,
+                description: freshEntityData.description,
+                validUntil: freshEntityData.endDate,
+                imageUrl: freshEntityData.imageUrl || "",
                 promoCode: validatedCodeObject.value,
                 qrValue: validatedCodeObject.id,
-                aiHint: activeEntityForQr.aiHint || "",
-                type: activeEntityForQr.type,
-                termsAndConditions: activeEntityForQr.termsAndConditions,
-                qrTemplateImageUrl: activeEntityForQr.qrTemplateImageUrl,
-                qrTemplateLayout: activeEntityForQr.qrTemplateLayout,
+                aiHint: freshEntityData.aiHint || "",
+                type: freshEntityData.type,
+                termsAndConditions: freshEntityData.termsAndConditions,
+                qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
+                qrTemplateLayout: freshEntityData.qrTemplateLayout,
             };
             setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
             setShowDniModal(false);
@@ -527,20 +537,21 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           throw new Error(result.error || 'Ocurrió un error al registrar el nuevo cliente.');
       }
     
+    const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
     const clientForQr: QrClient = result.clientData;
     const qrCodeDetails: QrCodeData["promotion"] = {
-      id: activeEntityForQr.id,
-      title: activeEntityForQr.name,
-      description: activeEntityForQr.description,
-      validUntil: activeEntityForQr.endDate,
-      imageUrl: activeEntityForQr.imageUrl || "",
+      id: freshEntityData.id,
+      title: freshEntityData.name,
+      description: freshEntityData.description,
+      validUntil: freshEntityData.endDate,
+      imageUrl: freshEntityData.imageUrl || "",
       promoCode: validatedCodeObject.value,
       qrValue: validatedCodeObject.id, // THE QR VALUE IS THE UNIQUE ID OF THE CODE
-      aiHint: activeEntityForQr.aiHint || "",
-      type: activeEntityForQr.type,
-      termsAndConditions: activeEntityForQr.termsAndConditions,
-      qrTemplateImageUrl: activeEntityForQr.qrTemplateImageUrl,
-      qrTemplateLayout: activeEntityForQr.qrTemplateLayout,
+      aiHint: freshEntityData.aiHint || "",
+      type: freshEntityData.type,
+      termsAndConditions: freshEntityData.termsAndConditions,
+      qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
+      qrTemplateLayout: freshEntityData.qrTemplateLayout,
     };
 
     setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
