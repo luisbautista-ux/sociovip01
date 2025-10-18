@@ -835,15 +835,25 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               <canvas ref={canvasRef} className="w-full h-auto" />
             </div>
           </main>
-          <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
-            <div className="max-w-7xl mx-auto flex items-center justify-between h-12 gap-4">
-              <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full">
-                <Download className="mr-2 h-4 w-4" /> Guardar QR
-              </Button>
-              <Button onClick={resetQrFlow} className="w-full text-white" style={{ backgroundColor: businessDetails.secondaryColor || '#8E5EA2' }}>
-                Ver Otras del Negocio
-              </Button>
-            </div>
+           <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t space-y-2">
+              <div className="max-w-7xl mx-auto flex items-center justify-between h-12 gap-2">
+                  <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full">
+                      <Download className="mr-2 h-4 w-4" /> Guardar QR
+                  </Button>
+                  <Button onClick={resetQrFlow} className="w-full text-white" style={{ backgroundColor: businessDetails.secondaryColor || '#8E5EA2' }}>
+                      Ver Otras del Negocio
+                  </Button>
+              </div>
+              <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
+                  <Button variant="outline" className="text-primary" onClick={() => setShowLoginModal(true)}>
+                      <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
+                  </Button>
+                  <Link href="/" passHref>
+                      <Button variant="link" className="text-primary">
+                          <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
+                      </Button>
+                  </Link>
+              </div>
           </footer>
         </div>
       );
@@ -909,7 +919,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         </main>
         <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
-            <Button variant="link" className="text-primary" onClick={() => setShowLoginModal(true)}>
+            <Button variant="outline" className="text-primary" onClick={() => setShowLoginModal(true)}>
               <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
             </Button>
             <Link href="/" passHref>
@@ -947,7 +957,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
                     </Button>
                  </Link>
-                  <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white" onClick={() => setShowLoginModal(true)}>
+                  <Button variant="outline" className="text-white border-white/50 hover:bg-white/10 hover:text-white" onClick={() => setShowLoginModal(true)}>
                     <UserCircle className="mr-2 h-4 w-4" />
                     Iniciar Sesión
                   </Button>
