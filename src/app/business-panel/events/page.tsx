@@ -86,14 +86,16 @@ const ManageEventDialog = ({
     
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
+            if (activeTab !== 'promoters') { // No resetear la pestaña si ya estamos en promotores
+                 // setActiveTab("details"); // CULPABLE DEL SALTO
+            }
             setImagePreviewUrl(editingEvent.imageUrl || null);
             setImageFile(null);
-            setActiveTab("details");
             
             initialDataSnapshot.current = JSON.stringify(editingEvent);
             setHasUnsavedChanges(false);
         }
-    }, [editingEvent, isManageEventDialogOpen]);
+    }, [editingEvent, isManageEventDialogOpen, activeTab]);
     
     useEffect(() => {
         if (editingEvent && initialDataSnapshot.current) {
@@ -211,11 +213,11 @@ const ManageEventDialog = ({
     };
 
     const handlePromoterAssignmentChange = (promoter: BusinessPromoterLink, isChecked: boolean) => {
-        if (!promoter.platformUserUid) {
-            console.error("handlePromoterAssignmentChange: promoter.platformUserUid is missing.");
+        const promoterProfileId = promoter.platformUserUid;
+        if (!promoterProfileId) {
+            toast({ title: "Error de Datos", description: `El promotor ${promoter.promoterName} no tiene un ID de usuario de plataforma.`, variant: "destructive"});
             return;
         }
-        const promoterProfileId = promoter.platformUserUid;
 
         setCurrentEventData(prev => {
             if (!prev) return null;
@@ -1239,6 +1241,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
