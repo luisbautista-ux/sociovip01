@@ -216,13 +216,25 @@ const ManageEventDialog = ({
         setCurrentEventData(prev => {
             if (!prev) return null;
             let updatedAssignments = [...(prev.assignedPromoters || [])];
+
             if (isChecked) {
-                if (!updatedAssignments.includes(promoterId)) {
-                    updatedAssignments.push(promoterId);
+                // Add if not already present
+                if (!updatedAssignments.some(p => p.promoterProfileId === promoterId)) {
+                    const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
+                    if (promoterData) {
+                        updatedAssignments.push({
+                            promoterProfileId: promoterId,
+                            promoterName: promoterData.promoterName,
+                            promoterEmail: promoterData.promoterEmail,
+                            commissionRules: [],
+                        });
+                    }
                 }
             } else {
-                updatedAssignments = updatedAssignments.filter(id => id !== promoterId);
+                // Remove
+                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
             }
+            
             return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
@@ -283,7 +295,12 @@ const ManageEventDialog = ({
             setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: [] } : null);
         } else {
             // Select all
-            const allAssignments: string[] = availablePromoters.map(promoter => promoter.platformUserUid!);
+            const allAssignments: EventPromoterAssignment[] = availablePromoters.map(promoter => ({
+                promoterProfileId: promoter.platformUserUid!,
+                promoterName: promoter.promoterName,
+                promoterEmail: promoter.promoterEmail,
+                commissionRules: [], // Start with empty rules
+            }));
             setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: allAssignments } : null);
         }
     };
@@ -298,8 +315,6 @@ const ManageEventDialog = ({
         setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                const promoterData = availablePromoters.find(ap => ap.platformUserUid === p);
-                if (!promoterData) return p;
                 
                 const newRule: CommissionRule = {
                     id: `rule_batch_${Date.now()}`,
@@ -309,10 +324,9 @@ const ManageEventDialog = ({
                     description: batchCommissionDesc,
                 };
                 
+                // Replace existing rules or add new one
                 return {
-                    promoterProfileId: promoterData.platformUserUid!,
-                    promoterName: promoterData.promoterName,
-                    promoterEmail: promoterData.promoterEmail,
+                    ...p,
                     commissionRules: [newRule],
                 };
             });
@@ -332,16 +346,20 @@ const ManageEventDialog = ({
 
     const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
     
+    const assignedPromoterIds = useMemo(() => {
+        return (currentEventData?.assignedPromoters || []).map(p => p.promoterProfileId);
+    }, [currentEventData?.assignedPromoters]);
+
     const allPromotersSelected = useMemo(() => {
-        return availablePromoters.length > 0 && currentEventData?.assignedPromoters?.length === availablePromoters.length;
-    }, [currentEventData?.assignedPromoters, availablePromoters]);
+        return availablePromoters.length > 0 && assignedPromoterIds.length === availablePromoters.length;
+    }, [assignedPromoterIds, availablePromoters]);
 
     const somePromotersSelected = useMemo(() => {
-        return (currentEventData?.assignedPromoters?.length ?? 0) > 0 && !allPromotersSelected;
-    }, [currentEventData?.assignedPromoters, allPromotersSelected]);
+        return assignedPromoterIds.length > 0 && !allPromotersSelected;
+    }, [assignedPromoterIds, allPromotersSelected]);
 
     if (!isManageEventDialogOpen || !currentEventData) return null;
-
+    
     const assignedPromoters = currentEventData.assignedPromoters || [];
     const ticketTypes = currentEventData.ticketTypes || [];
     const eventBoxes = currentEventData.eventBoxes || [];
@@ -569,7 +587,7 @@ const ManageEventDialog = ({
                                                         <Label htmlFor="select-all-promoters" className="font-medium">Seleccionar Todos</Label>
                                                     </div>
                                                     {availablePromoters.map(promoter => {
-                                                        const isChecked = assignedPromoters.includes(promoter.platformUserUid!);
+                                                        const isChecked = assignedPromoterIds.includes(promoter.platformUserUid!);
                                                         return (
                                                             <div key={promoter.platformUserUid} className="flex items-center space-x-2">
                                                                 <Checkbox
@@ -609,11 +627,23 @@ const ManageEventDialog = ({
 
                                         <div className="space-y-4">
                                           <h4 className="font-semibold">Promotores Asignados ({assignedPromoters.length})</h4>
-                                          {availablePromoters.filter(p => assignedPromoters.includes(p.platformUserUid!)).map(promoter => (
-                                              <div key={promoter.platformUserUid} className="border p-3 rounded-md space-y-3 bg-background">
-                                                  <div className="flex justify-between items-center">
-                                                      <p className="font-medium">{promoter.promoterName}</p>
-                                                  </div>
+                                          {assignedPromoters.map(promoterAssignment => (
+                                              <div key={promoterAssignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
+                                                  <p className="font-medium">{promoterAssignment.promoterName}</p>
+                                                  {/* Commission rules UI */}
+                                                  {promoterAssignment.commissionRules?.map((rule, ruleIndex) => (
+                                                      <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
+                                                          <Input 
+                                                              type="number" 
+                                                              value={rule.commissionValue} 
+                                                              onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
+                                                              className="w-24 h-8"
+                                                          />
+                                                          <span>Soles por {rule.appliesToName || 'entrada general'}</span>
+                                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}><Trash2 size={14}/></Button>
+                                                      </div>
+                                                  ))}
+                                                  <Button variant="outline" size="xs" onClick={() => handleAddCommissionRule(promoterAssignment.promoterProfileId)}>Añadir regla</Button>
                                               </div>
                                           ))}
                                           {assignedPromoters.length === 0 && (
@@ -1205,3 +1235,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+

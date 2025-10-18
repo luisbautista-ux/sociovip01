@@ -66,17 +66,39 @@ export default function PromoterEntitiesPage() {
     setIsLoading(true);
 
     try {
+      // This is the correct query. It finds any entity document where the 'assignedPromoters'
+      // array contains an object that has a 'promoterProfileId' field matching the current user's UID.
+      // Firestore can query against fields within objects in an array.
       const entitiesQuery = query(
         collection(db, "businessEntities"),
-        where("assignedPromoters", "array-contains", userProfile.uid)
+        where("assignedPromoters", "array-contains-any", [
+            {promoterProfileId: userProfile.uid, promoterName: userProfile.name}
+            // This is a simplified version. A more robust way would be to query just for the ID,
+            // but `array-contains` doesn't work for partial object matches.
+            // A better data model might be to have a subcollection of promoters.
+            // For now, we will filter client-side after a broader query.
+        ])
+      );
+      
+      // Let's use a broader query and filter client-side, as the object structure might vary (e.g. with commissionRules)
+      const allBusinessEntitiesQuery = query(
+        collection(db, "businessEntities"),
+        where('isActive', '==', true) // Fetch only active entities to reduce load
       );
 
-      const entitiesSnap = await getDocs(entitiesQuery);
+      const entitiesSnap = await getDocs(allBusinessEntitiesQuery);
       
       const allAssignedEntities: PromoterEntityView[] = [];
 
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data();
+        
+        const isAssigned = (data.assignedPromoters || []).some((p: any) => p.promoterProfileId === userProfile.uid);
+
+        if (!isAssigned) {
+            return;
+        }
+        
         const nowISO = new Date().toISOString();
         let startDateStr: string;
         if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
