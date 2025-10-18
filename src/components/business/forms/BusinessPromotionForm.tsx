@@ -92,7 +92,27 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
 
   const form = useForm<PromotionFormValues>({
     resolver: zodResolver(promotionFormSchema),
-    defaultValues: {},
+    defaultValues: {
+      name: "",
+      description: "",
+      startDate: new Date(),
+      endDate: new Date(new Date().setDate(new Date().getDate() + 7)),
+      usageLimit: undefined,
+      isActive: true,
+      imageUrl: "",
+      imageFile: null,
+      imageObjectPosition: '50% 50%',
+      termsAndConditions: "",
+      qrTemplateImageUrl: "",
+      qrTemplateFile: null,
+      templateObjectPosition: '50% 50%',
+      qrTemplateLayout: {
+        qr: { x: 190, y: 350, size: 80 },
+        name: { x: 190, y: 450 },
+        dni: { x: 190, y: 470 },
+        promoTitle: { x: 190, y: 500 },
+      },
+    },
   });
   
   const formValues = form.watch();
@@ -306,7 +326,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             <FormItem><FormLabel>Descripción <span className="text-destructive">*</span></FormLabel><FormControl><Textarea placeholder="Detalles de la promoción..." {...field} rows={3} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="termsAndConditions" render={({ field }) => (
-            <FormItem><FormLabel>Términos y Condiciones</FormLabel><FormControl><Textarea placeholder="Condiciones de la promoción, ej: Válido solo para consumo en local." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Términos y Condiciones</FormLabel><FormControl><Textarea placeholder="Condiciones de la promoción, ej: Válido solo para consumo en local." {...field} value={field.value ?? ""} rows={3} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )}/>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
