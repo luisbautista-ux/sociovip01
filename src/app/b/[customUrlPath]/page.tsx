@@ -610,9 +610,9 @@ const generateComposedQrImage = useCallback(async (): Promise<string | null> => 
     } else {
         canvas.width = 380;
         canvas.height = 700;
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, businessDetails.primaryColor || '#B080D0');
-        gradient.addColorStop(1, businessDetails.secondaryColor || '#8E5EA2');
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, '#333'); // Dark color at the top
+        gradient.addColorStop(1, '#D35400'); // Orange at the bottom
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
