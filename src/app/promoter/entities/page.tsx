@@ -58,7 +58,6 @@ export default function PromoterEntitiesPage() {
   
   const fetchAssignedEntities = useCallback(async () => {
     if (!userProfile?.uid || !userProfile.businessIds || userProfile.businessIds.length === 0) {
-        console.warn("Promoter Entities Page: No UID or businessIds in profile, cannot fetch entities.");
         setIsLoading(false);
         return;
     }

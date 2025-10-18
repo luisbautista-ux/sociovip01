@@ -212,27 +212,31 @@ const ManageEventDialog = ({
         });
     };
 
-    const handlePromoterAssignmentChange = (promoterUid: string, isChecked: boolean) => {
+    const handlePromoterAssignmentChange = (promoterProfileId: string, isChecked: boolean) => {
+        if (!promoterProfileId) {
+            console.error("handlePromoterAssignmentChange: promoterProfileId is missing.");
+            return;
+        }
+
         setCurrentEventData(prev => {
             if (!prev) return null;
             let updatedAssignments = [...(prev.assignedPromoters || [])];
 
             if (isChecked) {
-                if (!updatedAssignments.some(p => p.promoterProfileId === promoterUid)) {
-                    const promoterData = availablePromoters.find(p => p.platformUserUid === promoterUid);
+                if (!updatedAssignments.some(p => p.promoterProfileId === promoterProfileId)) {
+                    const promoterData = availablePromoters.find(p => p.platformUserUid === promoterProfileId);
                     if (promoterData) {
                         updatedAssignments.push({
-                            promoterProfileId: promoterUid,
+                            promoterProfileId: promoterProfileId,
                             promoterName: promoterData.promoterName,
                             promoterEmail: promoterData.promoterEmail,
-                            commissionRules: [], 
+                            commissionRules: [],
                         });
                     }
                 }
             } else {
-                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterUid);
+                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterProfileId);
             }
-            
             return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
@@ -292,12 +296,14 @@ const ManageEventDialog = ({
         if (!isChecked) {
             setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: [] } : null);
         } else {
-            const allAssignments: EventPromoterAssignment[] = availablePromoters.map(promoter => ({
-                promoterProfileId: promoter.platformUserUid!,
-                promoterName: promoter.promoterName,
-                promoterEmail: promoter.promoterEmail,
-                commissionRules: [],
-            }));
+            const allAssignments: EventPromoterAssignment[] = availablePromoters
+                .filter(promoter => promoter.platformUserUid) // Make sure UID exists
+                .map(promoter => ({
+                    promoterProfileId: promoter.platformUserUid!,
+                    promoterName: promoter.promoterName,
+                    promoterEmail: promoter.promoterEmail,
+                    commissionRules: [],
+                }));
             setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: allAssignments } : null);
         }
     };
@@ -563,7 +569,7 @@ const ManageEventDialog = ({
                             </TabsContent>
                            <TabsContent value="promoters" className="p-6 h-full">
                                 <div className="space-y-6">
-                                     <Card>
+                                    <Card>
                                         <CardHeader>
                                             <CardTitle>Promotores del Negocio</CardTitle>
                                             <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento.</CardDescription>
@@ -1236,5 +1242,6 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
