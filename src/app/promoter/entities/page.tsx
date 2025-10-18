@@ -112,10 +112,10 @@ export default function PromoterEntitiesPage() {
 
         if (isEntityCurrentlyActivatable(entity)) {
           const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
-          const isAssignedToEvent = (entity.type === 'event' && (entity.assignedPromoters || []).some(p => p.promoterProfileId === userProfile.uid));
-          const isPromotion = entity.type === 'promotion';
+          // CORREGIDO: Un promotor solo ve una entidad si está explícitamente en la lista de 'assignedPromoters'.
+          const isAssignedToEntity = (entity.assignedPromoters || []).some(p => p.promoterProfileId === userProfile.uid);
           
-          if(isPromotion || isAssignedToEvent) {
+          if(isAssignedToEntity) {
              const enrichedEntity: PromoterEntityView = {
               ...entity,
               businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
