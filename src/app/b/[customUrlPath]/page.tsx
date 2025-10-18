@@ -197,6 +197,7 @@ export default function BusinessPublicPage() {
 
 
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // For custom template rendering
 
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(DniEntrySchema),
@@ -592,12 +593,13 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   }, [qrData]);
 
   const handleSaveQrWithDetails = async () => {
-    if (!cardRef.current) {
-        toast({ title: "Error", description: "No se encontró la tarjeta para descargar.", variant: "destructive" });
+    const elementToCapture = cardRef.current || canvasRef.current;
+    if (!elementToCapture) {
+        toast({ title: "Error", description: "No se encontró el elemento para descargar.", variant: "destructive" });
         return;
     }
     try {
-        const dataUrl = await htmlToImage.toPng(cardRef.current);
+        const dataUrl = await htmlToImage.toPng(elementToCapture);
         const link = document.createElement('a');
         link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
         link.href = dataUrl;
@@ -608,6 +610,68 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         toast({ title: "Error al Guardar", description: "No se pudo generar la imagen de la tarjeta.", variant: "destructive" });
     }
   };
+  
+    const drawPreviewOnCanvas = useCallback(async () => {
+        const canvas = canvasRef.current;
+        if (!canvas || !qrData || !qrData.promotion.qrTemplateImageUrl) return;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        try {
+            const templateImg = new Image();
+            templateImg.crossOrigin = "anonymous";
+            templateImg.src = qrData.promotion.qrTemplateImageUrl;
+            await new Promise<void>((resolve, reject) => {
+                templateImg.onload = () => resolve();
+                templateImg.onerror = (err) => {
+                  console.error("Failed to load template image:", err);
+                  reject(new Error("Image load error"));
+                };
+            });
+
+            canvas.width = templateImg.width;
+            canvas.height = templateImg.height;
+            ctx.drawImage(templateImg, 0, 0);
+
+            const layout = qrData.promotion.qrTemplateLayout || {
+                qr: { x: 190, y: 350, size: 80 },
+                name: { x: 190, y: 450 },
+                dni: { x: 190, y: 470 },
+                promoTitle: { x: 190, y: 500 },
+            };
+
+            const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { width: layout.qr.size, errorCorrectionLevel: 'H', margin: 1 });
+            const qrImage = new Image();
+            qrImage.src = qrDataUrl;
+            await new Promise(resolve => qrImage.onload = resolve);
+            ctx.drawImage(qrImage, layout.qr.x - layout.qr.size / 2, layout.qr.y - layout.qr.size / 2, layout.qr.size, layout.qr.size);
+
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
+            ctx.font = '12px Arial';
+            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
+
+        } catch (error) {
+            console.error("Error drawing on canvas:", error);
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'red';
+            ctx.font = '16px Arial';
+            ctx.fillText('Error al cargar plantilla.', canvas.width / 2, canvas.height / 2);
+        }
+    }, [qrData]);
+
+    useEffect(() => {
+        if (pageViewState === 'qrDisplay' && qrData?.promotion.qrTemplateImageUrl) {
+            drawPreviewOnCanvas();
+        }
+    }, [pageViewState, qrData, drawPreviewOnCanvas]);
+
 
   const resetQrFlow = () => {
     setPageViewState("entityList");
@@ -745,12 +809,44 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
      if (qrData.promotion.qrTemplateImageUrl) {
-      // Custom template rendering logic would go here, for now it's a placeholder
-      return (
-        <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4 md:p-8">
-           <p>Custom template rendering not shown, but logic would go here.</p>
-        </div>
-      )
+        return (
+            <div className="min-h-screen bg-background text-foreground flex flex-col">
+                 <header
+                    className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white"
+                    >
+                    <div className="max-w-7xl mx-auto flex items-center justify-start">
+                        {businessDetails.logoUrl && (
+                        <NextImage
+                            src={businessDetails.logoUrl}
+                            alt={`${businessDetails.name} logo`}
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
+                        />
+                        )}
+                        <h1 className="font-semibold text-xl" style={{ color: businessDetails.primaryColor }}>{businessDetails.name}</h1>
+                        {businessDetails.slogan && (
+                        <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>
+                        )}
+                    </div>
+                </header>
+                <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
+                   <div className="w-full max-w-sm shadow-xl rounded-xl">
+                      <canvas ref={canvasRef} className="w-full h-auto" />
+                   </div>
+                </main>
+                <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
+                    <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
+                        <Button variant="outline" onClick={handleSaveQrWithDetails} className="w-full">
+                            <Download className="mr-2 h-4 w-4" /> Guardar QR
+                        </Button>
+                        <Button onClick={resetQrFlow} className="w-full text-white" style={{ backgroundColor: businessDetails.secondaryColor || '#8E5EA2' }}>
+                            Ver Otras del Negocio
+                        </Button>
+                    </div>
+                </footer>
+            </div>
+        )
     }
 
     return (
