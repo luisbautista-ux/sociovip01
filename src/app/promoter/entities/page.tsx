@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -66,7 +67,6 @@ export default function PromoterEntitiesPage() {
     try {
         const businessIds = userProfile.businessIds;
 
-        // 1. Fetch all businesses the promoter is linked to.
         const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
         const businessesSnapshot = await getDocs(businessesQuery);
         const businessesDataMap = new Map<string, Business>();
@@ -75,7 +75,6 @@ export default function PromoterEntitiesPage() {
         });
         setBusinessesMap(businessesDataMap);
 
-        // 2. Fetch all active entities from those businesses.
         const allBusinessEntitiesQuery = query(
             collection(db, "businessEntities"),
             where('businessId', 'in', businessIds),
@@ -85,7 +84,6 @@ export default function PromoterEntitiesPage() {
 
         const allAssignedEntities: PromoterEntityView[] = [];
 
-        // 3. Filter client-side to get only the assigned entities.
         entitiesSnap.forEach(docSnap => {
             const data = docSnap.data();
             const isAssigned = (data.assignedPromoters || []).some((p: any) => p.promoterProfileId === userProfile.uid);
@@ -192,8 +190,7 @@ export default function PromoterEntitiesPage() {
             
             transaction.update(targetEntityRef, { generatedCodes: updatedCodes });
 
-            // Update local state optimistically inside transaction logic for immediate feedback
-             const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
+            const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
                 e.id === entityId ? { ...e, generatedCodes: updatedCodes, promoterCodesCreated: e.promoterCodesCreated + newCodes.length } : e
             );
             setPromotions(updateLocalState);
@@ -204,7 +201,7 @@ export default function PromoterEntitiesPage() {
     } catch (error: any) {
         console.error("Promoter Page: Error saving new codes:", error);
         toast({ title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive" });
-        fetchAssignedEntities(); // Refetch on error to ensure consistency
+        fetchAssignedEntities();
         throw error;
     }
   };
@@ -239,7 +236,6 @@ export default function PromoterEntitiesPage() {
 
         transaction.update(targetEntityRef, { generatedCodes: finalCodesToSave });
         
-        // Optimistic UI update
         const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
             e.id === entityId ? { ...e, generatedCodes: finalCodesToSave } : e
         );
@@ -743,3 +739,4 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         </div>
     );
 }
+

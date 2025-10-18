@@ -212,17 +212,17 @@ const ManageEventDialog = ({
         });
     };
 
-    const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
+    const handlePromoterAssignmentChange = (promoterUid: string, isChecked: boolean) => {
         setCurrentEventData(prev => {
             if (!prev) return null;
             let updatedAssignments = [...(prev.assignedPromoters || [])];
 
             if (isChecked) {
-                if (!updatedAssignments.some(p => p.promoterProfileId === promoterId)) {
-                    const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
+                if (!updatedAssignments.some(p => p.promoterProfileId === promoterUid)) {
+                    const promoterData = availablePromoters.find(p => p.platformUserUid === promoterUid);
                     if (promoterData) {
                         updatedAssignments.push({
-                            promoterProfileId: promoterId,
+                            promoterProfileId: promoterUid,
                             promoterName: promoterData.promoterName,
                             promoterEmail: promoterData.promoterEmail,
                             commissionRules: [], 
@@ -230,7 +230,7 @@ const ManageEventDialog = ({
                     }
                 }
             } else {
-                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
+                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterUid);
             }
             
             return { ...prev, assignedPromoters: updatedAssignments };
@@ -563,7 +563,7 @@ const ManageEventDialog = ({
                             </TabsContent>
                            <TabsContent value="promoters" className="p-6 h-full">
                                 <div className="space-y-6">
-                                    <Card>
+                                     <Card>
                                         <CardHeader>
                                             <CardTitle>Promotores del Negocio</CardTitle>
                                             <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento.</CardDescription>
@@ -597,7 +597,7 @@ const ManageEventDialog = ({
                                         </CardContent>
                                     </Card>
                                     
-                                    <Card>
+                                     <Card>
                                         <CardHeader>
                                             <CardTitle>Configurar Comisiones ({assignedPromoters.length})</CardTitle>
                                         </CardHeader>
@@ -634,7 +634,6 @@ const ManageEventDialog = ({
                                                                   className="w-24 h-8"
                                                               />
                                                               <Input
-                                                                  type="text"
                                                                   value={rule.description || 'Soles por entrada general'}
                                                                   onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'description', e.target.value)}
                                                                   className="w-full h-8"
@@ -1012,7 +1011,7 @@ export default function BusinessEventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-primary flex items-center self-start">
             <Calendar className="h-8 w-8 mr-2" /> Eventos
         </h1>
@@ -1237,4 +1236,5 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
