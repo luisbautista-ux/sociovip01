@@ -626,18 +626,18 @@ const ManageEventDialog = ({
                                                     <div key={promoterAssignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
                                                         <p className="font-medium">{promoterAssignment.promoterName}</p>
                                                         {(promoterAssignment.commissionRules || []).map((rule, ruleIndex) => (
-                                                          <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
-                                                            <Input
-                                                                type="number"
-                                                                value={rule.commissionValue}
-                                                                onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
-                                                                className="w-24 h-8"
-                                                            />
-                                                            <span>Soles por {rule.description || 'entrada general'}</span>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}>
-                                                                <Trash2 size={14} />
-                                                            </Button>
-                                                          </div>
+                                                            <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
+                                                                <Input
+                                                                    type="number"
+                                                                    value={rule.commissionValue}
+                                                                    onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
+                                                                    className="w-24 h-8"
+                                                                />
+                                                                <span>Soles por {rule.description || 'entrada general'}</span>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}>
+                                                                    <Trash2 size={14} />
+                                                                </Button>
+                                                            </div>
                                                         ))}
                                                         <Button variant="outline" size="xs" onClick={() => handleAddCommissionRule(promoterAssignment.promoterProfileId)}>
                                                             Añadir regla
