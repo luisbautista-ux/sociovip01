@@ -64,21 +64,13 @@ export default function PromoterEntitiesPage() {
     }
     
     setIsLoading(true);
-    console.log(`Promoter Entities Page: Fetching entities assigned to UID: ${userProfile.uid}`);
 
     try {
-      // Corrected query: Directly fetch entities where the promoter is assigned.
       const entitiesQuery = query(
         collection(db, "businessEntities"),
-        where("assignedPromoters", "array-contains", {
-            // This object must EXACTLY match how it's stored in the 'assignedPromoters' array.
-            // Assuming it stores at least promoterProfileId and promoterName.
-            promoterProfileId: userProfile.uid,
-            promoterName: userProfile.name, // This assumes 'name' is stored and matches. If other fields are there, they must match too.
-            // If the object has more fields, this query might need adjustment.
-            // For now, assuming a simple structure.
-        })
+        where("assignedPromoters", "array-contains", userProfile.uid)
       );
+
       const entitiesSnap = await getDocs(entitiesQuery);
       
       const allAssignedEntities: PromoterEntityView[] = [];
@@ -141,10 +133,9 @@ export default function PromoterEntitiesPage() {
 
       setPromotions(promoterAssignedPromotions);
       setEvents(promoterAssignedEvents);
-      console.log(`Promoter Entities Page: Fetched ${promoterAssignedPromotions.length} promotions and ${promoterAssignedEvents.length} events.`);
 
     } catch (error: any) {
-      console.error("Promoter Entities Page: Error fetching assigned entities:", error.code, error.message, error);
+      console.error("Promoter Entities Page: Error fetching assigned entities:", error);
       toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones y eventos asignados. ${error.message}`, variant: "destructive"});
       setPromotions([]);
       setEvents([]);
@@ -558,7 +549,7 @@ export default function PromoterEntitiesPage() {
                     toast({
                         title: "Acción no permitida",
                         description: `Esta ${currentEntity.type === 'event' ? 'evento' : 'promoción'} no está activa o está fuera de su periodo de vigencia.`,
-                        variant: "destructive",
+                        variant: "destructive"
                     });
                  }
             }
@@ -751,4 +742,3 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         </div>
     );
 }
-

@@ -213,27 +213,20 @@ const ManageEventDialog = ({
     };
 
     const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
-        const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
-        if (!promoterData) return;
-
         setCurrentEventData(prev => {
             if (!prev) return null;
             let updatedAssignments = [...(prev.assignedPromoters || [])];
             if (isChecked) {
-                if (!updatedAssignments.some(p => p.promoterProfileId === promoterId)) {
-                    updatedAssignments.push({
-                        promoterProfileId: promoterData.platformUserUid!,
-                        promoterName: promoterData.promoterName,
-                        promoterEmail: promoterData.promoterEmail,
-                        commissionRules: [],
-                    });
+                if (!updatedAssignments.includes(promoterId)) {
+                    updatedAssignments.push(promoterId);
                 }
             } else {
-                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
+                updatedAssignments = updatedAssignments.filter(id => id !== promoterId);
             }
             return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
+
 
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
         setCurrentEventData(prev => {
@@ -290,12 +283,7 @@ const ManageEventDialog = ({
             setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: [] } : null);
         } else {
             // Select all
-            const allAssignments: EventPromoterAssignment[] = availablePromoters.map(promoter => ({
-                promoterProfileId: promoter.platformUserUid!,
-                promoterName: promoter.promoterName,
-                promoterEmail: promoter.promoterEmail,
-                commissionRules: [],
-            }));
+            const allAssignments: string[] = availablePromoters.map(promoter => promoter.platformUserUid!);
             setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: allAssignments } : null);
         }
     };
@@ -310,6 +298,9 @@ const ManageEventDialog = ({
         setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                const promoterData = availablePromoters.find(ap => ap.platformUserUid === p);
+                if (!promoterData) return p;
+                
                 const newRule: CommissionRule = {
                     id: `rule_batch_${Date.now()}`,
                     appliesTo: 'event_general',
@@ -317,7 +308,13 @@ const ManageEventDialog = ({
                     commissionValue: commissionValue,
                     description: batchCommissionDesc,
                 };
-                return { ...p, commissionRules: [newRule] }; // Replaces existing rules
+                
+                return {
+                    promoterProfileId: promoterData.platformUserUid!,
+                    promoterName: promoterData.promoterName,
+                    promoterEmail: promoterData.promoterEmail,
+                    commissionRules: [newRule],
+                };
             });
             return { ...prev, assignedPromoters: updatedAssignments };
         });
@@ -572,7 +569,7 @@ const ManageEventDialog = ({
                                                         <Label htmlFor="select-all-promoters" className="font-medium">Seleccionar Todos</Label>
                                                     </div>
                                                     {availablePromoters.map(promoter => {
-                                                        const isChecked = assignedPromoters.some(p => p.promoterProfileId === promoter.platformUserUid);
+                                                        const isChecked = assignedPromoters.includes(promoter.platformUserUid!);
                                                         return (
                                                             <div key={promoter.platformUserUid} className="flex items-center space-x-2">
                                                                 <Checkbox
@@ -612,23 +609,10 @@ const ManageEventDialog = ({
 
                                         <div className="space-y-4">
                                           <h4 className="font-semibold">Promotores Asignados ({assignedPromoters.length})</h4>
-                                          {assignedPromoters.map(assignment => (
-                                              <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
+                                          {availablePromoters.filter(p => assignedPromoters.includes(p.platformUserUid!)).map(promoter => (
+                                              <div key={promoter.platformUserUid} className="border p-3 rounded-md space-y-3 bg-background">
                                                   <div className="flex justify-between items-center">
-                                                      <p className="font-medium">{assignment.promoterName}</p>
-                                                  </div>
-                                                  
-                                                  <div className="space-y-2">
-                                                      {(assignment.commissionRules || []).map((rule, index) => (
-                                                          <div key={rule.id} className="flex items-center gap-2 bg-muted/50 p-2 rounded-md border">
-                                                              <div className="flex-grow grid grid-cols-2 gap-2">
-                                                                  <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
-                                                                  <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
-                                                              </div>
-                                                              <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemoveCommissionRule(assignment.promoterProfileId, rule.id)}><Trash2 className="h-4 w-4"/></Button>
-                                                          </div>
-                                                      ))}
-                                                      <Button size="sm" variant="outline" onClick={() => handleAddCommissionRule(assignment.promoterProfileId)}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Regla de Comisión</Button>
+                                                      <p className="font-medium">{promoter.promoterName}</p>
                                                   </div>
                                               </div>
                                           ))}
@@ -1221,4 +1205,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
