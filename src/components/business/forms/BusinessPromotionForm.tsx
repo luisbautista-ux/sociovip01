@@ -190,7 +190,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         ctx.textAlign = 'center';
         
         ctx.font = `bold ${layout.name.size || 16}px Arial`;
-        ctx.fillText("Nombre Apellido", layout.name.x, layout.name.y);
+        ctx.fillText("Jose Gabriel Bautista Gonzales", layout.name.x, layout.name.y);
         
         ctx.font = `${layout.dni.size || 12}px Arial`;
         ctx.fillText("DNI: 12345678", layout.dni.x, layout.dni.y);
