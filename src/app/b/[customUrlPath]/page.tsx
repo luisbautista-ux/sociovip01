@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
@@ -93,6 +93,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
+import * as htmlToImage from 'html-to-image';
 
 
 // --- Helpers robustos para códigos ---
@@ -192,6 +193,8 @@ export default function BusinessPublicPage() {
   const [showDniExistsWarningDialog, setShowDniExistsWarningDialog] = useState(false);
   const [formDataForDniWarning, setFormDataForDniWarning] = useState<NewQrClientFormData | null>(null);
   const [isConsultingDni, setIsConsultingDni] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
 
   const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -405,6 +408,8 @@ const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEnti
         startDate: anyToDate(data.startDate)?.toISOString() || "",
         endDate: anyToDate(data.endDate)?.toISOString() || "",
         createdAt: anyToDate(data.createdAt)?.toISOString(),
+        qrTemplateImageUrl: data.qrTemplateImageUrl,
+        qrTemplateLayout: data.qrTemplateLayout,
     } as BusinessManagedEntity;
 };
 
@@ -587,17 +592,21 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   }, [qrData]);
 
   const handleSaveQrWithDetails = async () => {
-    if (!qrCodeImage) {
-      toast({ title: "Error", description: "No hay imagen de QR para guardar.", variant: "destructive" });
-      return;
+    if (!cardRef.current) {
+        toast({ title: "Error", description: "No se encontró la tarjeta para descargar.", variant: "destructive" });
+        return;
     }
-    const link = document.createElement("a");
-    link.href = qrCodeImage;
-    link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast({ title: "QR Guardado", description: "La imagen del QR se ha descargado." });
+    try {
+        const dataUrl = await htmlToImage.toPng(cardRef.current);
+        const link = document.createElement('a');
+        link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
+        link.href = dataUrl;
+        link.click();
+        toast({ title: "QR Guardado", description: "La imagen de la tarjeta se ha descargado." });
+    } catch (error) {
+        console.error('oops, something went wrong!', error);
+        toast({ title: "Error al Guardar", description: "No se pudo generar la imagen de la tarjeta.", variant: "destructive" });
+    }
   };
 
   const resetQrFlow = () => {
@@ -736,8 +745,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
      if (qrData.promotion.qrTemplateImageUrl) {
+      // Custom template rendering logic would go here, for now it's a placeholder
       return (
-        // Keep the old canvas-based rendering for custom templates
         <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4 md:p-8">
            <p>Custom template rendering not shown, but logic would go here.</p>
         </div>
@@ -747,10 +756,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col">
         <header
-          className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full"
-          style={{
-            backgroundColor: businessDetails.primaryColor || '#B080D0'
-          }}
+          className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white"
         >
           <div className="max-w-7xl mx-auto flex items-center justify-start">
             {businessDetails.logoUrl && (
@@ -762,14 +768,14 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
               />
             )}
-            <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
+            <h1 className="font-semibold text-xl" style={{ color: businessDetails.primaryColor }}>{businessDetails.name}</h1>
             {businessDetails.slogan && (
-              <p className="text-xs text-white/80 ml-3">{businessDetails.slogan}</p>
+              <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>
             )}
           </div>
         </header>
          <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
-            <Card className="w-full max-w-sm shadow-xl rounded-xl">
+            <Card ref={cardRef} className="w-full max-w-sm shadow-xl rounded-xl">
               <CardHeader className="text-center pb-4">
                 <CardTitle className="text-xl font-bold">
                   {activeEntityForQr.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}
@@ -804,6 +810,18 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               </CardFooter>
             </Card>
         </main>
+        <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
+          <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
+            <Button variant="link" className="text-primary" onClick={() => setShowLoginModal(true)}>
+              <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
+            </Button>
+            <Link href="/" passHref>
+              <Button variant="link" className="text-primary">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
+              </Button>
+            </Link>
+          </div>
+        </footer>
       </div>
     )
   }
