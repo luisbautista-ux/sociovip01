@@ -43,11 +43,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 const ManageEventDialog = ({
     isManageEventDialogOpen,
     setIsManageEventDialogOpen,
-    editingEvent: initialEditingEvent, 
+    editingEvent,
     isDuplicating,
     availablePromoters,
     onSave,
     isSubmitting,
+    setCurrentEventData, // <<--- PASAMOS EL SETTER DEL ESTADO PADRE
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
@@ -56,10 +57,9 @@ const ManageEventDialog = ({
     availablePromoters: BusinessPromoterLink[];
     onSave: (event: BusinessManagedEntity, imageFile: File | null) => Promise<void>;
     isSubmitting: boolean;
+    setCurrentEventData: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>; // <<--- TIPO CORRECTO
 }) => {
     const [activeTab, setActiveTab] = useState("details");
-    
-    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(null);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     
@@ -85,29 +85,27 @@ const ManageEventDialog = ({
     };
     
     useEffect(() => {
-        if (isManageEventDialogOpen && initialEditingEvent) {
-            const sanitizedInitialEvent = sanitizeObjectForFirestore({ ...initialEditingEvent }) as BusinessManagedEntity;
-            setCurrentEventData(sanitizedInitialEvent);
-            setImagePreviewUrl(sanitizedInitialEvent.imageUrl || null);
+        if (isManageEventDialogOpen && editingEvent) {
+            setImagePreviewUrl(editingEvent.imageUrl || null);
             setImageFile(null);
             setActiveTab("details");
             
-            initialDataSnapshot.current = JSON.stringify(sanitizedInitialEvent);
+            initialDataSnapshot.current = JSON.stringify(editingEvent);
             setHasUnsavedChanges(false);
         }
-    }, [initialEditingEvent, isManageEventDialogOpen]);
+    }, [editingEvent, isManageEventDialogOpen]);
     
     useEffect(() => {
-        if (currentEventData && initialDataSnapshot.current) {
-            const currentDataString = JSON.stringify(currentEventData);
+        if (editingEvent && initialDataSnapshot.current) {
+            const currentDataString = JSON.stringify(editingEvent);
             setHasUnsavedChanges(currentDataString !== initialDataSnapshot.current);
         }
-    }, [currentEventData]);
+    }, [editingEvent]);
 
 
      const handleSaveChanges = async () => {
-        if (currentEventData) {
-            await onSave(currentEventData, imageFile);
+        if (editingEvent) {
+            await onSave(editingEvent, imageFile);
         } else {
             toast({ title: "Error", description: "No hay datos del evento para guardar.", variant: "destructive" });
         }
@@ -126,8 +124,8 @@ const ManageEventDialog = ({
         const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
             ...ticketData,
             id: ticketId,
-            eventId: currentEventData?.id || '',
-            businessId: currentEventData?.businessId || '',
+            eventId: editingEvent?.id || '',
+            businessId: editingEvent?.businessId || '',
         }) as TicketType;
 
         setCurrentEventData(prev => {
@@ -167,8 +165,8 @@ const ManageEventDialog = ({
         const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
             ...finalBoxData,
             id: boxId,
-            eventId: currentEventData?.id || '',
-            businessId: currentEventData?.businessId || '',
+            eventId: editingEvent?.id || '',
+            businessId: editingEvent?.businessId || '',
         }) as EventBox;
         
          setCurrentEventData(prev => {
@@ -189,8 +187,8 @@ const ManageEventDialog = ({
         for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
             newBoxes.push(sanitizeObjectForFirestore({
                 id: `box_batch_${Date.now()}_${i}`,
-                eventId: currentEventData?.id || '',
-                businessId: currentEventData?.businessId || '',
+                eventId: editingEvent?.id || '',
+                businessId: editingEvent?.businessId || '',
                 name: `${batchData.prefix} ${i}`,
                 cost: batchData.cost,
                 description: batchData.description,
@@ -212,11 +210,12 @@ const ManageEventDialog = ({
         });
     };
 
-    const handlePromoterAssignmentChange = (promoterProfileId: string, isChecked: boolean) => {
-        if (!promoterProfileId) {
-            console.error("handlePromoterAssignmentChange: promoterProfileId is missing.");
+    const handlePromoterAssignmentChange = (promoter: BusinessPromoterLink, isChecked: boolean) => {
+        if (!promoter.platformUserUid) {
+            console.error("handlePromoterAssignmentChange: promoter.platformUserUid is missing.");
             return;
         }
+        const promoterProfileId = promoter.platformUserUid;
 
         setCurrentEventData(prev => {
             if (!prev) return null;
@@ -224,15 +223,12 @@ const ManageEventDialog = ({
 
             if (isChecked) {
                 if (!updatedAssignments.some(p => p.promoterProfileId === promoterProfileId)) {
-                    const promoterData = availablePromoters.find(p => p.platformUserUid === promoterProfileId);
-                    if (promoterData) {
-                        updatedAssignments.push({
-                            promoterProfileId: promoterProfileId,
-                            promoterName: promoterData.promoterName,
-                            promoterEmail: promoterData.promoterEmail,
-                            commissionRules: [],
-                        });
-                    }
+                    updatedAssignments.push({
+                        promoterProfileId: promoterProfileId,
+                        promoterName: promoter.promoterName,
+                        promoterEmail: promoter.promoterEmail,
+                        commissionRules: [],
+                    });
                 }
             } else {
                 updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterProfileId);
@@ -335,7 +331,7 @@ const ManageEventDialog = ({
             return { ...prev, assignedPromoters: updatedAssignments };
         });
 
-        toast({ title: "Éxito", description: `Comisión aplicada a ${currentEventData?.assignedPromoters?.length || 0} promotor(es).` });
+        toast({ title: "Éxito", description: `Comisión aplicada a ${editingEvent?.assignedPromoters?.length || 0} promotor(es).` });
     };
 
     const handleImageFileChange = (file: File | null) => {
@@ -346,11 +342,11 @@ const ManageEventDialog = ({
         }
     };
 
-    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
+    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(editingEvent?.ticketTypes), [editingEvent?.ticketTypes]);
     
     const assignedPromoterIds = useMemo(() => {
-        return (currentEventData?.assignedPromoters || []).map(p => p.promoterProfileId);
-    }, [currentEventData?.assignedPromoters]);
+        return (editingEvent?.assignedPromoters || []).map(p => p.promoterProfileId);
+    }, [editingEvent?.assignedPromoters]);
 
     const allPromotersSelected = useMemo(() => {
         return availablePromoters.length > 0 && assignedPromoterIds.length === availablePromoters.length;
@@ -360,18 +356,18 @@ const ManageEventDialog = ({
         return assignedPromoterIds.length > 0 && !allPromotersSelected;
     }, [assignedPromoterIds, allPromotersSelected]);
 
-    if (!isManageEventDialogOpen || !currentEventData) return null;
+    if (!isManageEventDialogOpen || !editingEvent) return null;
     
-    const assignedPromoters = currentEventData.assignedPromoters || [];
-    const ticketTypes = currentEventData.ticketTypes || [];
-    const eventBoxes = currentEventData.eventBoxes || [];
+    const assignedPromoters = editingEvent.assignedPromoters || [];
+    const ticketTypes = editingEvent.ticketTypes || [];
+    const eventBoxes = editingEvent.eventBoxes || [];
 
     return (
         <>
             <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) handleAttemptClose(); }}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogTitle>{editingEvent.id && !isDuplicating ? `Editar Evento: ${editingEvent.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <UIDialogDescriptionComponent>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</UIDialogDescriptionComponent>
                     </DialogHeader>
                     
@@ -398,7 +394,7 @@ const ManageEventDialog = ({
                                   </CardHeader>
                                   <CardContent>
                                     <BusinessEventForm 
-                                        event={currentEventData} 
+                                        event={editingEvent} 
                                         isSubmitting={isSubmitting}
                                         setCurrentEventData={setCurrentEventData}
                                         imagePreviewUrl={imagePreviewUrl}
@@ -592,7 +588,7 @@ const ManageEventDialog = ({
                                                                 <Checkbox
                                                                     id={`promoter-${promoter.platformUserUid}`}
                                                                     checked={assignedPromoterIds.includes(promoter.platformUserUid!)}
-                                                                    onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter.platformUserUid!, Boolean(checked))}
+                                                                    onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter, Boolean(checked))}
                                                                 />
                                                                 <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
                                                             </div>
@@ -727,7 +723,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
-                        existingBoxes={currentEventData?.eventBoxes || []}
+                        existingBoxes={editingEvent?.eventBoxes || []}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -1188,6 +1184,7 @@ export default function BusinessEventsPage() {
         isManageEventDialogOpen={isManageEventDialogOpen}
         setIsManageEventDialogOpen={setIsManageEventDialogOpen}
         editingEvent={editingEvent}
+        setCurrentEventData={setEditingEvent}
         isDuplicating={isDuplicating}
         availablePromoters={availablePromoters}
         onSave={handleSaveEvent}
@@ -1242,6 +1239,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
