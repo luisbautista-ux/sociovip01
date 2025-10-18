@@ -561,7 +561,7 @@ const ManageEventDialog = ({
                                         </CardContent>
                                     </Card>
                             </TabsContent>
-                           <TabsContent value="promoters" className="p-6 h-full">
+                            <TabsContent value="promoters" className="p-6 h-full">
                                 <div className="space-y-6">
                                     <Card>
                                         <CardHeader>
@@ -596,58 +596,57 @@ const ManageEventDialog = ({
                                             </div>
                                         </CardContent>
                                     </Card>
-                                    {assignedPromoters.length > 0 && (
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Configurar Comisiones ({assignedPromoters.length})</CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-4">
-                                                <div className="space-y-3 p-4 border rounded-md bg-muted/50">
-                                                    <h4 className="font-semibold text-sm">Aplicar Comisión Grupal</h4>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                        <Input
-                                                            type="number"
-                                                            placeholder="Monto (ej: 5)"
-                                                            value={batchCommissionValue}
-                                                            onChange={(e) => setBatchCommissionValue(e.target.value)}
-                                                        />
-                                                        <Input
-                                                            placeholder="Descripción (ej: por entrada general)"
-                                                            value={batchCommissionDesc}
-                                                            onChange={(e) => setBatchCommissionDesc(e.target.value)}
-                                                            className="sm:col-span-2"
-                                                        />
-                                                    </div>
-                                                    <Button size="sm" onClick={applyBatchCommission}>Aplicar a todos los seleccionados</Button>
+                                    
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>Configurar Comisiones ({assignedPromoters.length})</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-3 p-4 border rounded-md bg-muted/50">
+                                                <h4 className="font-semibold text-sm">Aplicar Comisión Grupal</h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Monto (ej: 5)"
+                                                        value={batchCommissionValue}
+                                                        onChange={(e) => setBatchCommissionValue(e.target.value)}
+                                                    />
+                                                    <Input
+                                                        placeholder="Descripción (ej: por entrada general)"
+                                                        value={batchCommissionDesc}
+                                                        onChange={(e) => setBatchCommissionDesc(e.target.value)}
+                                                        className="sm:col-span-2"
+                                                    />
                                                 </div>
+                                                <Button size="sm" onClick={applyBatchCommission}>Aplicar a todos los seleccionados</Button>
+                                            </div>
 
-                                                <div className="space-y-4">
-                                                    {assignedPromoters.map((promoterAssignment) => (
-                                                        <div key={promoterAssignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
-                                                            <p className="font-medium">{promoterAssignment.promoterName}</p>
-                                                            {(promoterAssignment.commissionRules || []).map((rule, ruleIndex) => (
-                                                                <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
-                                                                    <Input
-                                                                        type="number"
-                                                                        value={rule.commissionValue}
-                                                                        onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
-                                                                        className="w-24 h-8"
-                                                                    />
-                                                                    <span>Soles por {rule.description || 'entrada general'}</span>
-                                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}>
-                                                                        <Trash2 size={14} />
-                                                                    </Button>
-                                                                </div>
-                                                            ))}
-                                                            <Button variant="outline" size="xs" onClick={() => handleAddCommissionRule(promoterAssignment.promoterProfileId)}>
-                                                                Añadir regla
+                                            <div className="space-y-4">
+                                                {assignedPromoters.map((promoterAssignment) => (
+                                                    <div key={promoterAssignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
+                                                        <p className="font-medium">{promoterAssignment.promoterName}</p>
+                                                        {(promoterAssignment.commissionRules || []).map((rule, ruleIndex) => (
+                                                          <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
+                                                            <Input
+                                                                type="number"
+                                                                value={rule.commissionValue}
+                                                                onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
+                                                                className="w-24 h-8"
+                                                            />
+                                                            <span>Soles por {rule.description || 'entrada general'}</span>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}>
+                                                                <Trash2 size={14} />
                                                             </Button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    )}
+                                                          </div>
+                                                        ))}
+                                                        <Button variant="outline" size="xs" onClick={() => handleAddCommissionRule(promoterAssignment.promoterProfileId)}>
+                                                            Añadir regla
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
                                 </div>
                             </TabsContent>
                         </Tabs>
