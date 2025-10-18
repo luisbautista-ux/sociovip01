@@ -593,7 +593,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   }, [qrData]);
 
   const handleSaveQrWithDetails = async () => {
-    const elementToCapture = cardRef.current;
+    const elementToCapture = qrData?.promotion.qrTemplateImageUrl ? canvasRef.current : cardRef.current;
     if (!elementToCapture) {
         toast({ title: "Error", description: "No se encontró el elemento para descargar.", variant: "destructive" });
         return;
@@ -652,10 +652,13 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
+            
             ctx.font = `bold ${layout.name.size || 16}px Arial`;
             ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
+            
             ctx.font = `${layout.dni.size || 12}px Arial`;
             ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
+            
             ctx.font = `bold ${layout.promoTitle.size || 14}px Arial`;
             ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
 
@@ -811,7 +814,28 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   }
 
   if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
-     if (qrData.promotion.qrTemplateImageUrl) {
+    const QrPageFooter = () => (
+      <footer className="sticky bottom-0 z-20 w-full bg-background/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Button variant="outline" className="w-full" onClick={() => setShowLoginModal(true)}>
+            <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
+          </Button>
+          <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full">
+            <Download className="mr-2 h-4 w-4" /> Guardar QR
+          </Button>
+          <Button onClick={resetQrFlow} className="w-full text-white" style={{ backgroundColor: businessDetails.secondaryColor || '#8E5EA2' }}>
+            Ver Otras del Negocio
+          </Button>
+          <Link href="/" passHref className="w-full">
+            <Button variant="link" className="w-full text-primary">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
+            </Button>
+          </Link>
+        </div>
+      </footer>
+    );
+
+    if (qrData.promotion.qrTemplateImageUrl) {
         return (
             <div className="min-h-screen bg-background text-foreground flex flex-col">
                  <header
@@ -838,26 +862,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       <canvas ref={canvasRef} className="w-full h-auto" />
                    </div>
                 </main>
-                <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t space-y-2">
-                    <div className="max-w-7xl mx-auto flex items-center justify-between h-12 gap-2">
-                        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full">
-                            <Download className="mr-2 h-4 w-4" /> Guardar QR
-                        </Button>
-                        <Button onClick={resetQrFlow} className="w-full text-white" style={{ backgroundColor: businessDetails.secondaryColor || '#8E5EA2' }}>
-                            Ver Otras del Negocio
-                        </Button>
-                    </div>
-                    <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
-                        <Button variant="outline" className="text-primary" onClick={() => setShowLoginModal(true)}>
-                            <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
-                        </Button>
-                        <Link href="/" passHref>
-                            <Button variant="link" className="text-primary">
-                                <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
-                            </Button>
-                        </Link>
-                    </div>
-                </footer>
+                <QrPageFooter />
             </div>
         )
     }
@@ -910,27 +915,10 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
-                <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full">
-                  <Download className="mr-2 h-4 w-4" /> Guardar QR
-                </Button>
-                <Button onClick={resetQrFlow} className="w-full text-white" style={{ backgroundColor: businessDetails.secondaryColor || '#8E5EA2' }}>
-                  Ver Otras del Negocio
-                </Button>
               </CardFooter>
             </Card>
         </main>
-        <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
-          <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
-            <Button variant="outline" className="text-primary border-primary/50" onClick={() => setShowLoginModal(true)}>
-              <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
-            </Button>
-            <Link href="/" passHref>
-              <Button variant="link" className="text-primary">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
-              </Button>
-            </Link>
-          </div>
-        </footer>
+        <QrPageFooter />
       </div>
     )
   }
