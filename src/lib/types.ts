@@ -1,4 +1,5 @@
 
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -245,6 +246,11 @@ export interface BusinessManagedEntity {
   qrTemplateImageUrl?: string;
   templateObjectPosition?: string; // New: To store template image focus point
   qrTemplateLayout?: QrTemplateLayout; // Added for layout customization
+}
+
+export interface PromoterEntityView extends BusinessManagedEntity {
+    promoterCodesCreated: number;
+    promoterCodesUsed: number;
 }
 
 export interface PromoterProfile { 

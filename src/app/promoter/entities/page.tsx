@@ -57,36 +57,31 @@ export default function PromoterEntitiesPage() {
   }, [userProfile]);
   
   const fetchAssignedEntities = useCallback(async () => {
-    if (!userProfile || !userProfile.businessIds || userProfile.businessIds.length === 0) {
-      console.warn("Promoter Entities Page: No businessIds found in profile, cannot fetch entities.");
-      setPromotions([]);
-      setEvents([]);
+    if (!userProfile?.uid) {
+      console.warn("Promoter Entities Page: No UID in profile, cannot fetch entities.");
       setIsLoading(false);
       return;
     }
     
     setIsLoading(true);
-    console.log(`Promoter Entities Page: Fetching entities for businesses:`, userProfile.businessIds);
+    console.log(`Promoter Entities Page: Fetching entities assigned to UID: ${userProfile.uid}`);
 
     try {
-      const assignedBusinessIds = userProfile.businessIds;
-      const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", assignedBusinessIds));
-      const businessesSnapshot = await getDocs(businessesQuery);
-      const businessesDataMap = new Map<string, Business>();
-      businessesSnapshot.forEach(doc => {
-          businessesDataMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
-      });
-      setBusinessesMap(businessesDataMap);
-
+      // Corrected query: Directly fetch entities where the promoter is assigned.
       const entitiesQuery = query(
         collection(db, "businessEntities"),
-        where("businessId", "in", assignedBusinessIds),
-        where("isActive", "==", true)
+        where("assignedPromoters", "array-contains", {
+            // This object must EXACTLY match how it's stored in the 'assignedPromoters' array.
+            // Assuming it stores at least promoterProfileId and promoterName.
+            promoterProfileId: userProfile.uid,
+            promoterName: userProfile.name, // This assumes 'name' is stored and matches. If other fields are there, they must match too.
+            // If the object has more fields, this query might need adjustment.
+            // For now, assuming a simple structure.
+        })
       );
       const entitiesSnap = await getDocs(entitiesQuery);
       
-      const promoterAssignedPromotions: PromoterEntityView[] = [];
-      const promoterAssignedEvents: PromoterEntityView[] = [];
+      const allAssignedEntities: PromoterEntityView[] = [];
 
       entitiesSnap.forEach(docSnap => {
         const data = docSnap.data();
@@ -112,21 +107,34 @@ export default function PromoterEntitiesPage() {
 
         if (isEntityCurrentlyActivatable(entity)) {
           const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
-          // CORREGIDO: Un promotor solo ve una entidad si está explícitamente en la lista de 'assignedPromoters'.
-          const isAssignedToEntity = (entity.assignedPromoters || []).some(p => p.promoterProfileId === userProfile.uid);
-          
-          if(isAssignedToEntity) {
-             const enrichedEntity: PromoterEntityView = {
-              ...entity,
-              businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
-              promoterCodesCreated: promoterCodeStats.created,
-              promoterCodesUsed: promoterCodeStats.used,
-            };
-            if(entity.type === 'promotion') promoterAssignedPromotions.push(enrichedEntity);
-            if(entity.type === 'event') promoterAssignedEvents.push(enrichedEntity);
-          }
+          const enrichedEntity: PromoterEntityView = {
+            ...entity,
+            businessName: "", // Will be populated later
+            promoterCodesCreated: promoterCodeStats.created,
+            promoterCodesUsed: promoterCodeStats.used,
+          };
+          allAssignedEntities.push(enrichedEntity);
         }
       });
+
+      // Now fetch business details for the found entities
+      const uniqueBusinessIds = [...new Set(allAssignedEntities.map(e => e.businessId))];
+      if (uniqueBusinessIds.length > 0) {
+        const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", uniqueBusinessIds));
+        const businessesSnapshot = await getDocs(businessesQuery);
+        const businessesDataMap = new Map<string, Business>();
+        businessesSnapshot.forEach(doc => {
+            businessesDataMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
+        });
+        setBusinessesMap(businessesDataMap);
+        
+        allAssignedEntities.forEach(entity => {
+            entity.businessName = businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido";
+        });
+      }
+
+      const promoterAssignedPromotions = allAssignedEntities.filter(e => e.type === 'promotion');
+      const promoterAssignedEvents = allAssignedEntities.filter(e => e.type === 'event');
       
       promoterAssignedPromotions.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       promoterAssignedEvents.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -743,3 +751,4 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         </div>
     );
 }
+
