@@ -47,9 +47,9 @@ const promotionFormSchema = z.object({
   templateObjectPosition: z.string().optional(),
   qrTemplateLayout: z.object({
     qr: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number() }),
-    name: z.object({ x: z.coerce.number(), y: z.coerce.number() }),
-    dni: z.object({ x: z.coerce.number(), y: z.coerce.number() }),
-    promoTitle: z.object({ x: z.coerce.number(), y: z.coerce.number() }),
+    name: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
+    dni: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
+    promoTitle: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
   }).optional(),
 }).refine(data => {
     if (data.startDate && data.endDate) {
@@ -108,9 +108,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       templateObjectPosition: '50% 50%',
       qrTemplateLayout: {
         qr: { x: 190, y: 350, size: 80 },
-        name: { x: 190, y: 450 },
-        dni: { x: 190, y: 470 },
-        promoTitle: { x: 190, y: 500 },
+        name: { x: 190, y: 450, size: 16 },
+        dni: { x: 190, y: 470, size: 12 },
+        promoTitle: { x: 190, y: 500, size: 14 },
       },
     },
   });
@@ -123,9 +123,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       const initialTmplPos = promotion.templateObjectPosition || '50% 50%';
       const initialLayout = promotion.qrTemplateLayout || {
         qr: { x: 190, y: 350, size: 80 },
-        name: { x: 190, y: 450 },
-        dni: { x: 190, y: 470 },
-        promoTitle: { x: 190, y: 500 },
+        name: { x: 190, y: 450, size: 16 },
+        dni: { x: 190, y: 470, size: 12 },
+        promoTitle: { x: 190, y: 500, size: 14 },
       };
 
       setObjectPosition(initialImgPos);
@@ -174,9 +174,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
 
         const layout = form.getValues('qrTemplateLayout') || {
             qr: { x: 190, y: 350, size: 80 },
-            name: { x: 190, y: 450 },
-            dni: { x: 190, y: 470 },
-            promoTitle: { x: 190, y: 500 },
+            name: { x: 190, y: 450, size: 16 },
+            dni: { x: 190, y: 470, size: 12 },
+            promoTitle: { x: 190, y: 500, size: 14 },
         };
 
         const exampleQrDataUrl = await QRCode.toDataURL("SocioVipPreview", { width: layout.qr.size, errorCorrectionLevel: "H", margin: 1 });
@@ -189,13 +189,13 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
         
-        ctx.font = 'bold 16px Arial';
+        ctx.font = `bold ${layout.name.size || 16}px Arial`;
         ctx.fillText("Nombre Apellido", layout.name.x, layout.name.y);
         
-        ctx.font = '12px Arial';
+        ctx.font = `${layout.dni.size || 12}px Arial`;
         ctx.fillText("DNI: 12345678", layout.dni.x, layout.dni.y);
         
-        ctx.font = 'bold 14px Arial';
+        ctx.font = `bold ${layout.promoTitle.size || 14}px Arial`;
         ctx.fillText(formValues.name || "Nombre Promoción", layout.promoTitle.x, layout.promoTitle.y);
         
     } else {
@@ -360,20 +360,23 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             <div className="grid grid-cols-2 gap-4">
                  <FormField control={form.control} name="qrTemplateLayout.qr.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                  <FormField control={form.control} name="qrTemplateLayout.qr.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                 <FormField control={form.control} name="qrTemplateLayout.qr.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
             </div>
+            <FormField control={form.control} name="qrTemplateLayout.qr.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
             <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="qrTemplateLayout.name.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                 <FormField control={form.control} name="qrTemplateLayout.name.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
             </div>
+             <FormField control={form.control} name="qrTemplateLayout.name.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre Tamaño</FormLabel><FormControl><Input type="number" placeholder="16" {...field}/></FormControl></FormItem>)}/>
             <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="qrTemplateLayout.dni.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                 <FormField control={form.control} name="qrTemplateLayout.dni.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
             </div>
+            <FormField control={form.control} name="qrTemplateLayout.dni.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI Tamaño</FormLabel><FormControl><Input type="number" placeholder="12" {...field}/></FormControl></FormItem>)}/>
             <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="qrTemplateLayout.promoTitle.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                 <FormField control={form.control} name="qrTemplateLayout.promoTitle.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
             </div>
+             <FormField control={form.control} name="qrTemplateLayout.promoTitle.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título Tamaño</FormLabel><FormControl><Input type="number" placeholder="14" {...field}/></FormControl></FormItem>)}/>
         </div>
         
         <FormField control={form.control} name="isActive" render={({ field }) => (

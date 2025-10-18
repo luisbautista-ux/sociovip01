@@ -578,7 +578,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
 
  useEffect(() => {
-    if (qrData?.promotion.qrValue) {
+    if (qrData?.promotion.qrValue && !qrData?.promotion.qrTemplateImageUrl) {
       QRCode.toDataURL(qrData.promotion.qrValue, { width: 400, errorCorrectionLevel: 'H' }, (err, url) => {
         if (err) {
           console.error("Failed to generate QR code:", err);
@@ -593,13 +593,16 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   }, [qrData]);
 
   const handleSaveQrWithDetails = async () => {
-    const elementToCapture = cardRef.current || canvasRef.current;
+    const elementToCapture = cardRef.current;
     if (!elementToCapture) {
         toast({ title: "Error", description: "No se encontró el elemento para descargar.", variant: "destructive" });
         return;
     }
     try {
-        const dataUrl = await htmlToImage.toPng(elementToCapture);
+        const dataUrl = await htmlToImage.toPng(elementToCapture, {
+          quality: 1.0,
+          pixelRatio: 2,
+        });
         const link = document.createElement('a');
         link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
         link.href = dataUrl;
@@ -636,9 +639,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
             const layout = qrData.promotion.qrTemplateLayout || {
                 qr: { x: 190, y: 350, size: 80 },
-                name: { x: 190, y: 450 },
-                dni: { x: 190, y: 470 },
-                promoTitle: { x: 190, y: 500 },
+                name: { x: 190, y: 450, size: 16 },
+                dni: { x: 190, y: 470, size: 12 },
+                promoTitle: { x: 190, y: 500, size: 14 },
             };
 
             const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { width: layout.qr.size, errorCorrectionLevel: 'H', margin: 1 });
@@ -649,11 +652,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
-            ctx.font = 'bold 16px Arial';
+            ctx.font = `bold ${layout.name.size || 16}px Arial`;
             ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
-            ctx.font = '12px Arial';
+            ctx.font = `${layout.dni.size || 12}px Arial`;
             ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
-            ctx.font = 'bold 14px Arial';
+            ctx.font = `bold ${layout.promoTitle.size || 14}px Arial`;
             ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
 
         } catch (error) {
@@ -918,7 +921,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         </main>
         <footer className="sticky bottom-0 z-20 w-full bg-white/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
           <div className="max-w-7xl mx-auto flex items-center justify-between h-12">
-            <Button variant="outline" className="text-primary" onClick={() => setShowLoginModal(true)}>
+            <Button variant="outline" className="text-primary border-primary/50" onClick={() => setShowLoginModal(true)}>
               <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
             </Button>
             <Link href="/" passHref>
