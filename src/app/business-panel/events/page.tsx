@@ -625,31 +625,35 @@ const ManageEventDialog = ({
                                             </div>
                                         )}
 
-                                        <div className="space-y-4">
-                                          <h4 className="font-semibold">Promotores Asignados ({assignedPromoters.length})</h4>
-                                          {assignedPromoters.map(promoterAssignment => (
-                                              <div key={promoterAssignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
-                                                  <p className="font-medium">{promoterAssignment.promoterName}</p>
-                                                  {/* Commission rules UI */}
-                                                  {promoterAssignment.commissionRules?.map((rule, ruleIndex) => (
-                                                      <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
-                                                          <Input 
-                                                              type="number" 
-                                                              value={rule.commissionValue} 
-                                                              onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
-                                                              className="w-24 h-8"
-                                                          />
-                                                          <span>Soles por {rule.appliesToName || 'entrada general'}</span>
-                                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}><Trash2 size={14}/></Button>
-                                                      </div>
-                                                  ))}
-                                                  <Button variant="outline" size="xs" onClick={() => handleAddCommissionRule(promoterAssignment.promoterProfileId)}>Añadir regla</Button>
-                                              </div>
-                                          ))}
-                                          {assignedPromoters.length === 0 && (
-                                              <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
-                                          )}
-                                        </div>
+                                        <Card>
+                                            <CardHeader className="p-4">
+                                                <CardTitle className="text-base">Promotores Asignados ({assignedPromoters.length})</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="p-4 space-y-4">
+                                                {assignedPromoters.length > 0 ? (
+                                                    assignedPromoters.map(promoterAssignment => (
+                                                        <div key={promoterAssignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
+                                                            <p className="font-medium">{promoterAssignment.promoterName}</p>
+                                                            {promoterAssignment.commissionRules?.map((rule, ruleIndex) => (
+                                                                <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={rule.commissionValue}
+                                                                        onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
+                                                                        className="w-24 h-8"
+                                                                    />
+                                                                    <span>Soles por {rule.appliesToName || 'entrada general'}</span>
+                                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}><Trash2 size={14} /></Button>
+                                                                </div>
+                                                            ))}
+                                                            <Button variant="outline" size="xs" onClick={() => handleAddCommissionRule(promoterAssignment.promoterProfileId)}>Añadir regla</Button>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
+                                                )}
+                                            </CardContent>
+                                        </Card>
                                     </CardContent>
                                 </Card>
                             </TabsContent>
@@ -1235,5 +1239,6 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
