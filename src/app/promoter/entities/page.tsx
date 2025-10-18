@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -57,113 +56,93 @@ export default function PromoterEntitiesPage() {
   }, [userProfile]);
   
   const fetchAssignedEntities = useCallback(async () => {
-    if (!userProfile?.uid) {
-      console.warn("Promoter Entities Page: No UID in profile, cannot fetch entities.");
-      setIsLoading(false);
-      return;
+    if (!userProfile?.uid || !userProfile.businessIds || userProfile.businessIds.length === 0) {
+        console.warn("Promoter Entities Page: No UID or businessIds in profile, cannot fetch entities.");
+        setIsLoading(false);
+        return;
     }
     
     setIsLoading(true);
-
     try {
-      // This is the correct query. It finds any entity document where the 'assignedPromoters'
-      // array contains an object that has a 'promoterProfileId' field matching the current user's UID.
-      // Firestore can query against fields within objects in an array.
-      const entitiesQuery = query(
-        collection(db, "businessEntities"),
-        where("assignedPromoters", "array-contains-any", [
-            {promoterProfileId: userProfile.uid, promoterName: userProfile.name}
-            // This is a simplified version. A more robust way would be to query just for the ID,
-            // but `array-contains` doesn't work for partial object matches.
-            // A better data model might be to have a subcollection of promoters.
-            // For now, we will filter client-side after a broader query.
-        ])
-      );
-      
-      // Let's use a broader query and filter client-side, as the object structure might vary (e.g. with commissionRules)
-      const allBusinessEntitiesQuery = query(
-        collection(db, "businessEntities"),
-        where('isActive', '==', true) // Fetch only active entities to reduce load
-      );
+        const businessIds = userProfile.businessIds;
 
-      const entitiesSnap = await getDocs(allBusinessEntitiesQuery);
-      
-      const allAssignedEntities: PromoterEntityView[] = [];
-
-      entitiesSnap.forEach(docSnap => {
-        const data = docSnap.data();
-        
-        const isAssigned = (data.assignedPromoters || []).some((p: any) => p.promoterProfileId === userProfile.uid);
-
-        if (!isAssigned) {
-            return;
-        }
-        
-        const nowISO = new Date().toISOString();
-        let startDateStr: string;
-        if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
-        else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
-        else startDateStr = nowISO;
-
-        let endDateStr: string;
-        if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
-        else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
-        else endDateStr = nowISO;
-        
-        const entity: BusinessManagedEntity = {
-          id: docSnap.id,
-          ...data,
-          startDate: startDateStr,
-          endDate: endDateStr,
-        } as BusinessManagedEntity;
-
-        if (isEntityCurrentlyActivatable(entity)) {
-          const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
-          const enrichedEntity: PromoterEntityView = {
-            ...entity,
-            businessName: "", // Will be populated later
-            promoterCodesCreated: promoterCodeStats.created,
-            promoterCodesUsed: promoterCodeStats.used,
-          };
-          allAssignedEntities.push(enrichedEntity);
-        }
-      });
-
-      // Now fetch business details for the found entities
-      const uniqueBusinessIds = [...new Set(allAssignedEntities.map(e => e.businessId))];
-      if (uniqueBusinessIds.length > 0) {
-        const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", uniqueBusinessIds));
+        // 1. Fetch all businesses the promoter is linked to.
+        const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
         const businessesSnapshot = await getDocs(businessesQuery);
         const businessesDataMap = new Map<string, Business>();
         businessesSnapshot.forEach(doc => {
             businessesDataMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
         });
         setBusinessesMap(businessesDataMap);
-        
-        allAssignedEntities.forEach(entity => {
-            entity.businessName = businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido";
+
+        // 2. Fetch all active entities from those businesses.
+        const allBusinessEntitiesQuery = query(
+            collection(db, "businessEntities"),
+            where('businessId', 'in', businessIds),
+            where('isActive', '==', true)
+        );
+        const entitiesSnap = await getDocs(allBusinessEntitiesQuery);
+
+        const allAssignedEntities: PromoterEntityView[] = [];
+
+        // 3. Filter client-side to get only the assigned entities.
+        entitiesSnap.forEach(docSnap => {
+            const data = docSnap.data();
+            const isAssigned = (data.assignedPromoters || []).some((p: any) => p.promoterProfileId === userProfile.uid);
+
+            if (!isAssigned) {
+                return;
+            }
+
+            const nowISO = new Date().toISOString();
+            let startDateStr: string;
+            if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
+            else if (typeof data.startDate === 'string') startDateStr = data.startDate;
+            else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
+            else startDateStr = nowISO;
+
+            let endDateStr: string;
+            if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
+            else if (typeof data.endDate === 'string') endDateStr = data.endDate;
+            else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
+            else endDateStr = nowISO;
+            
+            const entity: BusinessManagedEntity = {
+                id: docSnap.id,
+                ...data,
+                startDate: startDateStr,
+                endDate: endDateStr,
+            } as BusinessManagedEntity;
+
+            if (isEntityCurrentlyActivatable(entity)) {
+                const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
+                const enrichedEntity: PromoterEntityView = {
+                    ...entity,
+                    businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
+                    promoterCodesCreated: promoterCodeStats.created,
+                    promoterCodesUsed: promoterCodeStats.used,
+                };
+                allAssignedEntities.push(enrichedEntity);
+            }
         });
-      }
+        
+        const promoterAssignedPromotions = allAssignedEntities.filter(e => e.type === 'promotion');
+        const promoterAssignedEvents = allAssignedEntities.filter(e => e.type === 'event');
+        
+        promoterAssignedPromotions.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        promoterAssignedEvents.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
-      const promoterAssignedPromotions = allAssignedEntities.filter(e => e.type === 'promotion');
-      const promoterAssignedEvents = allAssignedEntities.filter(e => e.type === 'event');
-      
-      promoterAssignedPromotions.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      promoterAssignedEvents.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-
-      setPromotions(promoterAssignedPromotions);
-      setEvents(promoterAssignedEvents);
+        setPromotions(promoterAssignedPromotions);
+        setEvents(promoterAssignedEvents);
 
     } catch (error: any) {
-      console.error("Promoter Entities Page: Error fetching assigned entities:", error);
-      toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones y eventos asignados. ${error.message}`, variant: "destructive"});
-      setPromotions([]);
-      setEvents([]);
-      setBusinessesMap(new Map());
+        console.error("Promoter Entities Page: Error fetching assigned entities:", error);
+        toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones y eventos asignados. ${error.message}`, variant: "destructive"});
+        setPromotions([]);
+        setEvents([]);
+        setBusinessesMap(new Map());
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   }, [userProfile, toast, getPromoterCodeStats]);
 
