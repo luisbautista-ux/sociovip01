@@ -561,7 +561,7 @@ const ManageEventDialog = ({
                                         </CardContent>
                                     </Card>
                             </TabsContent>
-                            <TabsContent value="promoters" className="p-6 h-full">
+                           <TabsContent value="promoters" className="p-6 h-full">
                                 <div className="space-y-6">
                                     <Card>
                                         <CardHeader>
@@ -618,7 +618,7 @@ const ManageEventDialog = ({
                                                         className="sm:col-span-2"
                                                     />
                                                 </div>
-                                                <Button size="sm" onClick={applyBatchCommission}>Aplicar a todos los seleccionados</Button>
+                                                <Button size="sm" onClick={applyBatchCommission} className="bg-black text-white hover:bg-black/80">Aplicar a todos los seleccionados</Button>
                                             </div>
 
                                             <div className="space-y-4">
@@ -654,7 +654,7 @@ const ManageEventDialog = ({
 
                     <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
                         <Button variant="outline" onClick={handleAttemptClose} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={handleSaveChanges} disabled={isSubmitting}>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting} className="bg-black text-white hover:bg-black/80">
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>
