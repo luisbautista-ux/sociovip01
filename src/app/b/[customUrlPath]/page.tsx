@@ -415,13 +415,46 @@ const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEnti
 };
 
 const consultExternalDniApi = async (dni: string) => {
-    const response = await fetch('/api/admin/consult-dni', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dni }),
-    });
-    if (!response.ok) return null;
-    return await response.json();
+    try {
+        const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
+        const formNombres = new URLSearchParams();
+        formNombres.append('dni4', dni);
+        formNombres.append('company', '');
+        formNombres.append('action', 'buscar_nombres');
+        formNombres.append('security', '4550295f30'); 
+
+        const responseNombres = await fetch(endpointNombres, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
+            },
+            body: formNombres.toString(),
+        });
+        
+        let nombreCompleto = "";
+        let nombres = "";
+        let apellidoPaterno = "";
+        let apellidoMaterno = "";
+
+        if (responseNombres.ok) {
+            const dataNombres = await responseNombres.json();
+            const mensaje = dataNombres.data?.message;
+            if (mensaje) {
+                const lineas = mensaje.split('\n');
+                lineas.forEach((linea: string) => {
+                    if (linea.startsWith("Nombres:")) nombres = linea.replace("Nombres:", "").trim();
+                    else if (linea.startsWith("Apellido Paterno:")) apellidoPaterno = linea.replace("Apellido Paterno:", "").trim();
+                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterno = linea.replace("Apellido Materno:", "").trim();
+                });
+                nombreCompleto = `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim().replace(/\s+/g, ' ');
+            }
+        }
+        return { nombreCompleto, nombres, apellidoPaterno, apellidoMaterno, fechaNacimiento: "" };
+    } catch (e) {
+        console.warn("External DNI API call failed, user will fill manually.", e);
+        return null;
+    }
 };
 
 const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
@@ -817,7 +850,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
     const QrPageFooter = () => (
       <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
           <Link href="/login" passHref>
             <Button variant="outline" className="w-full font-bold">
               <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
@@ -950,10 +983,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
                     </Button>
                  </Link>
-                  <Button variant="outline" className="text-white border-white/50 hover:bg-white/10 hover:text-white" onClick={() => setShowLoginModal(true)}>
-                    <UserCircle className="mr-2 h-4 w-4" />
-                    Iniciar Sesión
-                  </Button>
+                  <Link href="/login" passHref>
+                    <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      Iniciar Sesión
+                    </Button>
+                  </Link>
               </div>
             </div>
          </div>
