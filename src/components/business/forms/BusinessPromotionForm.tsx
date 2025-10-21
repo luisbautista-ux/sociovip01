@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon, Loader2, Move, Upload, Settings } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2, Move, Upload, Settings, RefreshCw, Grab } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -65,7 +65,14 @@ const promotionFormSchema = z.object({
 
 type PromotionFormValues = z.infer<typeof promotionFormSchema>;
 
-type DraggableElement = "qr" | "name" | "dni" | "promoTitle" | null;
+type DraggableElement = "qr" | "name" | "dni" | "promoTitle";
+
+const elementLabels: Record<DraggableElement, string> = {
+  qr: "Código QR",
+  name: "Nombre Cliente",
+  dni: "DNI Cliente",
+  promoTitle: "Título Promoción",
+};
 
 interface BusinessPromotionFormProps {
   promotion?: BusinessManagedEntity; 
@@ -91,8 +98,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   const { toast } = useToast();
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [draggedElement, setDraggedElement] = useState<DraggableElement>(null);
+  const [draggedElement, setDraggedElement] = useState<DraggableElement | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const [selectedElement, setSelectedElement] = useState<DraggableElement | null>(null);
 
 
   const form = useForm<PromotionFormValues>({
@@ -157,7 +165,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     }
   }, [promotion, form]);
   
-  const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement = null) => {
+  const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement | null = null) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
@@ -193,6 +201,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           const config = layout[key as keyof typeof layout] as any;
           if(!config) return;
 
+          ctx.save();
           if (isHighlight) {
             ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
             ctx.strokeStyle = 'rgba(0, 123, 255, 0.7)';
@@ -205,14 +214,16 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           } else {
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
-            ctx.font = `bold ${config.size || 16}px Arial`;
+            const fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
+            ctx.font = `bold ${fontSize}px Arial`;
             const text = key === 'name' ? "Jose Gabriel Bautista Gonzales" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
             const textMetrics = ctx.measureText(text);
             const textWidth = textMetrics.width;
-            const textHeight = config.size || 16;
+            const textHeight = fontSize;
             ctx.fillText(text, config.x, config.y);
             if(isHighlight) ctx.strokeRect(config.x - textWidth/2, config.y - textHeight, textWidth, textHeight * 1.2);
           }
+           ctx.restore();
         }
         
         drawElement('qr', highlightedElement === 'qr');
@@ -235,8 +246,8 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
 
 
   useEffect(() => {
-    drawPreviewOnCanvas();
-  }, [drawPreviewOnCanvas, formValues]);
+    drawPreviewOnCanvas(selectedElement);
+  }, [drawPreviewOnCanvas, formValues, selectedElement]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'main' | 'template') => {
     const file = event.target.files?.[0];
@@ -296,20 +307,19 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       }
   };
 
-  const getElementAtPos = (x: number, y: number): DraggableElement => {
+  const getElementAtPos = (x: number, y: number): DraggableElement | null => {
     const layout = form.getValues('qrTemplateLayout');
     if (!layout) return null;
 
     const checkHit = (key: 'qr' | 'name' | 'dni' | 'promoTitle') => {
-      const el = layout[key];
+      const el = layout[key as keyof typeof layout];
       if (!el) return false;
       const elSize = el.size || 16;
       if (key === 'qr') {
         return x > el.x - elSize / 2 && x < el.x + elSize / 2 && y > el.y - elSize / 2 && y < el.y + elSize / 2;
       } else {
         const textHeight = elSize * 1.2;
-        // Approximation, depends on text. For now let's use a fixed width guess
-        const textWidth = 200; 
+        const textWidth = (key === 'name' ? 200 : key === 'dni' ? 80 : 150); // Approximation
         return x > el.x - textWidth / 2 && x < el.x + textWidth / 2 && y > el.y - textHeight && y < el.y + textHeight * 0.2;
       }
     };
@@ -330,6 +340,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     const canvasY = (e.clientY - rect.top) * scaleY;
     
     const element = getElementAtPos(canvasX, canvasY);
+    setSelectedElement(element); 
     if (element) {
         setDraggedElement(element);
         const elLayout = form.getValues(`qrTemplateLayout.${element}`);
@@ -364,6 +375,16 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     setDraggedElement(null);
     if(canvasRef.current) canvasRef.current.style.cursor = 'default';
   };
+  
+  const handleResetPosition = (element: DraggableElement) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const centerX = Math.round(canvas.width / 2);
+    const centerY = Math.round(canvas.height / 2);
+    form.setValue(`qrTemplateLayout.${element}.x`, centerX);
+    form.setValue(`qrTemplateLayout.${element}.y`, centerY);
+    toast({ title: "Posición Reseteada", description: `El elemento "${elementLabels[element]}" se ha centrado.`})
+  }
 
 
   const handleSubmit = (values: PromotionFormValues) => {
@@ -432,72 +453,66 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             <FormItem><FormLabel>Límite de Usos</FormLabel><FormControl><Input type="number" placeholder="Ej: 100 (0 o vacío para ilimitado)" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} disabled={isSubmitting} /></FormControl><FormDescription className="text-xs">Dejar vacío o 0 para usos ilimitados.</FormDescription><FormMessage /></FormItem>
         )}/>
         
-        <div className="flex flex-col items-center justify-center pt-4 border-t mt-6 space-y-3">
-          <FormLabel className="self-start">Plantilla de QR (Opcional)</FormLabel>
-          <div
-            className="group w-full max-w-xs relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
-          >
-             <canvas 
-                ref={canvasRef} 
-                className="w-full h-auto" 
-                onMouseDown={handleCanvasMouseDown}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseUp={handleCanvasMouseUp}
-                onMouseLeave={handleCanvasMouseUp}
-              />
+        <div className="pt-4 border-t mt-6 space-y-4">
+          <h3 className="flex items-center font-medium"><Settings className="h-5 w-5 mr-2"/>Personalización de Plantilla QR (Opcional)</h3>
+          
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <FormLabel className="self-start">Imagen de Plantilla</FormLabel>
+            <div className="group w-full max-w-xs relative rounded-md border bg-muted flex items-center justify-center overflow-hidden">
+               <canvas 
+                  ref={canvasRef} 
+                  className="w-full h-auto cursor-grab active:cursor-grabbing" 
+                  onMouseDown={handleCanvasMouseDown}
+                  onMouseMove={handleCanvasMouseMove}
+                  onMouseUp={handleCanvasMouseUp}
+                  onMouseLeave={handleCanvasMouseUp}
+                />
+            </div>
+            <input type="file" ref={templateImageInputRef} onChange={(e) => handleFileChange(e, 'template')} className="hidden" accept="image/png, image/jpeg, image/webp" />
+            <Button type="button" variant="outline" onClick={() => templateImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> {templatePreview ? 'Cambiar' : 'Subir'} Plantilla</Button>
+            <FormDescription className="text-xs">Imagen de fondo para el QR descargable (Formato Ticket).</FormDescription>
+            <FormMessage>{form.formState.errors.qrTemplateFile?.message}</FormMessage>
           </div>
-          <input type="file" ref={templateImageInputRef} onChange={(e) => handleFileChange(e, 'template')} className="hidden" accept="image/png, image/jpeg, image/webp" />
-          <Button type="button" variant="outline" onClick={() => templateImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> {templatePreview ? 'Cambiar' : 'Subir'} Plantilla</Button>
-          <FormDescription className="text-xs">Imagen de fondo para el QR descargable (Formato Ticket).</FormDescription>
-          <FormMessage>{form.formState.errors.qrTemplateFile?.message}</FormMessage>
-        </div>
 
-        <div className="space-y-4 pt-4 border-t mt-6">
-          <h4 className="flex items-center text-sm font-medium"><Settings className="h-4 w-4 mr-2"/>Ajustar Posiciones de Datos en Plantilla</h4>
+          <Card>
+            <CardHeader className="p-3">
+              <CardTitle className="text-sm">Caja de Herramientas</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 grid grid-cols-2 gap-2">
+                {(Object.keys(elementLabels) as DraggableElement[]).map(key => (
+                    <Button 
+                        key={key} 
+                        type="button" 
+                        variant={selectedElement === key ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedElement(key)}
+                        className="flex items-center justify-start gap-2"
+                        onMouseDown={() => {setDraggedElement(key); toast({title:"Arrastrando elemento", description: `Ahora mueve "${elementLabels[key]}" en la vista previa.`})}}
+                    >
+                        <Grab size={16} className="text-muted-foreground"/> {elementLabels[key]}
+                    </Button>
+                ))}
+            </CardContent>
+          </Card>
           
-          <Card>
-            <CardHeader className="p-4"><CardTitle className="text-base">Código QR</CardTitle></CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="qrTemplateLayout.qr.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                  <FormField control={form.control} name="qrTemplateLayout.qr.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-              </div>
-              <FormField control={form.control} name="qrTemplateLayout.qr.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="p-4"><CardTitle className="text-base">Nombre Cliente</CardTitle></CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="qrTemplateLayout.name.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                  <FormField control={form.control} name="qrTemplateLayout.name.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-              </div>
-              <FormField control={form.control} name="qrTemplateLayout.name.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Fuente</FormLabel><FormControl><Input type="number" placeholder="16" {...field}/></FormControl></FormItem>)}/>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="p-4"><CardTitle className="text-base">DNI Cliente</CardTitle></CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="qrTemplateLayout.dni.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                  <FormField control={form.control} name="qrTemplateLayout.dni.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-              </div>
-              <FormField control={form.control} name="qrTemplateLayout.dni.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Fuente</FormLabel><FormControl><Input type="number" placeholder="12" {...field}/></FormControl></FormItem>)}/>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="p-4"><CardTitle className="text-base">Título de Promoción</CardTitle></CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="qrTemplateLayout.promoTitle.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                  <FormField control={form.control} name="qrTemplateLayout.promoTitle.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-              </div>
-              <FormField control={form.control} name="qrTemplateLayout.promoTitle.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Fuente</FormLabel><FormControl><Input type="number" placeholder="14" {...field}/></FormControl></FormItem>)}/>
-            </CardContent>
-          </Card>
+          {selectedElement && (
+            <Card className="bg-muted/50">
+              <CardHeader className="p-3">
+                <CardTitle className="text-base flex items-center justify-between">
+                  Ajustes para: {elementLabels[selectedElement]}
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleResetPosition(selectedElement)}>
+                    <RefreshCw className="h-4 w-4"/>
+                    <span className="sr-only">Resetear Posición</span>
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.x`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                  <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.y`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                  <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem className="col-span-2"><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+              </CardContent>
+            </Card>
+          )}
 
         </div>
         
