@@ -418,6 +418,16 @@ const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEnti
         qrTemplateLayout: data.qrTemplateLayout,
     } as BusinessManagedEntity;
 };
+
+const consultExternalDniApi = async (dni: string) => {
+    const response = await fetch('/api/admin/consult-dni', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni }),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+};
   
 const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
   if (!activeEntityForQr || !validatedCodeObject || !businessDetails?.id) {
@@ -453,22 +463,14 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
           if (data.docType === 'dni') {
               setIsConsultingDni(true);
               try {
-                  const dniApiResponse = await fetch('/api/public/consult-document', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ docNumber: docNumberCleaned, docType: 'dni' }),
-                  });
-                  if (dniApiResponse.ok) {
-                    const dniData = await dniApiResponse.json();
-                    
-                    const names = dniData.nombres || "";
-                    const surnames = `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim();
+                  const dniData = await consultExternalDniApi(docNumberCleaned);
+                  if (dniData && dniData.nombres) {
+                    const { nombres, apellidoPaterno, apellidoMaterno, fechaNacimiento } = dniData;
+                    newQrClientForm.setValue('name', nombres || "");
+                    newQrClientForm.setValue('surname', `${apellidoPaterno || ''} ${apellidoMaterno || ''}`.trim());
 
-                    newQrClientForm.setValue('name', names);
-                    newQrClientForm.setValue('surname', surnames);
-
-                    if (dniData.fechaNacimiento) {
-                        const [day, month, year] = dniData.fechaNacimiento.split('/');
+                    if (fechaNacimiento) {
+                        const [day, month, year] = fechaNacimiento.split('/');
                         if (day && month && year) {
                             const dob = new Date(`${year}-${month}-${day}T00:00:00`);
                             if (!isNaN(dob.getTime())) {
@@ -477,7 +479,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                         }
                     }
                   } else {
-                     console.warn(`DNI consultation failed with status ${dniApiResponse.status}.`);
+                     console.warn(`DNI consultation failed.`);
                   }
               } catch (e) {
                   console.warn("DNI consultation API call failed, user will fill manually.", e);
@@ -657,7 +659,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.textAlign = 'center';
             
             ctx.font = `bold ${layout.name.size || 16}px Arial`;
-            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
+            ctx.fillText("Jose Gabriel Bautista Gonzales", layout.name.x, layout.name.y);
             
             ctx.font = `${layout.dni.size || 12}px Arial`;
             ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
@@ -811,22 +813,24 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
       </div>
     );
   }
-
+  
   if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
-     const QrPageFooter = () => (
-      <footer className="sticky bottom-0 z-20 w-full bg-background/80 backdrop-blur-sm py-2 px-4 sm:px-6 lg:px-8 border-t">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-2">
-          <Button variant="outline" className="w-full" onClick={() => setShowLoginModal(true)}>
-            <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
-          </Button>
-          <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full">
+    const QrPageFooter = () => (
+      <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
+          <Link href="/login" passHref>
+            <Button variant="outline" className="w-full font-bold">
+              <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
+            </Button>
+          </Link>
+          <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold">
             <Download className="mr-2 h-4 w-4" /> Guardar QR
           </Button>
-          <Button onClick={resetQrFlow} className="w-full text-white" style={{ backgroundColor: businessDetails.secondaryColor || '#8E5EA2' }}>
+          <Button onClick={resetQrFlow} variant="default" className="w-full font-bold" style={{ backgroundColor: businessDetails?.primaryColor, color: 'white' }}>
             Ver Otras del Negocio
           </Button>
-          <Link href="/" passHref className="w-full">
-            <Button variant="link" className="w-full text-primary">
+          <Link href="/" passHref>
+            <Button variant="link" className="w-full font-bold text-primary">
               <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
             </Button>
           </Link>
