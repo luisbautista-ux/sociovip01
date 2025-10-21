@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -66,6 +65,8 @@ const promotionFormSchema = z.object({
 
 type PromotionFormValues = z.infer<typeof promotionFormSchema>;
 
+type DraggableElement = "qr" | "name" | "dni" | "promoTitle" | null;
+
 interface BusinessPromotionFormProps {
   promotion?: BusinessManagedEntity; 
   onSubmit: (data: BusinessPromotionFormData) => void;
@@ -90,6 +91,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   const { toast } = useToast();
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [draggedElement, setDraggedElement] = useState<DraggableElement>(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
 
   const form = useForm<PromotionFormValues>({
     resolver: zodResolver(promotionFormSchema),
@@ -153,7 +157,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     }
   }, [promotion, form]);
   
-  const drawPreviewOnCanvas = useCallback(async () => {
+  const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement = null) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
@@ -167,7 +171,6 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             templateImg.onerror = reject;
         });
 
-        // Make canvas size match template image size
         canvas.width = templateImg.width;
         canvas.height = templateImg.height;
 
@@ -184,29 +187,46 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         const qrImage = new Image();
         qrImage.src = exampleQrDataUrl;
         await new Promise(resolve => (qrImage.onload = resolve));
-        // Draw centered on X coordinate
-        ctx.drawImage(qrImage, layout.qr.x - (layout.qr.size / 2), layout.qr.y - (layout.qr.size / 2), layout.qr.size, layout.qr.size);
+        
+        const drawElement = (key: DraggableElement, isHighlight: boolean) => {
+          if(!key) return;
+          const config = layout[key as keyof typeof layout] as any;
+          if(!config) return;
 
-        ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
+          if (isHighlight) {
+            ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
+            ctx.strokeStyle = 'rgba(0, 123, 255, 0.7)';
+            ctx.lineWidth = 2;
+          }
+
+          if (key === 'qr') {
+            ctx.drawImage(qrImage, config.x - (config.size / 2), config.y - (config.size / 2), config.size, config.size);
+            if(isHighlight) ctx.strokeRect(config.x - (config.size / 2), config.y - (config.size / 2), config.size, config.size);
+          } else {
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.font = `bold ${config.size || 16}px Arial`;
+            const text = key === 'name' ? "Jose Gabriel Bautista Gonzales" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
+            const textMetrics = ctx.measureText(text);
+            const textWidth = textMetrics.width;
+            const textHeight = config.size || 16;
+            ctx.fillText(text, config.x, config.y);
+            if(isHighlight) ctx.strokeRect(config.x - textWidth/2, config.y - textHeight, textWidth, textHeight * 1.2);
+          }
+        }
         
-        ctx.font = `bold ${layout.name.size || 16}px Arial`;
-        ctx.fillText("Jose Gabriel Bautista Gonzales", layout.name.x, layout.name.y);
-        
-        ctx.font = `${layout.dni.size || 12}px Arial`;
-        ctx.fillText("DNI: 12345678", layout.dni.x, layout.dni.y);
-        
-        ctx.font = `bold ${layout.promoTitle.size || 14}px Arial`;
-        ctx.fillText(formValues.name || "Nombre Promoción", layout.promoTitle.x, layout.promoTitle.y);
+        drawElement('qr', highlightedElement === 'qr');
+        drawElement('name', highlightedElement === 'name');
+        drawElement('dni', highlightedElement === 'dni');
+        drawElement('promoTitle', highlightedElement === 'promoTitle');
         
     } else {
-        // Fallback view if no template is loaded
         canvas.width = 380;
         canvas.height = 700;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#e5e7eb'; // muted color
+        ctx.fillStyle = '#e5e7eb';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#9ca3af'; // muted-foreground
+        ctx.fillStyle = '#9ca3af';
         ctx.textAlign = 'center';
         ctx.font = '14px Arial';
         ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
@@ -274,6 +294,75 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           isDragging.current = false;
           form.setValue(fieldName, position);
       }
+  };
+
+  const getElementAtPos = (x: number, y: number): DraggableElement => {
+    const layout = form.getValues('qrTemplateLayout');
+    if (!layout) return null;
+
+    const checkHit = (key: 'qr' | 'name' | 'dni' | 'promoTitle') => {
+      const el = layout[key];
+      if (!el) return false;
+      const elSize = el.size || 16;
+      if (key === 'qr') {
+        return x > el.x - elSize / 2 && x < el.x + elSize / 2 && y > el.y - elSize / 2 && y < el.y + elSize / 2;
+      } else {
+        const textHeight = elSize * 1.2;
+        // Approximation, depends on text. For now let's use a fixed width guess
+        const textWidth = 200; 
+        return x > el.x - textWidth / 2 && x < el.x + textWidth / 2 && y > el.y - textHeight && y < el.y + textHeight * 0.2;
+      }
+    };
+    if (checkHit('qr')) return 'qr';
+    if (checkHit('name')) return 'name';
+    if (checkHit('dni')) return 'dni';
+    if (checkHit('promoTitle')) return 'promoTitle';
+    return null;
+  };
+  
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
+    
+    const element = getElementAtPos(canvasX, canvasY);
+    if (element) {
+        setDraggedElement(element);
+        const elLayout = form.getValues(`qrTemplateLayout.${element}`);
+        if(elLayout) {
+          dragOffset.current = { x: elLayout.x - canvasX, y: elLayout.y - canvasY };
+        }
+        canvas.style.cursor = 'move';
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
+    
+    if (draggedElement) {
+        const newX = Math.round(canvasX + dragOffset.current.x);
+        const newY = Math.round(canvasY + dragOffset.current.y);
+        form.setValue(`qrTemplateLayout.${draggedElement}.x`, newX);
+        form.setValue(`qrTemplateLayout.${draggedElement}.y`, newY);
+    } else {
+        const element = getElementAtPos(canvasX, canvasY);
+        canvas.style.cursor = element ? 'move' : 'default';
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    setDraggedElement(null);
+    if(canvasRef.current) canvasRef.current.style.cursor = 'default';
   };
 
 
@@ -348,7 +437,14 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           <div
             className="group w-full max-w-xs relative rounded-md border bg-muted flex items-center justify-center overflow-hidden"
           >
-             <canvas ref={canvasRef} className="w-full h-auto" />
+             <canvas 
+                ref={canvasRef} 
+                className="w-full h-auto" 
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseUp}
+              />
           </div>
           <input type="file" ref={templateImageInputRef} onChange={(e) => handleFileChange(e, 'template')} className="hidden" accept="image/png, image/jpeg, image/webp" />
           <Button type="button" variant="outline" onClick={() => templateImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> {templatePreview ? 'Cambiar' : 'Subir'} Plantilla</Button>
