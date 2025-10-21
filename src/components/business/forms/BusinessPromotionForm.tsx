@@ -15,6 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -190,7 +191,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         ctx.textAlign = 'center';
         
         ctx.font = `bold ${layout.name.size || 16}px Arial`;
-        ctx.fillText("Nombre1 Nombre2 ApellidoP ApellidoM", layout.name.x, layout.name.y);
+        ctx.fillText("Jose Gabriel Bautista Gonzales", layout.name.x, layout.name.y);
         
         ctx.font = `${layout.dni.size || 12}px Arial`;
         ctx.fillText("DNI: 12345678", layout.dni.x, layout.dni.y);
@@ -356,27 +357,52 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         </div>
 
         <div className="space-y-4 pt-4 border-t mt-6">
-            <h4 className="flex items-center text-sm font-medium"><Settings className="h-4 w-4 mr-2"/>Ajustar Posiciones de Datos en Plantilla</h4>
-            <div className="grid grid-cols-2 gap-4">
-                 <FormField control={form.control} name="qrTemplateLayout.qr.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                 <FormField control={form.control} name="qrTemplateLayout.qr.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-            </div>
-            <FormField control={form.control} name="qrTemplateLayout.qr.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">QR Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-            <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="qrTemplateLayout.name.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                <FormField control={form.control} name="qrTemplateLayout.name.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-            </div>
-             <FormField control={form.control} name="qrTemplateLayout.name.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Nombre Tamaño</FormLabel><FormControl><Input type="number" placeholder="16" {...field}/></FormControl></FormItem>)}/>
-            <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="qrTemplateLayout.dni.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                <FormField control={form.control} name="qrTemplateLayout.dni.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-            </div>
-            <FormField control={form.control} name="qrTemplateLayout.dni.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">DNI Tamaño</FormLabel><FormControl><Input type="number" placeholder="12" {...field}/></FormControl></FormItem>)}/>
-            <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="qrTemplateLayout.promoTitle.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                <FormField control={form.control} name="qrTemplateLayout.promoTitle.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-            </div>
-             <FormField control={form.control} name="qrTemplateLayout.promoTitle.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Título Tamaño</FormLabel><FormControl><Input type="number" placeholder="14" {...field}/></FormControl></FormItem>)}/>
+          <h4 className="flex items-center text-sm font-medium"><Settings className="h-4 w-4 mr-2"/>Ajustar Posiciones de Datos en Plantilla</h4>
+          
+          <Card>
+            <CardHeader className="p-4"><CardTitle className="text-base">Código QR</CardTitle></CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="qrTemplateLayout.qr.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                  <FormField control={form.control} name="qrTemplateLayout.qr.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+              </div>
+              <FormField control={form.control} name="qrTemplateLayout.qr.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="p-4"><CardTitle className="text-base">Nombre Cliente</CardTitle></CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="qrTemplateLayout.name.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                  <FormField control={form.control} name="qrTemplateLayout.name.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+              </div>
+              <FormField control={form.control} name="qrTemplateLayout.name.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Fuente</FormLabel><FormControl><Input type="number" placeholder="16" {...field}/></FormControl></FormItem>)}/>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="p-4"><CardTitle className="text-base">DNI Cliente</CardTitle></CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="qrTemplateLayout.dni.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                  <FormField control={form.control} name="qrTemplateLayout.dni.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+              </div>
+              <FormField control={form.control} name="qrTemplateLayout.dni.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Fuente</FormLabel><FormControl><Input type="number" placeholder="12" {...field}/></FormControl></FormItem>)}/>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="p-4"><CardTitle className="text-base">Título de Promoción</CardTitle></CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="qrTemplateLayout.promoTitle.x" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                  <FormField control={form.control} name="qrTemplateLayout.promoTitle.y" render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+              </div>
+              <FormField control={form.control} name="qrTemplateLayout.promoTitle.size" render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Fuente</FormLabel><FormControl><Input type="number" placeholder="14" {...field}/></FormControl></FormItem>)}/>
+            </CardContent>
+          </Card>
+
         </div>
         
         <FormField control={form.control} name="isActive" render={({ field }) => (
