@@ -131,8 +131,8 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      const newPosition = '50% 50%';
       onImageFileChange(file); // Update parent state with the file
+      const newPosition = '50% 50%';
       setObjectPosition(newPosition);
     }
   };
@@ -394,3 +394,4 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
+
