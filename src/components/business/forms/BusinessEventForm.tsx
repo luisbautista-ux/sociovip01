@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -42,6 +41,7 @@ const eventDetailsFormSchema = z.object({
   imageUrl: z.string().optional(),
   imageObjectPosition: z.string().optional(), // Added for image positioning
   aiHint: z.string().optional(),
+  imageFile: z.custom<File | null>(() => true).optional(),
 });
 
 export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
@@ -119,6 +119,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     getValues: () => ({
       ...form.getValues(),
       imageObjectPosition: objectPosition, 
+      imageFile: form.getValues('imageFile'),
     }),
     trigger: () => form.trigger(),
     formState: form.formState,
@@ -132,6 +133,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         return;
       }
       onImageFileChange(file); // Update parent state with the file
+      form.setValue("imageFile", file);
       const newPosition = '50% 50%';
       setObjectPosition(newPosition);
     }
@@ -186,6 +188,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       <form className="space-y-4 overflow-y-auto">
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
+          <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
           <div 
             ref={imgContainerRef}
             className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
@@ -231,7 +234,15 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
           <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
              Cambiar Imagen
           </Button>
-          <FormMessage>{form.formState.errors.imageFile?.message}</FormMessage>
+          <FormField
+            control={form.control}
+            name="imageFile"
+            render={({ field }) => (
+                <FormItem>
+                    <FormMessage />
+                </FormItem>
+            )}
+            />
         </div>
         
         <FormField
@@ -394,4 +405,3 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
-

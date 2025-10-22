@@ -48,7 +48,6 @@ const ManageEventDialog = ({
     onSave,
     isSubmitting,
     setCurrentEventData,
-    imagePreviewUrl, // <<--- RECIBIMOS LA PROP
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
@@ -58,10 +57,10 @@ const ManageEventDialog = ({
     onSave: (event: BusinessManagedEntity, imageFile: File | null) => Promise<void>;
     isSubmitting: boolean;
     setCurrentEventData: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
-    imagePreviewUrl: string | null; // <<--- TIPO CORRECTO
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null); // State for preview
     
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
@@ -86,14 +85,12 @@ const ManageEventDialog = ({
     
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
-            if (activeTab !== 'promoters') {
-            }
             setImageFile(null);
-            
+            setImagePreviewUrl(editingEvent.imageUrl || null);
             initialDataSnapshot.current = JSON.stringify(editingEvent);
             setHasUnsavedChanges(false);
         }
-    }, [editingEvent, isManageEventDialogOpen, activeTab]);
+    }, [editingEvent, isManageEventDialogOpen]);
     
     useEffect(() => {
         if (editingEvent && initialDataSnapshot.current) {
@@ -337,7 +334,11 @@ const ManageEventDialog = ({
     const handleImageFileChange = (file: File | null) => {
         if (file) {
             setImageFile(file);
+            setImagePreviewUrl(URL.createObjectURL(file)); // Generate and set preview URL
             setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
+        } else {
+            setImageFile(null);
+            setImagePreviewUrl(editingEvent?.imageUrl || null);
         }
     };
 
@@ -755,7 +756,6 @@ export default function BusinessEventsPage() {
   
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const [availablePromoters, setAvailablePromoters] = useState<BusinessPromoterLink[]>([]);
 
@@ -830,7 +830,6 @@ export default function BusinessEventsPage() {
   const handleOpenManageEventDialog = (event: BusinessManagedEntity | null, duplicate = false) => {
     setIsSubmitting(false);
     setIsDuplicating(duplicate);
-    setImagePreviewUrl(event?.imageUrl || null);
     if (duplicate && event) {
         const { id, createdAt, ...eventToDuplicate } = event;
         setEditingEvent({
@@ -1190,7 +1189,6 @@ export default function BusinessEventsPage() {
         availablePromoters={availablePromoters}
         onSave={handleSaveEvent}
         isSubmitting={isSubmitting}
-        imagePreviewUrl={imagePreviewUrl}
       />
 
       {selectedEntityForCreatingCodes && userProfile && (
@@ -1241,4 +1239,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
