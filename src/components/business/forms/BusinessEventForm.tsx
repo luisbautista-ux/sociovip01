@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -116,6 +117,22 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     formState: form.formState,
   }));
   
+  useEffect(() => {
+    if (imagePreviewUrl) {
+      // Refrescar la vista previa cada vez que cambie el prop
+      const img = new Image();
+      img.src = imagePreviewUrl;
+    }
+  }, [imagePreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -180,7 +197,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
-          <div 
+          <div
             ref={imgContainerRef}
             className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
             style={{ touchAction: 'none' }}
@@ -193,158 +210,157 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             onTouchEnd={handleTouchEnd}
           >
             {imagePreviewUrl ? (
-              <>
-                <NextImage 
-                  src={imagePreviewUrl} 
-                  alt="Vista previa de la imagen" 
-                  fill={true}
-                  className="object-cover pointer-events-none"
+              &lt;&gt;
+                &lt;img
+                  src={imagePreviewUrl}
+                  alt="Vista previa de la imagen"
+                  className="object-cover w-full h-full"
                   style={{ objectPosition }}
-                  draggable={false}
-                  unoptimized={imagePreviewUrl.startsWith('blob:')}
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
-                  <Move className="h-8 w-8" />
-                  <span className="text-sm font-semibold mt-1">Arrastra para ajustar la imagen</span>
-                </div>
-              </>
+                /&gt;
+                &lt;div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none"&gt;
+                  &lt;Move className="h-8 w-8" /&gt;
+                  &lt;span className="text-sm font-semibold mt-1"&gt;
+                    Arrastra para ajustar la imagen
+                  &lt;/span&gt;
+                &lt;/div&gt;
+              &lt;/&gt;
             ) : (
-              <div className="text-muted-foreground flex flex-col items-center">
-                <ImageIcon className="h-10 w-10" />
-                <span className="text-sm mt-1">Vista Previa</span>
-              </div>
+              &lt;div className="text-muted-foreground flex flex-col items-center"&gt;
+                &lt;ImageIcon className="h-10 w-10" /&gt;
+                &lt;span className="text-sm mt-1"&gt;Vista Previa&lt;/span&gt;
+              &lt;/div&gt;
             )}
-          </div>
-          <input
+          &lt;/div&gt;
+          &lt;input
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
             className="hidden"
             accept="image/png, image/jpeg, image/webp"
-          />
-          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
+          /&gt;
+          &lt;Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}&gt;
              Cambiar Imagen
-          </Button>
-          <FormField
+          &lt;/Button&gt;
+          &lt;FormField
             control={form.control}
             name="imageFile"
             render={({ field }) => (
-                <FormItem>
-                    <FormMessage />
-                </FormItem>
+                &lt;FormItem&gt;
+                    &lt;FormMessage /&gt;
+                &lt;/FormItem&gt;
             )}
-            />
-        </div>
+            /&gt;
+        &lt;/div&gt;
         
-        <FormField
+        &lt;FormField
           control={form.control}
           name="name"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel><span className="font-bold">Nombre del Evento</span> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
+            &lt;FormItem&gt;
+              &lt;FormLabel&gt;&lt;span className="font-bold"&gt;Nombre del Evento&lt;/span&gt; &lt;span className="text-destructive"&gt;*&lt;/span&gt;&lt;/FormLabel&gt;
+              &lt;FormControl&gt;&lt;Input placeholder="Ej: Noche de Salsa" {...field} value={field.value || ''} disabled={isSubmitting} /&gt;&lt;/FormControl&gt;
+              &lt;FormMessage /&gt;
+            &lt;/FormItem&gt;
           )}
-        />
-        <FormField
+        /&gt;
+        &lt;FormField
           control={form.control}
           name="description"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>Descripción</strong> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Textarea placeholder="Detalles del evento..." {...field} value={field.value || ''} rows={3} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
+            &lt;FormItem&gt;
+              &lt;FormLabel&gt;&lt;strong&gt;Descripción&lt;/strong&gt; &lt;span className="text-destructive"&gt;*&lt;/span&gt;&lt;/FormLabel&gt;
+              &lt;FormControl&gt;&lt;Textarea placeholder="Detalles del evento..." {...field} value={field.value || ''} rows={3} disabled={isSubmitting} /&gt;&lt;/FormControl&gt;
+              &lt;FormMessage /&gt;
+            &lt;/FormItem&gt;
           )}
-        />
-        <FormField
+        /&gt;
+        &lt;FormField
           control={form.control}
           name="termsAndConditions"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>Términos y Condiciones (Opcional)</strong></FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
+            &lt;FormItem&gt;
+              &lt;FormLabel&gt;&lt;strong&gt;Términos y Condiciones (Opcional)&lt;/strong&gt;&lt;/FormLabel&gt;
+              &lt;FormControl&gt;&lt;Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /&gt;&lt;/FormControl&gt;
+              &lt;FormMessage /&gt;
+            &lt;/FormItem&gt;
           )}
-        />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
+        /&gt;
+        &lt;div className="grid grid-cols-1 md:grid-cols-2 gap-4"&gt;
+          &lt;FormField
             control={form.control}
             name="startDate"
             render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel><strong>Fecha de Inicio</strong> <span className="text-destructive">*</span></FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
+              &lt;FormItem className="flex flex-col"&gt;
+                &lt;FormLabel&gt;&lt;strong&gt;Fecha de Inicio&lt;/strong&gt; &lt;span className="text-destructive"&gt;*&lt;/span&gt;&lt;/FormLabel&gt;
+                &lt;Popover&gt;
+                  &lt;PopoverTrigger asChild&gt;
+                    &lt;FormControl&gt;
+                      &lt;Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}&gt;
+                        {field.value ? format(field.value, "PPP", { locale: es }) : &lt;span&gt;Selecciona fecha&lt;/span&gt;}
+                        &lt;CalendarIcon className="ml-auto h-4 w-4 opacity-50" /&gt;
+                      &lt;/Button&gt;
+                    &lt;/FormControl&gt;
+                  &lt;/PopoverTrigger&gt;
+                  &lt;PopoverContent className="w-auto p-0" align="start"&gt;
+                    &lt;CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus /&gt;
+                  &lt;/PopoverContent&gt;
+                &lt;/Popover&gt;
+                &lt;FormMessage /&gt;
+              &lt;/FormItem&gt;
             )}
-          />
-          <FormField
+          /&gt;
+          &lt;FormField
             control={form.control}
             name="endDate"
             render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel><strong>Fecha de Fin</strong> <span className="text-destructive">*</span></FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} locale={es} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
+              &lt;FormItem className="flex flex-col"&gt;
+                &lt;FormLabel&gt;&lt;strong&gt;Fecha de Fin&lt;/strong&gt; &lt;span className="text-destructive"&gt;*&lt;/span&gt;&lt;/FormLabel&gt;
+                &lt;Popover&gt;
+                  &lt;PopoverTrigger asChild&gt;
+                    &lt;FormControl&gt;
+                      &lt;Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}&gt;
+                        {field.value ? format(field.value, "PPP", { locale: es }) : &lt;span&gt;Selecciona fecha&lt;/span&gt;}
+                        &lt;CalendarIcon className="ml-auto h-4 w-4 opacity-50" /&gt;
+                      &lt;/Button&gt;
+                    &lt;/FormControl&gt;
+                  &lt;/PopoverTrigger&gt;
+                  &lt;PopoverContent className="w-auto p-0" align="start"&gt;
+                    &lt;CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} locale={es} initialFocus /&gt;
+                  &lt;/PopoverContent&gt;
+                &lt;/Popover&gt;
+                &lt;FormMessage /&gt;
+              &lt;/FormItem&gt;
             )}
-          />
-        </div>
+          /&gt;
+        &lt;/div&gt;
         
-        <div className="space-y-2">
-            <FormField
+        &lt;div className="space-y-2"&gt;
+            &lt;FormField
               control={form.control}
               name="unlimitedAttendance"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
+                &lt;FormItem className="flex flex-row items-center space-x-3 space-y-0"&gt;
+                  &lt;FormControl&gt;
+                    &lt;Checkbox
                       checked={field.value}
                       onCheckedChange={(isChecked) => {
                           field.onChange(isChecked);
                       }}
                       disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormLabel className="font-normal"><strong>Aforo Ilimitado</strong></FormLabel>
-                </FormItem>
+                    /&gt;
+                  &lt;/FormControl&gt;
+                  &lt;FormLabel className="font-normal"&gt;&lt;strong&gt;Aforo Ilimitado&lt;/strong&gt;&lt;/FormLabel&gt;
+                &lt;/FormItem&gt;
               )}
-            />
-             <FormField
+            /&gt;
+             &lt;FormField
                 control={form.control}
                 name="maxAttendance"
                 render={({ field }) => (
-                    <FormItem>
-                    <FormLabel className={cn(isUnlimited && "text-muted-foreground/50")}>Aforo Máximo</FormLabel>
-                    <FormControl>
-                        <Input
+                    &lt;FormItem&gt;
+                    &lt;FormLabel className={cn(isUnlimited && "text-muted-foreground/50")}&gt;Aforo Máximo&lt;/FormLabel&gt;
+                    &lt;FormControl&gt;
+                        &lt;Input
                         type="number"
                         placeholder="100"
                         className="no-spinner"
@@ -355,44 +371,46 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                             field.onChange(val === "" ? undefined : Number(val));
                         }}
                         disabled={isSubmitting || isUnlimited}
-                        />
-                    </FormControl>
-                    <FormDescription className="text-xs">
+                        /&gt;
+                    &lt;/FormControl&gt;
+                    &lt;FormDescription className="text-xs"&gt;
                         {isUnlimited ? "El aforo es ilimitado. Desmarca la casilla para definir un límite." : "Define el número máximo de asistentes."}
-                    </FormDescription>
-                    <FormMessage />
-                    </FormItem>
+                    &lt;/FormDescription&gt;
+                    &lt;FormMessage /&gt;
+                    &lt;/FormItem&gt;
                 )}
-                />
-        </div>
+                /&gt;
+        &lt;/div&gt;
 
-        <FormField
+        &lt;FormField
           control={form.control}
           name="aiHint"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>Palabras Clave para Imagen (Opcional)</strong></FormLabel>
-              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-               <FormMessage />
-            </FormItem>
+            &lt;FormItem&gt;
+              &lt;FormLabel&gt;&lt;strong&gt;Palabras Clave para Imagen (Opcional)&lt;/strong&gt;&lt;/FormLabel&gt;
+              &lt;FormControl&gt;&lt;Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /&gt;&lt;/FormControl&gt;
+               &lt;FormMessage /&gt;
+            &lt;/FormItem&gt;
           )}
-        />
-        <FormField
+        /&gt;
+        &lt;FormField
           control={form.control}
           name="isActive"
           render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-              <div className="space-y-0.5">
-                <FormLabel><strong>Activar Evento</strong> <span className="text-destructive">*</span></FormLabel>
-                <FormMessage />
-              </div>
-              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
-            </FormItem>
+            &lt;FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"&gt;
+              &lt;div className="space-y-0.5"&gt;
+                &lt;FormLabel&gt;&lt;strong&gt;Activar Evento&lt;/strong&gt; &lt;span className="text-destructive"&gt;*&lt;/span&gt;&lt;/FormLabel&gt;
+                &lt;FormMessage /&gt;
+              &lt;/div&gt;
+              &lt;FormControl&gt;&lt;Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /&gt;&lt;/FormControl&gt;
+            &lt;/FormItem&gt;
           )}
-        />
-      </form>
-    </Form>
+        /&gt;
+      &lt;/form&gt;
+    &lt;/Form&gt;
   );
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
+
+    
