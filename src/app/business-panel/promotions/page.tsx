@@ -629,10 +629,10 @@ export default function BusinessPromotionsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="min-w-[250px]">Promoción y Gestión</TableHead>
-                        <TableHead className="min-w-[220px]">QRs y Códigos</TableHead>
-                        <TableHead className="min-w-[180px]">Vigencia</TableHead>
-                        <TableHead className="min-w-[180px] text-left">Acciones Adicionales</TableHead>
+                        <TableHead className="w-[35%]">Promoción y Gestión</TableHead>
+                        <TableHead className="w-[25%]">QRs y Códigos</TableHead>
+                        <TableHead className="w-[20%]">Vigencia</TableHead>
+                        <TableHead className="w-[20%] text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -643,7 +643,7 @@ export default function BusinessPromotionsPage() {
                         
                         return (
                         <TableRow key={promo.id || `promo-fallback-${Math.random()}`}>
-                          <TableCell className="font-medium align-top py-3">
+                           <TableCell className="font-medium align-top py-3">
                               <div className="font-semibold text-base">{promo.name}</div>
                               <div className="flex items-center space-x-2 mt-1.5 mb-2">
                                   <Switch
@@ -661,32 +661,6 @@ export default function BusinessPromotionsPage() {
                                       {promo.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
                                   </Badge>
                               </div>
-                            <div className="flex flex-col items-start gap-1">
-                                  <Button 
-                                      variant="outline" 
-                                      size="xs" 
-                                      onClick={() => openCreateCodesDialog(promo)} 
-                                      disabled={!isActivatable || isSubmitting} 
-                                      className="px-2 py-1 h-auto text-xs"
-                                  >
-                                      <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
-                                  </Button>
-                                  <Button 
-                                      variant="outline" 
-                                      size="xs" 
-                                      onClick={() => openViewCodesDialog(promo)} 
-                                      disabled={isSubmitting} 
-                                      className="px-2 py-1 h-auto text-xs"
-                                  >
-                                      <ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({codesCreatedCount})
-                                  </Button>
-                                  <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo, false)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                      <Edit className="h-3 w-3 mr-1" /> Editar
-                                  </Button>
-                                  <Button variant="outline" size="xs" onClick={() => openStatsModal(promo)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                      <BarChart3 className="h-3 w-3 mr-1" /> Estadísticas
-                                  </Button>
-                              </div>
                           </TableCell>
                           <TableCell className="align-top py-3 text-xs">
                             <div className="flex flex-col">
@@ -700,39 +674,54 @@ export default function BusinessPromotionsPage() {
                             <br />
                             {promo.endDate ? format(parseISO(promo.endDate), "P p", { locale: es }) : 'N/A'}
                           </TableCell>
-                            <TableCell className="align-top py-3">
-                              <div className="flex flex-col items-start gap-1">
-                                  <Button variant="outline" size="xs" onClick={() => handleOpenCreateEditModal(promo, true)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                      <Copy className="h-3 w-3 mr-1" /> Duplicar
+                          <TableCell className="align-top py-3 text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Abrir menú</span>
+                                    <MoreVertical className="h-4 w-4" />
                                   </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem onClick={() => openCreateCodesDialog(promo)} disabled={!isActivatable}>
+                                    <QrCodeIcon className="mr-2 h-4 w-4" /> Crear Códigos
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openViewCodesDialog(promo)}>
+                                    <ListChecks className="mr-2 h-4 w-4" /> Ver Códigos
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo, false)}>
+                                    <Edit className="mr-2 h-4 w-4" /> Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openStatsModal(promo)}>
+                                    <BarChart3 className="mr-2 h-4 w-4" /> Estadísticas
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo, true)}>
+                                    <Copy className="mr-2 h-4 w-4" /> Duplicar
+                                  </DropdownMenuItem>
                                   <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                          <Button variant="destructive" size="xs" disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
-                                              <Trash2 className="h-3 w-3 mr-1" /> Eliminar
-                                          </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                              <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                  Esta acción no se puede deshacer. Esto eliminará permanentemente la promoción:
-                                                  <span className="font-semibold"> {promo.name}</span> y todos sus códigos asociados.
-                                              </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <UIAlertDialogFooter>
-                                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                                              <AlertDialogAction
-                                                  onClick={() => handleDeletePromotion(promo)}
-                                                  className="bg-destructive hover:bg-destructive/90"
-                                                  disabled={isSubmitting}
-                                              >
-                                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                                  Eliminar
-                                              </AlertDialogAction>
-                                          </UIAlertDialogFooter>
-                                      </AlertDialogContent>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <UIAlertDialogTitle>¿Confirmar eliminación?</UIAlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Se eliminará la promoción "{promo.name}" y todos sus códigos asociados. Esta acción es irreversible.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <UIAlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeletePromotion(promo)} className="bg-destructive hover:bg-destructive/90">
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </UIAlertDialogFooter>
+                                    </AlertDialogContent>
                                   </AlertDialog>
-                              </div>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );
