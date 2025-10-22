@@ -6,12 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect, useMemo, useRef } from "react";
-import type { GeneratedCode } from "@/lib/types";
-import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info } from "lucide-react";
+import type { Business, GeneratedCode } from "@/lib/types";
+import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormMessage, FormItem } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
+import { generateCodesPDF } from "@/lib/utils";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 function generateAlphanumericCode(length: number): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -55,6 +58,28 @@ export function CreateCodesDialog({
   const [isCreating, setIsCreating] = useState(false); 
   const { toast } = useToast();
   const form = useForm(); // Create a dummy form context
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
+
+  useEffect(() => {
+    const fetchBusinessDetails = async () => {
+      if(open && entityId) {
+        const entityRef = doc(db, "businessEntities", entityId);
+        const entitySnap = await getDoc(entityRef);
+        if(entitySnap.exists()) {
+          const businessId = entitySnap.data().businessId;
+          if(businessId) {
+            const businessRef = doc(db, "businesses", businessId);
+            const businessSnap = await getDoc(businessRef);
+            if(businessSnap.exists()) {
+              setBusinessDetails({id: businessSnap.id, ...businessSnap.data()} as Business);
+            }
+          }
+        }
+      }
+    };
+    fetchBusinessDetails();
+  }, [open, entityId]);
+
 
   const maxCodesCanCreate = useMemo(() => {
     if (maxAttendance && maxAttendance > 0) {
@@ -149,13 +174,22 @@ export function CreateCodesDialog({
 
   const handleCopyCreatedCodes = async () => {
     if (justCreatedCodes.length === 0) return;
-    const codesToCopy = justCreatedCodes.map(c => c.value).join('\n');
+    const codesToCopy = justCreatedCodes.map(c => c.value).join('\\n');
     try {
       await navigator.clipboard.writeText(codesToCopy);
       toast({ title: "Códigos Copiados", description: `${justCreatedCodes.length} códigos recién creados han sido copiados.` });
     } catch (err) {
       toast({ title: "Error al Copiar", description: "No se pudo copiar los códigos.", variant: "destructive" });
     }
+  };
+
+  const handleDownloadPDF = () => {
+    if (justCreatedCodes.length === 0 || !businessDetails) return;
+    const businessUrl = businessDetails.customUrlPath
+      ? `${window.location.origin}/b/${businessDetails.customUrlPath}`
+      : `${window.location.origin}/business/${businessDetails.id}`;
+
+    generateCodesPDF(justCreatedCodes, businessDetails.name, businessUrl);
   };
 
   const handleCloseAndReset = () => {
@@ -227,11 +261,14 @@ export function CreateCodesDialog({
           <div className="py-6 text-center space-y-4">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
             <p className="text-lg font-medium">¡Has creado {justCreatedCodes.length} código(s)!</p>
-            {justCreatedCodes.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Button onClick={handleCopyCreatedCodes} variant="outline" size="lg" className="w-full">
-                <Copy className="mr-2 h-5 w-5" /> Copiar códigos creados ({justCreatedCodes.length})
+                <Copy className="mr-2 h-5 w-5" /> Copiar códigos ({justCreatedCodes.length})
               </Button>
-            )}
+              <Button onClick={handleDownloadPDF} variant="outline" size="lg" className="w-full">
+                <Download className="mr-2 h-5 w-5" /> Descargar PDF
+              </Button>
+            </div>
              <p className="text-sm text-muted-foreground">
               Estos códigos se han añadido a '{entityName}'.
             </p>

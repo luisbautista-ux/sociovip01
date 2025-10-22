@@ -6,20 +6,13 @@ import sys
 import json
 import re
 import time
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import chromedriver_autoinstaller
-
-# Instalar y configurar el driver de Chrome automáticamente
-try:
-    chromedriver_autoinstaller.install()
-except Exception as e:
-    # En algunos entornos de servidor, la instalación puede fallar pero el driver ya puede estar disponible.
-    # No consideramos esto un error fatal.
-    pass
+import sparticuz
 
 def clean_value(s: str) -> str:
     if not s:
@@ -71,9 +64,13 @@ def consulta_dni_selenium(dni):
     chrome_opts.add_argument("--no-sandbox")
     chrome_opts.add_argument("--disable-dev-shm-usage")
     chrome_opts.add_argument("--disable-gpu")
-    chrome_opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36")
+    chrome_opts.add_argument("--single-process")
+    chrome_opts.add_argument(f"--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
     chrome_opts.page_load_strategy = 'eager'
 
+    # Set binary location for sparticuz/chromium
+    chrome_opts.binary_location = sparticuz.chromium_path
+    
     driver = None
     try:
         driver = webdriver.Chrome(options=chrome_opts)
