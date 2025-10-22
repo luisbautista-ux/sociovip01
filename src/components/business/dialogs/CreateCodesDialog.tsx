@@ -186,8 +186,8 @@ export function CreateCodesDialog({
   const handleDownloadPDF = () => {
     if (justCreatedCodes.length === 0 || !businessDetails) return;
     const businessUrl = businessDetails.customUrlPath
-      ? `${window.location.origin}/b/${businessDetails.customUrlPath}`
-      : `${window.location.origin}/business/${businessDetails.id}`;
+      ? `https://sociovip.app/b/${businessDetails.customUrlPath}`
+      : `https://sociovip.app/business/${businessDetails.id}`;
 
     generateCodesPDF(justCreatedCodes, businessDetails.name, businessUrl);
   };
