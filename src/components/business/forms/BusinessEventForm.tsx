@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -206,7 +205,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                 <NextImage 
                   src={imagePreviewUrl} 
                   alt="Vista previa de la imagen" 
-                  layout="fill" 
+                  fill={true}
                   className="object-cover pointer-events-none"
                   style={{ objectPosition }}
                   draggable={false}
