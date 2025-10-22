@@ -343,7 +343,7 @@ const ManageEventDialog = ({
         setImageFile(file);
         setImagePreviewUrl(previewUrl);
     
-        // Actualiza también el estado del evento
+        // Actualiza también el estado del evento para forzar re-render
         setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
       } else {
         // Si no hay archivo nuevo, restaurar la imagen existente
@@ -1122,10 +1122,7 @@ export default function BusinessEventsPage() {
                                             <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
                                             <AlertDialogDescription>Se eliminará el evento "{event.name}".</AlertDialogDescription>
                                         </AlertDialogHeader>
-                                        <ShadcnAlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                                        </ShadcnAlertDialogFooter>
+                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
                             </DropdownMenuContent>
@@ -1260,4 +1257,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-

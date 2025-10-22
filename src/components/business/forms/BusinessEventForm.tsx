@@ -115,14 +115,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     formState: form.formState,
   }));
   
-  useEffect(() => {
-    if (imagePreviewUrl) {
-      // Refrescar la vista previa cada vez que cambie el prop
-      const img = new Image();
-      img.src = imagePreviewUrl;
-    }
-  }, [imagePreviewUrl]);
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -183,7 +175,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(() => {})} className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
+      <div className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
@@ -202,10 +194,10 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                 {imagePreviewUrl ? (
                 <>
                     <img
-                    src={imagePreviewUrl}
-                    alt="Vista previa de la imagen"
-                    className="object-cover w-full h-full"
-                    style={{ objectPosition }}
+                        src={imagePreviewUrl}
+                        alt="Vista previa de la imagen"
+                        className="object-cover w-full h-full"
+                        style={{ objectPosition }}
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
                     <Move className="h-8 w-8" />
@@ -396,7 +388,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             </FormItem>
           )}
         />
-      </form>
+      </div>
     </Form>
   );
 });
