@@ -338,8 +338,8 @@ const ManageEventDialog = ({
 
     const handleImageFileChange = (file: File | null) => {
         if (file) {
-            setImageFile(file);
             setImagePreviewUrl(URL.createObjectURL(file));
+            setImageFile(file);
             setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
         }
     };
@@ -1241,6 +1241,7 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
 
 
 
