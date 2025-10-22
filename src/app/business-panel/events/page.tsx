@@ -100,8 +100,31 @@ const ManageEventDialog = ({
         }
     }, [currentEventData]);
 
+    const handleImageFileChange = (file: File | null) => {
+      if (file) {
+        // Si ya había un blob anterior, liberarlo
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+
+        const previewUrl = URL.createObjectURL(file);
+        setImageFile(file);
+        setImagePreviewUrl(previewUrl);
+
+        // Actualiza también el estado del evento
+        setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
+      } else {
+        // Si no hay archivo nuevo, restaurar la imagen existente
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+        setImageFile(null);
+        setImagePreviewUrl(editingEvent?.imageUrl || null);
+      }
+    };
+
+
     useEffect(() => {
-      // Cleanup effect for the blob URL
       return () => {
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
@@ -340,24 +363,6 @@ const ManageEventDialog = ({
 
         toast({ title: "Éxito", description: `Comisión aplicada a ${currentEventData?.assignedPromoters?.length || 0} promotor(es).` });
     };
-
-    const handleImageFileChange = (file: File | null) => {
-        // If there's an old blob URL, revoke it before creating a new one
-        if (imagePreviewUrl?.startsWith("blob:")) {
-          URL.revokeObjectURL(imagePreviewUrl);
-        }
-        
-        if (file) {
-            const previewUrl = URL.createObjectURL(file);
-            setImageFile(file);
-            setImagePreviewUrl(previewUrl);
-            setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null); // Force re-render
-        } else {
-            setImageFile(null);
-            setImagePreviewUrl(editingEvent?.imageUrl || null);
-        }
-    };
-
 
     const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
     
@@ -913,15 +918,30 @@ export default function BusinessEventsPage() {
       
       const isNewEntity = !eventDataToSave.id || isDuplicating;
       const entityId = isNewEntity ? doc(collection(db, "businessEntities")).id : eventDataToSave.id;
+      
+      let fileToUpload: File | null = imageFile;
 
       try {
+        // Handle image duplication
+        if (isDuplicating && !imageFile && eventDataToSave.imageUrl) {
+            try {
+                const response = await fetch(eventDataToSave.imageUrl);
+                const blob = await response.blob();
+                const originalFileName = eventDataToSave.imageUrl.split('/').pop()?.split('?')[0] || `image_${entityId}.jpg`;
+                fileToUpload = new File([blob], originalFileName, { type: blob.type });
+            } catch (fetchError) {
+                console.error("Could not fetch original image for duplication:", fetchError);
+                toast({ title: "Advertencia", description: "No se pudo duplicar la imagen original. Se creará el evento sin imagen.", variant: "default" });
+            }
+        }
+
         let finalImageUrl = eventDataToSave.imageUrl || "";
         const oldImageUrl = !isNewEntity && editingEvent?.imageUrl ? editingEvent.imageUrl : null;
         
-        if (imageFile) {
+        if (fileToUpload) {
             toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
-            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${imageFile.name}`);
-            const uploadResult = await uploadBytes(storageRef, imageFile);
+            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${fileToUpload.name}`);
+            const uploadResult = await uploadBytes(storageRef, fileToUpload);
             finalImageUrl = await getDownloadURL(uploadResult.ref);
         }
 
@@ -945,7 +965,7 @@ export default function BusinessEventsPage() {
             toast({title: "Evento Actualizado", description: "Los cambios se han guardado correctamente."});
         }
 
-        if (imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
+        if (fileToUpload && oldImageUrl && oldImageUrl.includes("firebase") && oldImageUrl !== finalImageUrl) {
             try {
               const oldImageRef = ref(storage, oldImageUrl);
               await deleteObject(oldImageRef);
@@ -1159,7 +1179,7 @@ export default function BusinessEventsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right space-x-1">
-                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Códigos</Button>
+                          <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos</Button>
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event, true)}>

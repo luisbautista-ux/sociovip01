@@ -216,7 +216,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             ctx.textAlign = 'center';
             const fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
             ctx.font = `bold ${fontSize}px Arial`;
-            const text = key === 'name' ? "Jose Gabriel Bautista Gonzales" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
+            const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
             const textMetrics = ctx.measureText(text);
             const textWidth = textMetrics.width;
             const textHeight = fontSize;
