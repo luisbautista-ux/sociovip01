@@ -68,32 +68,24 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   const imgContainerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
-
+  
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onBlur",
-  });
-  
-  useEffect(() => {
-    if (event) {
-        const unlimited = event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0;
-        const initialPosition = event.imageObjectPosition || '50% 50%';
-        setObjectPosition(initialPosition);
-        form.reset({
-            name: event.name || "",
-            description: event.description || "",
-            termsAndConditions: event.termsAndConditions || "",
-            startDate: anyToDate(event.startDate) ?? new Date(),
-            endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
-            unlimitedAttendance: unlimited,
-            maxAttendance: unlimited ? undefined : event.maxAttendance,
-            isActive: event.isActive === undefined ? true : event.isActive,
-            imageUrl: event.imageUrl,
-            imageObjectPosition: initialPosition,
-            aiHint: event.aiHint || "",
-        });
+    defaultValues: {
+        name: event?.name || "",
+        description: event?.description || "",
+        termsAndConditions: event?.termsAndConditions || "",
+        startDate: anyToDate(event?.startDate) ?? new Date(),
+        endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+        unlimitedAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0,
+        maxAttendance: (event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0) ? undefined : event.maxAttendance,
+        isActive: event?.isActive === undefined ? true : event.isActive,
+        imageUrl: event?.imageUrl || "",
+        imageObjectPosition: event?.imageObjectPosition || '50% 50%',
+        aiHint: event?.aiHint || "",
     }
-  }, [event, form]);
+  });
 
   useEffect(() => {
     const subscription = form.watch((values, { name, type }) => {
