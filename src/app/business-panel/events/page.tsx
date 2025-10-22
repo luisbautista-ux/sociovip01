@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -48,7 +47,8 @@ const ManageEventDialog = ({
     availablePromoters,
     onSave,
     isSubmitting,
-    setCurrentEventData, // <<--- PASAMOS EL SETTER DEL ESTADO PADRE
+    setCurrentEventData,
+    imagePreviewUrl, // <<--- RECIBIMOS LA PROP
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
@@ -57,11 +57,11 @@ const ManageEventDialog = ({
     availablePromoters: BusinessPromoterLink[];
     onSave: (event: BusinessManagedEntity, imageFile: File | null) => Promise<void>;
     isSubmitting: boolean;
-    setCurrentEventData: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>; // <<--- TIPO CORRECTO
+    setCurrentEventData: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
+    imagePreviewUrl: string | null; // <<--- TIPO CORRECTO
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
@@ -86,10 +86,8 @@ const ManageEventDialog = ({
     
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
-            if (activeTab !== 'promoters') { // No resetear la pestaña si ya estamos en promotores
-                 // setActiveTab("details"); // CULPABLE DEL SALTO
+            if (activeTab !== 'promoters') {
             }
-            setImagePreviewUrl(editingEvent.imageUrl || null);
             setImageFile(null);
             
             initialDataSnapshot.current = JSON.stringify(editingEvent);
@@ -338,7 +336,6 @@ const ManageEventDialog = ({
 
     const handleImageFileChange = (file: File | null) => {
         if (file) {
-            setImagePreviewUrl(URL.createObjectURL(file));
             setImageFile(file);
             setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
         }
@@ -758,6 +755,7 @@ export default function BusinessEventsPage() {
   
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
   const [availablePromoters, setAvailablePromoters] = useState<BusinessPromoterLink[]>([]);
 
@@ -832,6 +830,7 @@ export default function BusinessEventsPage() {
   const handleOpenManageEventDialog = (event: BusinessManagedEntity | null, duplicate = false) => {
     setIsSubmitting(false);
     setIsDuplicating(duplicate);
+    setImagePreviewUrl(event?.imageUrl || null);
     if (duplicate && event) {
         const { id, createdAt, ...eventToDuplicate } = event;
         setEditingEvent({
@@ -1015,7 +1014,7 @@ export default function BusinessEventsPage() {
 
   return (
     <div className="space-y-6">
-       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-primary flex items-center self-start">
             <Calendar className="h-8 w-8 mr-2" /> Eventos
         </h1>
@@ -1169,7 +1168,7 @@ export default function BusinessEventsPage() {
                                 <ShadcnAlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                     <AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                                </AlertDialogFooter>
+                                </ShadcnAlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         </TableCell>
@@ -1191,6 +1190,7 @@ export default function BusinessEventsPage() {
         availablePromoters={availablePromoters}
         onSave={handleSaveEvent}
         isSubmitting={isSubmitting}
+        imagePreviewUrl={imagePreviewUrl}
       />
 
       {selectedEntityForCreatingCodes && userProfile && (
@@ -1241,12 +1241,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
 
