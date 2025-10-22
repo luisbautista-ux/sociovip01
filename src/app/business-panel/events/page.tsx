@@ -1169,7 +1169,7 @@ export default function BusinessEventsPage() {
                                 <ShadcnAlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                     <AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                                </ShadcnAlertDialogFooter>
+                                </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         </TableCell>
@@ -1241,6 +1241,8 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
+
 
 
 
