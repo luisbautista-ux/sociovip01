@@ -88,6 +88,22 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         aiHint: event?.aiHint || "",
     }
   });
+  
+  useEffect(() => {
+    form.reset({
+      name: event?.name || "",
+      description: event?.description || "",
+      termsAndConditions: event?.termsAndConditions || "",
+      startDate: anyToDate(event?.startDate) ?? new Date(),
+      endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+      unlimitedAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0,
+      maxAttendance: (event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0) ? undefined : event.maxAttendance,
+      isActive: event?.isActive === undefined ? true : event.isActive,
+      imageUrl: event?.imageUrl || "",
+      imageObjectPosition: event?.imageObjectPosition || '50% 50%',
+      aiHint: event?.aiHint || "",
+    });
+  }, [event, form]);
 
   useImperativeHandle(ref, () => ({
     getValues: () => ({
@@ -167,44 +183,44 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 
   return (
     <Form {...form}>
-      <div className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
+      <form onSubmit={form.handleSubmit(() => {})} className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
         
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
-          <div
-            ref={imgContainerRef}
-            className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
-            style={{ touchAction: 'none' }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            {imagePreviewUrl ? (
-              <>
-                <img
-                  src={imagePreviewUrl}
-                  alt="Vista previa de la imagen"
-                  className="object-cover w-full h-full"
-                  style={{ objectPosition }}
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
-                  <Move className="h-8 w-8" />
-                  <span className="text-sm font-semibold mt-1">
-                    Arrastra para ajustar la imagen
-                  </span>
+            <div
+                ref={imgContainerRef}
+                className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
+                style={{ touchAction: 'none' }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
+                {imagePreviewUrl ? (
+                <>
+                    <img
+                    src={imagePreviewUrl}
+                    alt="Vista previa de la imagen"
+                    className="object-cover w-full h-full"
+                    style={{ objectPosition }}
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
+                    <Move className="h-8 w-8" />
+                    <span className="text-sm font-semibold mt-1">
+                        Arrastra para ajustar la imagen
+                    </span>
+                    </div>
+                </>
+                ) : (
+                <div className="text-muted-foreground flex flex-col items-center">
+                    <ImageIcon className="h-10 w-10" />
+                    <span className="text-sm mt-1">Vista Previa</span>
                 </div>
-              </>
-            ) : (
-              <div className="text-muted-foreground flex flex-col items-center">
-                <ImageIcon className="h-10 w-10" />
-                <span className="text-sm mt-1">Vista Previa</span>
-              </div>
-            )}
-          </div>
+                )}
+            </div>
           <input
             type="file"
             ref={fileInputRef}
@@ -380,7 +396,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             </FormItem>
           )}
         />
-      </div>
+      </form>
     </Form>
   );
 });
