@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -104,14 +105,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       const img = new Image();
       img.src = imagePreviewUrl;
     }
-  }, [imagePreviewUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (imagePreviewUrl?.startsWith("blob:")) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-    };
   }, [imagePreviewUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

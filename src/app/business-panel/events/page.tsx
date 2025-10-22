@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -332,15 +333,35 @@ const ManageEventDialog = ({
     };
 
     const handleImageFileChange = (file: File | null) => {
-        if (file) {
-            setImageFile(file);
-            setImagePreviewUrl(URL.createObjectURL(file)); // Generate and set preview URL
-            setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
-        } else {
-            setImageFile(null);
-            setImagePreviewUrl(editingEvent?.imageUrl || null);
+      if (file) {
+        // Si ya había un blob anterior, liberarlo
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
         }
+    
+        const previewUrl = URL.createObjectURL(file);
+        setImageFile(file);
+        setImagePreviewUrl(previewUrl);
+    
+        // Actualiza también el estado del evento
+        setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
+      } else {
+        // Si no hay archivo nuevo, restaurar la imagen existente
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+        setImageFile(null);
+        setImagePreviewUrl(editingEvent?.imageUrl || null);
+      }
     };
+
+    useEffect(() => {
+      return () => {
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+      };
+    }, [imagePreviewUrl]);
 
     const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(editingEvent?.ticketTypes), [editingEvent?.ticketTypes]);
     
@@ -1239,3 +1260,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
