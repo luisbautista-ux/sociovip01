@@ -61,7 +61,7 @@ const ManageEventDialog = ({
 }) => {
     const [activeTab, setActiveTab] = useState("details");
     const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null); // State for preview
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
@@ -99,6 +99,16 @@ const ManageEventDialog = ({
             setHasUnsavedChanges(currentDataString !== initialDataSnapshot.current);
         }
     }, [editingEvent]);
+
+    useEffect(() => {
+      // This is the cleanup effect.
+      // It runs when the component unmounts.
+      return () => {
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+      };
+    }, [imagePreviewUrl]); // The dependency array ensures this runs when imagePreviewUrl changes, but the cleanup runs on unmount.
 
 
      const handleSaveChanges = async () => {
@@ -334,14 +344,18 @@ const ManageEventDialog = ({
 
     const handleImageFileChange = (file: File | null) => {
       if (file) {
+        // If there's an old blob URL, revoke it before creating a new one
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
-        const previewUrl = URL.createObjectURL(file);
+        const newPreviewUrl = URL.createObjectURL(file);
         setImageFile(file);
-        setImagePreviewUrl(previewUrl);
+        setImagePreviewUrl(newPreviewUrl);
+        // Also update the main event data state to reflect that the image has changed.
+        // This is crucial for forcing a re-render in the child form.
         setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
       } else {
+        // If the file is cleared, revert to the original image URL
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
@@ -349,14 +363,6 @@ const ManageEventDialog = ({
         setImagePreviewUrl(editingEvent?.imageUrl || null);
       }
     };
-    
-    useEffect(() => {
-      return () => {
-        if (imagePreviewUrl?.startsWith("blob:")) {
-          URL.revokeObjectURL(imagePreviewUrl);
-        }
-      };
-    }, [imagePreviewUrl]);
 
 
     const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(editingEvent?.ticketTypes), [editingEvent?.ticketTypes]);

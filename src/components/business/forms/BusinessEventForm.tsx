@@ -88,7 +88,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         aiHint: event?.aiHint || "",
     }
   });
-
+  
   useImperativeHandle(ref, () => ({
     getValues: () => ({
       ...form.getValues(),
@@ -159,7 +159,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 
   return (
     <Form {...form}>
-      <form onSubmit={(e) => e.preventDefault()} className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
+      <div className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
             <div
@@ -371,7 +371,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             </FormItem>
           )}
         />
-      </form>
+      </div>
     </Form>
   );
 });
