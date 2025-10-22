@@ -88,22 +88,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         aiHint: event?.aiHint || "",
     }
   });
-  
-  useEffect(() => {
-    form.reset({
-      name: event?.name || "",
-      description: event?.description || "",
-      termsAndConditions: event?.termsAndConditions || "",
-      startDate: anyToDate(event?.startDate) ?? new Date(),
-      endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
-      unlimitedAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0,
-      maxAttendance: (event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0) ? undefined : event.maxAttendance,
-      isActive: event?.isActive === undefined ? true : event.isActive,
-      imageUrl: event?.imageUrl || "",
-      imageObjectPosition: event?.imageObjectPosition || '50% 50%',
-      aiHint: event?.aiHint || "",
-    });
-  }, [event, form]);
 
   useImperativeHandle(ref, () => ({
     getValues: () => ({
@@ -145,7 +129,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     setObjectPosition(newPosition);
     dragStart.current = { x: e.clientX, y: e.clientY };
   };
-
+  
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => { if (e.touches.length === 1) { isDragging.current = true; dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } };
   const handleTouchEnd = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); setCurrentEventData(prev => prev ? {...prev, imageObjectPosition: objectPosition} : null); }};
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -175,8 +159,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 
   return (
     <Form {...form}>
-      <div className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
-        
+      <form onSubmit={(e) => e.preventDefault()} className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
             <div
@@ -388,11 +371,9 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             </FormItem>
           )}
         />
-      </div>
+      </form>
     </Form>
   );
 });
 
 BusinessEventForm.displayName = "BusinessEventForm";
-
-    

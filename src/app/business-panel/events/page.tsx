@@ -334,19 +334,14 @@ const ManageEventDialog = ({
 
     const handleImageFileChange = (file: File | null) => {
       if (file) {
-        // Si ya había un blob anterior, liberarlo
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
-    
         const previewUrl = URL.createObjectURL(file);
         setImageFile(file);
         setImagePreviewUrl(previewUrl);
-    
-        // Actualiza también el estado del evento para forzar re-render
         setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
       } else {
-        // Si no hay archivo nuevo, restaurar la imagen existente
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
@@ -354,7 +349,7 @@ const ManageEventDialog = ({
         setImagePreviewUrl(editingEvent?.imageUrl || null);
       }
     };
-
+    
     useEffect(() => {
       return () => {
         if (imagePreviewUrl?.startsWith("blob:")) {
@@ -362,6 +357,7 @@ const ManageEventDialog = ({
         }
       };
     }, [imagePreviewUrl]);
+
 
     const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(editingEvent?.ticketTypes), [editingEvent?.ticketTypes]);
     
@@ -1182,10 +1178,7 @@ export default function BusinessEventsPage() {
                                     <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
                                     <AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription>
                                 </AlertDialogHeader>
-                                <ShadcnAlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                                </ShadcnAlertDialogFooter>
+                                <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         </TableCell>
