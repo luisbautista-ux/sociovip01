@@ -1,9 +1,9 @@
+
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { BusinessManagedEntity, GeneratedCode, TicketType } from "./types";
 import { Timestamp, FieldValue } from "firebase/firestore";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 
 export function cn(...inputs: ClassValue[]) {
@@ -165,14 +165,19 @@ export const generateCodesPDF = async (
     format: "a4",
   });
 
-  const codesPerPage = 10;
+  const codesPerPage = 20; // 5 columns x 4 rows
   const numPages = Math.ceil(codes.length / codesPerPage);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 10;
   const contentWidth = pageWidth - margin * 2;
-  const cellWidth = contentWidth / 5;
-  const cellHeight = (pageHeight - margin * 2) / 2;
+  const contentHeight = pageHeight - margin * 2;
+
+  const numCols = 5;
+  const numRows = 4;
+
+  const cellWidth = contentWidth / numCols;
+  const cellHeight = contentHeight / numRows;
 
   for (let page = 0; page < numPages; page++) {
     if (page > 0) {
@@ -185,45 +190,45 @@ export const generateCodesPDF = async (
 
     for (let i = 0; i < pageCodes.length; i++) {
       const code = pageCodes[i];
-      const col = i % 5;
-      const row = Math.floor(i / 5);
+      const col = i % numCols;
+      const row = Math.floor(i / numCols);
 
       const x = margin + col * cellWidth;
       const y = margin + row * cellHeight;
 
       // Business Name
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(businessName, x + cellWidth / 2, y + 15, { align: "center" });
+      doc.setFontSize(10);
+      doc.text(businessName, x + cellWidth / 2, y + 10, { align: "center" });
 
       // QR Code
       const qrCodeDataUrl = await QRCode.toDataURL(businessUrl, {
         errorCorrectionLevel: "H",
-        width: cellWidth * 0.8,
+        width: cellWidth * 0.7,
+        margin: 1,
       });
+      const qrYPos = y + 12;
+      const qrSize = cellWidth * 0.7;
       doc.addImage(
         qrCodeDataUrl,
         "PNG",
-        x + cellWidth * 0.1,
-        y + 20,
-        cellWidth * 0.8,
-        cellWidth * 0.8
+        x + (cellWidth - qrSize) / 2,
+        qrYPos,
+        qrSize,
+        qrSize
       );
 
       // Text below QR
+      const textYPos = qrYPos + qrSize + 4;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.text("Genera tu entrada QR", x + cellWidth / 2, y + 25 + cellWidth * 0.8, {
-        align: "center",
-      });
-      doc.text("con este código:", x + cellWidth / 2, y + 29 + cellWidth * 0.8, {
-        align: "center",
-      });
+      doc.setFontSize(7);
+      doc.text("Genera tu entrada QR", x + cellWidth / 2, textYPos, { align: "center" });
+      doc.text("con este código:", x + cellWidth / 2, textYPos + 3, { align: "center" });
 
       // Dynamic Code
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text(code.value, x + cellWidth / 2, y + 35 + cellWidth * 0.8, {
+      doc.setFontSize(9);
+      doc.text(code.value, x + cellWidth / 2, textYPos + 8, {
         align: "center",
       });
     }
