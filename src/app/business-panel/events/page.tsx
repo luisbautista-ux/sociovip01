@@ -27,7 +27,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BusinessEventForm, type EventDetailsFormRef, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
+import { BusinessEventForm, type EventDetailsFormRef } from '@/components/business/forms/BusinessEventForm';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
@@ -48,7 +48,6 @@ const ManageEventDialog = ({
     availablePromoters,
     onSave,
     isSubmitting,
-    setCurrentEventData,
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
@@ -57,8 +56,8 @@ const ManageEventDialog = ({
     availablePromoters: BusinessPromoterLink[];
     onSave: (event: BusinessManagedEntity, imageFile: File | null) => Promise<void>;
     isSubmitting: boolean;
-    setCurrentEventData: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
 }) => {
+    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(editingEvent);
     const [activeTab, setActiveTab] = useState("details");
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -86,6 +85,7 @@ const ManageEventDialog = ({
     
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
+            setCurrentEventData(editingEvent);
             setImageFile(null);
             setImagePreviewUrl(editingEvent.imageUrl || null);
             initialDataSnapshot.current = JSON.stringify(editingEvent);
@@ -94,26 +94,25 @@ const ManageEventDialog = ({
     }, [editingEvent, isManageEventDialogOpen]);
     
     useEffect(() => {
-        if (editingEvent && initialDataSnapshot.current) {
-            const currentDataString = JSON.stringify(editingEvent);
+        if (currentEventData && initialDataSnapshot.current) {
+            const currentDataString = JSON.stringify(currentEventData);
             setHasUnsavedChanges(currentDataString !== initialDataSnapshot.current);
         }
-    }, [editingEvent]);
+    }, [currentEventData]);
 
     useEffect(() => {
-      // This is the cleanup effect.
-      // It runs when the component unmounts.
+      // Cleanup effect for the blob URL
       return () => {
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
       };
-    }, [imagePreviewUrl]); // The dependency array ensures this runs when imagePreviewUrl changes, but the cleanup runs on unmount.
+    }, [imagePreviewUrl]);
 
 
      const handleSaveChanges = async () => {
-        if (editingEvent) {
-            await onSave(editingEvent, imageFile);
+        if (currentEventData) {
+            await onSave(currentEventData, imageFile);
         } else {
             toast({ title: "Error", description: "No hay datos del evento para guardar.", variant: "destructive" });
         }
@@ -132,8 +131,8 @@ const ManageEventDialog = ({
         const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
             ...ticketData,
             id: ticketId,
-            eventId: editingEvent?.id || '',
-            businessId: editingEvent?.businessId || '',
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
         }) as TicketType;
 
         setCurrentEventData(prev => {
@@ -173,8 +172,8 @@ const ManageEventDialog = ({
         const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
             ...finalBoxData,
             id: boxId,
-            eventId: editingEvent?.id || '',
-            businessId: editingEvent?.businessId || '',
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
         }) as EventBox;
         
          setCurrentEventData(prev => {
@@ -195,8 +194,8 @@ const ManageEventDialog = ({
         for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
             newBoxes.push(sanitizeObjectForFirestore({
                 id: `box_batch_${Date.now()}_${i}`,
-                eventId: editingEvent?.id || '',
-                businessId: editingEvent?.businessId || '',
+                eventId: currentEventData?.id || '',
+                businessId: currentEventData?.businessId || '',
                 name: `${batchData.prefix} ${i}`,
                 cost: batchData.cost,
                 description: batchData.description,
@@ -339,37 +338,32 @@ const ManageEventDialog = ({
             return { ...prev, assignedPromoters: updatedAssignments };
         });
 
-        toast({ title: "Éxito", description: `Comisión aplicada a ${editingEvent?.assignedPromoters?.length || 0} promotor(es).` });
+        toast({ title: "Éxito", description: `Comisión aplicada a ${currentEventData?.assignedPromoters?.length || 0} promotor(es).` });
     };
 
     const handleImageFileChange = (file: File | null) => {
-      if (file) {
         // If there's an old blob URL, revoke it before creating a new one
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
-        const newPreviewUrl = URL.createObjectURL(file);
-        setImageFile(file);
-        setImagePreviewUrl(newPreviewUrl);
-        // Also update the main event data state to reflect that the image has changed.
-        // This is crucial for forcing a re-render in the child form.
-        setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
-      } else {
-        // If the file is cleared, revert to the original image URL
-        if (imagePreviewUrl?.startsWith("blob:")) {
-          URL.revokeObjectURL(imagePreviewUrl);
+        
+        if (file) {
+            const previewUrl = URL.createObjectURL(file);
+            setImageFile(file);
+            setImagePreviewUrl(previewUrl);
+            setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null); // Force re-render
+        } else {
+            setImageFile(null);
+            setImagePreviewUrl(editingEvent?.imageUrl || null);
         }
-        setImageFile(null);
-        setImagePreviewUrl(editingEvent?.imageUrl || null);
-      }
     };
 
 
-    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(editingEvent?.ticketTypes), [editingEvent?.ticketTypes]);
+    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
     
     const assignedPromoterIds = useMemo(() => {
-        return (editingEvent?.assignedPromoters || []).map(p => p.promoterProfileId);
-    }, [editingEvent?.assignedPromoters]);
+        return (currentEventData?.assignedPromoters || []).map(p => p.promoterProfileId);
+    }, [currentEventData?.assignedPromoters]);
 
     const allPromotersSelected = useMemo(() => {
         return availablePromoters.length > 0 && assignedPromoterIds.length === availablePromoters.length;
@@ -379,18 +373,18 @@ const ManageEventDialog = ({
         return assignedPromoterIds.length > 0 && !allPromotersSelected;
     }, [assignedPromoterIds, allPromotersSelected]);
 
-    if (!isManageEventDialogOpen || !editingEvent) return null;
+    if (!isManageEventDialogOpen || !currentEventData) return null;
     
-    const assignedPromoters = editingEvent.assignedPromoters || [];
-    const ticketTypes = editingEvent.ticketTypes || [];
-    const eventBoxes = editingEvent.eventBoxes || [];
+    const assignedPromoters = currentEventData.assignedPromoters || [];
+    const ticketTypes = currentEventData.ticketTypes || [];
+    const eventBoxes = currentEventData.eventBoxes || [];
 
     return (
         <>
             <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) handleAttemptClose(); }}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{editingEvent.id && !isDuplicating ? `Editar Evento: ${editingEvent.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogTitle>{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <UIDialogDescriptionComponent>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</UIDialogDescriptionComponent>
                     </DialogHeader>
                     
@@ -417,7 +411,7 @@ const ManageEventDialog = ({
                                   </CardHeader>
                                   <CardContent>
                                     <BusinessEventForm 
-                                        event={editingEvent} 
+                                        event={currentEventData} 
                                         isSubmitting={isSubmitting}
                                         setCurrentEventData={setCurrentEventData}
                                         imagePreviewUrl={imagePreviewUrl}
@@ -746,7 +740,7 @@ const ManageEventDialog = ({
                         <DialogTitle>Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
-                        existingBoxes={editingEvent?.eventBoxes || []}
+                        existingBoxes={currentEventData?.eventBoxes || []}
                         onSubmit={handleBatchBoxSubmit}
                         onCancel={() => setIsBatchBoxFormOpen(false)}
                         isSubmitting={isSubmitting}
@@ -1201,7 +1195,6 @@ export default function BusinessEventsPage() {
         isManageEventDialogOpen={isManageEventDialogOpen}
         setIsManageEventDialogOpen={setIsManageEventDialogOpen}
         editingEvent={editingEvent}
-        setCurrentEventData={setEditingEvent}
         isDuplicating={isDuplicating}
         availablePromoters={availablePromoters}
         onSave={handleSaveEvent}

@@ -65,7 +65,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [objectPosition, setObjectPosition] = useState(event?.imageObjectPosition || '50% 50%');
+  const [objectPosition, setObjectPosition] = useState('50% 50%');
 
   const imgContainerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -75,19 +75,39 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     resolver: zodResolver(eventDetailsFormSchema),
     mode: "onBlur",
     defaultValues: {
-        name: event?.name || "",
-        description: event?.description || "",
-        termsAndConditions: event?.termsAndConditions || "",
-        startDate: anyToDate(event?.startDate) ?? new Date(),
-        endDate: anyToDate(event?.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
-        unlimitedAttendance: event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0,
-        maxAttendance: (event?.maxAttendance === undefined || event?.maxAttendance === null || event?.maxAttendance === 0) ? undefined : event.maxAttendance,
-        isActive: event?.isActive === undefined ? true : event.isActive,
-        imageUrl: event?.imageUrl || "",
-        imageObjectPosition: event?.imageObjectPosition || '50% 50%',
-        aiHint: event?.aiHint || "",
+        name: "",
+        description: "",
+        termsAndConditions: "",
+        startDate: new Date(),
+        endDate: new Date(new Date().setDate(new Date().getDate() + 7)),
+        unlimitedAttendance: true,
+        maxAttendance: undefined,
+        isActive: true,
+        imageUrl: "",
+        imageObjectPosition: '50% 50%',
+        aiHint: "",
     }
   });
+
+   useEffect(() => {
+    if (event) {
+      setObjectPosition(event.imageObjectPosition || '50% 50%');
+      form.reset({
+        name: event.name || "",
+        description: event.description || "",
+        termsAndConditions: event.termsAndConditions || "",
+        startDate: anyToDate(event.startDate) ?? new Date(),
+        endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
+        unlimitedAttendance: event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0,
+        maxAttendance: (event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0) ? undefined : event.maxAttendance,
+        isActive: event.isActive === undefined ? true : event.isActive,
+        imageUrl: event.imageUrl || "",
+        imageObjectPosition: event.imageObjectPosition || '50% 50%',
+        aiHint: event.aiHint || "",
+        imageFile: null,
+      });
+    }
+  }, [event, form]);
   
   useImperativeHandle(ref, () => ({
     getValues: () => ({
@@ -106,7 +126,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
         return;
       }
-      onImageFileChange(file); // Update parent state with the file
+      onImageFileChange(file);
       form.setValue("imageFile", file);
       const newPosition = '50% 50%';
       setObjectPosition(newPosition);
@@ -148,18 +168,21 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   const isUnlimited = form.watch("unlimitedAttendance");
 
   useEffect(() => {
-    if (isUnlimited) {
-      if (form.getValues("maxAttendance") !== 0) {
-        form.setValue("maxAttendance", 0, { shouldValidate: true });
-        setCurrentEventData(prev => prev ? { ...prev, maxAttendance: 0 } : null);
-      }
-    }
-  }, [isUnlimited, form, setCurrentEventData]);
-
+    const subscription = form.watch((value, { name, type }) => {
+        if(type === 'change') {
+            setCurrentEventData(prev => {
+                if(!prev) return null;
+                return {...prev, ...value};
+            });
+        }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, setCurrentEventData]);
 
   return (
     <Form {...form}>
-      <div className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
+      <form className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
+        
         <div className="flex flex-col items-center justify-center mb-4 space-y-3">
           <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
             <div
@@ -174,27 +197,27 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
             >
-                {imagePreviewUrl ? (
+              {imagePreviewUrl ? (
                 <>
-                    <img
-                        src={imagePreviewUrl}
-                        alt="Vista previa de la imagen"
-                        className="object-cover w-full h-full"
-                        style={{ objectPosition }}
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
+                  <img
+                    src={imagePreviewUrl}
+                    alt="Vista previa de la imagen"
+                    className="object-cover w-full h-full"
+                    style={{ objectPosition }}
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
                     <Move className="h-8 w-8" />
                     <span className="text-sm font-semibold mt-1">
-                        Arrastra para ajustar la imagen
+                      Arrastra para ajustar la imagen
                     </span>
-                    </div>
+                  </div>
                 </>
-                ) : (
+              ) : (
                 <div className="text-muted-foreground flex flex-col items-center">
-                    <ImageIcon className="h-10 w-10" />
-                    <span className="text-sm mt-1">Vista Previa</span>
+                  <ImageIcon className="h-10 w-10" />
+                  <span className="text-sm mt-1">Vista Previa</span>
                 </div>
-                )}
+              )}
             </div>
           <input
             type="file"
@@ -371,7 +394,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             </FormItem>
           )}
         />
-      </div>
+      </form>
     </Form>
   );
 });
