@@ -171,23 +171,25 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     }
   }, [promotion, form]);
   
-    const getElementRect = useCallback((key: DraggableElement, layout: QrTemplateLayout, ctx: CanvasRenderingContext2D): { x1: number, y1: number, x2: number, y2: number } => {
+    const getElementRect = useCallback((key: DraggableElement, layout: QrTemplateLayout, ctx: CanvasRenderingContext2D): { x1: number, y1: number, x2: number, y2: number, cx: number, cy: number } => {
         const el = layout[key];
         const size = el.size || 16;
         if (key === 'qr') {
             const halfSize = size / 2;
-            return { x1: el.x - halfSize, y1: el.y - halfSize, x2: el.x + halfSize, y2: el.y + halfSize };
+            return { x1: el.x - halfSize, y1: el.y - halfSize, x2: el.x + halfSize, y2: el.y + halfSize, cx: el.x, cy: el.y };
         } else {
             const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
             ctx.font = `bold ${size}px Arial`;
             const textMetrics = ctx.measureText(text);
             const textWidth = textMetrics.width;
-            const textHeight = size;
+            const textHeight = size; // Approximate height
             return {
                 x1: el.x - textWidth / 2,
                 y1: el.y - textHeight,
                 x2: el.x + textWidth / 2,
-                y2: el.y + textHeight * 0.2,
+                y2: el.y + textHeight * 0.2, // Adjust to better fit text rendering
+                cx: el.x,
+                cy: el.y - textHeight / 2,
             };
         }
     }, [formValues.name]);
@@ -408,41 +410,35 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         const ctx = canvas.getContext('2d');
         if (!layout || !ctx) return;
 
-        const draggedRect = getElementRect(draggedElement, layout, ctx);
-        const draggedWidth = draggedRect.x2 - draggedRect.x1;
-        const draggedHeight = draggedRect.y2 - draggedRect.y1;
+        const activeSnapLines: { x: number[], y: number[] } = { x: [], y: [] };
 
-        let activeSnapLines: { x: number[], y: number[] } = { x: [], y: [] };
-
-        const snapPoints: { x: number[], y: number[] } = {
-            x: [canvas.width / 2],
-            y: [canvas.height / 2],
+        const snapPoints: { x: { val: number, for: string }[], y: { val: number, for: string }[] } = {
+            x: [{ val: canvas.width / 2, for: 'canvas-center' }],
+            y: [{ val: canvas.height / 2, for: 'canvas-center' }],
         };
 
         (Object.keys(layout) as DraggableElement[]).forEach(key => {
             if (key !== draggedElement) {
                 const staticRect = getElementRect(key, layout, ctx);
-                snapPoints.x.push(staticRect.x1, (staticRect.x1 + staticRect.x2) / 2, staticRect.x2);
-                snapPoints.y.push(staticRect.y1, (staticRect.y1 + staticRect.y2) / 2, staticRect.y2);
+                snapPoints.x.push({ val: staticRect.x1, for: `${key}-left` }, { val: staticRect.cx, for: `${key}-center` }, { val: staticRect.x2, for: `${key}-right` });
+                snapPoints.y.push({ val: staticRect.y1, for: `${key}-top` }, { val: staticRect.cy, for: `${key}-center` }, { val: staticRect.y2, for: `${key}-bottom` });
             }
         });
         
         // Horizontal Snapping
-        const draggedCenterX = newX;
-        for (const snapX of snapPoints.x) {
-            if (Math.abs(draggedCenterX - snapX) < SNAP_THRESHOLD) {
-                newX = snapX;
-                activeSnapLines.x.push(snapX);
+        for (const snapPoint of snapPoints.x) {
+            if (Math.abs(newX - snapPoint.val) < SNAP_THRESHOLD) {
+                newX = snapPoint.val;
+                activeSnapLines.x.push(snapPoint.val);
                 break;
             }
         }
         
         // Vertical Snapping
-        const draggedCenterY = newY;
-        for (const snapY of snapPoints.y) {
-            if (Math.abs(draggedCenterY - snapY) < SNAP_THRESHOLD) {
-                newY = snapY;
-                activeSnapLines.y.push(snapY);
+        for (const snapPoint of snapPoints.y) {
+            if (Math.abs(newY - snapPoint.val) < SNAP_THRESHOLD) {
+                newY = snapPoint.val;
+                activeSnapLines.y.push(snapPoint.val);
                 break;
             }
         }
@@ -454,6 +450,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     } else {
         const element = getElementAtPos(canvasX, canvasY);
         canvas.style.cursor = element ? 'move' : 'default';
+        setSnapLines({ x: [], y: [] });
     }
   };
 
