@@ -692,7 +692,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.textAlign = 'center';
             
             ctx.font = `bold ${layout.name.size || 16}px Arial`;
-            ctx.fillText("Nombre1 Nombre2 Paterno Materno", layout.name.x, layout.name.y);
+            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
             
             ctx.font = `${layout.dni.size || 12}px Arial`;
             ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
