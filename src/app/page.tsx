@@ -127,8 +127,8 @@ export default function HomePage() {
 
   const EntityCard = ({ entity }: { entity: EnrichedEntity }) => {
     const businessUrl = entity.businessCustomUrlPath
-      ? `/b/${entity.businessCustomUrlPath}`
-      : `/business/${entity.businessId}`;
+      ? `/${entity.businessCustomUrlPath}`
+      : `/`; // Fallback to home if no custom URL
     
     const isEvent = entity.type === 'event';
 
