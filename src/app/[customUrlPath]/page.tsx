@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import NextImage from "next/image";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -159,8 +159,9 @@ const newQrClientSchema = z.object({
 type NewQrClientFormData = z.infer<typeof newQrClientSchema>;
 
 
-export default function BusinessPublicPage({ params }: { params: { customUrlPath: string } }) {
-  const { customUrlPath } = params;
+export default function BusinessPublicPage() {
+  const params = useParams();
+  const customUrlPath = params.customUrlPath as string;
   const router = useRouter();
   const { toast } = useToast();
   const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
