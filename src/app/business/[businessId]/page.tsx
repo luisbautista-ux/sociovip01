@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -691,13 +690,25 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
             
-            ctx.font = `bold ${layout.name.size || 16}px Arial`;
-            ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, layout.name.x, layout.name.y);
+            const fullName = `${qrData.user.name} ${qrData.user.surname}`;
+            let nameFontSize = layout.name.size || 16;
+            ctx.font = `bold ${nameFontSize}px Arial`;
+            const maxWidth = canvas.width * 0.9;
+            while(ctx.measureText(fullName).width > maxWidth && nameFontSize > 8) {
+                nameFontSize--;
+                ctx.font = `bold ${nameFontSize}px Arial`;
+            }
+            ctx.fillText(fullName, layout.name.x, layout.name.y);
             
-            ctx.font = `${layout.dni.size || 12}px Arial`;
+            ctx.font = `bold ${layout.dni.size || 12}px Arial`;
             ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
-            
-            ctx.font = `bold ${layout.promoTitle.size || 14}px Arial`;
+
+            let promoFontSize = layout.promoTitle.size || 14;
+            ctx.font = `bold ${promoFontSize}px Arial`;
+            while(ctx.measureText(qrData.promotion.title).width > maxWidth && promoFontSize > 8) {
+                promoFontSize--;
+                ctx.font = `bold ${promoFontSize}px Arial`;
+            }
             ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
 
         } catch (error) {

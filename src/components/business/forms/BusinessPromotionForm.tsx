@@ -245,9 +245,18 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           } else {
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
-            const fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
+            const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
+            
+            let fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
             ctx.font = `bold ${fontSize}px Arial`;
-            const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
+
+            // Adjust font size dynamically
+            const maxWidth = canvas.width * 0.9; 
+            while(ctx.measureText(text).width > maxWidth && fontSize > 8) {
+                fontSize--;
+                ctx.font = `bold ${fontSize}px Arial`;
+            }
+            
             const rect = getElementRect(key, layout, ctx);
             ctx.fillText(text, config.x, config.y);
             if(isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
