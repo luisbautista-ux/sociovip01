@@ -169,7 +169,7 @@ export const generateCodesPDF = async (
   const numPages = Math.ceil(codes.length / codesPerPage);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 10;
+  const margin = 5; // Reduced margin to make cells larger
   const contentWidth = pageWidth - margin * 2;
   const contentHeight = pageHeight - margin * 2;
 
@@ -198,17 +198,17 @@ export const generateCodesPDF = async (
 
       // Business Name
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text(businessName, x + cellWidth / 2, y + 10, { align: "center" });
+      doc.setFontSize(11); // Increased font size
+      doc.text(businessName, x + cellWidth / 2, y + 12, { align: "center" });
 
       // QR Code
+      const qrSize = cellWidth * 0.75; // Made QR slightly larger within the cell
       const qrCodeDataUrl = await QRCode.toDataURL(businessUrl, {
         errorCorrectionLevel: "H",
-        width: cellWidth * 0.7,
+        width: qrSize,
         margin: 1,
       });
-      const qrYPos = y + 12;
-      const qrSize = cellWidth * 0.7;
+      const qrYPos = y + 15;
       doc.addImage(
         qrCodeDataUrl,
         "PNG",
@@ -219,16 +219,16 @@ export const generateCodesPDF = async (
       );
 
       // Text below QR
-      const textYPos = qrYPos + qrSize + 4;
+      const textYPos = qrYPos + qrSize + 5; // Increased spacing
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
+      doc.setFontSize(8); // Increased font size
       doc.text("Genera tu entrada QR", x + cellWidth / 2, textYPos, { align: "center" });
-      doc.text("con este código:", x + cellWidth / 2, textYPos + 3, { align: "center" });
+      doc.text("con este código:", x + cellWidth / 2, textYPos + 4, { align: "center" }); // Increased spacing
 
       // Dynamic Code
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.text(code.value, x + cellWidth / 2, textYPos + 8, {
+      doc.setFontSize(10); // Increased font size
+      doc.text(code.value, x + cellWidth / 2, textYPos + 10, { // Increased spacing
         align: "center",
       });
     }
