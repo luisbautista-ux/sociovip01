@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -81,6 +82,8 @@ interface BusinessPromotionFormProps {
   isSubmitting?: boolean;
 }
 
+const SNAP_THRESHOLD = 5;
+
 export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitting = false }: BusinessPromotionFormProps) {
   
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -101,6 +104,9 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
   const [draggedElement, setDraggedElement] = useState<DraggableElement | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const [selectedElement, setSelectedElement] = useState<DraggableElement | null>(null);
+  
+  // New state for snapping lines
+  const [snapLines, setSnapLines] = useState<{ x: number[], y: number[] }>({ x: [], y: [] });
 
 
   const form = useForm<PromotionFormValues>({
@@ -165,7 +171,29 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     }
   }, [promotion, form]);
   
-  const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement | null = null) => {
+    const getElementRect = useCallback((key: DraggableElement, layout: QrTemplateLayout, ctx: CanvasRenderingContext2D): { x1: number, y1: number, x2: number, y2: number } => {
+        const el = layout[key];
+        const size = el.size || 16;
+        if (key === 'qr') {
+            const halfSize = size / 2;
+            return { x1: el.x - halfSize, y1: el.y - halfSize, x2: el.x + halfSize, y2: el.y + halfSize };
+        } else {
+            const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
+            ctx.font = `bold ${size}px Arial`;
+            const textMetrics = ctx.measureText(text);
+            const textWidth = textMetrics.width;
+            const textHeight = size;
+            return {
+                x1: el.x - textWidth / 2,
+                y1: el.y - textHeight,
+                x2: el.x + textWidth / 2,
+                y2: el.y + textHeight * 0.2,
+            };
+        }
+    }, [formValues.name]);
+
+
+  const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement | null = null, currentSnapLines: { x: number[], y: number[] }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
@@ -209,27 +237,43 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
           }
 
           if (key === 'qr') {
-            ctx.drawImage(qrImage, config.x - (config.size / 2), config.y - (config.size / 2), config.size, config.size);
-            if(isHighlight) ctx.strokeRect(config.x - (config.size / 2), config.y - (config.size / 2), config.size, config.size);
+            const rect = getElementRect(key, layout, ctx);
+            ctx.drawImage(qrImage, rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+            if(isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
           } else {
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
             const fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
             ctx.font = `bold ${fontSize}px Arial`;
             const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
-            const textMetrics = ctx.measureText(text);
-            const textWidth = textMetrics.width;
-            const textHeight = fontSize;
+            const rect = getElementRect(key, layout, ctx);
             ctx.fillText(text, config.x, config.y);
-            if(isHighlight) ctx.strokeRect(config.x - textWidth/2, config.y - textHeight, textWidth, textHeight * 1.2);
+            if(isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
           }
            ctx.restore();
-        }
+        };
+
+        (Object.keys(layout) as DraggableElement[]).forEach(key => {
+            drawElement(key, highlightedElement === key);
+        });
         
-        drawElement('qr', highlightedElement === 'qr');
-        drawElement('name', highlightedElement === 'name');
-        drawElement('dni', highlightedElement === 'dni');
-        drawElement('promoTitle', highlightedElement === 'promoTitle');
+        // Draw snapping lines
+        ctx.save();
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 0.5;
+        currentSnapLines.x.forEach(x => {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        });
+        currentSnapLines.y.forEach(y => {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        });
+        ctx.restore();
         
     } else {
         canvas.width = 380;
@@ -242,12 +286,12 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         ctx.font = '14px Arial';
         ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
     }
-  }, [templatePreview, formValues.name, form.getValues('qrTemplateLayout')]);
+  }, [templatePreview, formValues.name, form.getValues, getElementRect]);
 
 
   useEffect(() => {
-    drawPreviewOnCanvas(selectedElement);
-  }, [drawPreviewOnCanvas, formValues, selectedElement]);
+    drawPreviewOnCanvas(selectedElement, snapLines);
+  }, [drawPreviewOnCanvas, formValues, selectedElement, snapLines]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'main' | 'template') => {
     const file = event.target.files?.[0];
@@ -309,20 +353,16 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
 
   const getElementAtPos = (x: number, y: number): DraggableElement | null => {
     const layout = form.getValues('qrTemplateLayout');
-    if (!layout) return null;
+    if (!layout || !canvasRef.current) return null;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return null;
 
     const checkHit = (key: 'qr' | 'name' | 'dni' | 'promoTitle') => {
-      const el = layout[key as keyof typeof layout];
-      if (!el) return false;
-      const elSize = el.size || 16;
-      if (key === 'qr') {
-        return x > el.x - elSize / 2 && x < el.x + elSize / 2 && y > el.y - elSize / 2 && y < el.y + elSize / 2;
-      } else {
-        const textHeight = elSize * 1.2;
-        const textWidth = (key === 'name' ? 200 : key === 'dni' ? 80 : 150); // Approximation
-        return x > el.x - textWidth / 2 && x < el.x + textWidth / 2 && y > el.y - textHeight && y < el.y + textHeight * 0.2;
-      }
+      const rect = getElementRect(key, layout, ctx);
+      return x > rect.x1 && x < rect.x2 && y > rect.y1 && y < rect.y2;
     };
+    
+    // Check in reverse order to prioritize elements on top
     if (checkHit('qr')) return 'qr';
     if (checkHit('name')) return 'name';
     if (checkHit('dni')) return 'dni';
@@ -357,14 +397,60 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const canvasX = (e.clientX - rect.left) * scaleX;
-    const canvasY = (e.clientY - rect.top) * scaleY;
+    let canvasX = (e.clientX - rect.left) * scaleX;
+    let canvasY = (e.clientY - rect.top) * scaleY;
     
     if (draggedElement) {
-        const newX = Math.round(canvasX + dragOffset.current.x);
-        const newY = Math.round(canvasY + dragOffset.current.y);
+        let newX = Math.round(canvasX + dragOffset.current.x);
+        let newY = Math.round(canvasY + dragOffset.current.y);
+
+        const layout = form.getValues('qrTemplateLayout');
+        const ctx = canvas.getContext('2d');
+        if (!layout || !ctx) return;
+
+        const draggedRect = getElementRect(draggedElement, layout, ctx);
+        const draggedWidth = draggedRect.x2 - draggedRect.x1;
+        const draggedHeight = draggedRect.y2 - draggedRect.y1;
+
+        let activeSnapLines: { x: number[], y: number[] } = { x: [], y: [] };
+
+        const snapPoints: { x: number[], y: number[] } = {
+            x: [canvas.width / 2],
+            y: [canvas.height / 2],
+        };
+
+        (Object.keys(layout) as DraggableElement[]).forEach(key => {
+            if (key !== draggedElement) {
+                const staticRect = getElementRect(key, layout, ctx);
+                snapPoints.x.push(staticRect.x1, (staticRect.x1 + staticRect.x2) / 2, staticRect.x2);
+                snapPoints.y.push(staticRect.y1, (staticRect.y1 + staticRect.y2) / 2, staticRect.y2);
+            }
+        });
+        
+        // Horizontal Snapping
+        const draggedCenterX = newX;
+        for (const snapX of snapPoints.x) {
+            if (Math.abs(draggedCenterX - snapX) < SNAP_THRESHOLD) {
+                newX = snapX;
+                activeSnapLines.x.push(snapX);
+                break;
+            }
+        }
+        
+        // Vertical Snapping
+        const draggedCenterY = newY;
+        for (const snapY of snapPoints.y) {
+            if (Math.abs(draggedCenterY - snapY) < SNAP_THRESHOLD) {
+                newY = snapY;
+                activeSnapLines.y.push(snapY);
+                break;
+            }
+        }
+
+        setSnapLines(activeSnapLines);
         form.setValue(`qrTemplateLayout.${draggedElement}.x`, newX);
         form.setValue(`qrTemplateLayout.${draggedElement}.y`, newY);
+
     } else {
         const element = getElementAtPos(canvasX, canvasY);
         canvas.style.cursor = element ? 'move' : 'default';
@@ -373,6 +459,7 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
 
   const handleCanvasMouseUp = () => {
     setDraggedElement(null);
+    setSnapLines({ x: [], y: [] });
     if(canvasRef.current) canvasRef.current.style.cursor = 'default';
   };
   
