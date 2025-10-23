@@ -178,7 +178,7 @@ export function CreateCodesDialog({
 
   const handleCopyCreatedCodes = async () => {
     if (justCreatedCodes.length === 0) return;
-    const codesToCopy = justCreatedCodes.map(c => c.value).join('\\n');
+    const codesToCopy = justCreatedCodes.map(c => c.value).join('\n');
     try {
       await navigator.clipboard.writeText(codesToCopy);
       toast({ title: "Códigos Copiados", description: `${justCreatedCodes.length} códigos recién creados han sido copiados.` });
@@ -190,8 +190,8 @@ export function CreateCodesDialog({
   const handleDownloadPDF = () => {
     if (justCreatedCodes.length === 0 || !businessDetails) return;
     const businessUrl = businessDetails.customUrlPath
-      ? `https://sociovip.app/b/${businessDetails.customUrlPath}`
-      : `https://sociovip.app/business/${businessDetails.id}`;
+      ? `https://sociovip.app/${businessDetails.customUrlPath}`
+      : `https://sociovip.app/`;
 
     generateCodesPDF(justCreatedCodes, businessDetails.name, businessUrl);
   };
@@ -265,13 +265,13 @@ export function CreateCodesDialog({
           <div className="py-6 text-center space-y-4">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
             <p className="text-lg font-medium">¡Has creado {justCreatedCodes.length} código(s)!</p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:justify-center items-center gap-2">
               <Button onClick={handleCopyCreatedCodes} variant="outline" size="lg" className="w-full">
-                <Copy className="mr-2 h-5 w-5" /> Copiar códigos ({justCreatedCodes.length})
+                <Copy className="mr-2 h-4 w-4" /> Copiar códigos ({justCreatedCodes.length})
               </Button>
               {canDownloadPdf && (
                 <Button onClick={handleDownloadPDF} variant="outline" size="lg" className="w-full">
-                    <Download className="mr-2 h-5 w-5" /> Descargar PDF
+                    <Download className="mr-2 h-4 w-4" /> Descargar PDF
                 </Button>
               )}
             </div>
