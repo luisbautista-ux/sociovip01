@@ -788,6 +788,7 @@ export default function BusinessPromotionsPage() {
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name} 
           currentUserProfileUid={userProfile.uid}
+          currentUserRoles={userProfile.roles}
         />
       )}
 

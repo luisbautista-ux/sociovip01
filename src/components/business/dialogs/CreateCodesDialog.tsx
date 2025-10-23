@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect, useMemo, useRef } from "react";
-import type { Business, GeneratedCode } from "@/lib/types";
+import type { Business, GeneratedCode, PlatformUserRole } from "@/lib/types";
 import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
@@ -35,6 +34,7 @@ interface CreateCodesDialogProps {
   isSubmittingMain?: boolean; 
   currentUserProfileName?: string;
   currentUserProfileUid?: string;
+  currentUserRoles?: PlatformUserRole[]; // Added roles
   maxAttendance?: number;
   currentCodeCount?: number;
 }
@@ -49,6 +49,7 @@ export function CreateCodesDialog({
     isSubmittingMain = false, 
     currentUserProfileName,
     currentUserProfileUid,
+    currentUserRoles = [], // Default to empty array
     maxAttendance,
     currentCodeCount = 0,
 }: CreateCodesDialogProps) {
@@ -59,6 +60,8 @@ export function CreateCodesDialog({
   const { toast } = useToast();
   const form = useForm(); // Create a dummy form context
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
+
+  const canDownloadPdf = currentUserRoles.includes('business_admin') || currentUserRoles.includes('staff');
 
   useEffect(() => {
     const fetchBusinessDetails = async () => {
@@ -265,9 +268,11 @@ export function CreateCodesDialog({
               <Button onClick={handleCopyCreatedCodes} variant="outline" size="lg" className="w-full">
                 <Copy className="mr-2 h-5 w-5" /> Copiar códigos ({justCreatedCodes.length})
               </Button>
-              <Button onClick={handleDownloadPDF} variant="outline" size="lg" className="w-full">
-                <Download className="mr-2 h-5 w-5" /> Descargar PDF
-              </Button>
+              {canDownloadPdf && (
+                <Button onClick={handleDownloadPDF} variant="outline" size="lg" className="w-full">
+                    <Download className="mr-2 h-5 w-5" /> Descargar PDF
+                </Button>
+              )}
             </div>
              <p className="text-sm text-muted-foreground">
               Estos códigos se han añadido a '{entityName}'.

@@ -520,6 +520,7 @@ export default function PromoterEntitiesPage() {
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
+          currentUserRoles={userProfile.roles}
           maxAttendance={selectedEntityForCreatingCodes.maxAttendance}
           currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
         />
@@ -738,4 +739,3 @@ function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBo
         </div>
     );
 }
-

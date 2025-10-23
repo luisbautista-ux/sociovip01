@@ -1232,6 +1232,7 @@ export default function BusinessEventsPage() {
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
+          currentUserRoles={userProfile.roles}
           maxAttendance={
             (selectedEntityForCreatingCodes.maxAttendance && selectedEntityForCreatingCodes.maxAttendance > 0)
             ? selectedEntityForCreatingCodes.maxAttendance
