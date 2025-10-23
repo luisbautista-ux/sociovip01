@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -264,7 +265,7 @@ export function CreateCodesDialog({
           <div className="py-6 text-center space-y-4">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
             <p className="text-lg font-medium">¡Has creado {justCreatedCodes.length} código(s)!</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
               <Button onClick={handleCopyCreatedCodes} variant="outline" size="lg" className="w-full">
                 <Copy className="mr-2 h-5 w-5" /> Copiar códigos ({justCreatedCodes.length})
               </Button>
