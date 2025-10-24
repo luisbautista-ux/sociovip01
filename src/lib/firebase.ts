@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
@@ -8,9 +9,9 @@ const firebaseConfig = {
   apiKey: "AIzaSyDtMgj_WySsrpmVdYLxem22UzCG8xCKQ4I",
   authDomain: "cloverpass.firebaseapp.com",
   projectId: "cloverpass",
-  storageBucket: "cloverpass.firebasestorage.app",
+  storageBucket: "cloverpass.appspot.com",
   messagingSenderId: "564817412003",
-  appId: "1:564817412003:web:83938e8372bb360c0bde416"
+  appId: "1:564817412003:web:8938e8372bb360c0bde416"
 };
 
 // Initialize Firebase for SSR
