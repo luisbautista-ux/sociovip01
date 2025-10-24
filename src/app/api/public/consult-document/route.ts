@@ -3,41 +3,42 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { spawn } from 'child_process';
-import path from 'path';
+import * as cheerio from 'cheerio';
 
 const ConsultDocumentSchema = z.object({
-  docNumber: z.string().length(8, 'El DNI debe tener 8 dígitos.'),
+  docNumber: z.string().length(8, 'El documento debe tener 8 dígitos.'),
   docType: z.enum(['dni', 'ce']),
 });
 
 /**
- * Performs a search on an external page to get name, surname, and date of birth for a given DNI.
- * This function makes two separate API calls to retrieve all necessary data.
+ * Performs two separate searches on an external page to get name/surname and birth date for a given DNI.
  *
  * @param dni The 8-digit DNI number to consult.
- * @returns An object with full name and date of birth, or null if not found.
+ * @returns An object with the full profile, or null if not found.
  */
 async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string, nombres: string, apellidoPaterno: string, apellidoMaterno: string, fechaNacimiento: string } | null> {
-  try {
-    const securityToken = '4550295f30'; // Este token podría necesitar ser actualizado si la página cambia
+  const commonHeaders = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+  };
 
-    // --- 1. Get Names and Surnames ---
-    const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
+  try {
+    // --- 1. Fetch Names and Surnames ---
     const formNombres = new URLSearchParams();
     formNombres.append('dni4', dni);
+    formNombres.append('company', '');
     formNombres.append('action', 'buscar_nombres');
-    formNombres.append('security', securityToken);
+    formNombres.append('security', '4550295f30');
 
-    const responseNombres = await fetch(endpointNombres, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
-        },
-        body: formNombres.toString(),
+    const responseNombres = await fetch("https://dniperu.com/wp-admin/admin-ajax.php", {
+      method: 'POST',
+      headers: {
+        ...commonHeaders,
+        'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
+      },
+      body: formNombres.toString(),
     });
-    
+
     let nombres = "", apellidoPaterno = "", apellidoMaterno = "";
     if (responseNombres.ok) {
         const data = await responseNombres.json();
@@ -51,48 +52,49 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
             });
         }
     }
-
-    if (!nombres) { // If we didn't get a name, no point in continuing
+    
+    // Si no se obtuvieron los nombres, no continuar.
+    if (!nombres) {
+        console.warn(`[consultExternalDniApi] Could not fetch names for DNI: ${dni}`);
         return null;
     }
+    
+    // --- 2. Fetch Birth Date ---
+    const formFecha = new URLSearchParams();
+    formFecha.append('dni', dni);
+    formFecha.append('company', '');
+    formFecha.append('action', 'buscar_fecha');
+    formFecha.append('security', 'b8f54a1fcd');
 
-    // --- 2. Get Date of Birth ---
-    const endpointNacimiento = "https://dniperu.com/wp-admin/admin-ajax.php";
-    const formNacimiento = new URLSearchParams();
-    formNacimiento.append('dni5', dni);
-    formNacimiento.append('action', 'buscar_nacimiento');
-    formNacimiento.append('security', securityToken);
-
-    const responseNacimiento = await fetch(endpointNacimiento, {
+    const responseFecha = await fetch("https://dniperu.com/wp-admin/admin-ajax.php", {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
+          ...commonHeaders,
+          'Referer': 'https://dniperu.com/fecha-de-nacimiento-con-dni/',
         },
-        body: formNacimiento.toString(),
+        body: formFecha.toString(),
     });
-    
+
     let fechaNacimiento = "";
-    if (responseNacimiento.ok) {
-        const data = await responseNacimiento.json();
-        const mensaje = data.data?.message;
-        if (data.success && mensaje) {
-             const match = mensaje.match(/(\d{2}\/\d{2}\/\d{4})/);
-             if (match) {
-                fechaNacimiento = match[0];
-             }
+    if (responseFecha.ok) {
+        const dataFecha = await responseFecha.json();
+        const mensajeFecha = dataFecha.data?.message;
+        if (dataFecha.success && mensajeFecha) {
+            const match = mensajeFecha.match(/(\d{2}\/\d{2}\/\d{4})/);
+            if (match) {
+                fechaNacimiento = match[1];
+            }
         }
     }
-
+    
     const nombreCompleto = `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim().replace(/\s+/g, ' ');
     return { nombreCompleto, nombres, apellidoPaterno, apellidoMaterno, fechaNacimiento };
 
-  } catch (e) {
-      console.warn("External DNI API call failed:", e);
-      return null;
+  } catch (error) {
+    console.error('[consultExternalDniApi] Error during DNI consultation:', error);
+    return null;
   }
 }
-
 
 export async function POST(request: Request) {
   try {
@@ -105,7 +107,6 @@ export async function POST(request: Request) {
 
     const { docNumber, docType } = validation.data;
 
-    // Currently, only DNI consultation is supported by this external method
     if (docType !== 'dni') {
       return NextResponse.json({ error: "Actualmente solo se soporta la consulta de DNI." }, { status: 400 });
     }
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
         nombres: data.nombres,
         apellidoPaterno: data.apellidoPaterno,
         apellidoMaterno: data.apellidoMaterno,
-        fechaNacimiento: data.fechaNacimiento
+        fechaNacimiento: data.fechaNacimiento // Ahora sí se devuelve la fecha.
       });
     } else {
       return NextResponse.json({ error: "No se pudo obtener información para el DNI consultado." }, { status: 404 });
