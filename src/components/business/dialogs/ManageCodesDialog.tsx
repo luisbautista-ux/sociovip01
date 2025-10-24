@@ -247,7 +247,7 @@ export function ManageCodesDialog({
       }
 
       const businessUrl = businessDetails?.customUrlPath
-          ? `https://sociovip.app/b/${businessDetails.customUrlPath}`
+          ? `https://sociovip.app/${businessDetails.customUrlPath}`
           : `https://sociovip.app/business/${entity?.businessId}`;
 
       const codesText = codes.join('\n');
