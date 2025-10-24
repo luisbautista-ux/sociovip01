@@ -1,5 +1,6 @@
-
 import admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // This function ensures that Firebase Admin is initialized only once.
 export async function initializeAdminApp() {
@@ -7,25 +8,18 @@ export async function initializeAdminApp() {
     return admin.apps[0]; // Return the existing app instance
   }
 
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-  if (!serviceAccountJson || serviceAccountJson.startsWith('TU_JSON_DE')) {
-    const errorMessage = 'El JSON de la cuenta de servicio de Firebase no ha sido configurado correctamente en el archivo .env.';
-    console.error(`Firebase Admin Init Error: ${errorMessage}`);
-    throw new Error(errorMessage);
-  }
-
   try {
-    const serviceAccount = JSON.parse(serviceAccountJson);
+    const serviceAccountPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
     const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
 
-    console.log("Firebase Admin SDK initialized successfully.");
+    console.log("Firebase Admin SDK initialized successfully from file.");
     return app;
   } catch (error: any) {
-    console.error('Firebase Admin Init Error: Failed to initialize.', error);
+    console.error('Firebase Admin Init Error: Failed to initialize from file.', error);
     throw new Error(`No se pudo inicializar el Firebase Admin SDK: ${error.message}`);
   }
 }
