@@ -28,7 +28,7 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
     formNombres.append('dni4', dni);
     formNombres.append('company', '');
     formNombres.append('action', 'buscar_nombres');
-    formNombres.append('security', '4550295f30');
+    formNombres.append('security', 'b8d55f5c4f');
 
     const responseNombres = await fetch("https://dniperu.com/wp-admin/admin-ajax.php", {
       method: 'POST',
