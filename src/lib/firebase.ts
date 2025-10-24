@@ -6,12 +6,12 @@ import { getAuth, type Auth } from "firebase/auth";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDtMgj_WySsrpmVdYLxem22UzCG8xCKQ4I",
-  authDomain: "cloverpass.firebaseapp.com",
-  projectId: "cloverpass",
-  storageBucket: "cloverpass.appspot.com",
-  messagingSenderId: "564817412003",
-  appId: "1:564817412003:web:8938e8372bb360c0bde416"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase for SSR
