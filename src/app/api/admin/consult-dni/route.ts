@@ -3,67 +3,93 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import { admin, initializeAdminApp } from '@/lib/firebase/firebaseAdmin';
+import { getAuth } from 'firebase-admin/auth';
+import type { PlatformUser } from '@/lib/types';
+
 
 const ConsultDniSchema = z.object({
   dni: z.string().length(8, 'El DNI debe tener 8 dígitos.'),
 });
 
-async function runPuppeteer(dni: string): Promise<any> {
-    let browser = null;
+// Helper function to verify the token and get user profile
+async function getCallerProfile(idToken: string) {
     try {
-        browser = await puppeteer.launch({
-            args: chromium.args,
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
-            ignoreHTTPSErrors: true,
-        });
-
-        const page = await browser.newPage();
-        await page.goto('https://dniperu.com/buscar-dni-nombres-apellidos/', { waitUntil: 'networkidle2' });
-
-        await page.type('input[name="dni4"]', dni);
-        
-        await Promise.all([
-            page.waitForNavigation({ waitUntil: 'networkidle2' }),
-            page.click('button[type="submit"]')
-        ]);
-        
-        const result = await page.evaluate(() => {
-            const infoDiv = document.querySelector('.info-dni');
-            if (!infoDiv) return { error: 'No se encontró el contenedor de información.' };
-            
-            const text = (infoDiv as HTMLElement).innerText;
-            const nombresMatch = text.match(/Nombres:\s*([^\n]+)/);
-            const paternoMatch = text.match(/Apellido Paterno:\s*([^\n]+)/);
-            const maternoMatch = text.match(/Apellido Materno:\s*([^\n]+)/);
-            const nacimientoMatch = text.match(/Fecha de Nacimiento:\s*([^\n]+)/);
-            
-            return {
-                nombres: nombresMatch ? nombresMatch[1].trim() : null,
-                apellidoPaterno: paternoMatch ? paternoMatch[1].trim() : null,
-                apellidoMaterno: maternoMatch ? maternoMatch[1].trim() : null,
-                fechaNacimiento: nacimientoMatch ? nacimientoMatch[1].trim() : null,
-            };
-        });
-
-        return result;
-
-    } catch (error: any) {
-        console.error('Puppeteer error:', error);
-        return { error: 'Error durante la consulta con Puppeteer.', details: error.message };
-    } finally {
-        if (browser !== null) {
-            await browser.close();
-        }
+        const decodedToken = await getAuth().verifyIdToken(idToken);
+        return decodedToken.uid;
+    } catch (error) {
+        console.error("Token verification failed:", error);
+        throw new Error("Invalid authentication token.");
     }
+}
+
+async function fetchExternalDniData(dni: string): Promise<{ nombres: string | null; apellidoPaterno: string | null; apellidoMaterno: string | null; fechaNacimiento: string | null; }> {
+    let result = {
+        nombres: null,
+        apellidoPaterno: null,
+        apellidoMaterno: null,
+        fechaNacimiento: null,
+    };
+
+    try {
+        // --- 1. Fetch Nombres y Apellidos ---
+        const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
+        const formNombres = new URLSearchParams();
+        formNombres.append('dni4', dni);
+        formNombres.append('company', '');
+        formNombres.append('action', 'buscar_nombres');
+        formNombres.append('security', 'b8d55f5c4f');
+
+        const responseNombres = await fetch(endpointNombres, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/' },
+            body: formNombres.toString(),
+        });
+        
+        if (responseNombres.ok) {
+            const dataNombres = await responseNombres.json();
+            if (dataNombres.success && dataNombres.data?.message) {
+                const lines = dataNombres.data.message.split('\n');
+                lines.forEach((line: string) => {
+                    if (line.startsWith("Nombres:")) result.nombres = line.replace("Nombres:", "").trim();
+                    else if (line.startsWith("Apellido Paterno:")) result.apellidoPaterno = line.replace("Apellido Paterno:", "").trim();
+                    else if (line.startsWith("Apellido Materno:")) result.apellidoMaterno = line.replace("Apellido Materno:", "").trim();
+                });
+            }
+        }
+
+        // --- 2. Fetch Fecha de Nacimiento ---
+        const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
+        const formFecha = new URLSearchParams();
+        formFecha.append('dni', dni);
+        formFecha.append('company', '');
+        formFecha.append('action', 'buscar_fecha');
+        formFecha.append('security', '5c5665b196');
+
+        const responseFecha = await fetch(endpointFecha, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/consultar-dni/' },
+            body: formFecha.toString(),
+        });
+
+        if (responseFecha.ok) {
+            const dataFecha = await responseFecha.json();
+            if (dataFecha.success && dataFecha.data?.fecha_nacimiento) {
+                result.fechaNacimiento = dataFecha.data.fecha_nacimiento.trim();
+            }
+        }
+    } catch (e) {
+        console.error("Error fetching from external DNI API:", e);
+    }
+    return result;
 }
 
 
 export async function POST(request: Request) {
   try {
+    await initializeAdminApp();
+    const adminDb = admin.firestore();
+
     const body = await request.json();
     const validation = ConsultDniSchema.safeParse(body);
 
@@ -72,20 +98,41 @@ export async function POST(request: Request) {
     }
     
     const dni = validation.data.dni;
-    const data = await runPuppeteer(dni);
-
-    if (data.error) {
-        return NextResponse.json({ error: "No se pudo obtener información para el DNI consultado.", details: data.error }, { status: 404 });
+    
+    // --- 1. Search in internal DB ---
+    const collectionsToSearch = ['qrClients', 'socioVipMembers', 'platformUsers'];
+    for (const collectionName of collectionsToSearch) {
+        const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', dni).limit(1).get();
+        if (!querySnapshot.empty) {
+            const data = querySnapshot.docs[0].data();
+            const fullName = `${data.name || ''} ${data.surname || ''}`.trim();
+            let dob = null;
+            if (data.dob) {
+                const dateObj = data.dob.toDate ? data.dob.toDate() : new Date(data.dob);
+                if (!isNaN(dateObj.getTime())) {
+                    dob = dateObj.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                }
+            }
+            if (fullName) {
+                return NextResponse.json({ 
+                    nombreCompleto: fullName, 
+                    nombres: data.name, 
+                    apellidoPaterno: data.surname?.split(' ')[0] || '',
+                    apellidoMaterno: data.surname?.split(' ').slice(1).join(' ') || '',
+                    fechaNacimiento: dob 
+                });
+            }
+        }
     }
 
-    if (data.nombres || data.fechaNacimiento) {
-      const nombreCompleto = `${data.nombres || ''} ${data.apellidoPaterno || ''} ${data.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
+    // --- 2. If not found, consult external API ---
+    const externalData = await fetchExternalDniData(dni);
+
+    if (externalData.nombres || externalData.fechaNacimiento) {
+      const nombreCompleto = `${externalData.nombres || ''} ${externalData.apellidoPaterno || ''} ${externalData.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
       return NextResponse.json({
           nombreCompleto,
-          nombres: data.nombres,
-          apellidoPaterno: data.apellidoPaterno,
-          apellidoMaterno: data.apellidoMaterno,
-          fechaNacimiento: data.fechaNacimiento,
+          ...externalData
       });
     } else {
       return NextResponse.json({ error: "No se pudo obtener información para el DNI consultado." }, { status: 404 });
