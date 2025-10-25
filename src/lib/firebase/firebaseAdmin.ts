@@ -1,5 +1,6 @@
 
 import admin from 'firebase-admin';
+import serviceAccount from '../../../serviceAccountKey.json';
 
 // This function ensures that Firebase Admin is initialized only once.
 export async function initializeAdminApp() {
@@ -8,26 +9,21 @@ export async function initializeAdminApp() {
   }
 
   try {
-    // Attempt to parse the service account from the environment variable.
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (!serviceAccountString) {
-      throw new Error("La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON no está definida.");
-    }
-    const serviceAccount = JSON.parse(serviceAccountString);
+    // We explicitly cast the service account to the correct type to satisfy TypeScript
+    const typedServiceAccount = serviceAccount as admin.ServiceAccount;
 
     const app = admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.credential.cert(typedServiceAccount),
     });
 
-    console.log("Firebase Admin SDK initialized successfully from environment variable.");
+    console.log("Firebase Admin SDK initialized successfully from serviceAccountKey.json file.");
     return app;
     
   } catch (error: any) {
     console.error('Firebase Admin Init Error:', error.message);
-    // Provide a more descriptive error message to help debug.
     let detail = error.message;
     if (error instanceof SyntaxError) {
-        detail = "El JSON de la variable de entorno está mal formado.";
+        detail = "El archivo serviceAccountKey.json está mal formado.";
     }
     throw new Error(`No se pudo inicializar el Firebase Admin SDK: ${detail}`);
   }
