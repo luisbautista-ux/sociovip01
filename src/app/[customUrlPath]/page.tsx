@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -458,14 +459,16 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 setIsConsultingDni(true);
                 try {
                     const dniData = await consultExternalDniApi(docNumberCleaned);
-                    if (dniData && dniData.nombres) {
-                        const { nombres, apellidoPaterno, apellidoMaterno, fechaNacimiento } = dniData;
-                        newQrClientForm.setValue('name', nombres || "");
-                        newQrClientForm.setValue('surname', `${apellidoPaterno || ''} ${apellidoMaterno || ''}`.trim());
+                    if (dniData) {
+                        if (dniData.nombres && dniData.apellidoPaterno) {
+                            newQrClientForm.setValue('name', dniData.nombres || "");
+                            newQrClientForm.setValue('surname', `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim());
+                        }
 
-                        if (fechaNacimiento) {
-                            const [day, month, year] = fechaNacimiento.split('/');
+                        if (dniData.fechaNacimiento) {
+                            const [day, month, year] = dniData.fechaNacimiento.split('/');
                             if (day && month && year) {
+                                // Asegurarse que el formato sea YYYY-MM-DD para el constructor de Date
                                 const dob = new Date(`${year}-${month}-${day}T00:00:00`);
                                 if (!isNaN(dob.getTime())) {
                                     newQrClientForm.setValue('dob', dob);
