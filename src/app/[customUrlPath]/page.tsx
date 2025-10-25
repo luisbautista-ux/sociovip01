@@ -408,41 +408,15 @@ const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEnti
 
 const consultExternalDniApi = async (dni: string) => {
     try {
-        const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
-        const formNombres = new URLSearchParams();
-        formNombres.append('dni4', dni);
-        formNombres.append('company', '');
-        formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '4550295f30'); 
-
-        const responseNombres = await fetch(endpointNombres, {
+        const response = await fetch('/api/admin/consult-dni', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
-            },
-            body: formNombres.toString(),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni }),
         });
-        
-        let nombreCompleto = "";
-        let nombres = "";
-        let apellidoPaterno = "";
-        let apellidoMaterno = "";
-
-        if (responseNombres.ok) {
-            const dataNombres = await responseNombres.json();
-            const mensaje = dataNombres.data?.message;
-            if (mensaje) {
-                const lineas = mensaje.split('\n');
-                lineas.forEach((linea: string) => {
-                    if (linea.startsWith("Nombres:")) nombres = linea.replace("Nombres:", "").trim();
-                    else if (linea.startsWith("Apellido Paterno:")) apellidoPaterno = linea.replace("Apellido Paterno:", "").trim();
-                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterno = linea.replace("Apellido Materno:", "").trim();
-                });
-                nombreCompleto = `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim().replace(/\s+/g, ' ');
-            }
+        if (response.ok) {
+            return await response.json();
         }
-        return { nombreCompleto, nombres, apellidoPaterno, apellidoMaterno, fechaNacimiento: "" };
+        return null;
     } catch (e) {
         console.warn("External DNI API call failed, user will fill manually.", e);
         return null;
