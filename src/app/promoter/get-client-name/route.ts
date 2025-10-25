@@ -27,17 +27,15 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     return userDoc.data() as PlatformUser;
 }
 
-async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; nombres: string | null; apellidoPaterno: string | null; apellidoMaterno: string | null; fechaNacimiento: string | null; }> {
+async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; }> {
     let result = {
         nombreCompleto: "",
         nombres: null,
         apellidoPaterno: null,
         apellidoMaterno: null,
-        fechaNacimiento: null,
     };
 
     try {
-        // --- 1. Fetch Nombres y Apellidos ---
         const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
@@ -63,33 +61,12 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
             }
         }
 
-        // --- 2. Fetch Fecha de Nacimiento ---
-        const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
-        const formFecha = new URLSearchParams();
-        formFecha.append('dni', dni);
-        formFecha.append('company', '');
-        formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', '5c5665b196');
-
-        const responseFecha = await fetch(endpointFecha, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/consultar-dni/' },
-            body: formFecha.toString(),
-        });
-
-        if (responseFecha.ok) {
-            const dataFecha = await responseFecha.json();
-            if (dataFecha.success && dataFecha.data?.fecha_nacimiento) {
-                result.fechaNacimiento = dataFecha.data.fecha_nacimiento.trim();
-            }
-        }
-
         result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
 
     } catch (e) {
         console.error("Error fetching from external DNI API in get-client-name:", e);
     }
-    return result;
+    return { nombreCompleto: result.nombreCompleto };
 }
 
 

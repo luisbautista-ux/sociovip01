@@ -23,8 +23,9 @@ async function getCallerProfile(idToken: string) {
     }
 }
 
-async function fetchExternalDniData(dni: string): Promise<{ nombres: string | null; apellidoPaterno: string | null; apellidoMaterno: string | null; fechaNacimiento: string | null; }> {
+async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: string; nombres: string | null; apellidoPaterno: string | null; apellidoMaterno: string | null; fechaNacimiento: string | null; }> {
     let result = {
+        nombreCompleto: "",
         nombres: null,
         apellidoPaterno: null,
         apellidoMaterno: null,
@@ -61,7 +62,7 @@ async function fetchExternalDniData(dni: string): Promise<{ nombres: string | nu
         // --- 2. Fetch Fecha de Nacimiento ---
         const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formFecha = new URLSearchParams();
-        formFecha.append('dni', dni);
+        formFecha.append('dni', dni); // <<<<<< CORRECCIÓN: USAR 'dni' en lugar de 'dni4'
         formFecha.append('company', '');
         formFecha.append('action', 'buscar_fecha');
         formFecha.append('security', '5c5665b196');
@@ -78,6 +79,9 @@ async function fetchExternalDniData(dni: string): Promise<{ nombres: string | nu
                 result.fechaNacimiento = dataFecha.data.fecha_nacimiento.trim();
             }
         }
+
+        result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
+
     } catch (e) {
         console.error("Error fetching from external DNI API:", e);
     }
@@ -129,11 +133,7 @@ export async function POST(request: Request) {
     const externalData = await fetchExternalDniData(dni);
 
     if (externalData.nombres || externalData.fechaNacimiento) {
-      const nombreCompleto = `${externalData.nombres || ''} ${externalData.apellidoPaterno || ''} ${externalData.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
-      return NextResponse.json({
-          nombreCompleto,
-          ...externalData
-      });
+      return NextResponse.json(externalData);
     } else {
       return NextResponse.json({ error: "No se pudo obtener información para el DNI consultado." }, { status: 404 });
     }
