@@ -16,6 +16,7 @@ import QRCode from 'qrcode';
 import type { BusinessManagedEntity, QrTemplateLayout } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 
 const templateFormSchema = z.object({
   qrTemplateFile: z.custom<File | null>(() => true).optional(),
@@ -387,4 +388,3 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
     </Dialog>
   );
 }
-
