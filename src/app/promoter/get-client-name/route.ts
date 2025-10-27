@@ -41,7 +41,6 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
-        formNombres.append('company', '');
         formNombres.append('action', 'buscar_nombres');
         formNombres.append('security', 'b8d55f5c4f');
 
@@ -66,14 +65,13 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         // --- 2. Fetch birth date ---
         const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formFecha = new URLSearchParams();
-        formFecha.append('dni', dni);
-        formFecha.append('company', '');
+        formFecha.append('dni', dni); // param is 'dni' not 'dni4'
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', 'c5a5d96362'); // Updated security token
+        formFecha.append('security', '94c643fd81'); // The new security token
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/fecha-de-nacimiento-con-dni/' },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/consultar-dni/' }, // Different referer
             body: formFecha.toString(),
         });
 
