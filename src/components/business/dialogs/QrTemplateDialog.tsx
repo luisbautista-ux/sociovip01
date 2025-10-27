@@ -38,8 +38,6 @@ const elementLabels: Record<DraggableElement, string> = {
   promoTitle: "Título Campaña",
 };
 
-const SNAP_THRESHOLD = 5;
-
 interface QrTemplateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -268,6 +266,9 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
         const layout = form.getValues('qrTemplateLayout');
         const ctx = canvas.getContext('2d');
         if (!layout || !ctx) return;
+        
+        // Make SNAP_THRESHOLD dynamic
+        const snapThreshold = Math.max(5, Math.round(canvas.width * 0.01)); // 1% of width, with a minimum of 5px
 
         const activeSnapLines: { x: number[], y: number[] } = { x: [], y: [] };
 
@@ -284,8 +285,8 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
             }
         });
         
-        for (const snapPoint of snapPoints.x) if (Math.abs(newX - snapPoint.val) < SNAP_THRESHOLD) { newX = snapPoint.val; activeSnapLines.x.push(snapPoint.val); break; }
-        for (const snapPoint of snapPoints.y) if (Math.abs(newY - snapPoint.val) < SNAP_THRESHOLD) { newY = snapPoint.val; activeSnapLines.y.push(snapPoint.val); break; }
+        for (const snapPoint of snapPoints.x) if (Math.abs(newX - snapPoint.val) < snapThreshold) { newX = snapPoint.val; activeSnapLines.x.push(snapPoint.val); break; }
+        for (const snapPoint of snapPoints.y) if (Math.abs(newY - snapPoint.val) < snapThreshold) { newY = snapPoint.val; activeSnapLines.y.push(snapPoint.val); break; }
 
         setSnapLines(activeSnapLines);
         form.setValue(`qrTemplateLayout.${draggedElement}.x`, newX);
