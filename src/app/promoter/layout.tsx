@@ -154,8 +154,12 @@ export default function PromoterLayout({
   if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <Loader2 className="h-12 w-12 animate-spin text-white" />
-        <p className="ml-4 text-lg text-white/90">Verificando autenticación...</p>
+        <div className="flex flex-col items-center justify-center text-center">
+            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
+                <SocioVipLogo size={80} className="animate-pulse" />
+            </div>
+            <p className="mt-4 text-lg text-white/90">Verificando autenticación...</p>
+        </div>
       </div>
     );
   }
@@ -163,7 +167,12 @@ export default function PromoterLayout({
   if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <p className="text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
+        <div className="flex flex-col items-center justify-center text-center">
+            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
+                <SocioVipLogo size={80} className="animate-pulse" />
+            </div>
+            <p className="mt-4 text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
+        </div>
       </div>
     );
   }
@@ -171,8 +180,12 @@ export default function PromoterLayout({
   if (loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <Loader2 className="h-12 w-12 animate-spin text-white" />
-        <p className="ml-4 text-lg text-white/90">Cargando perfil de usuario...</p>
+        <div className="flex flex-col items-center justify-center text-center">
+            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
+                <SocioVipLogo size={80} className="animate-pulse" />
+            </div>
+            <p className="mt-4 text-lg text-white/90">Cargando perfil de usuario...</p>
+        </div>
       </div>
     );
   }

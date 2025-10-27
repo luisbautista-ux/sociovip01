@@ -15,6 +15,7 @@ import type { Business } from "@/lib/types";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import NextImage from "next/image";
 import { DialogTitle } from "@/components/ui/dialog";
+import { SocioVipLogo } from "@/components/icons";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -108,8 +109,12 @@ export default function BusinessPanelLayout({
   if (loadingAuth || loadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <Loader2 className="h-12 w-12 animate-spin text-white" />
-        <p className="ml-4 text-lg text-white/90">Verificando y cargando...</p>
+        <div className="flex flex-col items-center justify-center text-center">
+            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
+                <SocioVipLogo size={80} className="animate-pulse" />
+            </div>
+            <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
+        </div>
       </div>
     );
   }
@@ -117,7 +122,12 @@ export default function BusinessPanelLayout({
   if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-         <p className="text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
+        <div className="flex flex-col items-center justify-center text-center">
+            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
+                <SocioVipLogo size={80} className="animate-pulse" />
+            </div>
+            <p className="mt-4 text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
+        </div>
       </div>
     );
   }
