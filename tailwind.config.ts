@@ -87,14 +87,21 @@ export default {
   				to: {
   					height: '0'
   				}
-  			}
+  			},
+        'drop-and-bounce': {
+          '0%': { transform: 'translateY(-200px)', opacity: '0', 'animation-timing-function': 'ease-in' },
+          '60%': { transform: 'translateY(0)', opacity: '1', 'animation-timing-function': 'cubic-bezier(0.215, 0.61, 0.355, 1)' },
+          '75%': { transform: 'translateY(-15px)', 'animation-timing-function': 'cubic-bezier(0.755, 0.05, 0.855, 0.06)' },
+          '90%': { transform: 'translateY(0)', 'animation-timing-function': 'ease-in' },
+          '100%': { transform: 'translateY(0)' },
+        }
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+        'drop-and-bounce': 'drop-and-bounce 1s ease-out forwards',
   		}
   	}
   },
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;
-

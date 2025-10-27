@@ -196,8 +196,8 @@ export default function HomePage() {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
             <div className="flex flex-col items-center justify-center text-center">
-                <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-                    <SocioVipLogo size={80} className="animate-pulse" />
+                <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-and-bounce">
+                    <SocioVipLogo size={80} />
                 </div>
                 <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
             </div>
@@ -310,4 +310,3 @@ export default function HomePage() {
     </div>
   );
 }
-
