@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -17,6 +18,8 @@ import type { BusinessManagedEntity, QrTemplateLayout } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 const templateFormSchema = z.object({
   qrTemplateFile: z.custom<File | null>(() => true).optional(),
@@ -80,6 +83,10 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
   const qrImageRef = useRef<HTMLImageElement | null>(null);
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedChangesAlert, setShowUnsavedChangesAlert] = useState(false);
+  const initialDataSnapshot = useRef<string | null>(null);
+
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateFormSchema),
     defaultValues: {
@@ -97,18 +104,31 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
 
   useEffect(() => {
     if (open && entity) {
+      const initialLayout = entity.qrTemplateLayout || {
+        qr: { x: 190, y: 350, size: 80, color: "#000000" },
+        name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
+        dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
+        promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
+      };
       setTemplatePreview(entity.qrTemplateImageUrl || null);
-      form.reset({
-        qrTemplateFile: null,
-        qrTemplateLayout: entity.qrTemplateLayout || {
-          qr: { x: 190, y: 350, size: 80, color: "#000000" },
-          name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
-          dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
-          promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
-        },
-      });
+      form.reset({ qrTemplateFile: null, qrTemplateLayout: initialLayout });
+      const snapshot = {
+        imageUrl: entity.qrTemplateImageUrl,
+        layout: initialLayout,
+      };
+      initialDataSnapshot.current = JSON.stringify(snapshot);
+      setHasUnsavedChanges(false);
     }
   }, [open, entity, form]);
+  
+  useEffect(() => {
+    if (!initialDataSnapshot.current) return;
+    const currentSnapshot = {
+        imageUrl: templatePreview,
+        layout: form.getValues('qrTemplateLayout')
+    };
+    setHasUnsavedChanges(JSON.stringify(currentSnapshot) !== initialDataSnapshot.current);
+  }, [formValues, templatePreview]);
 
   const getElementRect = useCallback((key: DraggableElement, layout: QrTemplateLayout, ctx: CanvasRenderingContext2D): { x1: number, y1: number, x2: number, y2: number, cx: number, cy: number } => {
     const el = layout[key];
@@ -381,9 +401,18 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
   const handleSave = (values: TemplateFormValues) => {
     onSave(entity.id, values.qrTemplateFile || null, values.qrTemplateLayout);
   };
+  
+  const handleAttemptClose = () => {
+    if (hasUnsavedChanges) {
+        setShowUnsavedChangesAlert(true);
+    } else {
+        onOpenChange(false);
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) handleAttemptClose(); else onOpenChange(true); }}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-2 shrink-0">
           <DialogTitle>Personalizar Plantilla QR para: {entity.name}</DialogTitle>
@@ -439,12 +468,12 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.x`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.y`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         <div className="col-span-2 grid grid-cols-2 gap-4 items-center">
-                            <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl></FormItem>)}/>
+                            <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} value={field.value || ""} /></FormControl></FormItem>)}/>
                             {selectedElement !== 'qr' && (
-                                <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} value={field.value || ''} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#FFFFFF'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
                             )}
                             {selectedElement === 'qr' && (
-                                 <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} value={field.value || ''} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                 <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#000000'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
                             )}
                         </div>
                     </CardContent>
@@ -453,7 +482,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
             </div>
 
             <DialogFooter className="md:col-span-3 pt-4 border-t mt-auto">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
+                <Button type="button" variant="outline" onClick={handleAttemptClose} disabled={isSubmitting}>Cancelar</Button>
                 <Button type="submit" variant="gradient" disabled={isSubmitting}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Guardar Plantilla"}
                 </Button>
@@ -462,5 +491,28 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
         </Form>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={showUnsavedChangesAlert} onOpenChange={setShowUnsavedChangesAlert}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Has realizado cambios que no se han guardado. ¿Estás seguro de que quieres cerrar y descartar estos cambios?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <ShadcnAlertDialogFooter>
+                <AlertDialogCancel>No, continuar editando</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={() => {
+                        setShowUnsavedChangesAlert(false);
+                        onOpenChange(false);
+                    }}
+                    className="bg-destructive hover:bg-destructive/90"
+                >
+                    Sí, descartar
+                </AlertDialogAction>
+            </ShadcnAlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+   </>
   );
 }

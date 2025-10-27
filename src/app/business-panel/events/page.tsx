@@ -1257,7 +1257,7 @@ export default function BusinessEventsPage() {
                                     <Edit className="mr-2 h-4 w-4" /> Gestionar
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setSelectedEventForTemplate(event); setShowQrTemplateModal(true); }}>
-                                    <ImageIcon className="h-4 w-4 mr-2" /> Plantilla QR
+                                    <ImageIcon className="mr-2 h-4 w-4" /> Plantilla QR
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event, true)}>
                                     <Copy className="mr-2 h-4 w-4" /> Duplicar
