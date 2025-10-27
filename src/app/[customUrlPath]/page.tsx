@@ -39,7 +39,7 @@ import type {
   NewQrClientFormData,
   GeneratedCode,
 } from "@/lib/types";
-import { format, parseISO, isPast } from "date-fns";
+import { format, parse, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import {
@@ -407,12 +407,12 @@ const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEnti
     } as BusinessManagedEntity;
 };
 
-const consultExternalDniApi = async (dni: string) => {
+const consultExternalDniApi = async (dni: string, docType: 'dni' | 'ce') => {
     try {
         const response = await fetch('/api/public/consult-document', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dni }),
+            body: JSON.stringify({ dni, docType }),
         });
         if (response.ok) {
             return await response.json();
@@ -455,34 +455,36 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: docNumberCleaned });
             setCurrentStepInModal("newUserForm");
             
-            if (data.docType === 'dni') {
-                setIsConsultingDni(true);
-                try {
-                    const dniData = await consultExternalDniApi(docNumberCleaned);
-                    if (dniData) {
-                        if (dniData.nombres && dniData.apellidoPaterno) {
-                            newQrClientForm.setValue('name', dniData.nombres || "");
-                            newQrClientForm.setValue('surname', `${dniData.apellidoPaterno || ''} ${dniData.apellidoMaterno || ''}`.trim());
-                        }
-
-                        if (dniData.fechaNacimiento) {
-                            const [day, month, year] = dniData.fechaNacimiento.split('/');
-                            if (day && month && year) {
-                                const dob = new Date(`${year}-${month}-${day}T00:00:00`);
-                                if (!isNaN(dob.getTime())) {
-                                    newQrClientForm.setValue('dob', dob);
-                                }
-                            }
-                        }
-                    } else {
-                       console.warn(`DNI consultation failed.`);
+            setIsConsultingDni(true);
+            try {
+                const apiData = await consultExternalDniApi(docNumberCleaned, data.docType);
+                if (apiData) {
+                    if (apiData.nombreCompleto) {
+                        const nameParts = apiData.nombreCompleto.split(' ');
+                        const surname = nameParts.slice(-2).join(' ');
+                        const name = nameParts.slice(0, -2).join(' ');
+                        newQrClientForm.setValue('name', name || "");
+                        newQrClientForm.setValue('surname', surname || "");
+                    } else if (apiData.nombres && apiData.apellidoPaterno) {
+                        newQrClientForm.setValue('name', apiData.nombres || "");
+                        newQrClientForm.setValue('surname', `${apiData.apellidoPaterno || ''} ${apiData.apellidoMaterno || ''}`.trim());
                     }
-                } catch (e) {
-                    console.warn("DNI consultation API call failed, user will fill manually.", e);
-                } finally {
-                    setIsConsultingDni(false);
+
+                    if (apiData.fechaNacimiento) {
+                        const parsedDate = parse(apiData.fechaNacimiento, 'dd/MM/yyyy', new Date());
+                        if (!isNaN(parsedDate.getTime())) {
+                            newQrClientForm.setValue('dob', parsedDate);
+                        }
+                    }
+                } else {
+                   console.warn(`DNI/CE consultation failed.`);
                 }
+            } catch (e) {
+                console.warn("DNI/CE consultation API call failed, user will fill manually.", e);
+            } finally {
+                setIsConsultingDni(false);
             }
+            
         } else if (result.action === 'userExists') {
             const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
             const clientForQr: QrClient = result.clientData;
@@ -927,7 +929,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 <Separator />
                 <div className="text-center">
                    <p className="font-semibold">{qrData.promotion.title}</p>
-                   <p className="text-xs text-muted-foreground">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
+                   <p className="text-xs text-muted-foreground">Válido hasta: {format(parse(qrData.promotion.validUntil, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}</p>
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
@@ -1044,7 +1046,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
                     <p className="text-xs text-muted-foreground">
-                      Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
+                      Válido hasta el {format(parse(promo.endDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}
                     </p>
                   </CardContent>
                   <CardFooter className="flex-col items-start p-4 border-t">
@@ -1086,7 +1088,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   <CardContent className="flex-grow space-y-1">
                     <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
                     <p className="text-xs text-muted-foreground">
-                      Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}
+                      Fecha: {format(parse(event.startDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}
                     </p>
                   </CardContent>
                   {isEntityCurrentlyActivatable(event) ? (

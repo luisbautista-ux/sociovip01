@@ -1,18 +1,16 @@
 
+
 'use server';
 
 import { NextResponse } from 'next/server';
-import { admin, initializeAdminApp } from '@/lib/firebase/firebaseAdmin';
-import { getAuth } from 'firebase-admin/auth';
-import type { PlatformUser } from '@/lib/types';
 import { z } from 'zod';
 
-const GetDocumentSchema = z.object({
-    dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(20, "DNI/CE no debe exceder 20 caracteres."),
-    docType: z.enum(['dni', 'ce']),
+const ConsultDocumentSchema = z.object({
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(20, "DNI/CE no debe exceder 20 caracteres."),
+  docType: z.enum(['dni', 'ce'], { required_error: "docType es requerido." }),
 });
 
-async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: string; nombres: string | null; apellidoPaterno: string | null; apellidoMaterno: string | null; fechaNacimiento: string | null; }> {
+async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: string; fechaNacimiento: string | null }> {
     let result = {
         nombreCompleto: "",
         nombres: null as string | null,
@@ -27,11 +25,14 @@ async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: stri
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', 'b8d55f5c4f');
+        formNombres.append('security', '2a92912867');
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
+            },
             body: formNombres.toString(),
         });
         
@@ -50,13 +51,16 @@ async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: stri
         // --- 2. Fetch birth date ---
         const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formFecha = new URLSearchParams();
-        formFecha.append('dni', dni); // param is 'dni' not 'dni4'
+        formFecha.append('dni', dni); // param is 'dni'
         formFecha.append('action', 'buscar_fecha');
         formFecha.append('security', '94c643fd81');
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/consultar-dni/' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://dniperu.com/consultar-dni/',
+            },
             body: formFecha.toString(),
         });
 
@@ -75,61 +79,32 @@ async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: stri
         result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
 
     } catch (e) {
-        console.error("Error fetching from external DNI API in public/consult-document:", e);
+        console.error("Error fetching from external DNI API in consult-document:", e);
     }
     
-    return result;
+    return { nombreCompleto: result.nombreCompleto, fechaNacimiento: result.fechaNacimiento };
 }
 
 
 export async function POST(request: Request) {
   try {
-    await initializeAdminApp();
-    const adminDb = admin.firestore();
-
     const body = await request.json();
-    const validation = GetDocumentSchema.safeParse(body);
+    const validation = ConsultDocumentSchema.safeParse(body);
     
     if (!validation.success) {
       return NextResponse.json({ error: 'DNI/CE inválido o no proporcionado.', details: validation.error.flatten() }, { status: 400 });
     }
+
     const { dni, docType } = validation.data;
 
-    // --- 1. Search in internal DB ---
-    const collectionsToSearch = ['qrClients', 'socioVipMembers'];
-    for (const collectionName of collectionsToSearch) {
-        const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', dni).limit(1).get();
-        if (!querySnapshot.empty) {
-            const data = querySnapshot.docs[0].data();
-            const fullName = `${data.name} ${data.surname}`.trim();
-            const dobDate = data.dob?.toDate?.();
-            const fechaNacimiento = dobDate ? dobDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }) : null;
-            return NextResponse.json({ 
-                nombreCompleto: fullName, 
-                nombres: data.name,
-                apellidoPaterno: data.surname.split(' ')[0] || '',
-                apellidoMaterno: data.surname.split(' ').slice(1).join(' ') || '',
-                fechaNacimiento: fechaNacimiento,
-            });
-        }
-    }
-
-    // --- 2. If it's a DNI and not found internally, consult external API ---
     if (docType === 'dni') {
         const externalData = await fetchExternalDniData(dni);
-        if (externalData && externalData.nombreCompleto) {
+        if (externalData.nombreCompleto) {
             return NextResponse.json(externalData);
         }
     }
-
-    // --- 3. If not found anywhere ---
-    return NextResponse.json({ 
-        nombreCompleto: null, 
-        nombres: null,
-        apellidoPaterno: null,
-        apellidoMaterno: null,
-        fechaNacimiento: null 
-    });
+    
+    return NextResponse.json({ nombreCompleto: null, fechaNacimiento: null });
 
   } catch (error: any) {
     console.error("API Route (public/consult-document): Error:", error);

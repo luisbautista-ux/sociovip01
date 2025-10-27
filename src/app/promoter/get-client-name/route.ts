@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { NextResponse } from 'next/server';
@@ -42,11 +43,14 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', 'b8d55f5c4f');
+        formNombres.append('security', '2a92912867');
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
+            },
             body: formNombres.toString(),
         });
         
@@ -65,13 +69,16 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         // --- 2. Fetch birth date ---
         const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formFecha = new URLSearchParams();
-        formFecha.append('dni', dni); // param is 'dni' not 'dni4'
+        formFecha.append('dni', dni); // param is 'dni'
         formFecha.append('action', 'buscar_fecha');
         formFecha.append('security', '94c643fd81');
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/consultar-dni/' },
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://dniperu.com/consultar-dni/',
+            },
             body: formFecha.toString(),
         });
 
