@@ -67,11 +67,11 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         const formFecha = new URLSearchParams();
         formFecha.append('dni', dni); // param is 'dni' not 'dni4'
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', '94c643fd81'); // The new security token
+        formFecha.append('security', '94c643fd81');
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/consultar-dni/' }, // Different referer
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/consultar-dni/' },
             body: formFecha.toString(),
         });
 
@@ -126,8 +126,9 @@ export async function GET(request: Request) {
         if (!querySnapshot.empty) {
             const data = querySnapshot.docs[0].data();
             const fullName = `${data.name} ${data.surname}`.trim();
-            const dob = data.dob?.toDate?.()?.toLocaleDateString('es-PE', { timeZone: 'America/Lima' }) || null;
-            return NextResponse.json({ name: fullName, phone: data.phone || null, dob: dob });
+            const dobDate = data.dob?.toDate?.();
+            const fechaNacimiento = dobDate ? dobDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }) : null;
+            return NextResponse.json({ name: fullName, phone: data.phone || null, dob: fechaNacimiento });
         }
     }
 
