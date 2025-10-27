@@ -95,7 +95,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
       const halfSize = size / 2;
       return { x1: el.x - halfSize, y1: el.y - halfSize, x2: el.x + halfSize, y2: el.y + halfSize, cx: el.x, cy: el.y };
     } else {
-      const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
+      const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Promoción";
       ctx.font = `bold ${size}px Arial`;
       const textMetrics = ctx.measureText(text);
       const textWidth = textMetrics.width;
@@ -109,7 +109,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
         cy: el.y - textHeight / 2,
       };
     }
-  }, [formValues.name]);
+  }, [entity.name]);
 
   const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement | null = null, currentSnapLines: { x: number[], y: number[] }) => {
     const canvas = canvasRef.current;
