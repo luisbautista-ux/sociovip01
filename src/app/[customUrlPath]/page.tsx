@@ -950,7 +950,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
          }}
        >
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
+            <div className="flex items-center justify-between h-14">
               <div className="flex items-center gap-2">
                  <Link href="/" className="flex items-center gap-2">
                     <SocioVipLogo size={32} />
@@ -974,13 +974,13 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
          </div>
        </header>
 
-       <div className="relative w-full h-48 md:h-64 bg-black">
+       <div className="relative w-full aspect-[16/9] max-h-48 md:max-h-64 bg-black">
         {businessDetails.publicCoverImageUrl ? (
           <NextImage
             src={businessDetails.publicCoverImageUrl}
             alt={`${businessDetails.name} cover image`}
             fill
-            className="object-contain"
+            className="object-cover"
             priority
           />
         ) : (
@@ -1006,9 +1006,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         </div>
       </div>
       
-      <div className="sticky top-16 z-10" style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
+      <div className="sticky top-14 z-10" style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-start h-12 gap-6">
+            <div className="flex items-center justify-start h-10 gap-6">
                 <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
                 <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
                 <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
