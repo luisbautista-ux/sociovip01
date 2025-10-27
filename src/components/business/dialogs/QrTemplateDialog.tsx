@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -21,10 +22,30 @@ import { Label } from "@/components/ui/label";
 const templateFormSchema = z.object({
   qrTemplateFile: z.custom<File | null>(() => true).optional(),
   qrTemplateLayout: z.object({
-    qr: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number() }),
-    name: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
-    dni: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
-    promoTitle: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
+    qr: z.object({
+      x: z.coerce.number(),
+      y: z.coerce.number(),
+      size: z.coerce.number(),
+      color: z.string().optional(),
+    }),
+    name: z.object({
+      x: z.coerce.number(),
+      y: z.coerce.number(),
+      size: z.coerce.number().optional(),
+      color: z.string().optional(),
+    }),
+    dni: z.object({
+      x: z.coerce.number(),
+      y: z.coerce.number(),
+      size: z.coerce.number().optional(),
+      color: z.string().optional(),
+    }),
+    promoTitle: z.object({
+      x: z.coerce.number(),
+      y: z.coerce.number(),
+      size: z.coerce.number().optional(),
+      color: z.string().optional(),
+    }),
   }),
 });
 
@@ -66,10 +87,10 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
     defaultValues: {
       qrTemplateFile: null,
       qrTemplateLayout: entity.qrTemplateLayout || {
-        qr: { x: 190, y: 350, size: 80 },
-        name: { x: 190, y: 450, size: 16 },
-        dni: { x: 190, y: 470, size: 12 },
-        promoTitle: { x: 190, y: 500, size: 14 },
+        qr: { x: 190, y: 350, size: 80, color: "#000000" },
+        name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
+        dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
+        promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
       },
     }
   });
@@ -82,10 +103,10 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
       form.reset({
         qrTemplateFile: null,
         qrTemplateLayout: entity.qrTemplateLayout || {
-          qr: { x: 190, y: 350, size: 80 },
-          name: { x: 190, y: 450, size: 16 },
-          dni: { x: 190, y: 470, size: 12 },
-          promoTitle: { x: 190, y: 500, size: 14 },
+          qr: { x: 190, y: 350, size: 80, color: "#000000" },
+          name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
+          dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
+          promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
         },
       });
     }
@@ -135,7 +156,15 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
       });
 
       const qrPromise = new Promise<HTMLImageElement | null>((resolve) => {
-          QRCode.toDataURL("SocioVipPreview", { width: layout.qr.size, errorCorrectionLevel: "H", margin: 1 })
+          QRCode.toDataURL("SocioVipPreview", { 
+              width: layout.qr.size, 
+              errorCorrectionLevel: "H", 
+              margin: 1,
+              color: {
+                  dark: layout.qr.color || "#000000",
+                  light: "#0000" // Transparent background
+              }
+          })
             .then(url => {
               const img = new Image();
               img.src = url;
@@ -157,7 +186,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
     loadResources();
 
     return () => { isMounted = false; };
-  }, [templatePreview, form.getValues('qrTemplateLayout').qr.size]);
+  }, [templatePreview, form.getValues('qrTemplateLayout').qr.size, form.getValues('qrTemplateLayout').qr.color]);
 
 
   const drawPreviewOnCanvas = useCallback((highlightedElement: DraggableElement | null = null, currentSnapLines: { x: number[], y: number[] }) => {
@@ -191,7 +220,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
             ctx.drawImage(qrImageRef.current, rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
             if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
           } else if (key !== 'qr') {
-            ctx.fillStyle = 'white';
+            ctx.fillStyle = config.color || '#FFFFFF';
             ctx.textAlign = 'center';
             const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Campaña";
             let fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
@@ -412,7 +441,15 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
                     <CardContent className="p-3 grid grid-cols-2 gap-4">
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.x`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.y`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                        <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem className="col-span-2"><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                        <div className="col-span-2 grid grid-cols-2 gap-4 items-center">
+                            <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
+                            {selectedElement !== 'qr' && (
+                                <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                            )}
+                            {selectedElement === 'qr' && (
+                                 <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                            )}
+                        </div>
                     </CardContent>
                   </Card>
                 )}

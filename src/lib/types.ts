@@ -213,10 +213,10 @@ export interface EventBox {
 }
 
 export interface QrTemplateLayout {
-  qr: { x: number; y: number; size: number };
-  name: { x: number; y: number; size?: number };
-  dni: { x: number; y: number; size?: number };
-  promoTitle: { x: number; y: number; size?: number };
+  qr: { x: number; y: number; size: number; color?: string; };
+  name: { x: number; y: number; size?: number; color?: string; };
+  dni: { x: number; y: number; size?: number; color?: string; };
+  promoTitle: { x: number; y: number; size?: number; color?: string; };
 }
 
 
