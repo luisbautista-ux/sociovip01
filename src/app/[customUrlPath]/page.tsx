@@ -409,7 +409,7 @@ const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEnti
 
 const consultExternalDniApi = async (dni: string) => {
     try {
-        const response = await fetch('/api/admin/consult-dni', {
+        const response = await fetch('/api/public/consult-document', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ dni }),
@@ -468,7 +468,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                         if (dniData.fechaNacimiento) {
                             const [day, month, year] = dniData.fechaNacimiento.split('/');
                             if (day && month && year) {
-                                // Asegurarse que el formato sea YYYY-MM-DD para el constructor de Date
                                 const dob = new Date(`${year}-${month}-${day}T00:00:00`);
                                 if (!isNaN(dob.getTime())) {
                                     newQrClientForm.setValue('dob', dob);
