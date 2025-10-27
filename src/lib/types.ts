@@ -16,7 +16,7 @@ export interface PromotionDetails {
   type: 'promotion' | 'event';
   termsAndConditions?: string;
   qrTemplateImageUrl?: string;
-  qrTemplateLayout?: QrTemplateLayout; // Added for layout customization
+  qrTemplateLayout?: QrTemplateLayout;
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'used' | 'expired';
@@ -229,7 +229,7 @@ export interface BusinessManagedEntity {
   usageLimit?: number; 
   isActive: boolean;
   imageUrl?: string;
-  imageObjectPosition?: string; // New: To store image focus point
+  imageObjectPosition?: string;
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
@@ -244,8 +244,8 @@ export interface BusinessManagedEntity {
   businessCustomUrlPath?: string | null;
   createdAt?: string; 
   qrTemplateImageUrl?: string;
-  templateObjectPosition?: string; // New: To store template image focus point
-  qrTemplateLayout?: QrTemplateLayout; // Added for layout customization
+  templateObjectPosition?: string;
+  qrTemplateLayout?: QrTemplateLayout;
 }
 
 export interface PromoterEntityView extends BusinessManagedEntity {

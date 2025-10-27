@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,21 +16,19 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, ImageIcon, Loader2, Move, Upload, Settings, RefreshCw, Grab } from "lucide-react";
+import { CalendarIcon, ImageIcon, Loader2, Move, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import type { BusinessManagedEntity, BusinessPromotionFormData, QrTemplateLayout } from "@/lib/types";
+import type { BusinessManagedEntity, BusinessPromotionFormData } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
 import NextImage from "next/image";
 import { useToast } from "@/hooks/use-toast";
-import QRCode from 'qrcode';
 
 
 const promotionFormSchema = z.object({
@@ -43,15 +42,6 @@ const promotionFormSchema = z.object({
   imageFile: z.custom<File | null>(() => true).optional(),
   imageObjectPosition: z.string().optional(),
   termsAndConditions: z.string().optional(),
-  qrTemplateImageUrl: z.string().optional(),
-  qrTemplateFile: z.custom<File | null>(() => true).optional(),
-  templateObjectPosition: z.string().optional(),
-  qrTemplateLayout: z.object({
-    qr: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number() }),
-    name: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
-    dni: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
-    promoTitle: z.object({ x: z.coerce.number(), y: z.coerce.number(), size: z.coerce.number().optional() }),
-  }).optional(),
 }).refine(data => {
     if (data.startDate && data.endDate) {
         const start = new Date(data.startDate.getFullYear(), data.startDate.getMonth(), data.startDate.getDate());
@@ -66,15 +56,6 @@ const promotionFormSchema = z.object({
 
 type PromotionFormValues = z.infer<typeof promotionFormSchema>;
 
-type DraggableElement = "qr" | "name" | "dni" | "promoTitle";
-
-const elementLabels: Record<DraggableElement, string> = {
-  qr: "Código QR",
-  name: "Nombre Cliente",
-  dni: "DNI Cliente",
-  promoTitle: "Título Promoción",
-};
-
 interface BusinessPromotionFormProps {
   promotion?: BusinessManagedEntity; 
   onSubmit: (data: BusinessPromotionFormData) => void;
@@ -82,33 +63,18 @@ interface BusinessPromotionFormProps {
   isSubmitting?: boolean;
 }
 
-const SNAP_THRESHOLD = 5;
-
 export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitting = false }: BusinessPromotionFormProps) {
   
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [templatePreview, setTemplatePreview] = useState<string | null>(null);
   const [objectPosition, setObjectPosition] = useState(promotion?.imageObjectPosition || '50% 50%');
-  const [templateObjectPosition, setTemplateObjectPosition] = useState(promotion?.templateObjectPosition || '50% 50%'); // New state for template position
   
   const imgContainerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
-  const templateContainerRef = useRef<HTMLDivElement>(null);
 
   const mainImageInputRef = useRef<HTMLInputElement>(null);
-  const templateImageInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [draggedElement, setDraggedElement] = useState<DraggableElement | null>(null);
-  const dragOffset = useRef({ x: 0, y: 0 });
-  const [selectedElement, setSelectedElement] = useState<DraggableElement | null>(null);
-  
-  // New state for snapping lines
-  const [snapLines, setSnapLines] = useState<{ x: number[], y: number[] }>({ x: [], y: [] });
-
-
   const form = useForm<PromotionFormValues>({
     resolver: zodResolver(promotionFormSchema),
     defaultValues: {
@@ -122,36 +88,15 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       imageFile: null,
       imageObjectPosition: '50% 50%',
       termsAndConditions: "",
-      qrTemplateImageUrl: "",
-      qrTemplateFile: null,
-      templateObjectPosition: '50% 50%',
-      qrTemplateLayout: {
-        qr: { x: 190, y: 350, size: 80 },
-        name: { x: 190, y: 450, size: 16 },
-        dni: { x: 190, y: 470, size: 12 },
-        promoTitle: { x: 190, y: 500, size: 14 },
-      },
     },
   });
-  
-  const formValues = form.watch();
 
   useEffect(() => {
     if (promotion) {
       const initialImgPos = promotion.imageObjectPosition || '50% 50%';
-      const initialTmplPos = promotion.templateObjectPosition || '50% 50%';
-      const initialLayout = promotion.qrTemplateLayout || {
-        qr: { x: 190, y: 350, size: 80 },
-        name: { x: 190, y: 450, size: 16 },
-        dni: { x: 190, y: 470, size: 12 },
-        promoTitle: { x: 190, y: 500, size: 14 },
-      };
-
       setObjectPosition(initialImgPos);
-      setTemplateObjectPosition(initialTmplPos);
       setImagePreview(promotion.imageUrl || null);
-      setTemplatePreview(promotion.qrTemplateImageUrl || null);
-
+      
       form.reset({
         name: promotion.name || "",
         description: promotion.description || "",
@@ -163,148 +108,12 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         imageFile: null,
         imageObjectPosition: initialImgPos,
         termsAndConditions: promotion.termsAndConditions || "",
-        qrTemplateImageUrl: promotion.qrTemplateImageUrl || "",
-        qrTemplateFile: null,
-        templateObjectPosition: initialTmplPos,
-        qrTemplateLayout: initialLayout,
       });
     }
   }, [promotion, form]);
   
-    const getElementRect = useCallback((key: DraggableElement, layout: QrTemplateLayout, ctx: CanvasRenderingContext2D): { x1: number, y1: number, x2: number, y2: number, cx: number, cy: number } => {
-        const el = layout[key];
-        const size = el.size || 16;
-        if (key === 'qr') {
-            const halfSize = size / 2;
-            return { x1: el.x - halfSize, y1: el.y - halfSize, x2: el.x + halfSize, y2: el.y + halfSize, cx: el.x, cy: el.y };
-        } else {
-            const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
-            ctx.font = `bold ${size}px Arial`;
-            const textMetrics = ctx.measureText(text);
-            const textWidth = textMetrics.width;
-            const textHeight = size; // Approximate height
-            return {
-                x1: el.x - textWidth / 2,
-                y1: el.y - textHeight,
-                x2: el.x + textWidth / 2,
-                y2: el.y + textHeight * 0.2, // Adjust to better fit text rendering
-                cx: el.x,
-                cy: el.y - textHeight / 2,
-            };
-        }
-    }, [formValues.name]);
 
-
-  const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement | null = null, currentSnapLines: { x: number[], y: number[] }) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!ctx || !canvas) return;
-
-    if (templatePreview) {
-        const templateImg = new Image();
-        templateImg.crossOrigin = "anonymous";
-        templateImg.src = templatePreview;
-        await new Promise<void>((resolve, reject) => {
-            templateImg.onload = () => resolve();
-            templateImg.onerror = reject;
-        });
-
-        canvas.width = templateImg.width;
-        canvas.height = templateImg.height;
-
-        ctx.drawImage(templateImg, 0, 0, templateImg.width, templateImg.height);
-
-        const layout = form.getValues('qrTemplateLayout') || {
-            qr: { x: 190, y: 350, size: 80 },
-            name: { x: 190, y: 450, size: 16 },
-            dni: { x: 190, y: 470, size: 12 },
-            promoTitle: { x: 190, y: 500, size: 14 },
-        };
-
-        const exampleQrDataUrl = await QRCode.toDataURL("SocioVipPreview", { width: layout.qr.size, errorCorrectionLevel: "H", margin: 1 });
-        const qrImage = new Image();
-        qrImage.src = exampleQrDataUrl;
-        await new Promise(resolve => (qrImage.onload = resolve));
-        
-        const drawElement = (key: DraggableElement, isHighlight: boolean) => {
-          if(!key) return;
-          const config = layout[key as keyof typeof layout] as any;
-          if(!config) return;
-
-          ctx.save();
-          if (isHighlight) {
-            ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
-            ctx.strokeStyle = 'rgba(0, 123, 255, 0.7)';
-            ctx.lineWidth = 2;
-          }
-
-          if (key === 'qr') {
-            const rect = getElementRect(key, layout, ctx);
-            ctx.drawImage(qrImage, rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-            if(isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-          } else {
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : formValues.name || "Nombre Promoción";
-            
-            let fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
-            ctx.font = `bold ${fontSize}px Arial`;
-
-            // Adjust font size dynamically
-            const maxWidth = canvas.width * 0.9; 
-            while(ctx.measureText(text).width > maxWidth && fontSize > 8) {
-                fontSize--;
-                ctx.font = `bold ${fontSize}px Arial`;
-            }
-            
-            const rect = getElementRect(key, layout, ctx);
-            ctx.fillText(text, config.x, config.y);
-            if(isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-          }
-           ctx.restore();
-        };
-
-        (Object.keys(layout) as DraggableElement[]).forEach(key => {
-            drawElement(key, highlightedElement === key);
-        });
-        
-        // Draw snapping lines
-        ctx.save();
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 0.5;
-        currentSnapLines.x.forEach(x => {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-            ctx.stroke();
-        });
-        currentSnapLines.y.forEach(y => {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
-        });
-        ctx.restore();
-        
-    } else {
-        canvas.width = 380;
-        canvas.height = 700;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#e5e7eb';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#9ca3af';
-        ctx.textAlign = 'center';
-        ctx.font = '14px Arial';
-        ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
-    }
-  }, [templatePreview, formValues.name, form.getValues, getElementRect]);
-
-
-  useEffect(() => {
-    drawPreviewOnCanvas(selectedElement, snapLines);
-  }, [drawPreviewOnCanvas, formValues, selectedElement, snapLines]);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, fileType: 'main' | 'template') => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
@@ -313,17 +122,10 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       }
       const reader = new FileReader();
       reader.onload = () => {
-        if (fileType === 'main') {
-          setImagePreview(reader.result as string);
-          setObjectPosition('50% 50%');
-          form.setValue("imageFile", file);
-          form.setValue("imageObjectPosition", '50% 50%');
-        } else {
-          setTemplatePreview(reader.result as string);
-          setTemplateObjectPosition('50% 50%');
-          form.setValue("qrTemplateFile", file);
-          form.setValue("templateObjectPosition", '50% 50%');
-        }
+        setImagePreview(reader.result as string);
+        setObjectPosition('50% 50%');
+        form.setValue("imageFile", file);
+        form.setValue("imageObjectPosition", '50% 50%');
       };
       reader.readAsDataURL(file);
     }
@@ -337,147 +139,30 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       dragStart.current = { x: clientX, y: clientY };
   };
 
-  const handleDragMove = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>, containerRef: React.RefObject<HTMLDivElement>, currentPosition: string, setPosition: (pos: string) => void) => {
-      if (!isDragging.current || !containerRef.current) return;
+  const handleDragMove = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+      if (!isDragging.current || !imgContainerRef.current) return;
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-      const container = containerRef.current;
+      const container = imgContainerRef.current;
       const dx = clientX - dragStart.current.x;
       const dy = clientY - dragStart.current.y;
-      const [currentX, currentY] = currentPosition.split(' ').map(p => parseFloat(p));
+      const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
       
       const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
       const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
       const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
       
-      setPosition(newPosition);
+      setObjectPosition(newPosition);
       dragStart.current = { x: clientX, y: clientY };
   };
 
-  const handleDragEnd = (fieldName: "imageObjectPosition" | "templateObjectPosition", position: string) => {
+  const handleDragEnd = () => {
       if (isDragging.current) {
           isDragging.current = false;
-          form.setValue(fieldName, position);
+          form.setValue("imageObjectPosition", objectPosition);
       }
   };
-
-  const getElementAtPos = (x: number, y: number): DraggableElement | null => {
-    const layout = form.getValues('qrTemplateLayout');
-    if (!layout || !canvasRef.current) return null;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return null;
-
-    const checkHit = (key: 'qr' | 'name' | 'dni' | 'promoTitle') => {
-      const rect = getElementRect(key, layout, ctx);
-      return x > rect.x1 && x < rect.x2 && y > rect.y1 && y < rect.y2;
-    };
-    
-    // Check in reverse order to prioritize elements on top
-    if (checkHit('qr')) return 'qr';
-    if (checkHit('name')) return 'name';
-    if (checkHit('dni')) return 'dni';
-    if (checkHit('promoTitle')) return 'promoTitle';
-    return null;
-  };
-  
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const canvasX = (e.clientX - rect.left) * scaleX;
-    const canvasY = (e.clientY - rect.top) * scaleY;
-    
-    const element = getElementAtPos(canvasX, canvasY);
-    setSelectedElement(element); 
-    if (element) {
-        setDraggedElement(element);
-        const elLayout = form.getValues(`qrTemplateLayout.${element}`);
-        if(elLayout) {
-          dragOffset.current = { x: elLayout.x - canvasX, y: elLayout.y - canvasY };
-        }
-        canvas.style.cursor = 'move';
-    }
-  };
-
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    let canvasX = (e.clientX - rect.left) * scaleX;
-    let canvasY = (e.clientY - rect.top) * scaleY;
-    
-    if (draggedElement) {
-        let newX = Math.round(canvasX + dragOffset.current.x);
-        let newY = Math.round(canvasY + dragOffset.current.y);
-
-        const layout = form.getValues('qrTemplateLayout');
-        const ctx = canvas.getContext('2d');
-        if (!layout || !ctx) return;
-
-        const activeSnapLines: { x: number[], y: number[] } = { x: [], y: [] };
-
-        const snapPoints: { x: { val: number, for: string }[], y: { val: number, for: string }[] } = {
-            x: [{ val: canvas.width / 2, for: 'canvas-center' }],
-            y: [{ val: canvas.height / 2, for: 'canvas-center' }],
-        };
-
-        (Object.keys(layout) as DraggableElement[]).forEach(key => {
-            if (key !== draggedElement) {
-                const staticRect = getElementRect(key, layout, ctx);
-                snapPoints.x.push({ val: staticRect.x1, for: `${key}-left` }, { val: staticRect.cx, for: `${key}-center` }, { val: staticRect.x2, for: `${key}-right` });
-                snapPoints.y.push({ val: staticRect.y1, for: `${key}-top` }, { val: staticRect.cy, for: `${key}-center` }, { val: staticRect.y2, for: `${key}-bottom` });
-            }
-        });
-        
-        // Horizontal Snapping
-        for (const snapPoint of snapPoints.x) {
-            if (Math.abs(newX - snapPoint.val) < SNAP_THRESHOLD) {
-                newX = snapPoint.val;
-                activeSnapLines.x.push(snapPoint.val);
-                break;
-            }
-        }
-        
-        // Vertical Snapping
-        for (const snapPoint of snapPoints.y) {
-            if (Math.abs(newY - snapPoint.val) < SNAP_THRESHOLD) {
-                newY = snapPoint.val;
-                activeSnapLines.y.push(snapPoint.val);
-                break;
-            }
-        }
-
-        setSnapLines(activeSnapLines);
-        form.setValue(`qrTemplateLayout.${draggedElement}.x`, newX);
-        form.setValue(`qrTemplateLayout.${draggedElement}.y`, newY);
-
-    } else {
-        const element = getElementAtPos(canvasX, canvasY);
-        canvas.style.cursor = element ? 'move' : 'default';
-        setSnapLines({ x: [], y: [] });
-    }
-  };
-
-  const handleCanvasMouseUp = () => {
-    setDraggedElement(null);
-    setSnapLines({ x: [], y: [] });
-    if(canvasRef.current) canvasRef.current.style.cursor = 'default';
-  };
-  
-  const handleResetPosition = (element: DraggableElement) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const centerX = Math.round(canvas.width / 2);
-    const centerY = Math.round(canvas.height / 2);
-    form.setValue(`qrTemplateLayout.${element}.x`, centerX);
-    form.setValue(`qrTemplateLayout.${element}.y`, centerY);
-    toast({ title: "Posición Reseteada", description: `El elemento "${elementLabels[element]}" se ha centrado.`})
-  }
 
 
   const handleSubmit = (values: PromotionFormValues) => {
@@ -485,8 +170,6 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
       ...values,
       usageLimit: values.usageLimit === undefined || values.usageLimit === null || isNaN(Number(values.usageLimit)) ? undefined : Number(values.usageLimit),
       imageObjectPosition: objectPosition,
-      templateObjectPosition: templateObjectPosition,
-      qrTemplateLayout: values.qrTemplateLayout,
     });
   };
 
@@ -500,13 +183,13 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
             ref={imgContainerRef} 
             className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
             style={{ touchAction: 'none' }} 
-            onMouseDown={(e) => handleDragStart(e)}
-            onMouseMove={(e) => handleDragMove(e, imgContainerRef, objectPosition, setObjectPosition)}
-            onMouseUp={() => handleDragEnd("imageObjectPosition", objectPosition)}
-            onMouseLeave={() => handleDragEnd("imageObjectPosition", objectPosition)}
-            onTouchStart={(e) => handleDragStart(e)}
-            onTouchMove={(e) => handleDragMove(e, imgContainerRef, objectPosition, setObjectPosition)}
-            onTouchEnd={() => handleDragEnd("imageObjectPosition", objectPosition)}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
           >
             {imagePreview ? (
               <>
@@ -518,8 +201,8 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
               </>
             ) : ( <div className="text-muted-foreground flex flex-col items-center"><ImageIcon className="h-10 w-10" /><span className="text-sm mt-1">Vista Previa</span></div> )}
           </div>
-          <input type="file" ref={mainImageInputRef} onChange={(e) => handleFileChange(e, 'main')} className="hidden" accept="image/png, image/jpeg, image/webp" />
-          <Button type="button" variant="outline" onClick={() => mainImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> Subir Imagen Principal</Button>
+          <input type="file" ref={mainImageInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp" />
+          <Button type="button" variant="outline" onClick={() => mainImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> Subir Imagen</Button>
           <FormMessage>{form.formState.errors.imageFile?.message}</FormMessage>
         </div>
 
@@ -545,69 +228,6 @@ export function BusinessPromotionForm({ promotion, onSubmit, onCancel, isSubmitt
         <FormField control={form.control} name="usageLimit" render={({ field }) => (
             <FormItem><FormLabel>Límite de Usos</FormLabel><FormControl><Input type="number" placeholder="Ej: 100 (0 o vacío para ilimitado)" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))} disabled={isSubmitting} /></FormControl><FormDescription className="text-xs">Dejar vacío o 0 para usos ilimitados.</FormDescription><FormMessage /></FormItem>
         )}/>
-        
-        <div className="pt-4 border-t mt-6 space-y-4">
-          <h3 className="flex items-center font-medium"><Settings className="h-5 w-5 mr-2"/>Personalización de Plantilla QR (Opcional)</h3>
-          
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <FormLabel className="self-start">Imagen de Plantilla</FormLabel>
-            <div className="group w-full max-w-xs relative rounded-md border bg-muted flex items-center justify-center overflow-hidden">
-               <canvas 
-                  ref={canvasRef} 
-                  className="w-full h-auto cursor-grab active:cursor-grabbing" 
-                  onMouseDown={handleCanvasMouseDown}
-                  onMouseMove={handleCanvasMouseMove}
-                  onMouseUp={handleCanvasMouseUp}
-                  onMouseLeave={handleCanvasMouseUp}
-                />
-            </div>
-            <input type="file" ref={templateImageInputRef} onChange={(e) => handleFileChange(e, 'template')} className="hidden" accept="image/png, image/jpeg, image/webp" />
-            <Button type="button" variant="outline" onClick={() => templateImageInputRef.current?.click()} disabled={isSubmitting}><Upload className="mr-2 h-4 w-4"/> {templatePreview ? 'Cambiar' : 'Subir'} Plantilla</Button>
-            <FormDescription className="text-xs">Imagen de fondo para el QR descargable (Formato Ticket).</FormDescription>
-            <FormMessage>{form.formState.errors.qrTemplateFile?.message}</FormMessage>
-          </div>
-
-          <Card>
-            <CardHeader className="p-3">
-              <CardTitle className="text-sm">Caja de Herramientas</CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 grid grid-cols-2 gap-2">
-                {(Object.keys(elementLabels) as DraggableElement[]).map(key => (
-                    <Button 
-                        key={key} 
-                        type="button" 
-                        variant={selectedElement === key ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedElement(key)}
-                        className="flex items-center justify-start gap-2"
-                        onMouseDown={() => {setDraggedElement(key); toast({title:"Arrastrando elemento", description: `Ahora mueve "${elementLabels[key]}" en la vista previa.`})}}
-                    >
-                        <Grab size={16} className="text-muted-foreground"/> {elementLabels[key]}
-                    </Button>
-                ))}
-            </CardContent>
-          </Card>
-          
-          {selectedElement && (
-            <Card className="bg-muted/50">
-              <CardHeader className="p-3">
-                <CardTitle className="text-base flex items-center justify-between">
-                  Ajustes para: {elementLabels[selectedElement]}
-                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleResetPosition(selectedElement)}>
-                    <RefreshCw className="h-4 w-4"/>
-                    <span className="sr-only">Resetear Posición</span>
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.x`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                  <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.y`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                  <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem className="col-span-2"><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-              </CardContent>
-            </Card>
-          )}
-
-        </div>
         
         <FormField control={form.control} name="isActive" render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-6"><div className="space-y-0.5"><FormLabel>Activar Promoción <span className="text-destructive">*</span></FormLabel><FormMessage /></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl></FormItem>

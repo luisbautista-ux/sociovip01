@@ -15,7 +15,7 @@ import {
   DialogDescription as ShadcnDialogDescription,
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
-import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle, MoreVertical } from "lucide-react";
+import { Ticket as TicketIconLucide, PlusCircle, Edit, Trash2, Search, BarChart3, Copy, ListChecks, QrCode as QrCodeIcon, Loader2, AlertTriangle, MoreVertical, ImageIcon } from "lucide-react";
 import type { BusinessManagedEntity, BusinessPromotionFormData, GeneratedCode, Business, QrTemplateLayout } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -36,6 +36,7 @@ import {
 import { BusinessPromotionForm } from "@/components/business/forms/BusinessPromotionForm";
 import { ManageCodesDialog } from "@/components/business/dialogs/ManageCodesDialog";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
+import { QrTemplateDialog } from "@/components/business/dialogs/QrTemplateDialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
@@ -69,6 +70,10 @@ export default function BusinessPromotionsPage() {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedPromotionForStats, setSelectedPromotionForStats] = useState<BusinessManagedEntity | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const [showQrTemplateModal, setShowQrTemplateModal] = useState(false);
+  const [selectedPromotionForTemplate, setSelectedPromotionForTemplate] = useState<BusinessManagedEntity | null>(null);
+
 
  useEffect(() => {
     if (loadingAuth || loadingProfile) {
@@ -239,13 +244,6 @@ export default function BusinessPromotionsPage() {
         finalImageUrl = await getDownloadURL(uploadResult.ref);
       }
       
-      if (data.qrTemplateFile) {
-        toast({ title: "Subiendo plantilla de QR...", description: "Por favor, espera." });
-        const templateStorageRef = ref(storage, `promotion-qr-templates/${currentBusinessId}/${entityId}/${data.qrTemplateFile.name}`);
-        const templateUploadResult = await uploadBytes(templateStorageRef, data.qrTemplateFile);
-        finalQrTemplateUrl = await getDownloadURL(templateUploadResult.ref);
-      }
-
       const promotionPayloadBase = {
         name: data.name,
         description: data.description,
@@ -287,9 +285,6 @@ export default function BusinessPromotionsPage() {
       if (data.imageFile && oldImageUrl && oldImageUrl.includes("firebase")) {
         try { const oldImageRef = ref(storage, oldImageUrl); await deleteObject(oldImageRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete old promotion image:", e); }
       }
-      if (data.qrTemplateFile && oldQrTemplateUrl && oldQrTemplateUrl.includes("firebase")) {
-        try { const oldTemplateRef = ref(storage, oldQrTemplateUrl); await deleteObject(oldTemplateRef); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Could not delete old QR template image:", e); }
-      }
 
       setShowCreateEditPromotionModal(false);
       if (currentBusinessId) fetchBusinessData(currentBusinessId);
@@ -299,6 +294,60 @@ export default function BusinessPromotionsPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleSaveQrTemplate = async (entityId: string, templateFile: File | null, layout: QrTemplateLayout) => {
+    if (!currentBusinessId) {
+        toast({ title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+
+    try {
+        const entityRef = doc(db, "businessEntities", entityId);
+        const currentDoc = await getDoc(entityRef);
+        if (!currentDoc.exists()) {
+            throw new Error("La promoción no existe.");
+        }
+
+        const oldTemplateUrl = currentDoc.data().qrTemplateImageUrl;
+        let finalTemplateUrl = oldTemplateUrl;
+
+        if (templateFile) {
+            toast({ title: "Subiendo plantilla...", description: "Por favor, espera." });
+            const storageRef = ref(storage, `promotion-qr-templates/${currentBusinessId}/${entityId}/${templateFile.name}`);
+            const uploadResult = await uploadBytes(storageRef, templateFile);
+            finalTemplateUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        const updateData = {
+            qrTemplateImageUrl: finalTemplateUrl,
+            qrTemplateLayout: layout,
+        };
+
+        await updateDoc(entityRef, updateData);
+
+        if (templateFile && oldTemplateUrl && oldTemplateUrl !== finalTemplateUrl && oldTemplateUrl.includes("firebase")) {
+            try {
+                const oldTemplateRef = ref(storage, oldTemplateUrl);
+                await deleteObject(oldTemplateRef);
+            } catch (deleteError: any) {
+                if (deleteError.code !== 'storage/object-not-found') {
+                    console.warn("Could not delete old QR template image:", deleteError);
+                }
+            }
+        }
+        
+        toast({ title: "Plantilla Guardada", description: "La plantilla QR para esta promoción ha sido actualizada." });
+        if (currentBusinessId) fetchBusinessData(currentBusinessId);
+        setShowQrTemplateModal(false);
+
+    } catch (error: any) {
+        toast({ title: "Error al Guardar Plantilla", description: error.message, variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+  
   
   const handleDeletePromotion = async (promotionToDelete: BusinessManagedEntity) => {
     if (isSubmitting || !currentBusinessId) {
@@ -570,6 +619,10 @@ export default function BusinessPromotionsPage() {
                                 <ListChecks className="h-4 w-4 mr-2" />
                                 Ver Códigos ({promo.generatedCodes?.length || 0})
                               </DropdownMenuItem>
+                               <DropdownMenuItem onClick={() => { setSelectedPromotionForTemplate(promo); setShowQrTemplateModal(true); }}>
+                                    <ImageIcon className="h-4 w-4 mr-2" />
+                                    Plantilla QR
+                                </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleOpenCreateEditModal(promo, false)}
                               >
@@ -689,6 +742,9 @@ export default function BusinessPromotionsPage() {
                                   <DropdownMenuItem onClick={() => openViewCodesDialog(promo)}>
                                     <ListChecks className="mr-2 h-4 w-4" /> Ver Códigos
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => { setSelectedPromotionForTemplate(promo); setShowQrTemplateModal(true); }}>
+                                    <ImageIcon className="mr-2 h-4 w-4" /> Plantilla QR
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleOpenCreateEditModal(promo, false)}>
                                     <Edit className="mr-2 h-4 w-4" /> Editar
                                   </DropdownMenuItem>
@@ -737,42 +793,52 @@ export default function BusinessPromotionsPage() {
         </Card>
       )}
       
-      <ShadcnDialog open={showCreateEditPromotionModal} onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setEditingPromotion(null);
-          setIsDuplicating(false);
-        }
-        setShowCreateEditPromotionModal(isOpen);
-      }}>
       {showCreateEditPromotionModal && (
-        <ShadcnDialogContent className="sm:max-w-2xl">
-          <ShadcnDialogHeader>
-            <ShadcnDialogTitle>
-              {isDuplicating && editingPromotion
-                ? `Duplicar Promoción: ${(editingPromotion.name || 'Promoción').replace(' (Copia)', '')} (Copia)`
-                : editingPromotion
-                  ? `Editar Promoción: ${editingPromotion.name}`
-                  : "Crear Nueva Promoción"}
-            </ShadcnDialogTitle>
-            <ShadcnDialogDescription>
-              {isDuplicating
-                ? "Creando una copia. Ajusta los detalles necesarios."
-                : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
-            </ShadcnDialogDescription>
-          </ShadcnDialogHeader>
-          <BusinessPromotionForm
-            promotion={editingPromotion || undefined}
-            onSubmit={handleFormSubmit}
-            onCancel={() => {
-              setShowCreateEditPromotionModal(false);
-              setEditingPromotion(null);
-              setIsDuplicating(false);
-            }}
-            isSubmitting={isSubmitting}
-          />
-        </ShadcnDialogContent>
+        <ShadcnDialog open={showCreateEditPromotionModal} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setEditingPromotion(null);
+            setIsDuplicating(false);
+          }
+          setShowCreateEditPromotionModal(isOpen);
+        }}>
+          <ShadcnDialogContent className="sm:max-w-2xl">
+            <ShadcnDialogHeader>
+              <ShadcnDialogTitle>
+                {isDuplicating && editingPromotion
+                  ? `Duplicar Promoción: ${(editingPromotion.name || 'Promoción').replace(' (Copia)', '')} (Copia)`
+                  : editingPromotion
+                    ? `Editar Promoción: ${editingPromotion.name}`
+                    : "Crear Nueva Promoción"}
+              </ShadcnDialogTitle>
+              <ShadcnDialogDescription>
+                {isDuplicating
+                  ? "Creando una copia. Ajusta los detalles necesarios."
+                  : (editingPromotion ? `Actualiza los detalles de "${editingPromotion.name}".` : "Completa los detalles para tu nueva promoción.")}
+              </ShadcnDialogDescription>
+            </ShadcnDialogHeader>
+            <BusinessPromotionForm
+              promotion={editingPromotion || undefined}
+              onSubmit={handleFormSubmit}
+              onCancel={() => {
+                setShowCreateEditPromotionModal(false);
+                setEditingPromotion(null);
+                setIsDuplicating(false);
+              }}
+              isSubmitting={isSubmitting}
+            />
+          </ShadcnDialogContent>
+        </ShadcnDialog>
       )}
-      </ShadcnDialog>
+
+      {showQrTemplateModal && selectedPromotionForTemplate && (
+          <QrTemplateDialog
+              open={showQrTemplateModal}
+              onOpenChange={(isOpen) => { if (!isOpen) setSelectedPromotionForTemplate(null); setShowQrTemplateModal(isOpen); }}
+              entity={selectedPromotionForTemplate}
+              onSave={handleSaveQrTemplate}
+              isSubmitting={isSubmitting}
+          />
+      )}
 
     {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
@@ -804,17 +870,17 @@ export default function BusinessPromotionsPage() {
           onRequestCreateNewCodes={() => { 
             const currentEntity = promotions.find(e => e.id === selectedEntityForViewingCodes?.id); 
             if(currentEntity) { 
-                if (isEntityCurrentlyActivatable(currentEntity)) {
+                 if (isEntityCurrentlyActivatable(currentEntity)) {
                     setShowManageCodesModal(false); 
                     setSelectedEntityForCreatingCodes(currentEntity);
                     setShowCreateCodesModal(true);
-                } else {
+                 } else {
                     toast({
                         title: "Acción no permitida",
                         description: `Esta ${currentEntity.type === 'event' ? 'evento' : 'promoción'} no está activa o está fuera de su periodo de vigencia.`,
                         variant: "destructive"
                     });
-                }
+                 }
             }
           }}
           isPromoterView={false} 

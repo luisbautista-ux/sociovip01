@@ -15,13 +15,13 @@ import {
   DialogDescription as UIDialogDescriptionComponent,
   DialogFooter
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box, User, Phone } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box, User, Phone, Image as ImageIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db, storage } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, Business, EventBoxFormData, BatchBoxFormData, CommissionRule, BusinessPromoterLink } from "@/lib/types";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, Business, EventBoxFormData, BatchBoxFormData, CommissionRule, BusinessPromoterLink, QrTemplateLayout } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -34,6 +34,7 @@ import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
 import { BatchBoxForm } from '@/components/business/forms/BatchBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
 import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDialog';
+import { QrTemplateDialog } from '@/components/business/dialogs/QrTemplateDialog';
 import { Label } from '@/components/ui/label';
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -780,6 +781,10 @@ export default function BusinessEventsPage() {
   const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
 
   const [availablePromoters, setAvailablePromoters] = useState<BusinessPromoterLink[]>([]);
+  
+  const [showQrTemplateModal, setShowQrTemplateModal] = useState(false);
+  const [selectedEventForTemplate, setSelectedEventForTemplate] = useState<BusinessManagedEntity | null>(null);
+
 
   useEffect(() => {
     if (!loadingAuth && !loadingProfile && userProfile?.businessId) {
@@ -987,6 +992,60 @@ export default function BusinessEventsPage() {
       }
   };
 
+  const handleSaveQrTemplate = async (entityId: string, templateFile: File | null, layout: QrTemplateLayout) => {
+    if (!currentBusinessId) {
+        toast({ title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+
+    try {
+        const entityRef = doc(db, "businessEntities", entityId);
+        const currentDoc = await getDoc(entityRef);
+        if (!currentDoc.exists()) {
+            throw new Error("El evento no existe.");
+        }
+
+        const oldTemplateUrl = currentDoc.data().qrTemplateImageUrl;
+        let finalTemplateUrl = oldTemplateUrl;
+
+        if (templateFile) {
+            toast({ title: "Subiendo plantilla...", description: "Por favor, espera." });
+            const storageRef = ref(storage, `event-qr-templates/${currentBusinessId}/${entityId}/${templateFile.name}`);
+            const uploadResult = await uploadBytes(storageRef, templateFile);
+            finalTemplateUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        const updateData = {
+            qrTemplateImageUrl: finalTemplateUrl,
+            qrTemplateLayout: layout,
+        };
+
+        await updateDoc(entityRef, updateData);
+
+        if (templateFile && oldTemplateUrl && oldTemplateUrl !== finalTemplateUrl && oldTemplateUrl.includes("firebase")) {
+            try {
+                const oldTemplateRef = ref(storage, oldTemplateUrl);
+                await deleteObject(oldTemplateRef);
+            } catch (deleteError: any) {
+                if (deleteError.code !== 'storage/object-not-found') {
+                    console.warn("Could not delete old QR template image:", deleteError);
+                }
+            }
+        }
+        
+        toast({ title: "Plantilla Guardada", description: "La plantilla QR para este evento ha sido actualizada." });
+        if (currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
+        setShowQrTemplateModal(false);
+
+    } catch (error: any) {
+        toast({ title: "Error al Guardar Plantilla", description: error.message, variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+
   const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
     if (!userProfile?.name || !userProfile.uid) {
         toast({title: "Error de Usuario", description: "No se pudo obtener el nombre del usuario para registrar los códigos.", variant: "destructive"});
@@ -1112,6 +1171,10 @@ export default function BusinessEventsPage() {
                                     <Edit className="h-4 w-4 mr-2" />
                                     Gestionar Evento
                                 </DropdownMenuItem>
+                                 <DropdownMenuItem onClick={() => { setSelectedEventForTemplate(event); setShowQrTemplateModal(true); }}>
+                                    <ImageIcon className="h-4 w-4 mr-2" />
+                                    Plantilla QR
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
                                     <QrCodeIcon className="h-4 w-4 mr-2" />
@@ -1181,26 +1244,42 @@ export default function BusinessEventsPage() {
                         <TableCell className="text-right space-x-1">
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos</Button>
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event, true)}>
-                            <Copy className="h-4 w-4" />
-                            <span className="sr-only">Duplicar</span>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Eliminar</span>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                               <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                                <span className="sr-only">Abrir menú</span>
+                                <MoreVertical className="h-4 w-4" />
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
-                                    <AlertDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
+                                    <Edit className="mr-2 h-4 w-4" /> Gestionar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setSelectedEventForTemplate(event); setShowQrTemplateModal(true); }}>
+                                    <ImageIcon className="h-4 w-4 mr-2" /> Plantilla QR
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event, true)}>
+                                    <Copy className="mr-2 h-4 w-4" /> Duplicar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                     <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>¿Confirmar?</AlertDialogTitle>
+                                            <AlertDialogDescription>Se eliminará "{event.name}" irreversiblemente.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+
                         </TableCell>
                       </TableRow>
                     )
@@ -1220,6 +1299,16 @@ export default function BusinessEventsPage() {
         onSave={handleSaveEvent}
         isSubmitting={isSubmitting}
       />
+
+      {showQrTemplateModal && selectedEventForTemplate && (
+          <QrTemplateDialog
+              open={showQrTemplateModal}
+              onOpenChange={(isOpen) => { if (!isOpen) setSelectedEventForTemplate(null); setShowQrTemplateModal(isOpen); }}
+              entity={selectedEventForTemplate}
+              onSave={handleSaveQrTemplate}
+              isSubmitting={isSubmitting}
+          />
+      )}
 
       {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
