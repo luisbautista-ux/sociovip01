@@ -56,6 +56,11 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
   const [snapLines, setSnapLines] = useState<{ x: number[], y: number[] }>({ x: [], y: [] });
   const templateImageInputRef = useRef<HTMLInputElement>(null);
 
+  // --- Refs for caching images ---
+  const templateImageRef = useRef<HTMLImageElement | null>(null);
+  const qrImageRef = useRef<HTMLImageElement | null>(null);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateFormSchema),
     defaultValues: {
@@ -108,94 +113,131 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
       };
     }
   }, [entity.name]);
+  
+  // Load images and QR code into memory
+  useEffect(() => {
+    let isMounted = true;
+    setImagesLoaded(false);
 
-  const drawPreviewOnCanvas = useCallback(async (highlightedElement: DraggableElement | null = null, currentSnapLines: { x: number[], y: number[] }) => {
+    const loadResources = async () => {
+      const layout = form.getValues('qrTemplateLayout');
+      
+      const templatePromise = new Promise<HTMLImageElement | null>((resolve) => {
+        if (templatePreview) {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = templatePreview;
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+        } else {
+          resolve(null);
+        }
+      });
+
+      const qrPromise = new Promise<HTMLImageElement | null>((resolve) => {
+          QRCode.toDataURL("SocioVipPreview", { width: layout.qr.size, errorCorrectionLevel: "H", margin: 1 })
+            .then(url => {
+              const img = new Image();
+              img.src = url;
+              img.onload = () => resolve(img);
+              img.onerror = () => resolve(null);
+            })
+            .catch(() => resolve(null));
+      });
+      
+      const [templateImg, qrImg] = await Promise.all([templatePromise, qrPromise]);
+
+      if (isMounted) {
+        templateImageRef.current = templateImg;
+        qrImageRef.current = qrImg;
+        setImagesLoaded(true);
+      }
+    };
+    
+    loadResources();
+
+    return () => { isMounted = false; };
+  }, [templatePreview, form.getValues('qrTemplateLayout').qr.size]);
+
+
+  const drawPreviewOnCanvas = useCallback((highlightedElement: DraggableElement | null = null, currentSnapLines: { x: number[], y: number[] }) => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
 
-    if (templatePreview) {
-      const templateImg = new Image();
-      templateImg.crossOrigin = "anonymous";
-      templateImg.src = templatePreview;
-      await new Promise<void>((resolve, reject) => {
-        templateImg.onload = () => resolve();
-        templateImg.onerror = reject;
-      });
+    if (templateImageRef.current) {
+        const templateImg = templateImageRef.current;
+        canvas.width = templateImg.width;
+        canvas.height = templateImg.height;
 
-      canvas.width = templateImg.width;
-      canvas.height = templateImg.height;
+        ctx.drawImage(templateImg, 0, 0, templateImg.width, templateImg.height);
+        
+        const layout = form.getValues('qrTemplateLayout') as QrTemplateLayout;
 
-      ctx.drawImage(templateImg, 0, 0, templateImg.width, templateImg.height);
+        const drawElement = (key: DraggableElement, isHighlight: boolean) => {
+          if (!key) return;
+          const config = layout[key as keyof typeof layout] as any;
+          if (!config) return;
 
-      const layout = form.getValues('qrTemplateLayout') as QrTemplateLayout;
-
-      const exampleQrDataUrl = await QRCode.toDataURL("SocioVipPreview", { width: layout.qr.size, errorCorrectionLevel: "H", margin: 1 });
-      const qrImage = new Image();
-      qrImage.src = exampleQrDataUrl;
-      await new Promise(resolve => (qrImage.onload = resolve));
-      
-      const drawElement = (key: DraggableElement, isHighlight: boolean) => {
-        if (!key) return;
-        const config = layout[key as keyof typeof layout] as any;
-        if (!config) return;
-
-        ctx.save();
-        if (isHighlight) {
-          ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
-          ctx.strokeStyle = 'rgba(0, 123, 255, 0.7)';
-          ctx.lineWidth = 2;
-        }
-
-        if (key === 'qr') {
-          const rect = getElementRect(key, layout, ctx);
-          ctx.drawImage(qrImage, rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-          if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-        } else {
-          ctx.fillStyle = 'white';
-          ctx.textAlign = 'center';
-          const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Campaña";
-          let fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
-          ctx.font = `bold ${fontSize}px Arial`;
-          
-          const maxWidth = canvas.width * 0.9;
-          while (ctx.measureText(text).width > maxWidth && fontSize > 8) {
-            fontSize--;
-            ctx.font = `bold ${fontSize}px Arial`;
+          ctx.save();
+          if (isHighlight) {
+            ctx.fillStyle = 'rgba(0, 123, 255, 0.3)';
+            ctx.strokeStyle = 'rgba(0, 123, 255, 0.7)';
+            ctx.lineWidth = 2;
           }
-          
-          const rect = getElementRect(key, layout, ctx);
-          ctx.fillText(text, config.x, config.y);
-          if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
-        }
-        ctx.restore();
-      };
 
-      (Object.keys(layout) as DraggableElement[]).forEach(key => drawElement(key, highlightedElement === key));
-      
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-      ctx.lineWidth = Math.max(1, canvas.width / 250);
-      currentSnapLines.x.forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); });
-      currentSnapLines.y.forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); });
-      ctx.restore();
-      
+          if (key === 'qr' && qrImageRef.current) {
+            const rect = getElementRect(key, layout, ctx);
+            ctx.drawImage(qrImageRef.current, rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+            if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+          } else if (key !== 'qr') {
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Campaña";
+            let fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
+            ctx.font = `bold ${fontSize}px Arial`;
+            
+            const maxWidth = canvas.width * 0.9;
+            while (ctx.measureText(text).width > maxWidth && fontSize > 8) {
+              fontSize--;
+              ctx.font = `bold ${fontSize}px Arial`;
+            }
+            
+            const rect = getElementRect(key, layout, ctx);
+            ctx.fillText(text, config.x, config.y);
+            if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+          }
+          ctx.restore();
+        };
+
+        (Object.keys(layout) as DraggableElement[]).forEach(key => drawElement(key, highlightedElement === key));
+        
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+        ctx.lineWidth = Math.max(1, canvas.width / 250);
+        currentSnapLines.x.forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); });
+        currentSnapLines.y.forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); });
+        ctx.restore();
+        
     } else {
-      canvas.width = 380;
-      canvas.height = 700;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#e5e7eb';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#9ca3af';
-      ctx.textAlign = 'center';
-      ctx.font = '14px Arial';
-      ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
+        canvas.width = 380;
+        canvas.height = 700;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#e5e7eb';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#9ca3af';
+        ctx.textAlign = 'center';
+        ctx.font = '14px Arial';
+        ctx.fillText("Sube una plantilla para ver la vista previa", canvas.width / 2, canvas.height / 2);
     }
-  }, [templatePreview, entity.name, form, getElementRect]);
+  }, [entity.name, form, getElementRect, imagesLoaded]);
+
 
   useEffect(() => {
-    drawPreviewOnCanvas(selectedElement, snapLines);
-  }, [drawPreviewOnCanvas, formValues, selectedElement, snapLines]);
+    if (imagesLoaded) {
+      drawPreviewOnCanvas(selectedElement, snapLines);
+    }
+  }, [drawPreviewOnCanvas, formValues, selectedElement, snapLines, imagesLoaded]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
