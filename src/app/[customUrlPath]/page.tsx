@@ -784,11 +784,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="flex flex-col items-center justify-center flex-grow pt-12">
-          <Loader2 className="h-16 w-16 animate-spin text-primary mb-4" />
-          <p className="text-xl text-muted-foreground">Cargando información del negocio...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-loader">
+        <Loader2 className="h-16 w-16 animate-spin text-white mb-4" />
+        <p className="text-xl text-white/90">Cargando información del negocio...</p>
       </div>
     );
   }
@@ -976,13 +974,13 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
          </div>
        </header>
 
-       <div className="relative w-full h-48 md:h-64">
+       <div className="relative w-full h-48 md:h-64 bg-black">
         {businessDetails.publicCoverImageUrl ? (
           <NextImage
             src={businessDetails.publicCoverImageUrl}
             alt={`${businessDetails.name} cover image`}
             fill
-            className="object-cover"
+            className="object-contain"
             priority
           />
         ) : (
