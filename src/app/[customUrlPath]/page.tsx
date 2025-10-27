@@ -841,11 +841,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold">
             <Download className="mr-2 h-4 w-4" /> Guardar QR
           </Button>
-          <Button onClick={resetQrFlow} variant="default" className="w-full font-bold" style={{ backgroundColor: businessDetails?.primaryColor, color: 'white' }}>
+          <Button onClick={resetQrFlow} variant="outline" className="w-full font-bold">
             Ver Otras del Negocio
           </Button>
           <Link href="/" passHref>
-            <Button variant="link" className="w-full font-bold text-primary">
+            <Button variant="outline" className="w-full font-bold">
               <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
             </Button>
           </Link>
