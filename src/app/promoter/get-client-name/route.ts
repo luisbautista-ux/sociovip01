@@ -27,15 +27,17 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     return userDoc.data() as PlatformUser;
 }
 
-async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; }> {
+async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; fechaNacimiento: string | null }> {
     let result = {
         nombreCompleto: "",
-        nombres: null,
-        apellidoPaterno: null,
-        apellidoMaterno: null,
+        nombres: null as string | null,
+        apellidoPaterno: null as string | null,
+        apellidoMaterno: null as string | null,
+        fechaNacimiento: null as string | null,
     };
 
     try {
+        // --- 1. Fetch names ---
         const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
@@ -61,12 +63,39 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
             }
         }
 
+        // --- 2. Fetch birth date ---
+        const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
+        const formFecha = new URLSearchParams();
+        formFecha.append('dni', dni);
+        formFecha.append('company', '');
+        formFecha.append('action', 'buscar_fecha');
+        formFecha.append('security', 'c5a5d96362'); // Updated security token
+
+        const responseFecha = await fetch(endpointFecha, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://dniperu.com/fecha-de-nacimiento-con-dni/' },
+            body: formFecha.toString(),
+        });
+
+        if (responseFecha.ok) {
+            const dataFecha = await responseFecha.json();
+            if (dataFecha.success && dataFecha.data?.message) {
+                const lines = dataFecha.data.message.split('\n');
+                lines.forEach((line: string) => {
+                    if (line.startsWith("Fecha de Nacimiento:")) {
+                        result.fechaNacimiento = line.replace("Fecha de Nacimiento:", "").trim();
+                    }
+                });
+            }
+        }
+
         result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
 
     } catch (e) {
         console.error("Error fetching from external DNI API in get-client-name:", e);
     }
-    return { nombreCompleto: result.nombreCompleto };
+    
+    return { nombreCompleto: result.nombreCompleto, fechaNacimiento: result.fechaNacimiento };
 }
 
 
@@ -99,7 +128,8 @@ export async function GET(request: Request) {
         if (!querySnapshot.empty) {
             const data = querySnapshot.docs[0].data();
             const fullName = `${data.name} ${data.surname}`.trim();
-            return NextResponse.json({ name: fullName, phone: data.phone || null });
+            const dob = data.dob?.toDate?.()?.toLocaleDateString('es-PE', { timeZone: 'America/Lima' }) || null;
+            return NextResponse.json({ name: fullName, phone: data.phone || null, dob: dob });
         }
     }
 
@@ -107,11 +137,11 @@ export async function GET(request: Request) {
     if (validation.data.docType === 'dni') {
         const externalData = await consultExternalDniApi(validatedDni);
         if (externalData && externalData.nombreCompleto) {
-            return NextResponse.json({ name: externalData.nombreCompleto, phone: null });
+            return NextResponse.json({ name: externalData.nombreCompleto, phone: null, dob: externalData.fechaNacimiento });
         }
     }
 
-    return NextResponse.json({ name: null, phone: null });
+    return NextResponse.json({ name: null, phone: null, dob: null });
 
   } catch (error: any) {
     console.error("API Route (get-client-name): Error:", error);
