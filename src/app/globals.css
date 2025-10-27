@@ -111,7 +111,7 @@
   }
 }
 
-/* Custom Animated Gradient Background for Loaders */
+/* Custom Animated Gradient Background */
 @keyframes gradient-animation {
   0% {
     background-position: 0% 50%;
@@ -126,6 +126,12 @@
 
 .bg-gradient-loader {
   background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)), #8e44ad, #c0392b, #2980b9);
+  background-size: 400% 400%;
+  animation: gradient-animation 15s ease infinite;
+}
+
+.bg-header-gradient {
+  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)));
   background-size: 400% 400%;
   animation: gradient-animation 15s ease infinite;
 }
