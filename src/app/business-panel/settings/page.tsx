@@ -3,16 +3,17 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Palette, Image as ImageIconLucide, Type, QrCode, UploadCloud, Loader2, Link as LinkIcon, Smartphone } from "lucide-react"; 
+import { Settings, Palette, Image as ImageIconLucide, Type, UploadCloud, Loader2, Link as LinkIcon, Smartphone, Upload } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import React, { useState, useEffect, useCallback } from 'react'; 
+import React, { useState, useEffect, useCallback, useRef } from 'react'; 
 import NextImage from "next/image"; 
 import { useToast } from "@/hooks/use-toast"; 
 import { useAuth } from "@/context/AuthContext"; 
-import { db } from "@/lib/firebase"; 
+import { db, storage } from "@/lib/firebase"; 
 import { doc, getDoc, updateDoc, type DocumentData } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import type { Business } from "@/lib/types";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
 
@@ -27,15 +28,24 @@ export default function BusinessSettingsPage() {
   const [businessContactEmail, setBusinessContactEmail] = useState("");
   const [businessAddress, setBusinessAddress] = useState(""); 
   const [businessPublicPhone, setBusinessPublicPhone] = useState("");
-  const [personalPhone, setPersonalPhone] = useState(""); // Nuevo estado
+  const [personalPhone, setPersonalPhone] = useState("");
 
   // State for branding info
-  const [logoUrl, setLogoUrl] = useState("");
-  const [coverUrl, setCoverUrl] = useState("");
   const [slogan, setSlogan] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#B080D0"); 
   const [secondaryColor, setSecondaryColor] = useState("#8E5EA2");
   
+  // State for images
+  const [logoUrl, setLogoUrl] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchBusinessData = useCallback(async () => {
@@ -51,13 +61,16 @@ export default function BusinessSettingsPage() {
           setBusinessContactEmail(data.contactEmail || "");
           setBusinessAddress(data.publicAddress || data.address || ""); 
           setBusinessPublicPhone(data.publicPhone || "");
-          setPersonalPhone(data.personalPhone || ""); // Cargar nuevo campo
+          setPersonalPhone(data.personalPhone || "");
 
           setSlogan(data.slogan || "");
           setPrimaryColor(data.primaryColor || "#B080D0"); 
           setSecondaryColor(data.secondaryColor || "#8E5EA2");
           setLogoUrl(data.logoUrl || "");
           setCoverUrl(data.publicCoverImageUrl || "");
+          setLogoPreview(data.logoUrl || null);
+          setCoverPreview(data.publicCoverImageUrl || null);
+
         } else {
           toast({ title: "Error", description: "No se encontraron los datos del negocio.", variant: "destructive" });
         }
@@ -77,43 +90,82 @@ export default function BusinessSettingsPage() {
     fetchBusinessData();
   }, [fetchBusinessData]);
   
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCoverFile(file);
+      setCoverPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSaveChanges = async () => {
     if (!userProfile?.businessId) {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       return;
     }
     
-    // Validación para el nuevo campo de teléfono personal
     const personalPhoneRegex = /^9\d{8}$/;
     if (personalPhone && !personalPhoneRegex.test(personalPhone)) {
-        toast({
-            title: "Teléfono Personal Inválido",
-            description: "El teléfono personal debe empezar con 9 y tener exactamente 9 dígitos.",
-            variant: "destructive"
-        });
+        toast({ title: "Teléfono Personal Inválido", description: "El teléfono personal debe empezar con 9 y tener exactamente 9 dígitos.", variant: "destructive" });
         return;
     }
     
     setIsSaving(true);
-
-    const updateData: Partial<Business> = {
-        name: businessName,
-        contactEmail: businessContactEmail,
-        publicAddress: businessAddress, 
-        publicPhone: businessPublicPhone,
-        personalPhone: personalPhone, // Añadir nuevo campo al payload
-        slogan,
-        primaryColor,
-        secondaryColor,
-        logoUrl,
-        publicCoverImageUrl: coverUrl,
-    };
+    let finalLogoUrl = logoUrl;
+    let finalCoverUrl = coverUrl;
 
     try {
-        const businessDocRef = doc(db, "businesses", userProfile.businessId);
-        await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
-        toast({ title: "Configuración Guardada", description: "Los datos de tu negocio se han actualizado." });
-        fetchBusinessData(); 
+      // Handle Logo Upload
+      if (logoFile) {
+        toast({ description: "Subiendo nuevo logo..." });
+        if (logoUrl && logoUrl.includes("firebase")) {
+          try { await deleteObject(ref(storage, logoUrl)); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Old logo not deleted:", e); }
+        }
+        const logoStorageRef = ref(storage, `business-assets/${userProfile.businessId}/logo-${Date.now()}-${logoFile.name}`);
+        const logoUploadResult = await uploadBytes(logoStorageRef, logoFile);
+        finalLogoUrl = await getDownloadURL(logoUploadResult.ref);
+      }
+      
+      // Handle Cover Upload
+      if (coverFile) {
+        toast({ description: "Subiendo nueva portada..." });
+        if (coverUrl && coverUrl.includes("firebase")) {
+          try { await deleteObject(ref(storage, coverUrl)); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Old cover not deleted:", e); }
+        }
+        const coverStorageRef = ref(storage, `business-assets/${userProfile.businessId}/cover-${Date.now()}-${coverFile.name}`);
+        const coverUploadResult = await uploadBytes(coverStorageRef, coverFile);
+        finalCoverUrl = await getDownloadURL(coverUploadResult.ref);
+      }
+
+      const updateData: Partial<Business> = {
+          name: businessName,
+          contactEmail: businessContactEmail,
+          publicAddress: businessAddress, 
+          publicPhone: businessPublicPhone,
+          personalPhone: personalPhone,
+          slogan,
+          primaryColor,
+          secondaryColor,
+          logoUrl: finalLogoUrl,
+          publicCoverImageUrl: finalCoverUrl,
+      };
+
+      const businessDocRef = doc(db, "businesses", userProfile.businessId);
+      await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
+      
+      toast({ title: "Configuración Guardada", description: "Los datos de tu negocio se han actualizado." });
+      setLogoFile(null);
+      setCoverFile(null);
+      await fetchBusinessData();
+
     } catch (error: any) {
         console.error("Error saving business settings:", error);
         const description = error?.message 
@@ -220,38 +272,38 @@ export default function BusinessSettingsPage() {
         <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               <div className="space-y-2">
-                <Label htmlFor="logoUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> URL del Logo del Negocio</Label>
-                <div className="flex items-center gap-2">
-                    <div className="w-16 h-16 flex-shrink-0">
-                      {logoUrl ? (
-                        <NextImage src={logoUrl} alt="Logo actual" width={64} height={64} className="rounded-md border p-1 object-contain" />
+                <Label htmlFor="logoUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Logo del Negocio</Label>
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 flex-shrink-0 border p-1 rounded-md flex items-center justify-center bg-muted">
+                      {logoPreview ? (
+                        <NextImage src={logoPreview} alt="Vista previa del logo" width={64} height={64} className="object-contain" />
                       ) : (
-                        <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
-                            <ImageIconLucide/>
-                        </div>
+                        <ImageIconLucide className="text-muted-foreground"/>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 w-full">
-                       <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                       <Input id="logoUrl" type="url" placeholder="https://ejemplo.com/logo.png" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} disabled={isSaving || isLoadingData}/>
+                    <div className="w-full">
+                       <input type="file" ref={logoInputRef} onChange={handleLogoFileChange} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" />
+                       <Button type="button" variant="outline" className="w-full" onClick={() => logoInputRef.current?.click()} disabled={isSaving}>
+                         <Upload className="mr-2 h-4 w-4" /> Subir Logo
+                       </Button>
                     </div>
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="coverUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> URL de Imagen de Portada</Label>
-                 <div className="flex items-center gap-2">
-                   <div className="w-24 h-14 flex-shrink-0">
-                      {coverUrl ? (
-                         <NextImage src={coverUrl} alt="Portada actual" width={100} height={56} className="rounded-md border p-1 object-cover" />
+                <Label htmlFor="coverUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Imagen de Portada</Label>
+                 <div className="flex items-center gap-4">
+                   <div className="w-24 h-14 flex-shrink-0 border p-1 rounded-md flex items-center justify-center bg-muted">
+                      {coverPreview ? (
+                         <NextImage src={coverPreview} alt="Vista previa de portada" width={96} height={56} className="object-cover" />
                       ) : (
-                         <div className="w-24 h-14 bg-muted rounded-md flex items-center justify-center text-muted-foreground">
-                            <ImageIconLucide/>
-                        </div>
+                         <ImageIconLucide className="text-muted-foreground"/>
                       )}
                     </div>
-                     <div className="flex items-center gap-2 w-full">
-                       <LinkIcon className="h-4 w-4 text-muted-foreground" />
-                       <Input id="coverUrl" type="url" placeholder="https://ejemplo.com/portada.jpg" value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} disabled={isSaving || isLoadingData}/>
+                     <div className="w-full">
+                       <input type="file" ref={coverInputRef} onChange={handleCoverFileChange} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" />
+                       <Button type="button" variant="outline" className="w-full" onClick={() => coverInputRef.current?.click()} disabled={isSaving}>
+                         <Upload className="mr-2 h-4 w-4" /> Subir Portada
+                       </Button>
                     </div>
                 </div>
               </div>

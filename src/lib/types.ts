@@ -67,6 +67,8 @@ export interface Business {
   customUrlPath?: string | null; 
   primaryColor?: string;
   secondaryColor?: string;
+  logoFile?: File | null; // For upload
+  coverFile?: File | null; // For upload
 }
 
 export type PlatformUserRole = typeof ALL_PLATFORM_USER_ROLES[number];
