@@ -191,6 +191,19 @@ export default function HomePage() {
 
   const showPromotions = view === 'all' || view === 'promotions';
   const showEvents = view === 'all' || view === 'events';
+  
+  if (isLoading) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
+            <div className="flex flex-col items-center justify-center text-center">
+                <div className="relative p-1 rounded-full shadow-lg bg-white/90">
+                    <SocioVipLogo size={80} className="animate-pulse" />
+                </div>
+                <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
@@ -249,16 +262,7 @@ export default function HomePage() {
         </div>
       </header>
 
-       {isLoading ? (
-          <main className="flex-grow flex items-center justify-center bg-gradient-loader">
-            <div className="flex flex-col items-center justify-center text-center">
-                <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-                    <SocioVipLogo size={80} className="animate-pulse" />
-                </div>
-                <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
-            </div>
-          </main>
-        ) : (
+       
           <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow w-full">
             <div className="space-y-12">
               {showEvents && (
@@ -302,7 +306,8 @@ export default function HomePage() {
               )}
             </div>
           </main>
-        )}
+        
     </div>
   );
 }
+
