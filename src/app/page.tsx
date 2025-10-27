@@ -100,7 +100,7 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchEntitiesAndBusinesses();
@@ -193,7 +193,7 @@ export default function HomePage() {
   const showEvents = view === 'all' || view === 'events';
 
   return (
-    <div className="min-h-screen bg-muted/40 text-foreground">
+    <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
       <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
         <div className="bg-gradient-to-r from-purple-800 to-red-600">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -249,56 +249,61 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center text-center py-20">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="mt-4 text-lg text-muted-foreground">Cargando...</p>
-          </div>
+       {isLoading ? (
+          <main className="flex-grow flex flex-col items-center justify-center bg-gradient-loader">
+            <div className="text-center">
+                <div className="relative inline-block">
+                    <SocioVipLogo size={80} className="animate-pulse" />
+                </div>
+                <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
+            </div>
+          </main>
         ) : (
-          <div className="space-y-8">
-            {showEvents && (
-              <section>
-                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
-                  <Calendar className="h-7 w-7 mr-3 text-purple-800" /> Próximos Eventos
-                </h2>
-                {filteredEvents.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                    <p className="text-lg font-semibold">No se encontraron eventos</p>
-                    <p className="text-muted-foreground mt-1">
-                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevos eventos."}
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
+          <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow w-full">
+            <div className="space-y-12">
+              {showEvents && (
+                <section>
+                  <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
+                    <Calendar className="h-7 w-7 mr-3 text-purple-800" /> Próximos Eventos
+                  </h2>
+                  {filteredEvents.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 rounded-lg border-2 border-dashed">
+                      <p className="text-lg font-semibold">No se encontraron eventos</p>
+                      <p className="text-muted-foreground mt-1">
+                        {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevos eventos."}
+                      </p>
+                    </div>
+                  )}
+                </section>
+              )}
 
-            {showPromotions && (
-              <section>
-                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
-                  <Tag className="h-7 w-7 mr-3 text-purple-800" /> Promociones Vigentes
-                </h2>
-                {filteredPromotions.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                    <p className="text-lg font-semibold">No se encontraron promociones</p>
-                    <p className="text-muted-foreground mt-1">
-                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
-          </div>
+              {showPromotions && (
+                <section>
+                  <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
+                    <Tag className="h-7 w-7 mr-3 text-purple-800" /> Promociones Vigentes
+                  </h2>
+                  {filteredPromotions.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 rounded-lg border-2 border-dashed">
+                      <p className="text-lg font-semibold">No se encontraron promociones</p>
+                      <p className="text-muted-foreground mt-1">
+                        {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
+                      </p>
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
+          </main>
         )}
-      </main>
     </div>
   );
 }
+
