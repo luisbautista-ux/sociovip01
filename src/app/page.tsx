@@ -252,7 +252,7 @@ export default function HomePage() {
        {isLoading ? (
           <main className="flex-grow flex flex-col items-center justify-center bg-gradient-loader">
             <div className="text-center">
-                <div className="relative inline-block bg-white/90 p-4 rounded-full shadow-lg">
+                <div className="relative w-[80px] h-[80px] flex items-center justify-center bg-white/90 p-1 rounded-full shadow-lg">
                     <SocioVipLogo size={80} className="animate-pulse" />
                 </div>
                 <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
