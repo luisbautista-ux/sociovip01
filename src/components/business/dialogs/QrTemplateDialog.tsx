@@ -175,7 +175,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
       
       ctx.save();
       ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-      ctx.lineWidth = Math.max(1, canvas.width / 500);
+      ctx.lineWidth = Math.max(1, canvas.width / 250);
       currentSnapLines.x.forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); });
       currentSnapLines.y.forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); });
       ctx.restore();
@@ -267,7 +267,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
         const ctx = canvas.getContext('2d');
         if (!layout || !ctx) return;
         
-        const snapThreshold = Math.max(5, Math.round(canvas.width * 0.01)); 
+        const snapThreshold = Math.max(5, Math.round(canvas.width * 0.01));
 
         const activeSnapLines: { x: number[], y: number[] } = { x: [], y: [] };
 
