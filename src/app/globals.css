@@ -125,7 +125,7 @@
 }
 
 .bg-gradient-loader {
-  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)), #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)), #8e44ad, #c0392b, #2980b9);
   background-size: 400% 400%;
   animation: gradient-animation 15s ease infinite;
 }

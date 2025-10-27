@@ -195,7 +195,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
       <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
-        <div className="bg-gradient-to-r from-purple-800 to-red-600">
+        <div className="bg-gradient-loader">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-start h-12 gap-6">
                     <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
