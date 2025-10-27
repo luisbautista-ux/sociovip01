@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -172,12 +171,13 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         if(type === 'change') {
             setCurrentEventData(prev => {
                 if(!prev) return null;
-                return {...prev, ...value};
+                const updatedValue = { ...value, imageObjectPosition: objectPosition };
+                return {...prev, ...updatedValue};
             });
         }
     });
     return () => subscription.unsubscribe();
-  }, [form, setCurrentEventData]);
+  }, [form, setCurrentEventData, objectPosition]);
 
   return (
     <Form {...form}>

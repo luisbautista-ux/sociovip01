@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -77,7 +76,6 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
   const [snapLines, setSnapLines] = useState<{ x: number[], y: number[] }>({ x: [], y: [] });
   const templateImageInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Refs for caching images ---
   const templateImageRef = useRef<HTMLImageElement | null>(null);
   const qrImageRef = useRef<HTMLImageElement | null>(null);
   const [imagesLoaded, setImagesLoaded] = useState(false);
@@ -135,7 +133,6 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
     }
   }, [entity.name]);
   
-  // Load images and QR code into memory
   useEffect(() => {
     let isMounted = true;
     setImagesLoaded(false);
@@ -442,12 +439,12 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.x`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.y`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         <div className="col-span-2 grid grid-cols-2 gap-4 items-center">
-                            <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
+                            <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} value={field.value || ''} /></FormControl></FormItem>)}/>
                             {selectedElement !== 'qr' && (
-                                <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} value={field.value || ''} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
                             )}
                             {selectedElement === 'qr' && (
-                                 <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                 <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} value={field.value || ''} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
                             )}
                         </div>
                     </CardContent>
