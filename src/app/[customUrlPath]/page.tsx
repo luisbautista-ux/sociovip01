@@ -642,24 +642,32 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.drawImage(templateImg, 0, 0);
 
             const layout = qrData.promotion.qrTemplateLayout || {
-                qr: { x: 190, y: 350, size: 80 },
-                name: { x: 190, y: 450, size: 16 },
-                dni: { x: 190, y: 470, size: 12 },
-                promoTitle: { x: 190, y: 500, size: 14 },
+                qr: { x: 190, y: 350, size: 80, color: '#000000' },
+                name: { x: 190, y: 450, size: 16, color: '#FFFFFF' },
+                dni: { x: 190, y: 470, size: 12, color: '#FFFFFF' },
+                promoTitle: { x: 190, y: 500, size: 14, color: '#FFFFFF' },
             };
 
-            const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { width: layout.qr.size, errorCorrectionLevel: 'H', margin: 1 });
+            const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { 
+                width: layout.qr.size, 
+                errorCorrectionLevel: 'H', 
+                margin: 1,
+                color: {
+                  dark: layout.qr.color || '#000000',
+                  light: '#0000' // transparent
+                }
+            });
             const qrImage = new Image();
             qrImage.src = qrDataUrl;
             await new Promise(resolve => qrImage.onload = resolve);
             ctx.drawImage(qrImage, layout.qr.x - layout.qr.size / 2, layout.qr.y - layout.qr.size / 2, layout.qr.size, layout.qr.size);
 
-            ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
             
             const fullName = `${qrData.user.name} ${qrData.user.surname}`;
             let nameFontSize = layout.name.size || 16;
             ctx.font = `bold ${nameFontSize}px Arial`;
+            ctx.fillStyle = layout.name.color || '#FFFFFF';
             const maxWidth = canvas.width * 0.9;
             while(ctx.measureText(fullName).width > maxWidth && nameFontSize > 8) {
                 nameFontSize--;
@@ -668,10 +676,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.fillText(fullName, layout.name.x, layout.name.y);
             
             ctx.font = `bold ${layout.dni.size || 12}px Arial`;
+            ctx.fillStyle = layout.dni.color || '#FFFFFF';
             ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
             
             let promoFontSize = layout.promoTitle.size || 14;
             ctx.font = `bold ${promoFontSize}px Arial`;
+            ctx.fillStyle = layout.promoTitle.color || '#FFFFFF';
             while(ctx.measureText(qrData.promotion.title).width > maxWidth && promoFontSize > 8) {
                 promoFontSize--;
                 ctx.font = `bold ${promoFontSize}px Arial`;
