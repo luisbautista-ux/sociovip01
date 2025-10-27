@@ -175,7 +175,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
       
       ctx.save();
       ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
-      ctx.lineWidth = Math.max(1, canvas.width / 1000);
+      ctx.lineWidth = Math.max(1, canvas.width / 500);
       currentSnapLines.x.forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); });
       currentSnapLines.y.forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); });
       ctx.restore();
