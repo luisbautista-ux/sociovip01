@@ -15,6 +15,7 @@ const SLIDE_DURATION = 5000; // 5 segundos por slide
 
 export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [animationKey, setAnimationKey] = useState(0);
 
   useEffect(() => {
     if (images.length <= 1) return;
@@ -25,6 +26,12 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
 
     return () => clearInterval(slideInterval);
   }, [images.length]);
+  
+  useEffect(() => {
+    // Cambia la key para forzar el reinicio de la animación CSS
+    setAnimationKey(prevKey => prevKey + 1);
+  }, [currentIndex]);
+
 
   const goToPrevious = () => {
     setCurrentIndex((prevIndex) => (prevIndex === 0 ? images.length - 1 : prevIndex - 1));
@@ -94,14 +101,10 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
               className="w-8 h-1 bg-white/30 rounded-full cursor-pointer overflow-hidden"
             >
               <div
-                key={`${slideIndex}-${currentIndex}`} // Reinicia la animación en cambio de slide
+                key={slideIndex === currentIndex ? animationKey : `static-${slideIndex}`}
                 className={cn(
                   'h-full rounded-full',
-                  {
-                    'w-full': slideIndex < currentIndex, // Barras pasadas
-                    'w-0': slideIndex > currentIndex,   // Barras futuras
-                    'animate-progress-bar-fill': slideIndex === currentIndex, // Barra activa
-                  }
+                   slideIndex === currentIndex ? 'animate-progress-bar-fill' : (slideIndex < currentIndex ? 'w-full' : 'w-0')
                 )}
                 style={{
                   backgroundColor: primaryColor,
@@ -115,4 +118,3 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
     </div>
   );
 }
-
