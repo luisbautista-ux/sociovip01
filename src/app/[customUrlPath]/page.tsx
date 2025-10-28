@@ -993,25 +993,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         <ImageCarousel 
                           images={businessDetails.publicCoverImageUrls || []}
                           primaryColor={businessDetails.primaryColor}
+                          title={businessDetails.name}
+                          slogan={businessDetails.slogan}
                         />
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white text-center p-4 pointer-events-none rounded-lg">
-                            {businessDetails.logoUrl && (
-                                <div className="mb-4">
-                                    <NextImage
-                                        src={businessDetails.logoUrl}
-                                        alt={`${businessDetails.name} logo`}
-                                        width={80}
-                                        height={80}
-                                        className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md border-2 border-white/50 shadow-lg bg-black/20 p-1"
-                                    />
-                                </div>
-                            )}
-                            <h1 className="font-bold text-2xl md:text-4xl text-white drop-shadow-lg">{businessDetails.name}</h1>
-                            {businessDetails.slogan && <p className="text-sm md:text-lg text-white/90 mt-1 drop-shadow-md">{businessDetails.slogan}</p>}
-                        </div>
                     </section>
                     
-                    <div className="sticky top-14 z-10 py-2 bg-muted/40" style={{ backgroundColor: businessDetails.primaryColor ? 'transparent' : '#B080D0' }}>
+                    <div className="sticky top-14 z-10 py-2 bg-muted/40" style={{ backgroundColor: 'transparent' }}>
                         <div className="max-w-7xl mx-auto">
                             <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
                                 <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Ver Todo</button>

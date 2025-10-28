@@ -8,12 +8,19 @@ import { cn } from '@/lib/utils';
 
 interface ImageCarouselProps {
   images: string[];
-  primaryColor?: string; // Prop para el color primario
+  primaryColor?: string;
+  title?: string;
+  slogan?: string;
 }
 
-const SLIDE_DURATION = 5000; // 5 segundos por slide
+const SLIDE_DURATION = 5000;
 
-export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouselProps) {
+export function ImageCarousel({
+  images,
+  primaryColor = '#B080D0',
+  title = 'Nombre del Negocio',
+  slogan = 'Tu lema o frase inspiradora aquí',
+}: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animationKey, setAnimationKey] = useState(0);
 
@@ -26,12 +33,10 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
 
     return () => clearInterval(slideInterval);
   }, [images.length]);
-  
-  useEffect(() => {
-    // Cambia la key para forzar el reinicio de la animación CSS
-    setAnimationKey(prevKey => prevKey + 1);
-  }, [currentIndex]);
 
+  useEffect(() => {
+    setAnimationKey((prevKey) => prevKey + 1);
+  }, [currentIndex]);
 
   const goToPrevious = () => {
     setCurrentIndex((prevIndex) => (prevIndex === 0 ? images.length - 1 : prevIndex - 1));
@@ -44,56 +49,72 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
   const goToSlide = (slideIndex: number) => {
     setCurrentIndex(slideIndex);
   };
-  
+
   if (!images || images.length === 0) {
-      return (
-        <div className="relative w-full aspect-[16/9] md:rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-            <Video className="w-12 h-12 text-muted-foreground" />
-            <p className="ml-4 text-muted-foreground">No hay imágenes de portada.</p>
-        </div>
-      );
+    return (
+      <div className="relative w-full aspect-[16/9] md:rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+        <Video className="w-12 h-12 text-muted-foreground" />
+        <p className="ml-4 text-muted-foreground">No hay imágenes de portada.</p>
+      </div>
+    );
   }
 
   return (
     <div className="relative w-full h-full group">
-      {/* Botones de navegación (solo si hay más de una imagen) */}
       {images.length > 1 && (
         <>
-          <button 
+          <button
             onClick={goToPrevious}
-            className="absolute top-1/2 left-3 z-20 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white"
+            className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/60"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <button 
+          <button
             onClick={goToNext}
-            className="absolute top-1/2 right-3 z-20 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white"
+            className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/60"
           >
             <ChevronRight className="h-6 w-6" />
           </button>
         </>
       )}
 
-      {/* Contenedor de la Imagen */}
       <div className="relative w-full h-full aspect-[16/9] md:rounded-lg overflow-hidden">
         {images.map((image, index) => (
-            <NextImage
-                key={index}
-                src={image}
-                alt={`Imagen de portada ${index + 1}`}
-                fill
-                className={cn(
-                    "object-cover transition-opacity duration-700 ease-in-out",
-                    index === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
-                )}
-                priority={index === 0}
-            />
+          <NextImage
+            key={index}
+            src={image}
+            alt={`Imagen ${index + 1}`}
+            fill
+            className={cn(
+              "object-cover transition-opacity duration-700 ease-in-out",
+              index === currentIndex ? "opacity-100 z-10" : "opacity-0 z-0"
+            )}
+            priority={index === 0}
+          />
         ))}
+
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black/30 px-6 pointer-events-none">
+          {title && (
+            <h2
+              className="text-3xl md:text-5xl font-bold text-white drop-shadow-lg mb-2"
+              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}
+            >
+              {title}
+            </h2>
+          )}
+          {slogan && (
+             <p
+              className="text-lg md:text-2xl text-white/90 font-medium max-w-2xl"
+              style={{ textShadow: '0 1px 5px rgba(0,0,0,0.5)' }}
+            >
+              {slogan}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Barras de Progreso */}
       {images.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 flex space-x-2">
+        <div className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex space-x-2">
           {images.map((_, slideIndex) => (
             <div
               key={slideIndex}
@@ -104,7 +125,11 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
                 key={slideIndex === currentIndex ? animationKey : `static-${slideIndex}`}
                 className={cn(
                   'h-full rounded-full',
-                   slideIndex === currentIndex ? 'animate-progress-bar-fill' : (slideIndex < currentIndex ? 'w-full' : 'w-0')
+                  slideIndex === currentIndex
+                    ? 'animate-progress-bar-fill'
+                    : slideIndex < currentIndex
+                    ? 'w-full'
+                    : 'w-0'
                 )}
                 style={{
                   backgroundColor: primaryColor,
