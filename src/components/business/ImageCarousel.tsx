@@ -40,6 +40,18 @@ export function ImageCarousel({
     setAnimationKey((prev) => prev + 1);
   }, [currentIndex]);
 
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+  
+  const goToSlide = (slideIndex: number) => {
+    setCurrentIndex(slideIndex);
+  };
+
   if (!images || images.length === 0) {
     return (
       <div className="relative w-full aspect-[4/3] md:aspect-[16/9] md:rounded-xl overflow-hidden bg-muted flex items-center justify-center">
@@ -50,7 +62,7 @@ export function ImageCarousel({
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full px-0 md:px-0">
       <div className="relative w-full aspect-[4/3] md:aspect-[16/9] md:rounded-xl overflow-hidden group shadow-md">
         {/* Imagen */}
         {images.map((image, index) => (
@@ -67,28 +79,20 @@ export function ImageCarousel({
           />
         ))}
 
-        {/* Botones de navegación */}
+        {/* Botones de navegación fijos */}
         {images.length > 1 && (
           <>
             <button
-              onClick={() =>
-                setCurrentIndex((prev) =>
-                  prev === 0 ? images.length - 1 : prev - 1
-                )
-              }
-              className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/60"
+              onClick={goToPrevious}
+              className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-black/30 text-white rounded-full transition-colors duration-300 hover:bg-black/50"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-6 w-6" />
             </button>
             <button
-              onClick={() =>
-                setCurrentIndex((prev) =>
-                  prev === images.length - 1 ? 0 : prev + 1
-                )
-              }
-              className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-black/60"
+              onClick={goToNext}
+              className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-black/30 text-white rounded-full transition-colors duration-300 hover:bg-black/50"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-6 w-6" />
             </button>
           </>
         )}
@@ -96,7 +100,7 @@ export function ImageCarousel({
         {/* Overlay centrado */}
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black/30 backdrop-blur-[1px] px-4 md:px-8">
           {logoUrl && (
-            <div className="relative w-16 h-16 md:w-20 md:h-20 mb-2">
+            <div className="relative w-16 h-16 md:w-20 md:h-20 mb-4">
               <NextImage
                 src={logoUrl}
                 alt="Logo del negocio"
@@ -118,38 +122,30 @@ export function ImageCarousel({
           </p>
         </div>
 
-        {/* Barras de progreso */}
+        {/* Indicadores de progreso circulares */}
         {images.length > 1 && (
-          <div className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex space-x-2">
+          <div className="absolute bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center space-x-2">
             {images.map((_, slideIndex) => (
-              <div
+              <button
                 key={slideIndex}
-                onClick={() => setCurrentIndex(slideIndex)}
-                className="w-8 h-1 bg-white/30 rounded-full cursor-pointer overflow-hidden"
+                onClick={() => goToSlide(slideIndex)}
+                className={cn(
+                  'h-2 rounded-full cursor-pointer transition-all duration-500 ease-in-out',
+                  slideIndex === currentIndex ? 'w-8 bg-white/70' : 'w-2 bg-white/40 hover:bg-white/60'
+                )}
+                aria-label={`Ir a la imagen ${slideIndex + 1}`}
               >
-                <div
-                  key={
-                    slideIndex === currentIndex
-                      ? animationKey
-                      : `static-${slideIndex}`
-                  }
-                  className={cn(
-                    'h-full rounded-full',
-                    slideIndex === currentIndex
-                      ? 'animate-progress-bar-fill'
-                      : slideIndex < currentIndex
-                      ? 'w-full'
-                      : 'w-0'
-                  )}
-                  style={{
-                    backgroundColor: primaryColor,
-                    animationDuration:
-                      slideIndex === currentIndex
-                        ? `${SLIDE_DURATION}ms`
-                        : undefined,
-                  }}
-                />
-              </div>
+                {slideIndex === currentIndex && (
+                  <div
+                    key={animationKey}
+                    className="h-full rounded-full animate-progress-bar-fill"
+                    style={{
+                      backgroundColor: primaryColor,
+                      animationDuration: `${SLIDE_DURATION}ms`,
+                    }}
+                  />
+                )}
+              </button>
             ))}
           </div>
         )}
