@@ -38,7 +38,7 @@ import type {
   NewQrClientFormData,
   GeneratedCode,
 } from "@/lib/types";
-import { format, parse, isPast } from "date-fns";
+import { format, parse, isPast, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import {
