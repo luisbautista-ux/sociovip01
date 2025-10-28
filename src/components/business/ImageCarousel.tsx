@@ -91,22 +91,20 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
             <div
               key={slideIndex}
               onClick={() => goToSlide(slideIndex)}
-              className="w-8 h-1 bg-white/30 rounded-full cursor-pointer overflow-hidden"
+              className="w-8 h-1 bg-white/30 rounded-full cursor-pointer overflow-hidden relative"
             >
-              <div
-                className={cn(
-                  "h-full rounded-full",
-                  currentIndex === slideIndex && "animate-progress-bar-fill"
-                )}
-                style={{
-                  backgroundColor: primaryColor,
-                  animationDuration: SLIDE_DURATION + 'ms',
-                  animationPlayState: currentIndex === slideIndex ? 'running' : 'paused',
-                  width: currentIndex === slideIndex ? '100%' : '0%', // Start at 0% for non-active
-                }}
-                // Reinicia la animación cuando el índice cambia
-                key={currentIndex === slideIndex ? `active-${currentIndex}` : `inactive-${slideIndex}`}
-              />
+              {currentIndex === slideIndex && (
+                 <div
+                    className="h-full rounded-full animate-progress-bar-fill"
+                    style={{
+                      backgroundColor: primaryColor,
+                      animationDuration: SLIDE_DURATION + 'ms',
+                      animationPlayState: 'running',
+                    }}
+                    // Reinicia la animación cuando el índice cambia
+                    key={`active-indicator-${currentIndex}`}
+                />
+              )}
             </div>
           ))}
         </div>
