@@ -116,7 +116,7 @@ export function ImageCarousel({
           )}
           {slogan && (
              <p
-              className="text-lg md:text-2xl text-white/90 font-medium max-w-2xl"
+              className="text-lg md:text-xl text-white/90 font-medium max-w-2xl"
               style={{ textShadow: '0 1px 5px rgba(0,0,0,0.5)' }}
             >
               {slogan}
