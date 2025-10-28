@@ -58,7 +58,7 @@ export interface Business {
   managerDni?: string;
   businessType?: BusinessType;
   logoUrl?: string;
-  publicCoverImageUrl?: string;
+  publicCoverImageUrls?: string[]; // Campo actualizado para soportar múltiples imágenes
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
@@ -67,8 +67,6 @@ export interface Business {
   customUrlPath?: string | null; 
   primaryColor?: string;
   secondaryColor?: string;
-  logoFile?: File | null; // For upload
-  coverFile?: File | null; // For upload
 }
 
 export type PlatformUserRole = typeof ALL_PLATFORM_USER_ROLES[number];
@@ -315,7 +313,7 @@ export interface BusinessFormData {
   managerDni?: string;
   businessType?: BusinessType;
   logoUrl?: string;
-  publicCoverImageUrl?: string;
+  publicCoverImageUrls?: string[];
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
