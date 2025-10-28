@@ -938,7 +938,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 <Separator />
                 <div className="text-center">
                    <p className="font-semibold">{qrData.promotion.title}</p>
-                   <p className="text-xs text-muted-foreground">Válido hasta: {format(parse(qrData.promotion.validUntil, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}</p>
+                   <p className="text-xs text-muted-foreground">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
@@ -989,7 +989,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Columna Izquierda (Carrusel y Contenido) */}
                 <div className="md:col-span-2 space-y-12">
-                    <section className="relative">
+                    <section>
                         <ImageCarousel
                           images={businessDetails.publicCoverImageUrls || []}
                           primaryColor={businessDetails.primaryColor}
