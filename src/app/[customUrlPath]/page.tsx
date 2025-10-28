@@ -990,11 +990,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 {/* Columna Izquierda (Carrusel y Contenido) */}
                 <div className="md:col-span-2 space-y-12">
                     <section className="relative">
-                        <ImageCarousel 
+                        <ImageCarousel
                           images={businessDetails.publicCoverImageUrls || []}
                           primaryColor={businessDetails.primaryColor}
                           title={businessDetails.name}
                           slogan={businessDetails.slogan}
+                          logoUrl={businessDetails.logoUrl}
                         />
                     </section>
                     

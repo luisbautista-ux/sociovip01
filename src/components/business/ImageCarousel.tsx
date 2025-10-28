@@ -11,6 +11,7 @@ interface ImageCarouselProps {
   primaryColor?: string;
   title?: string;
   slogan?: string;
+  logoUrl?: string;
 }
 
 const SLIDE_DURATION = 5000;
@@ -20,6 +21,7 @@ export function ImageCarousel({
   primaryColor = '#B080D0',
   title = 'Nombre del Negocio',
   slogan = 'Tu lema o frase inspiradora aquí',
+  logoUrl,
 }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animationKey, setAnimationKey] = useState(0);
@@ -94,6 +96,16 @@ export function ImageCarousel({
         ))}
 
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black/30 px-6 pointer-events-none">
+          {logoUrl && (
+            <NextImage
+              src={logoUrl}
+              alt={`${title} Logo`}
+              width={80}
+              height={80}
+              className="h-20 w-20 object-contain drop-shadow-lg mb-4"
+              data-ai-hint="logo business"
+            />
+          )}
           {title && (
             <h2
               className="text-3xl md:text-5xl font-bold text-white drop-shadow-lg mb-2"
