@@ -989,26 +989,26 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Columna Izquierda (Carrusel y Contenido) */}
                 <div className="md:col-span-2 space-y-12">
-                    <section>
-                         {businessDetails.logoUrl && (
-                             <div className="mb-8 flex items-center gap-4">
-                                <NextImage
-                                    src={businessDetails.logoUrl}
-                                    alt={`${businessDetails.name} logo`}
-                                    width={80}
-                                    height={80}
-                                    className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md border-2 border-white/50 shadow-lg bg-black/20 p-1"
-                                />
-                                <div>
-                                    <h1 className="font-bold text-2xl md:text-4xl" style={{color: businessDetails.primaryColor}}>{businessDetails.name}</h1>
-                                    {businessDetails.slogan && <p className="text-sm md:text-lg text-muted-foreground mt-1">{businessDetails.slogan}</p>}
-                                </div>
-                             </div>
-                         )}
+                    <section className="relative">
                         <ImageCarousel 
                           images={businessDetails.publicCoverImageUrls || []}
                           primaryColor={businessDetails.primaryColor}
                         />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-white text-center p-4 pointer-events-none rounded-lg">
+                            {businessDetails.logoUrl && (
+                                <div className="mb-4">
+                                    <NextImage
+                                        src={businessDetails.logoUrl}
+                                        alt={`${businessDetails.name} logo`}
+                                        width={80}
+                                        height={80}
+                                        className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md border-2 border-white/50 shadow-lg bg-black/20 p-1"
+                                    />
+                                </div>
+                            )}
+                            <h1 className="font-bold text-2xl md:text-4xl text-white drop-shadow-lg">{businessDetails.name}</h1>
+                            {businessDetails.slogan && <p className="text-sm md:text-lg text-white/90 mt-1 drop-shadow-md">{businessDetails.slogan}</p>}
+                        </div>
                     </section>
                     
                     <div className="sticky top-14 z-10 py-2 bg-muted/40" style={{ backgroundColor: businessDetails.primaryColor ? 'transparent' : '#B080D0' }}>
@@ -1033,7 +1033,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                 <NextImage src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} alt={promo.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} data-ai-hint={promo.aiHint || "discount offer"}/>
                               </div>
                               <CardHeader className="pb-3"><CardTitle className="text-xl">{promo.name}</CardTitle></CardHeader>
-                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p><p className="text-xs text-muted-foreground">Válido hasta el {format(parse(promo.endDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
+                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p><p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
                               <CardFooter className="flex-col items-start p-4 border-t"><SpecificCodeEntryForm entity={promo} /></CardFooter>
                             </Card>
                           ))}
@@ -1054,7 +1054,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                  {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30" />)}
                               </div>
                               <CardHeader className="pb-3"><CardTitle className="text-xl">{event.name}</CardTitle></CardHeader>
-                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p><p className="text-xs text-muted-foreground">Fecha: {format(parse(event.startDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
+                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p><p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
                               {isEntityCurrentlyActivatable(event) ? (<CardFooter className="flex-col items-start p-4 border-t"><SpecificCodeEntryForm entity={event} /></CardFooter>) : (<PastEventCardFooter entity={event} />)}
                             </Card>
                           ))}
