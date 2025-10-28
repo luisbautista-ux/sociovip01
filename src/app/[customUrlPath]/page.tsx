@@ -96,6 +96,7 @@ import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
 import { ImageCarousel } from "@/components/business/ImageCarousel";
+import { VideoCarousel } from "@/components/business/VideoCarousel";
 
 
 // --- Helpers robustos para códigos ---
@@ -242,6 +243,7 @@ export default function BusinessPublicPage() {
           slogan: bizData.slogan || undefined,
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
+          publicAddress: bizData.publicAddress, // Keep as is
           primaryColor: bizData.primaryColor || '#B080D0',
           secondaryColor: bizData.secondaryColor || '#8E5EA2',
         };
@@ -1057,40 +1059,23 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     )}
                 </div>
 
-                {/* Columna Derecha (Info y Video) */}
+                {/* Columna Derecha (Video) */}
                 <aside className="md:col-span-1 space-y-8">
-                     <Card>
-                        <CardHeader>
-                           <CardTitle className="flex items-center"><Video className="mr-2 h-5 w-5 text-primary"/> Videos del Negocio</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex items-center justify-center p-2 rounded-b-lg">
-                           {(businessDetails.publicVideoUrls && businessDetails.publicVideoUrls.length > 0) ? (
-                                <video key={businessDetails.publicVideoUrls[0]} className="w-full aspect-video rounded-md" controls>
-                                    <source src={businessDetails.publicVideoUrls[0]} type="video/mp4" />
-                                    Tu navegador no soporta el tag de video.
-                                </video>
-                           ) : (
-                               <div className="flex items-center justify-center h-48 bg-muted w-full rounded-b-lg">
-                                  <p className="text-muted-foreground">No hay videos disponibles.</p>
-                               </div>
-                           )}
-                        </CardContent>
-                     </Card>
-                     {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
-                      <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center"><Info className="h-5 w-5 mr-2 text-primary" />Información de Contacto</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm text-muted-foreground">
-                            {businessDetails.publicAddress && (<p><strong>Dirección:</strong> {businessDetails.publicAddress}</p>)}
-                            {businessDetails.publicPhone && (<p><strong>Teléfono:</strong> {businessDetails.publicPhone}</p>)}
-                            {businessDetails.publicContactEmail && (<p><strong>Email:</strong> <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
-                        </CardContent>
-                      </Card>
-                    ) : null}
+                     <VideoCarousel videos={businessDetails.publicVideoUrls || []} />
                 </aside>
             </div>
       </main>
+
+      {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
+        <footer className="w-full bg-background border-t mt-12 py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-muted-foreground text-sm">
+                <p className="font-semibold text-foreground mb-2">Información de Contacto</p>
+                {businessDetails.publicAddress && (<p>{businessDetails.publicAddress}</p>)}
+                {businessDetails.publicPhone && (<p>Teléfono: {businessDetails.publicPhone}</p>)}
+                {businessDetails.publicContactEmail && (<p>Email: <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
+            </div>
+        </footer>
+      ) : null}
 
       <Dialog
         open={showDniModal}
