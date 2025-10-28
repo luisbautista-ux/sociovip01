@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -1006,7 +1005,10 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                 </div>
                              </div>
                          )}
-                        <ImageCarousel images={businessDetails.publicCoverImageUrls || []} />
+                        <ImageCarousel 
+                          images={businessDetails.publicCoverImageUrls || []}
+                          primaryColor={businessDetails.primaryColor}
+                        />
                     </section>
                     
                     <div className="sticky top-14 z-10 py-2 bg-muted/40" style={{ backgroundColor: businessDetails.primaryColor ? 'transparent' : '#B080D0' }}>
