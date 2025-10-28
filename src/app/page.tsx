@@ -179,7 +179,7 @@ export default function HomePage() {
             Válido hasta el {format(parseISO(entity.endDate), "dd MMMM, yyyy", { locale: es })}
           </p>
           <Link href={businessUrl} passHref className="w-full">
-            <Button className="w-full bg-gradient-to-r from-purple-800 to-red-600 text-white hover:opacity-90 transition-opacity">
+            <Button className="w-full text-white hover:opacity-90 transition-opacity bg-header-gradient">
               {isEvent ? <Calendar className="mr-2 h-4 w-4" /> : <Tag className="mr-2 h-4 w-4" />}
                {isEvent ? "Ver Evento" : "Ver Promoción"}
             </Button>
