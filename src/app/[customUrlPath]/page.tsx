@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -237,6 +238,7 @@ export default function BusinessPublicPage() {
           customUrlPath: bizData.customUrlPath || customUrlPath,
           logoUrl: bizData.logoUrl || undefined,
           publicCoverImageUrls: bizData.publicCoverImageUrls || [],
+          publicVideoUrls: bizData.publicVideoUrls || [],
           slogan: bizData.slogan || undefined,
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
@@ -1059,10 +1061,19 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 <aside className="md:col-span-1 space-y-8">
                      <Card>
                         <CardHeader>
-                           <CardTitle className="flex items-center"><Video className="mr-2 h-5 w-5 text-primary"/> Próximos Videos</CardTitle>
+                           <CardTitle className="flex items-center"><Video className="mr-2 h-5 w-5 text-primary"/> Videos del Negocio</CardTitle>
                         </CardHeader>
-                        <CardContent className="flex items-center justify-center h-48 bg-muted rounded-b-lg">
-                           <p className="text-muted-foreground">Contenido de video próximamente.</p>
+                        <CardContent className="flex items-center justify-center p-2 rounded-b-lg">
+                           {(businessDetails.publicVideoUrls && businessDetails.publicVideoUrls.length > 0) ? (
+                                <video key={businessDetails.publicVideoUrls[0]} className="w-full aspect-video rounded-md" controls>
+                                    <source src={businessDetails.publicVideoUrls[0]} type="video/mp4" />
+                                    Tu navegador no soporta el tag de video.
+                                </video>
+                           ) : (
+                               <div className="flex items-center justify-center h-48 bg-muted w-full rounded-b-lg">
+                                  <p className="text-muted-foreground">No hay videos disponibles.</p>
+                               </div>
+                           )}
                         </CardContent>
                      </Card>
                      {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (

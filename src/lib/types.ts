@@ -59,6 +59,7 @@ export interface Business {
   businessType?: BusinessType;
   logoUrl?: string;
   publicCoverImageUrls?: string[]; // Campo actualizado para soportar múltiples imágenes
+  publicVideoUrls?: string[]; // Campo para URLs de videos
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
@@ -314,6 +315,7 @@ export interface BusinessFormData {
   businessType?: BusinessType;
   logoUrl?: string;
   publicCoverImageUrls?: string[];
+  publicVideoUrls?: string[];
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;

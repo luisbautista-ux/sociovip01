@@ -3,7 +3,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Palette, ImageIcon as ImageIconLucide, Type, UploadCloud, Loader2, Link as LinkIcon, Smartphone, Upload, Trash2, Image as ImageIcon } from "lucide-react"; 
+import { Settings, Palette, ImageIcon as ImageIconLucide, Type, UploadCloud, Loader2, Link as LinkIcon, Smartphone, Upload, Trash2, Image as ImageIcon, Video } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -36,9 +36,14 @@ export default function BusinessSettingsPage() {
   const [coverUrls, setCoverUrls] = useState<string[]>([]);
   const [coverFiles, setCoverFiles] = useState<File[]>([]);
   const [coverPreviews, setCoverPreviews] = useState<string[]>([]);
+
+  const [videoUrls, setVideoUrls] = useState<string[]>([]);
+  const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [videoPreviews, setVideoPreviews] = useState<string[]>([]);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -59,9 +64,13 @@ export default function BusinessSettingsPage() {
           setLogoUrl(data.logoUrl || "");
           setLogoPreview(data.logoUrl || null);
           
-          const urls = data.publicCoverImageUrls || [];
-          setCoverUrls(urls);
-          setCoverPreviews(urls);
+          const coverImageUrls = data.publicCoverImageUrls || [];
+          setCoverUrls(coverImageUrls);
+          setCoverPreviews(coverImageUrls);
+          
+          const publicVideoUrls = data.publicVideoUrls || [];
+          setVideoUrls(publicVideoUrls);
+          setVideoPreviews(publicVideoUrls);
 
         } else {
           toast({ title: "Error", description: "No se encontraron los datos del negocio.", variant: "destructive" });
@@ -124,19 +133,58 @@ export default function BusinessSettingsPage() {
   const removeCoverImage = (indexToRemove: number) => {
     const previewToRemove = coverPreviews[indexToRemove];
     
-    // If it's a new file (blob URL)
     if (previewToRemove.startsWith('blob:')) {
-        const fileIndex = coverFiles.findIndex(file => URL.createObjectURL(file) === previewToRemove);
+        const fileIndex = coverPreviews.filter(p => p.startsWith('blob:')).indexOf(previewToRemove);
         if (fileIndex > -1) {
             setCoverFiles(prev => prev.filter((_, i) => i !== fileIndex));
         }
     } else {
-        // It's an existing URL from Firebase
         setCoverUrls(prev => prev.filter(url => url !== previewToRemove));
     }
     
-    // Always remove from previews
     setCoverPreviews(prev => prev.filter((_, i) => i !== indexToRemove));
+  };
+  
+  const handleVideoFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    let error = false;
+
+    files.forEach(file => {
+        if (file.size > 50 * 1024 * 1024) { // 50MB limit
+            toast({ title: `Video '${file.name}' muy grande`, description: "Los videos no deben superar los 50MB.", variant: "destructive" });
+            error = true;
+        } else if ((videoFiles.length + newFiles.length + videoUrls.length) < 3) {
+            newFiles.push(file);
+            newPreviews.push(URL.createObjectURL(file));
+        } else {
+            toast({ title: "Límite de videos alcanzado", description: "Puedes tener un máximo de 3 videos.", variant: "destructive" });
+            error = true;
+        }
+    });
+
+    if (!error) {
+        setVideoFiles(prev => [...prev, ...newFiles]);
+        setVideoPreviews(prev => [...prev, ...newPreviews]);
+    }
+  };
+
+  const removeVideo = (indexToRemove: number) => {
+    const previewToRemove = videoPreviews[indexToRemove];
+    
+    if (previewToRemove.startsWith('blob:')) {
+        const fileIndex = videoPreviews.filter(p => p.startsWith('blob:')).indexOf(previewToRemove);
+        if (fileIndex > -1) {
+            setVideoFiles(prev => prev.filter((_, i) => i !== fileIndex));
+        }
+    } else {
+        setVideoUrls(prev => prev.filter(url => url !== previewToRemove));
+    }
+    
+    setVideoPreviews(prev => prev.filter((_, i) => i !== indexToRemove));
   };
 
 
@@ -149,6 +197,7 @@ export default function BusinessSettingsPage() {
     setIsSaving(true);
     let finalLogoUrl = logoUrl;
     let finalCoverUrls = [...coverUrls];
+    let finalVideoUrls = [...videoUrls];
 
     try {
       // Handle Logo Upload
@@ -174,20 +223,42 @@ export default function BusinessSettingsPage() {
         );
         finalCoverUrls.push(...uploadedUrls);
       }
-
-      // Identify deleted URLs
-      const initialUrls = (await getDoc(doc(db, "businesses", userProfile.businessId))).data()?.publicCoverImageUrls || [];
-      const deletedUrls = initialUrls.filter((url: string) => !finalCoverUrls.includes(url));
       
-      // Delete from Storage
-      if (deletedUrls.length > 0) {
-        toast({ description: `Eliminando ${deletedUrls.length} imágen(es) antiguas...` });
-        await Promise.all(deletedUrls.map(async (url: string) => {
-          if (url.includes("firebase")) {
-            try { await deleteObject(ref(storage, url)); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Old cover not deleted:", e); }
-          }
-        }));
+      // Handle Video Uploads
+      if (videoFiles.length > 0) {
+        toast({ description: `Subiendo ${videoFiles.length} nuevo(s) video(s)...` });
+        const uploadedUrls = await Promise.all(
+          videoFiles.map(async (file) => {
+            const videoStorageRef = ref(storage, `business-assets/${userProfile.businessId}/videos/${Date.now()}-${file.name}`);
+            const uploadResult = await uploadBytes(videoStorageRef, file);
+            return getDownloadURL(uploadResult.ref);
+          })
+        );
+        finalVideoUrls.push(...uploadedUrls);
       }
+
+      // Identify and delete removed files from storage
+      const initialDoc = (await getDoc(doc(db, "businesses", userProfile.businessId))).data() as Business;
+      const initialCoverUrls = initialDoc?.publicCoverImageUrls || [];
+      const deletedCoverUrls = initialCoverUrls.filter((url: string) => !finalCoverUrls.includes(url));
+      
+      const initialVideoUrls = initialDoc?.publicVideoUrls || [];
+      const deletedVideoUrls = initialVideoUrls.filter((url: string) => !finalVideoUrls.includes(url));
+      
+      const deletionPromises: Promise<void>[] = [];
+      if (deletedCoverUrls.length > 0) {
+        toast({ description: `Eliminando ${deletedCoverUrls.length} imágen(es) antiguas...` });
+        deletedCoverUrls.forEach(url => {
+          if (url.includes("firebase")) deletionPromises.push(deleteObject(ref(storage, url)).catch(e => {if (e.code !== 'storage/object-not-found') console.warn("Old cover not deleted:", e)}));
+        });
+      }
+      if (deletedVideoUrls.length > 0) {
+        toast({ description: `Eliminando ${deletedVideoUrls.length} video(s) antiguos...` });
+        deletedVideoUrls.forEach(url => {
+          if (url.includes("firebase")) deletionPromises.push(deleteObject(ref(storage, url)).catch(e => {if (e.code !== 'storage/object-not-found') console.warn("Old video not deleted:", e)}));
+        });
+      }
+      await Promise.all(deletionPromises);
 
       const updateData: Partial<Business> = {
           name: businessName,
@@ -196,6 +267,7 @@ export default function BusinessSettingsPage() {
           secondaryColor,
           logoUrl: finalLogoUrl,
           publicCoverImageUrls: finalCoverUrls,
+          publicVideoUrls: finalVideoUrls,
       };
 
       const businessDocRef = doc(db, "businesses", userProfile.businessId);
@@ -205,6 +277,7 @@ export default function BusinessSettingsPage() {
       
       setLogoFile(null);
       setCoverFiles([]);
+      setVideoFiles([]);
       await fetchBusinessData();
 
     } catch (error: any) {
@@ -319,7 +392,39 @@ export default function BusinessSettingsPage() {
               )}
             </div>
             <input type="file" ref={coverInputRef} onChange={handleCoverFilesChange} className="hidden" accept="image/png, image/jpeg, image/webp" multiple />
-            <p className="text-xs text-muted-foreground mt-2">Puedes arrastrar para reordenar las imágenes.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Videos del Negocio (hasta 3)</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {videoPreviews.map((preview, index) => (
+                <div key={index} className="relative group aspect-video">
+                  <video src={preview} className="w-full h-full object-cover rounded-md bg-black" controls={false} />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeVideo(index)}
+                    disabled={isSaving}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              {videoPreviews.length < 3 && (
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={isSaving}
+                  className="aspect-video border-2 border-dashed rounded-md flex flex-col items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  <UploadCloud className="h-8 w-8" />
+                  <span className="text-xs mt-1">Añadir video</span>
+                </button>
+              )}
+            </div>
+            <input type="file" ref={videoInputRef} onChange={handleVideoFilesChange} className="hidden" accept="video/mp4,video/webm,video/quicktime" multiple />
           </div>
 
           <div className="space-y-2">
