@@ -7,11 +7,13 @@ import { cn } from '@/lib/utils';
 
 interface VideoCarouselProps {
   videos: string[];
+  primaryColor?: string;
 }
 
-export function VideoCarousel({ videos }: VideoCarouselProps) {
+export function VideoCarousel({ videos, primaryColor = '#B080D0' }: VideoCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [progress, setProgress] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
   useEffect(() => {
@@ -21,30 +23,46 @@ export function VideoCarousel({ videos }: VideoCarouselProps) {
   const handleEnded = () => {
     setCurrentIndex((prevIndex) => (prevIndex + 1) % videos.length);
   };
-  
+
+  const goToSlide = (slideIndex: number) => {
+    setCurrentIndex(slideIndex);
+    setProgress(0); // Reset progress on manual slide change
+  };
+
   const goToPrevious = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + videos.length) % videos.length);
+    goToSlide((currentIndex - 1 + videos.length) % videos.length);
   };
 
   const goToNext = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % videos.length);
+    goToSlide((currentIndex + 1) % videos.length);
   };
 
   useEffect(() => {
-    videoRefs.current.forEach((video, index) => {
-      if (video) {
-        if (index === currentIndex) {
-          video.play().catch(error => {
-            // Autoplay was prevented.
-            console.warn("Autoplay was prevented. User interaction might be required.", error);
-          });
-        } else {
+    const currentVideo = videoRefs.current[currentIndex];
+    if (currentVideo) {
+      // Pause all other videos and reset them
+      videoRefs.current.forEach((video, index) => {
+        if (video && index !== currentIndex) {
           video.pause();
           video.currentTime = 0;
         }
-      }
-    });
+      });
+
+      // Play the current video
+      currentVideo.play().catch(error => {
+        console.warn("Autoplay was prevented.", error);
+      });
+      setProgress(0); // Reset progress when index changes
+    }
   }, [currentIndex, videos]);
+
+  const handleTimeUpdate = () => {
+    const currentVideo = videoRefs.current[currentIndex];
+    if (currentVideo && currentVideo.duration) {
+      setProgress((currentVideo.currentTime / currentVideo.duration) * 100);
+    }
+  };
+
 
   if (!videos || videos.length === 0) {
     return (
@@ -67,10 +85,9 @@ export function VideoCarousel({ videos }: VideoCarouselProps) {
           )}
           src={videoUrl}
           muted={isMuted}
-          autoPlay={index === currentIndex}
           playsInline
-          loop={videos.length === 1} // Loop only if there's one video
           onEnded={handleEnded}
+          onTimeUpdate={handleTimeUpdate}
         />
       ))}
       
@@ -78,39 +95,49 @@ export function VideoCarousel({ videos }: VideoCarouselProps) {
         <>
           <button
             onClick={goToPrevious}
-            className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full transition-opacity duration-300 hover:bg-black/60"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <button
             onClick={goToNext}
-            className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full transition-opacity duration-300 hover:bg-black/60"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
-           <div className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex space-x-2">
-                {videos.map((_, slideIndex) => (
-                <div
-                    key={slideIndex}
-                    onClick={() => setCurrentIndex(slideIndex)}
-                    className="w-8 h-1.5 bg-white/40 rounded-full cursor-pointer overflow-hidden"
-                >
-                    <div
-                    className="h-full bg-primary"
-                    style={{ width: slideIndex === currentIndex ? '100%' : (slideIndex < currentIndex ? '100%' : '0%'), transition: slideIndex === currentIndex ? 'width 5s linear' : 'none' }}
-                    />
-                </div>
-                ))}
-            </div>
         </>
       )}
 
       <button
         onClick={() => setIsMuted(prev => !prev)}
-        className="absolute top-3 right-3 z-30 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-3 right-3 z-30 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
       >
         {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>
+
+      {/* Indicadores de progreso circulares */}
+      {videos.length > 1 && (
+        <div className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex space-x-2">
+          {videos.map((_, slideIndex) => (
+            <div
+              key={slideIndex}
+              onClick={() => goToSlide(slideIndex)}
+              className={cn(
+                'h-2 rounded-full cursor-pointer bg-white/40 overflow-hidden transition-[width] duration-300',
+                slideIndex === currentIndex ? 'w-8' : 'w-2'
+              )}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${slideIndex === currentIndex ? progress : (slideIndex < currentIndex ? 100 : 0)}%`,
+                  backgroundColor: primaryColor,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

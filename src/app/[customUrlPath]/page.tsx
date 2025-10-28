@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -1002,7 +1001,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     />
                 </div>
                 <aside className="md:col-span-1 h-full hidden md:block">
-                     <VideoCarousel videos={businessDetails.publicVideoUrls || []} />
+                     <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor} />
                 </aside>
             </div>
             
