@@ -96,14 +96,14 @@ export function ImageCarousel({
         {/* Overlay centrado */}
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black/30 backdrop-blur-[1px] px-4 md:px-8">
           {logoUrl && (
-            <div className="relative w-20 h-20 md:w-24 md:h-24 mb-4">
+            <div className="relative w-16 h-16 md:w-20 md:h-20 mb-2">
               <NextImage
                 src={logoUrl}
                 alt="Logo del negocio"
                 fill
                 quality={100}
-                className="object-contain drop-shadow-md"
-                sizes="(max-width: 768px) 80px, 96px"
+                className="object-contain drop-shadow-md rounded-md"
+                sizes="(max-width: 768px) 64px, 80px"
               />
             </div>
           )}
@@ -157,5 +157,3 @@ export function ImageCarousel({
     </div>
   );
 }
-
-    
