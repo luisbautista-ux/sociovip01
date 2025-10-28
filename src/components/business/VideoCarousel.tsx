@@ -48,7 +48,7 @@ export function VideoCarousel({ videos }: VideoCarouselProps) {
 
   if (!videos || videos.length === 0) {
     return (
-      <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-muted flex items-center justify-center">
+      <div className="relative w-full h-full rounded-xl overflow-hidden bg-muted flex items-center justify-center">
         <Video className="w-12 h-12 text-muted-foreground" />
         <p className="ml-4 text-muted-foreground">No hay videos disponibles.</p>
       </div>
@@ -56,13 +56,13 @@ export function VideoCarousel({ videos }: VideoCarouselProps) {
   }
 
   return (
-    <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden group shadow-md">
+    <div className="relative w-full h-full rounded-xl overflow-hidden group shadow-md">
       {videos.map((videoUrl, index) => (
         <video
           key={videoUrl}
           ref={el => videoRefs.current[index] = el}
           className={cn(
-            'absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-500',
+            'absolute top-0 left-0 w-full h-full object-contain transition-opacity duration-500',
             index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
           )}
           src={videoUrl}

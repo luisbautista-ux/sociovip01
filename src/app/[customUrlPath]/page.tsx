@@ -39,7 +39,7 @@ import type {
   NewQrClientFormData,
   GeneratedCode,
 } from "@/lib/types";
-import { format, parse, isPast, parseISO } from "date-fns";
+import { format, isPast } from "date-fns";
 import { es } from "date-fns/locale";
 import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import {
@@ -97,6 +97,7 @@ import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
 import { ImageCarousel } from "@/components/business/ImageCarousel";
 import { VideoCarousel } from "@/components/business/VideoCarousel";
+import { parseISO } from "date-fns/parseISO";
 
 
 // --- Helpers robustos para códigos ---
@@ -990,7 +991,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
        </header>
 
        <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 flex">
                 <div className="md:col-span-2">
                     <ImageCarousel
                       images={businessDetails.publicCoverImageUrls || []}
@@ -1000,7 +1001,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       logoUrl={businessDetails.logoUrl}
                     />
                 </div>
-                <aside className="md:col-span-1">
+                <aside className="md:col-span-1 h-full">
                      <VideoCarousel videos={businessDetails.publicVideoUrls || []} />
                 </aside>
             </div>
