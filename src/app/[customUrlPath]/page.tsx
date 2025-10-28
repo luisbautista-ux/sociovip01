@@ -990,8 +990,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
          </div>
        </header>
 
-       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 flex">
+       <main className="max-w-7xl mx-auto py-8 px-0 sm:px-6 lg:px-8 flex-grow w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                 <div className="md:col-span-2">
                     <ImageCarousel
                       images={businessDetails.publicCoverImageUrls || []}
@@ -1001,7 +1001,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       logoUrl={businessDetails.logoUrl}
                     />
                 </div>
-                <aside className="md:col-span-1 h-full">
+                <aside className="md:col-span-1 h-full hidden md:block">
                      <VideoCarousel videos={businessDetails.publicVideoUrls || []} />
                 </aside>
             </div>
@@ -1016,7 +1016,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 </div>
             </div>
 
-            <div className="space-y-12">
+            <div className="space-y-12 px-4 sm:px-0">
                 {showPromotions && (
                   <section>
                     <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
