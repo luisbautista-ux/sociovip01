@@ -42,7 +42,7 @@ export function ImageCarousel({
 
   if (!images || images.length === 0) {
     return (
-      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] rounded-xl overflow-hidden bg-muted flex items-center justify-center">
+      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] md:rounded-xl overflow-hidden bg-muted flex items-center justify-center">
         <Video className="w-12 h-12 text-muted-foreground" />
         <p className="ml-4 text-muted-foreground">No hay imágenes de portada.</p>
       </div>
@@ -50,8 +50,8 @@ export function ImageCarousel({
   }
 
   return (
-    <div className="relative w-full h-full md:px-4">
-      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] rounded-xl overflow-hidden group shadow-md">
+    <div className="relative w-full h-full">
+      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] md:rounded-xl overflow-hidden group shadow-md">
         {/* Imagen */}
         {images.map((image, index) => (
           <NextImage
@@ -157,3 +157,5 @@ export function ImageCarousel({
     </div>
   );
 }
+
+    

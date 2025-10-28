@@ -990,8 +990,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
          </div>
        </header>
 
-       <main className="max-w-7xl mx-auto py-8 px-0 sm:px-6 lg:px-8 flex-grow w-full">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+       <main className="max-w-7xl mx-auto w-full flex-grow px-0 sm:px-6 lg:px-8 py-0 sm:py-8">
+            <div className="md:grid md:grid-cols-3 md:gap-8 mb-8">
                 <div className="md:col-span-2">
                     <ImageCarousel
                       images={businessDetails.publicCoverImageUrls || []}
@@ -1006,7 +1006,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 </aside>
             </div>
             
-            <div className="sticky top-14 z-10 py-2 bg-muted/40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 mb-8" style={{ backgroundColor: 'hsla(var(--background))' }}>
+            <div className="sticky top-14 z-10 py-2 bg-background px-4">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
                         <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Ver Todo</button>
@@ -1016,7 +1016,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 </div>
             </div>
 
-            <div className="space-y-12 px-4 sm:px-0">
+            <div className="space-y-12 px-4 sm:px-0 mt-8">
                 {showPromotions && (
                   <section>
                     <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
@@ -1362,3 +1362,5 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
+    
