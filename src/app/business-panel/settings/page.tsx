@@ -3,7 +3,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Palette, Image as ImageIconLucide, Type, UploadCloud, Loader2, Link as LinkIcon, Smartphone, Upload } from "lucide-react"; 
+import { Settings, Palette, ImageIcon as ImageIconLucide, Type, UploadCloud, Loader2, Link as LinkIcon, Smartphone, Upload, Trash2, Image as ImageIcon } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -23,25 +23,19 @@ export default function BusinessSettingsPage() {
 
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // State for business info
+  // Form state
   const [businessName, setBusinessName] = useState("");
-  const [businessContactEmail, setBusinessContactEmail] = useState("");
-  const [businessAddress, setBusinessAddress] = useState(""); 
-  const [businessPublicPhone, setBusinessPublicPhone] = useState("");
-  const [personalPhone, setPersonalPhone] = useState("");
-
-  // State for branding info
   const [slogan, setSlogan] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#B080D0"); 
   const [secondaryColor, setSecondaryColor] = useState("#8E5EA2");
   
-  // State for images
   const [logoUrl, setLogoUrl] = useState("");
-  const [coverUrl, setCoverUrl] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  
+  const [coverUrls, setCoverUrls] = useState<string[]>([]);
+  const [coverFiles, setCoverFiles] = useState<File[]>([]);
+  const [coverPreviews, setCoverPreviews] = useState<string[]>([]);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -58,18 +52,16 @@ export default function BusinessSettingsPage() {
           const data = businessSnap.data() as Business;
           
           setBusinessName(data.name || "");
-          setBusinessContactEmail(data.contactEmail || "");
-          setBusinessAddress(data.publicAddress || data.address || ""); 
-          setBusinessPublicPhone(data.publicPhone || "");
-          setPersonalPhone(data.personalPhone || "");
-
           setSlogan(data.slogan || "");
           setPrimaryColor(data.primaryColor || "#B080D0"); 
           setSecondaryColor(data.secondaryColor || "#8E5EA2");
+          
           setLogoUrl(data.logoUrl || "");
-          setCoverUrl(data.publicCoverImageUrl || "");
           setLogoPreview(data.logoUrl || null);
-          setCoverPreview(data.publicCoverImageUrl || null);
+          
+          const urls = data.publicCoverImageUrls || [];
+          setCoverUrls(urls);
+          setCoverPreviews(urls);
 
         } else {
           toast({ title: "Error", description: "No se encontraron los datos del negocio.", variant: "destructive" });
@@ -93,18 +85,60 @@ export default function BusinessSettingsPage() {
   const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({ title: "Archivo de logo muy grande", description: "Por favor, selecciona una imagen de menos de 2MB.", variant: "destructive" });
+        return;
+      }
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
     }
   };
 
-  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setCoverFile(file);
-      setCoverPreview(URL.createObjectURL(file));
+  const handleCoverFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    let error = false;
+
+    files.forEach(file => {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            toast({ title: `Archivo '${file.name}' muy grande`, description: "Las imágenes de portada no deben superar los 5MB.", variant: "destructive" });
+            error = true;
+        } else if ((coverFiles.length + newFiles.length + coverUrls.length) < 5) {
+            newFiles.push(file);
+            newPreviews.push(URL.createObjectURL(file));
+        } else {
+            toast({ title: "Límite de imágenes alcanzado", description: "Puedes tener un máximo de 5 imágenes de portada.", variant: "destructive" });
+            error = true;
+        }
+    });
+
+    if (!error) {
+        setCoverFiles(prev => [...prev, ...newFiles]);
+        setCoverPreviews(prev => [...prev, ...newPreviews]);
     }
   };
+
+  const removeCoverImage = (indexToRemove: number) => {
+    const previewToRemove = coverPreviews[indexToRemove];
+    
+    // If it's a new file (blob URL)
+    if (previewToRemove.startsWith('blob:')) {
+        const fileIndex = coverFiles.findIndex(file => URL.createObjectURL(file) === previewToRemove);
+        if (fileIndex > -1) {
+            setCoverFiles(prev => prev.filter((_, i) => i !== fileIndex));
+        }
+    } else {
+        // It's an existing URL from Firebase
+        setCoverUrls(prev => prev.filter(url => url !== previewToRemove));
+    }
+    
+    // Always remove from previews
+    setCoverPreviews(prev => prev.filter((_, i) => i !== indexToRemove));
+  };
+
 
   const handleSaveChanges = async () => {
     if (!userProfile?.businessId) {
@@ -112,15 +146,9 @@ export default function BusinessSettingsPage() {
       return;
     }
     
-    const personalPhoneRegex = /^9\d{8}$/;
-    if (personalPhone && !personalPhoneRegex.test(personalPhone)) {
-        toast({ title: "Teléfono Personal Inválido", description: "El teléfono personal debe empezar con 9 y tener exactamente 9 dígitos.", variant: "destructive" });
-        return;
-    }
-    
     setIsSaving(true);
     let finalLogoUrl = logoUrl;
-    let finalCoverUrl = coverUrl;
+    let finalCoverUrls = [...coverUrls];
 
     try {
       // Handle Logo Upload
@@ -134,43 +162,56 @@ export default function BusinessSettingsPage() {
         finalLogoUrl = await getDownloadURL(logoUploadResult.ref);
       }
       
-      // Handle Cover Upload
-      if (coverFile) {
-        toast({ description: "Subiendo nueva portada..." });
-        if (coverUrl && coverUrl.includes("firebase")) {
-          try { await deleteObject(ref(storage, coverUrl)); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Old cover not deleted:", e); }
-        }
-        const coverStorageRef = ref(storage, `business-assets/${userProfile.businessId}/cover-${Date.now()}-${coverFile.name}`);
-        const coverUploadResult = await uploadBytes(coverStorageRef, coverFile);
-        finalCoverUrl = await getDownloadURL(coverUploadResult.ref);
+      // Handle Cover Uploads
+      if (coverFiles.length > 0) {
+        toast({ description: `Subiendo ${coverFiles.length} nueva(s) imágen(es) de portada...` });
+        const uploadedUrls = await Promise.all(
+          coverFiles.map(async (file) => {
+            const coverStorageRef = ref(storage, `business-assets/${userProfile.businessId}/covers/${Date.now()}-${file.name}`);
+            const uploadResult = await uploadBytes(coverStorageRef, file);
+            return getDownloadURL(uploadResult.ref);
+          })
+        );
+        finalCoverUrls.push(...uploadedUrls);
+      }
+
+      // Identify deleted URLs
+      const initialUrls = (await getDoc(doc(db, "businesses", userProfile.businessId))).data()?.publicCoverImageUrls || [];
+      const deletedUrls = initialUrls.filter((url: string) => !finalCoverUrls.includes(url));
+      
+      // Delete from Storage
+      if (deletedUrls.length > 0) {
+        toast({ description: `Eliminando ${deletedUrls.length} imágen(es) antiguas...` });
+        await Promise.all(deletedUrls.map(async (url: string) => {
+          if (url.includes("firebase")) {
+            try { await deleteObject(ref(storage, url)); } catch (e: any) { if (e.code !== 'storage/object-not-found') console.warn("Old cover not deleted:", e); }
+          }
+        }));
       }
 
       const updateData: Partial<Business> = {
           name: businessName,
-          contactEmail: businessContactEmail,
-          publicAddress: businessAddress, 
-          publicPhone: businessPublicPhone,
-          personalPhone: personalPhone,
           slogan,
           primaryColor,
           secondaryColor,
           logoUrl: finalLogoUrl,
-          publicCoverImageUrl: finalCoverUrl,
+          publicCoverImageUrls: finalCoverUrls,
       };
 
       const businessDocRef = doc(db, "businesses", userProfile.businessId);
       await updateDoc(businessDocRef, sanitizeObjectForFirestore(updateData as DocumentData));
       
       toast({ title: "Configuración Guardada", description: "Los datos de tu negocio se han actualizado." });
+      
       setLogoFile(null);
-      setCoverFile(null);
+      setCoverFiles([]);
       await fetchBusinessData();
 
     } catch (error: any) {
         console.error("Error saving business settings:", error);
-        const description = error?.message 
-          ? `No se pudieron guardar los cambios. ${error.message}` 
-          : "No se pudieron guardar los cambios. Ocurrió un error desconocido.";
+        const description = error?.code === 'storage/unauthorized'
+            ? "Permiso denegado. Verifica las reglas de Firebase Storage."
+            : error.message || "No se pudieron guardar los cambios.";
         toast({ title: "Error al Guardar", description, variant: "destructive"});
     } finally {
         setIsSaving(false);
@@ -223,105 +264,91 @@ export default function BusinessSettingsPage() {
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Información del Negocio</CardTitle>
-          <CardDescription>Actualiza los datos principales de tu negocio.</CardDescription>
+          <CardTitle>Información Pública</CardTitle>
+          <CardDescription>Esta información será visible en la página pública de tu negocio.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
+        <CardContent className="space-y-6">
+          
+          <div className="space-y-2">
+            <Label>Logo del Negocio</Label>
+            <div className="flex items-center gap-4">
+                <div className="w-16 h-16 flex-shrink-0 border p-1 rounded-md flex items-center justify-center bg-muted">
+                  {logoPreview ? (
+                    <NextImage src={logoPreview} alt="Vista previa del logo" width={64} height={64} className="object-contain" />
+                  ) : (
+                    <ImageIconLucide className="text-muted-foreground"/>
+                  )}
+                </div>
+                <div className="w-full">
+                   <input type="file" ref={logoInputRef} onChange={handleLogoFileChange} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" />
+                   <Button type="button" variant="outline" className="w-full" onClick={() => logoInputRef.current?.click()} disabled={isSaving}>
+                     <Upload className="mr-2 h-4 w-4" /> Cambiar Logo
+                   </Button>
+                </div>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Imágenes de Portada (hasta 5)</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {coverPreviews.map((preview, index) => (
+                <div key={index} className="relative group aspect-video">
+                  <NextImage src={preview} alt={`Portada ${index + 1}`} fill className="object-cover rounded-md" />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeCoverImage(index)}
+                    disabled={isSaving}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              {coverPreviews.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={isSaving}
+                  className="aspect-video border-2 border-dashed rounded-md flex flex-col items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  <UploadCloud className="h-8 w-8" />
+                  <span className="text-xs mt-1">Añadir imagen</span>
+                </button>
+              )}
+            </div>
+            <input type="file" ref={coverInputRef} onChange={handleCoverFilesChange} className="hidden" accept="image/png, image/jpeg, image/webp" multiple />
+            <p className="text-xs text-muted-foreground mt-2">Puedes arrastrar para reordenar las imágenes.</p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="businessName">Nombre del Negocio</Label>
             <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} disabled={isSaving || isLoadingData} />
           </div>
-          <div>
-            <Label htmlFor="businessEmail">Email de Contacto</Label>
-            <Input id="businessEmail" type="email" value={businessContactEmail} onChange={(e) => setBusinessContactEmail(e.target.value)} disabled={isSaving || isLoadingData} />
+
+          <div className="space-y-2">
+            <Label htmlFor="slogan" className="flex items-center"><Type className="h-4 w-4 mr-1 text-muted-foreground"/> Slogan del Negocio</Label>
+            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSaving || isLoadingData} />
           </div>
-           <div>
-            <Label htmlFor="businessAddress">Dirección Pública</Label>
-            <Input id="businessAddress" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} disabled={isSaving || isLoadingData} />
-          </div>
-           <div>
-            <Label htmlFor="businessPhone">Teléfono Público</Label>
-            <Input id="businessPhone" type="tel" value={businessPublicPhone} onChange={(e) => setBusinessPublicPhone(e.target.value)} disabled={isSaving || isLoadingData}/>
-          </div>
-          <div>
-            <Label htmlFor="personalPhone" className="flex items-center mb-2">
-                <Smartphone className="h-4 w-4 mr-2 text-muted-foreground"/> Teléfono Personal
-                <span className="text-destructive ml-1">*</span>
-            </Label>
-            <Input 
-                id="personalPhone" 
-                type="tel" 
-                value={personalPhone} 
-                onChange={(e) => setPersonalPhone(e.target.value)} 
-                disabled={isSaving || isLoadingData}
-                placeholder="987654321"
-                maxLength={9}
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-                Se usará para compartir códigos por WhatsApp.
-            </p>
-          </div>
+
         </CardContent>
       </Card>
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center"><Palette className="h-6 w-6 mr-2 text-primary"/> Branding y Personalización</CardTitle>
-          <CardDescription>Define la identidad visual de tu negocio en la plataforma.</CardDescription>
+          <CardTitle className="flex items-center"><Palette className="h-6 w-6 mr-2 text-primary"/> Tema de Marca</CardTitle>
+          <CardDescription>Personaliza los colores de tu página pública y componentes.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div className="space-y-2">
-                <Label htmlFor="logoUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Logo del Negocio</Label>
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 flex-shrink-0 border p-1 rounded-md flex items-center justify-center bg-muted">
-                      {logoPreview ? (
-                        <NextImage src={logoPreview} alt="Vista previa del logo" width={64} height={64} className="object-contain" />
-                      ) : (
-                        <ImageIconLucide className="text-muted-foreground"/>
-                      )}
-                    </div>
-                    <div className="w-full">
-                       <input type="file" ref={logoInputRef} onChange={handleLogoFileChange} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" />
-                       <Button type="button" variant="outline" className="w-full" onClick={() => logoInputRef.current?.click()} disabled={isSaving}>
-                         <Upload className="mr-2 h-4 w-4" /> Subir Logo
-                       </Button>
-                    </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="coverUrl" className="flex items-center"><ImageIconLucide className="h-4 w-4 mr-1 text-muted-foreground"/> Imagen de Portada</Label>
-                 <div className="flex items-center gap-4">
-                   <div className="w-24 h-14 flex-shrink-0 border p-1 rounded-md flex items-center justify-center bg-muted">
-                      {coverPreview ? (
-                         <NextImage src={coverPreview} alt="Vista previa de portada" width={96} height={56} className="object-cover" />
-                      ) : (
-                         <ImageIconLucide className="text-muted-foreground"/>
-                      )}
-                    </div>
-                     <div className="w-full">
-                       <input type="file" ref={coverInputRef} onChange={handleCoverFileChange} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" />
-                       <Button type="button" variant="outline" className="w-full" onClick={() => coverInputRef.current?.click()} disabled={isSaving}>
-                         <Upload className="mr-2 h-4 w-4" /> Subir Portada
-                       </Button>
-                    </div>
-                </div>
-              </div>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="primaryColor">Color Primario</Label>
+              <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSaving || isLoadingData}/>
             </div>
-          <div className="space-y-2">
-            <Label htmlFor="slogan" className="flex items-center"><Type className="h-4 w-4 mr-1 text-muted-foreground"/> Slogan del Negocio</Label>
-            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSaving || isLoadingData} />
-          </div>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="primaryColor">Color Primario</Label>
-                  <Input id="primaryColor" type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSaving || isLoadingData}/>
-                </div>
-                <div>
-                  <Label htmlFor="secondaryColor">Color Secundario</Label>
-                  <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSaving || isLoadingData}/>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="secondaryColor">Color Secundario (Acento)</Label>
+              <Input id="secondaryColor" type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="h-10 p-1 w-full" disabled={isSaving || isLoadingData}/>
             </div>
           </div>
         </CardContent>

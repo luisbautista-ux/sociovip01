@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; 
@@ -54,7 +55,7 @@ export default function AdminBusinessesPage() {
           managerDni: data.managerDni || undefined,
           businessType: data.businessType || undefined,
           logoUrl: data.logoUrl || undefined,
-          publicCoverImageUrl: data.publicCoverImageUrl || undefined,
+          publicCoverImageUrls: data.publicCoverImageUrls || [],
           slogan: data.slogan || undefined,
           publicContactEmail: data.publicContactEmail || undefined,
           publicPhone: data.publicPhone || undefined,
@@ -99,14 +100,14 @@ export default function AdminBusinessesPage() {
       toast({ title: "Sin Datos", description: "No hay negocios para exportar.", variant: "default" });
       return;
     }
-    const headers = ["ID", "Nombre Comercial", "Razón Social", "RUC", "Email Contacto", "Fecha Ingreso", "Giro", "Departamento", "Provincia", "Distrito", "Dirección", "Gerente", "DNI Gerente", "URL Personalizada", "Logo URL", "Portada URL", "Slogan", "Email Público", "Teléfono Público", "Dirección Pública"];
+    const headers = ["ID", "Nombre Comercial", "Razón Social", "RUC", "Email Contacto", "Fecha Ingreso", "Giro", "Departamento", "Provincia", "Distrito", "Dirección", "Gerente", "DNI Gerente", "URL Personalizada", "Logo URL", "Portada URLs", "Slogan", "Email Público", "Teléfono Público", "Dirección Pública"];
     const rows = filteredBusinesses.map(biz => [
       biz.id, biz.name, biz.razonSocial || "N/A", `'${biz.ruc || "N/A"}`, biz.contactEmail,
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
       biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
       biz.managerName || "N/A", `'${biz.managerDni || "N/A"}`, 
       biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : `sociosvip.app/business/${biz.id}`,
-      biz.logoUrl || "N/A", biz.publicCoverImageUrl || "N/A", biz.slogan || "N/A",
+      biz.logoUrl || "N/A", (biz.publicCoverImageUrls || []).join(', '), biz.slogan || "N/A",
       biz.publicContactEmail || "N/A", `'${biz.publicPhone || "N/A"}`, biz.publicAddress || "N/A",
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
     
@@ -173,7 +174,7 @@ export default function AdminBusinessesPage() {
         managerDni: data.managerDni || null,
         businessType: data.businessType || null,
         logoUrl: data.logoUrl || null,
-        publicCoverImageUrl: data.publicCoverImageUrl || null,
+        publicCoverImageUrls: data.publicCoverImageUrls || [],
         slogan: data.slogan || null,
         publicContactEmail: data.publicContactEmail || null,
         publicPhone: data.publicPhone || null,

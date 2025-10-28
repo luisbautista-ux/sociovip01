@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,7 +39,7 @@ const businessFormSchemaBase = z.object({
   managerDni: z.string().min(8, "Debe tener al menos 8 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^\d+$/, "Solo debe contener números.").optional().or(z.literal("")),
   
   logoUrl: z.string().url("URL de logo inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
-  publicCoverImageUrl: z.string().url("URL de imagen de portada inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
+  publicCoverImageUrls: z.array(z.string().url()).optional(),
   slogan: z.string().max(100, "El slogan no debe exceder 100 caracteres.").optional().or(z.literal("")),
   publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")),
   publicPhone: z.string().regex(/^[\+]?[(]?[0-9\s-()]{7,20}$/, "Número de teléfono público inválido.").optional().or(z.literal("")),
@@ -88,7 +89,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       managerDni: business?.managerDni || "",
       businessType: business?.businessType,
       logoUrl: business?.logoUrl || "",
-      publicCoverImageUrl: business?.publicCoverImageUrl || "",
+      publicCoverImageUrls: business?.publicCoverImageUrls || [],
       slogan: business?.slogan || "",
       publicContactEmail: business?.publicContactEmail || "",
       publicPhone: business?.publicPhone || "",
@@ -111,7 +112,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       managerDni: business?.managerDni || "",
       businessType: business?.businessType,
       logoUrl: business?.logoUrl || "",
-      publicCoverImageUrl: business?.publicCoverImageUrl || "",
+      publicCoverImageUrls: business?.publicCoverImageUrls || [],
       slogan: business?.slogan || "",
       publicContactEmail: business?.publicContactEmail || "",
       publicPhone: business?.publicPhone || "",
@@ -136,7 +137,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       managerName: values.managerName || undefined,
       managerDni: values.managerDni || undefined,
       logoUrl: values.logoUrl || undefined,
-      publicCoverImageUrl: values.publicCoverImageUrl || undefined,
+      publicCoverImageUrls: values.publicCoverImageUrls || [],
       slogan: values.slogan || undefined,
       publicContactEmail: values.publicContactEmail || undefined,
       publicPhone: values.publicPhone || undefined,
@@ -223,9 +224,6 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
         )}/>
         <FormField control={form.control} name="logoUrl" render={({ field }) => (
           <FormItem><FormLabel>URL del Logo (Público)</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/logo.png" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormDescription className="text-xs">URL pública de tu logo. Idealmente PNG con fondo transparente.</FormDescription><FormMessage /></FormItem>
-        )}/>
-        <FormField control={form.control} name="publicCoverImageUrl" render={({ field }) => (
-          <FormItem><FormLabel>URL Imagen de Portada (Pública)</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/portada.jpg" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormDescription className="text-xs">Imagen para la página pública de tu negocio.</FormDescription><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicAddress" render={({ field }) => (
           <FormItem><FormLabel>Dirección Pública (si difiere de la principal)</FormLabel><FormControl><Textarea placeholder="Ej: Av. Comercial 456, Referencia..." {...field} value={field.value || ""} disabled={isSubmittingForm} rows={2}/></FormControl><FormMessage /></FormItem>

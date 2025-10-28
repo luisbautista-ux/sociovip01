@@ -56,6 +56,7 @@ import {
   Calendar,
   ArrowLeft,
   History,
+  Video,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -94,6 +95,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
+import { ImageCarousel } from "@/components/business/ImageCarousel";
 
 
 // --- Helpers robustos para códigos ---
@@ -235,7 +237,7 @@ export default function BusinessPublicPage() {
           joinDate: anyToDate(bizData.joinDate)?.toISOString() || new Date().toISOString(),
           customUrlPath: bizData.customUrlPath || customUrlPath,
           logoUrl: bizData.logoUrl || undefined,
-          publicCoverImageUrl: bizData.publicCoverImageUrl || undefined,
+          publicCoverImageUrls: bizData.publicCoverImageUrls || [],
           slogan: bizData.slogan || undefined,
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
@@ -984,184 +986,109 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
          </div>
        </header>
 
-       <div className="relative w-full aspect-[16/9] max-h-48 md:max-h-64 bg-black">
-        {businessDetails.publicCoverImageUrl ? (
-          <NextImage
-            src={businessDetails.publicCoverImageUrl}
-            alt={`${businessDetails.name} cover image`}
-            fill
-            className="object-cover"
-            priority
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-r from-purple-500 to-purple-700"></div>
-        )}
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center p-4">
-             {businessDetails.logoUrl && (
-              <NextImage
-                src={businessDetails.logoUrl}
-                alt={`${businessDetails.name} logo`}
-                width={80}
-                height={80}
-                className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md mx-auto mb-2 border-2 border-white/50 shadow-lg bg-black/20 p-1"
-              />
-            )}
-            <h1 className="font-bold text-2xl md:text-4xl text-white shadow-md">{businessDetails.name}</h1>
-            {businessDetails.slogan && (
-              <p className="text-sm md:text-lg text-white/90 mt-1 shadow-sm">{businessDetails.slogan}</p>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      <div className="sticky top-14 z-10" style={{ backgroundColor: businessDetails.primaryColor || '#B080D0' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-start h-10 gap-6">
-                <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
-                <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
-                <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
-            </div>
-        </div>
-      </div>
+       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Columna Izquierda (Carrusel y Contenido) */}
+                <div className="md:col-span-2 space-y-12">
+                    <section>
+                         {businessDetails.logoUrl && (
+                             <div className="mb-8 flex items-center gap-4">
+                                <NextImage
+                                    src={businessDetails.logoUrl}
+                                    alt={`${businessDetails.name} logo`}
+                                    width={80}
+                                    height={80}
+                                    className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-md border-2 border-white/50 shadow-lg bg-black/20 p-1"
+                                />
+                                <div>
+                                    <h1 className="font-bold text-2xl md:text-4xl" style={{color: businessDetails.primaryColor}}>{businessDetails.name}</h1>
+                                    {businessDetails.slogan && <p className="text-sm md:text-lg text-muted-foreground mt-1">{businessDetails.slogan}</p>}
+                                </div>
+                             </div>
+                         )}
+                        <ImageCarousel images={businessDetails.publicCoverImageUrls || []} />
+                    </section>
+                    
+                    <div className="sticky top-14 z-10 py-2 bg-muted/40" style={{ backgroundColor: businessDetails.primaryColor ? 'transparent' : '#B080D0' }}>
+                        <div className="max-w-7xl mx-auto">
+                            <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
+                                <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Ver Todo</button>
+                                <button onClick={() => setView('promotions')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'promotions' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Promociones</button>
+                                <button onClick={() => setView('events')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'events' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Eventos</button>
+                            </div>
+                        </div>
+                    </div>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex-grow w-full">
-        {showPromotions && (
-          <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
-              <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {promotions.map((promo) => (
-                <Card
-                  key={promo.id}
-                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1"
-                >
-                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                    <NextImage
-                      src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"}
-                      alt={promo.name}
-                      fill
-                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-                      style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }}
-                      data-ai-hint={promo.aiHint || "discount offer"}
-                    />
-                  </div>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xl">{promo.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow space-y-1">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Válido hasta el {format(parse(promo.endDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}
-                    </p>
-                  </CardContent>
-                  <CardFooter className="flex-col items-start p-4 border-t">
-                    <SpecificCodeEntryForm entity={promo} />
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-        
-        {showEvents && (
-          <section className="mb-12">
-            <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
-              <Calendar className="h-7 w-7 mr-3" /> Eventos
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {allEvents.map((event) => (
-                <Card
-                  key={event.id}
-                  className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1"
-                >
-                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                    <NextImage
-                      src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"}
-                      alt={event.name}
-                      fill
-                      className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-                      style={{ objectPosition: event.imageObjectPosition || '50% 50%' }}
-                      data-ai-hint={event.aiHint || "party concert"}
-                    />
-                     {isPast(new Date(event.endDate)) && (
-                       <div className="absolute inset-0 bg-black/30" />
-                     )}
-                  </div>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xl">{event.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow space-y-1">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Fecha: {format(parse(event.startDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}
-                    </p>
-                  </CardContent>
-                  {isEntityCurrentlyActivatable(event) ? (
-                     <CardFooter className="flex-col items-start p-4 border-t">
-                       <SpecificCodeEntryForm entity={event} />
-                     </CardFooter>
-                  ) : (
-                    <PastEventCardFooter entity={event} />
-                  )}
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
+                    {showPromotions && (
+                      <section>
+                        <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
+                          <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                          {promotions.map((promo) => (
+                            <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1">
+                              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                                <NextImage src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} alt={promo.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} data-ai-hint={promo.aiHint || "discount offer"}/>
+                              </div>
+                              <CardHeader className="pb-3"><CardTitle className="text-xl">{promo.name}</CardTitle></CardHeader>
+                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p><p className="text-xs text-muted-foreground">Válido hasta el {format(parse(promo.endDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
+                              <CardFooter className="flex-col items-start p-4 border-t"><SpecificCodeEntryForm entity={promo} /></CardFooter>
+                            </Card>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                    
+                    {showEvents && (
+                      <section>
+                        <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
+                          <Calendar className="h-7 w-7 mr-3" /> Eventos
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                          {allEvents.map((event) => (
+                            <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1">
+                              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                                <NextImage src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} data-ai-hint={event.aiHint || "party concert"}/>
+                                 {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30" />)}
+                              </div>
+                              <CardHeader className="pb-3"><CardTitle className="text-xl">{event.name}</CardTitle></CardHeader>
+                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p><p className="text-xs text-muted-foreground">Fecha: {format(parse(event.startDate, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
+                              {isEntityCurrentlyActivatable(event) ? (<CardFooter className="flex-col items-start p-4 border-t"><SpecificCodeEntryForm entity={event} /></CardFooter>) : (<PastEventCardFooter entity={event} />)}
+                            </Card>
+                          ))}
+                        </div>
+                      </section>
+                    )}
 
-        {noContentToShow && (
-          <div className="py-12">
-            <Card className="col-span-full">
-              <CardHeader className="text-center">
-                <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-                <CardTitle className="mt-2">
-                  {view === 'promotions' && 'No hay Promociones por Ahora'}
-                  {view === 'events' && 'No hay Eventos por Ahora'}
-                  {view === 'all' && 'No hay Promociones y Eventos por Ahora'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center">
-                <CardDescription>
-                  {view === 'promotions' && 'Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!'}
-                  {view === 'events' && 'Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!'}
-                  {view === 'all' && 'Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!'}
-                </CardDescription>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    {noContentToShow && (
+                      <div className="py-12"><Card className="col-span-full"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">{view === 'promotions' && 'No hay Promociones por Ahora'}{view === 'events' && 'No hay Eventos por Ahora'}{view === 'all' && 'No hay Promociones y Eventos por Ahora'}</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>{view === 'promotions' && 'Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!'}{view === 'events' && 'Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!'}{view === 'all' && 'Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!'}</CardDescription></CardContent></Card></div>
+                    )}
+                </div>
 
-        {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
-          <section className="mt-12 pt-8 border-t">
-            <h2 className="text-xl font-semibold tracking-tight text-foreground mb-4 flex items-center">
-              <Info className="h-6 w-6 mr-2 text-foreground" />
-              Información de Contacto
-            </h2>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              {businessDetails.publicAddress && (
-                <p>
-                  <strong>Dirección:</strong> {businessDetails.publicAddress}
-                </p>
-              )}
-              {businessDetails.publicPhone && (
-                <p>
-                  <strong>Teléfono:</strong> {businessDetails.publicPhone}
-                </p>
-              )}
-              {businessDetails.publicContactEmail && (
-                <p>
-                  <strong>Email:</strong>{" "}
-                  <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-muted-foreground hover:underline">
-                    {businessDetails.publicContactEmail}
-                  </a>
-                </p>
-              )}
+                {/* Columna Derecha (Info y Video) */}
+                <aside className="md:col-span-1 space-y-8">
+                     <Card>
+                        <CardHeader>
+                           <CardTitle className="flex items-center"><Video className="mr-2 h-5 w-5 text-primary"/> Próximos Videos</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex items-center justify-center h-48 bg-muted rounded-b-lg">
+                           <p className="text-muted-foreground">Contenido de video próximamente.</p>
+                        </CardContent>
+                     </Card>
+                     {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
+                      <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center"><Info className="h-5 w-5 mr-2 text-primary" />Información de Contacto</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm text-muted-foreground">
+                            {businessDetails.publicAddress && (<p><strong>Dirección:</strong> {businessDetails.publicAddress}</p>)}
+                            {businessDetails.publicPhone && (<p><strong>Teléfono:</strong> {businessDetails.publicPhone}</p>)}
+                            {businessDetails.publicContactEmail && (<p><strong>Email:</strong> <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
+                        </CardContent>
+                      </Card>
+                    ) : null}
+                </aside>
             </div>
-          </section>
-        ) : null}
       </main>
 
       <Dialog
