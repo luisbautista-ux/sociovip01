@@ -94,18 +94,18 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
               className="w-8 h-1 bg-white/30 rounded-full cursor-pointer overflow-hidden"
             >
               <div
-                key={`${slideIndex}-${currentIndex}`} // Crucial para forzar el reinicio de la animación
+                key={`${slideIndex}-${currentIndex}`} // Reinicia la animación en cambio de slide
                 className={cn(
                   'h-full rounded-full',
-                  slideIndex === currentIndex
-                    ? 'animate-progress-bar-fill w-full' // Aplica animación y ancho final
-                    : slideIndex < currentIndex
-                    ? 'w-full' // Las barras pasadas están completas
-                    : 'w-0' // Las barras futuras están vacías
+                  {
+                    'w-full': slideIndex < currentIndex, // Barras pasadas
+                    'w-0': slideIndex > currentIndex,   // Barras futuras
+                    'animate-progress-bar-fill': slideIndex === currentIndex, // Barra activa
+                  }
                 )}
                 style={{
                   backgroundColor: primaryColor,
-                  animationDuration: SLIDE_DURATION + 'ms',
+                  animationDuration: slideIndex === currentIndex ? `${SLIDE_DURATION}ms` : undefined,
                 }}
               />
             </div>
@@ -115,3 +115,4 @@ export function ImageCarousel({ images, primaryColor = '#B080D0' }: ImageCarouse
     </div>
   );
 }
+
