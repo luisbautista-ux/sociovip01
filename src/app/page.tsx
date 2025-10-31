@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SocioVipLogo } from "@/components/icons";
+import { HeroCarousel } from "@/components/home/HeroCarousel";
 
 interface EnrichedEntity extends BusinessManagedEntity {
   businessName?: string;
@@ -207,62 +208,17 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
-      <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
-        
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between sm:h-20 gap-4">
-              <div className="flex items-center justify-between w-full sm:w-auto">
-                <div className="flex items-center gap-3">
-                  <SocioVipLogo size={50} />
-                  <div>
-                      <h1 className="text-2xl font-bold tracking-tight text-gradient">SocioVIP</h1>
-                  </div>
-                </div>
-                <div className="sm:hidden">
-                    <Link href="/login" passHref>
-                        <Button variant="outline" size="sm" className="text-primary border-primary/50 hover:bg-gradient-to-r from-purple-800 to-red-600 hover:text-white font-bold">
-                            <UserCircle className="mr-2 h-5 w-5" />
-                            Inicia Sesión
-                        </Button>
-                    </Link>
-                </div>
-              </div>
-
-              <div className="flex-grow flex justify-center items-center w-full sm:w-auto">
-                 <div className="relative w-full max-w-lg">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        placeholder="Buscar promociones, eventos o negocios..."
-                        className="pl-10 w-full rounded-full h-12 text-base"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-              </div>
-
-              <div className="hidden sm:flex items-center">
-                <Link href="/login" passHref>
-                    <Button variant="outline" size="lg" className="text-primary border-primary/50 hover:bg-gradient-to-r from-purple-800 to-red-600 hover:text-white font-bold">
-                        <UserCircle className="mr-2 h-5 w-5" />
-                        Inicia Sesión
-                    </Button>
-                </Link>
+      <HeroCarousel searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+       
+      <div className="bg-header-gradient shadow-md sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-start h-12 gap-6">
+                  <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
+                  <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
+                  <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
               </div>
           </div>
-        </div>
-        <div className="bg-header-gradient">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-start h-12 gap-6">
-                    <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
-                    <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
-                    <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
-                </div>
-            </div>
-        </div>
-      </header>
-       
+      </div>
           <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow w-full">
             <div className="space-y-12">
               {showEvents && (
@@ -328,5 +284,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    
