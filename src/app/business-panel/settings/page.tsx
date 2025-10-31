@@ -26,6 +26,7 @@ export default function BusinessSettingsPage() {
   // Form state
   const [businessName, setBusinessName] = useState("");
   const [slogan, setSlogan] = useState("");
+  const [personalPhone, setPersonalPhone] = useState(""); // <-- Añadido
   const [primaryColor, setPrimaryColor] = useState("#B080D0"); 
   const [secondaryColor, setSecondaryColor] = useState("#8E5EA2");
   
@@ -58,6 +59,7 @@ export default function BusinessSettingsPage() {
           
           setBusinessName(data.name || "");
           setSlogan(data.slogan || "");
+          setPersonalPhone(data.personalPhone || ""); // <-- Añadido
           setPrimaryColor(data.primaryColor || "#B080D0"); 
           setSecondaryColor(data.secondaryColor || "#8E5EA2");
           
@@ -263,6 +265,7 @@ export default function BusinessSettingsPage() {
       const updateData: Partial<Business> = {
           name: businessName,
           slogan,
+          personalPhone, // <-- Añadido
           primaryColor,
           secondaryColor,
           logoUrl: finalLogoUrl,
@@ -435,6 +438,12 @@ export default function BusinessSettingsPage() {
           <div className="space-y-2">
             <Label htmlFor="slogan" className="flex items-center"><Type className="h-4 w-4 mr-1 text-muted-foreground"/> Slogan del Negocio</Label>
             <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSaving || isLoadingData} />
+          </div>
+
+           <div className="space-y-2">
+            <Label htmlFor="personalPhone" className="flex items-center"><Smartphone className="h-4 w-4 mr-1 text-muted-foreground"/> Teléfono Personal (para WhatsApp)</Label>
+            <Input id="personalPhone" type="tel" placeholder="51987654321" value={personalPhone} onChange={(e) => setPersonalPhone(e.target.value)} disabled={isSaving || isLoadingData} />
+            <p className="text-xs text-muted-foreground">Este número (incluyendo el código de país) se usará para compartir códigos. No será público.</p>
           </div>
 
         </CardContent>
