@@ -799,9 +799,15 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-loader">
-        <Loader2 className="h-16 w-16 animate-spin text-white mb-4" />
-        <p className="text-xl text-white/90">Cargando información del negocio...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
+            <SocioVipLogo size={80} />
+          </div>
+          <p className="mt-4 text-lg font-semibold text-white/90">
+            Cargando información del negocio...
+          </p>
+        </div>
       </div>
     );
   }
@@ -958,28 +964,31 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
-       <header 
-         className="sticky top-0 z-20 w-full"
-         style={{ 
-           backgroundColor: businessDetails.primaryColor || '#B080D0'
-         }}
-       >
+       <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-14">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-3">
                  <Link href="/" className="flex items-center gap-2">
                     <SocioVipLogo size={32} />
-                    <span className="font-bold text-xl text-white hidden sm:inline">SocioVIP</span>
+                    <span className="font-bold text-xl text-gradient hidden sm:inline">SocioVIP</span>
                  </Link>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                  <Link href="/" passHref>
-                    <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
-                      <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
+                    <Button
+                        variant="ghost"
+                        className="font-semibold text-sm text-muted-foreground hover:text-primary transition"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Volver al Inicio
                     </Button>
                  </Link>
                   <Link href="/login" passHref>
-                    <Button variant="ghost" className="text-white hover:bg-white/10 hover:text-white">
+                     <Button
+                        variant="ghost"
+                        className="font-semibold text-sm text-white shadow-md hover:opacity-90 transition"
+                        style={{ backgroundColor: businessDetails.primaryColor }}
+                    >
                       <UserCircle className="mr-2 h-4 w-4" />
                       Iniciar Sesión
                     </Button>
@@ -990,7 +999,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
        </header>
 
        <main className="max-w-7xl mx-auto w-full flex-grow px-0 sm:px-6 lg:px-8 py-0 sm:py-8">
-            <div className="md:grid md:grid-cols-3 md:gap-8 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 mb-8">
                 <div className="md:col-span-2">
                     <ImageCarousel
                       images={businessDetails.publicCoverImageUrls || []}
@@ -1000,12 +1009,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       logoUrl={businessDetails.logoUrl}
                     />
                 </div>
-                <aside className="md:col-span-1 h-full hidden md:block">
-                     <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor} />
+                <aside className="hidden md:block h-full">
+                     <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor}/>
                 </aside>
             </div>
             
-            <div className="sticky top-14 z-10 py-2 bg-background px-4">
+            <div className="sticky top-16 z-10 py-2 bg-background px-4">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
                         <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Ver Todo</button>
@@ -1361,5 +1370,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
+    
 
     
