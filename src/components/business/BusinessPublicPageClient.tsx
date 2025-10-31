@@ -963,7 +963,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
-       <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
+       <header className="sticky top-0 z-40 w-full bg-background shadow-sm">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-3">
@@ -997,8 +997,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
          </div>
        </header>
 
-       <main className="max-w-7xl mx-auto w-full flex-grow px-0 sm:px-6 lg:px-8 pt-16">
-            <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 mb-8">
+       <main className="max-w-7xl mx-auto w-full flex-grow px-0 sm:px-6 lg:px-8 pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 mb-8 z-0">
                 <div className="md:col-span-2">
                     <ImageCarousel
                       images={businessDetails.publicCoverImageUrls || []}
@@ -1008,12 +1008,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       logoUrl={businessDetails.logoUrl}
                     />
                 </div>
-                <aside className="hidden md:block h-full">
+                <aside className="hidden md:block h-full z-10">
                      <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor}/>
                 </aside>
             </div>
             
-            <div className="sticky top-16 z-10 py-2 bg-background px-4">
+            <div className="sticky top-16 z-30 py-2 bg-background px-4">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
                         <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Ver Todo</button>
