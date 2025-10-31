@@ -960,7 +960,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
   return (
     <div className="h-screen flex flex-col bg-muted/40">
-       <header className="sticky top-0 z-40 w-full bg-background shadow-sm shrink-0">
+       <header className="sticky top-0 z-50 w-full bg-background shadow-sm shrink-0">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-3">
@@ -1011,7 +1011,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     </aside>
                 </div>
             
-                <div className="sticky top-16 z-30 py-2 bg-background/90 backdrop-blur-sm px-4">
+                <div className="sticky top-0 z-30 py-2 bg-background/90 backdrop-blur-sm px-4">
                     <div className="max-w-7xl mx-auto">
                         <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
                             <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Ver Todo</button>
