@@ -802,7 +802,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
           <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
-            <SocioVipLogo size={80} />
+            <SocioVipLogo size={70} />
           </div>
           <p className="mt-4 text-lg font-semibold text-white/90">
             Cargando información del negocio...

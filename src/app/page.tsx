@@ -12,7 +12,7 @@ import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, Search, Calendar, UserCircle } from "lucide-react";
+import { Loader2, Building, Tag, Search, Calendar, UserCircle, PartyPopper } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -197,7 +197,7 @@ export default function HomePage() {
         <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
             <div className="flex flex-col items-center justify-center text-center">
                 <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
-                    <SocioVipLogo size={80} />
+                    <SocioVipLogo size={70} />
                 </div>
                 <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
             </div>
@@ -208,15 +208,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
       <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
-        <div className="bg-header-gradient">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-start h-12 gap-6">
-                    <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
-                    <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
-                    <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
-                </div>
-            </div>
-        </div>
+        
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row items-center justify-between sm:h-20 gap-4">
@@ -260,8 +252,16 @@ export default function HomePage() {
               </div>
           </div>
         </div>
+        <div className="bg-header-gradient">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-start h-12 gap-6">
+                    <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
+                    <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
+                    <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
+                </div>
+            </div>
+        </div>
       </header>
-
        
           <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex-grow w-full">
             <div className="space-y-12">
@@ -275,12 +275,21 @@ export default function HomePage() {
                       {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
                     </div>
                   ) : (
-                    <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                      <p className="text-lg font-semibold">No se encontraron eventos</p>
-                      <p className="text-muted-foreground mt-1">
-                        {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevos eventos."}
-                      </p>
-                    </div>
+                    <Card className="col-span-full">
+                      <CardHeader className="items-center text-center">
+                        <PartyPopper className="h-12 w-12 text-primary/70" />
+                        <CardTitle className="mt-4">
+                          {searchTerm ? "Sin Resultados" : "No Hay Eventos Disponibles"}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-center">
+                        <CardDescription>
+                          {searchTerm
+                            ? `No se encontraron eventos que coincidan con "${searchTerm}".`
+                            : "Vuelve pronto, siempre estamos añadiendo nuevas experiencias."}
+                        </CardDescription>
+                      </CardContent>
+                    </Card>
                   )}
                 </section>
               )}
@@ -295,12 +304,21 @@ export default function HomePage() {
                       {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
                     </div>
                   ) : (
-                    <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                      <p className="text-lg font-semibold">No se encontraron promociones</p>
-                      <p className="text-muted-foreground mt-1">
-                        {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
-                      </p>
-                    </div>
+                     <Card className="col-span-full">
+                      <CardHeader className="items-center text-center">
+                        <PartyPopper className="h-12 w-12 text-primary/70" />
+                        <CardTitle className="mt-4">
+                          {searchTerm ? "Sin Resultados" : "No Hay Promociones Disponibles"}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-center">
+                        <CardDescription>
+                          {searchTerm
+                            ? `No se encontraron promociones que coincidan con "${searchTerm}".`
+                            : "¡Los negocios están preparando sus mejores ofertas! Vuelve pronto."}
+                        </CardDescription>
+                      </CardContent>
+                    </Card>
                   )}
                 </section>
               )}
@@ -310,3 +328,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
