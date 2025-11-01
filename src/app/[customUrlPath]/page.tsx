@@ -3,7 +3,7 @@ import { type Metadata } from 'next';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Business, BusinessManagedEntity } from '@/lib/types';
-import { isEntityCurrentlyActivatable, anyToDate } from '@/lib/utils';
+import { anyToDate } from '@/lib/utils';
 import BusinessPublicPageClient from '@/components/business/BusinessPublicPageClient';
 
 interface PageProps {
@@ -26,14 +26,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const businessSnap = await getDocs(businessQuery);
 
     if (businessSnap.empty) {
-      return {
-        title: "La secta edición Sexy Halloween 🎃",
-        description: "Dj Velmat || Dj Billy || Dj Yenpi",
-        openGraph: {
-          title: "La secta edición Sexy Halloween 🎃",
-          description: "Dj Velmat || Dj Billy || Dj Yenpi",
-          images: [{ url: "https://i.ibb.co/HLwH0pSq/hallo.jpg" }],
-        },
+      return { 
+        title: "Negocio no encontrado | SocioVIP", 
+        description: "Esta página de negocio no existe o la URL es incorrecta." 
       };
     }
     
@@ -51,6 +46,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const futureOrCurrentEvents = entitiesSnap.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as BusinessManagedEntity))
         .filter(entity => {
+            if (entity.type !== 'event') return false;
             const endDate = anyToDate(entity.endDate);
             return endDate ? endDate >= now : false;
         })
@@ -65,7 +61,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
             openGraph: {
                 title: mostRelevantEvent.name,
                 description: mostRelevantEvent.description,
-                images: [{ url: mostRelevantEvent.imageUrl || 'https://i.ibb.co/fVH01x3/Dise-o-sin-t-tulo-1.png' }],
+                images: [{ url: mostRelevantEvent.imageUrl || businessData.logoUrl || 'https://i.ibb.co/fVH01x3/Dise-o-sin-t-tulo-1.png' }],
             }
         };
     }
@@ -77,27 +73,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       openGraph: {
         title: businessData.name || "Detalles del Negocio",
         description: businessData.slogan || `Explora las ofertas de ${businessData.name}`,
-        images: [{ url: businessData.logoUrl || businessData.publicCoverImageUrls?.[0] || 'https://i.ibb.co/fVH01x3/Dise-o-sin-t-tulo-1.png' }],
+        images: [{ url: businessData.publicCoverImageUrls?.[0] || businessData.logoUrl || 'https://i.ibb.co/fVH01x3/Dise-o-sin-t-tulo-1.png' }],
       },
     };
 
   } catch (error) {
     console.error("Error generating metadata:", error);
-    // Fallback in case of any error
+    // Fallback in case of any server error
     return {
-        title: "La secta edición Sexy Halloween 🎃",
-        description: "Dj Velmat || Dj Billy || Dj Yenpi",
-        openGraph: {
-          title: "La secta edición Sexy Halloween 🎃",
-          description: "Dj Velmat || Dj Billy || Dj Yenpi",
-          images: [{ url: "https://i.ibb.co/HLwH0pSq/hallo.jpg" }],
-        },
-      };
+        title: "SocioVIP",
+        description: "Tu portal a las mejores promociones y eventos.",
+    };
   }
 }
 
 export default function BusinessPage({ params }: PageProps) {
-  // This component now only passes the parameter down.
-  // The actual page content is handled by a Client Component.
   return <BusinessPublicPageClient customUrlPath={params.customUrlPath} />;
 }
