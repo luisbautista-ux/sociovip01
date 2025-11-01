@@ -25,7 +25,7 @@ async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: stri
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '2a92912867');
+        formNombres.append('security', '91ccab2039');
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
@@ -53,7 +53,7 @@ async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: stri
         const formFecha = new URLSearchParams();
         formFecha.append('dni', dni); // param is 'dni'
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', '94c643fd81');
+        formFecha.append('security', '74326411be');
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
