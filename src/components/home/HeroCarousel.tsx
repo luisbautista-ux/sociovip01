@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { SocioVipLogo } from '@/components/icons';
 
 const heroImages = [
-  { src: "https://picsum.photos/seed/event1/1920/1080", alt: "Evento vibrante con luces de neón" },
+  { src: "https://i.ibb.co/HLwH0pSq/hallo.jpg", alt: "Evento vibrante con luces de neón" },
   { src: "https://picsum.photos/seed/crowd2/1920/1080", alt: "Multitud disfrutando de un concierto" },
   { src: "https://picsum.photos/seed/dj3/1920/1080", alt: "DJ mezclando música en un club" },
   { src: "https://picsum.photos/seed/food4/1920/1080", alt: "Platos gourmet en un restaurante exclusivo" },
