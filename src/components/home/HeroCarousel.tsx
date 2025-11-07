@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +10,7 @@ import Link from 'next/link';
 import { SocioVipLogo } from '@/components/icons';
 
 const heroImages = [
-  { src: "https://i.ibb.co/4gdS4YXY/fondods-de-discoteca.jpg", alt: "Discoteca con luces" },
+  { src: "https://i.ibb.co/4z4sKGC/pan2.jpg", alt: "Discoteca con luces" },
   { src: "https://i.ibb.co/QvL3Z7Vz/Dise-o-sin-t-tulo-1.jpg", alt: "Logo de SocioVip" },
   { src: "https://i.ibb.co/ZRnYm6h6/pan.jpg", alt: "Gente en un evento" },
   { src: "https://i.ibb.co/rRphWBmX/pan1.jpg", alt: "Gente en una fiesta" },
