@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { NextResponse } from 'next/server';
@@ -25,7 +24,7 @@ async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: stri
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '91ccab2039');
+        formNombres.append('security', '6b5762d689');
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
@@ -53,7 +52,7 @@ async function fetchExternalDniData(dni: string): Promise<{ nombreCompleto: stri
         const formFecha = new URLSearchParams();
         formFecha.append('dni', dni); // param is 'dni'
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', '74326411be');
+        formFecha.append('security', 'd65c3ae72d'); // <-- TOKEN CORREGIDO
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
