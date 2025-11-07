@@ -11,10 +11,10 @@ import Link from 'next/link';
 import { SocioVipLogo } from '@/components/icons';
 
 const heroImages = [
-  { src: "https://i.ibb.co/HLwH0pSq/hallo.jpg", alt: "Evento vibrante con luces de neón" },
-  { src: "https://picsum.photos/seed/crowd2/1920/1080", alt: "Multitud disfrutando de un concierto" },
-  { src: "https://picsum.photos/seed/dj3/1920/1080", alt: "DJ mezclando música en un club" },
-  { src: "https://picsum.photos/seed/food4/1920/1080", alt: "Platos gourmet en un restaurante exclusivo" },
+  { src: "https://i.ibb.co/4gdS4YXY/fondods-de-discoteca.jpg", alt: "Discoteca con luces" },
+  { src: "https://i.ibb.co/QvL3Z7Vz/Dise-o-sin-t-tulo-1.jpg", alt: "Logo de SocioVip" },
+  { src: "https://i.ibb.co/ZRnYm6h6/pan.jpg", alt: "Gente en un evento" },
+  { src: "https://i.ibb.co/rRphWBmX/pan1.jpg", alt: "Gente en una fiesta" },
 ];
 
 const SLIDE_DURATION = 5000;
