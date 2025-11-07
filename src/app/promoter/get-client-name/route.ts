@@ -28,6 +28,7 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     return userDoc.data() as PlatformUser;
 }
 
+// ✅ CORREGIDO: Ahora devuelve la fecha de nacimiento.
 async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; fechaNacimiento: string | null }> {
     let result = {
         nombreCompleto: "",
@@ -43,7 +44,7 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '2a92912867');
+        formNombres.append('security', '6b5762d689'); // Token para nombres
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
@@ -69,9 +70,9 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         // --- 2. Fetch birth date ---
         const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formFecha = new URLSearchParams();
-        formFecha.append('dni', dni); // param is 'dni'
+        formFecha.append('dni', dni);
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', '94c643fd81');
+        formFecha.append('security', 'd65c3ae72d'); // Token para fecha
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
