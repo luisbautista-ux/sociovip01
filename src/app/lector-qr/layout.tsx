@@ -106,7 +106,7 @@ export default function LectorQrLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || loadingProfile) {
+  if (loadingAuth || (currentUser && loadingProfile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -117,6 +117,10 @@ export default function LectorQrLayout({
         </div>
       </div>
     );
+  }
+
+  if (!currentUser) {
+    return null;
   }
 
   if (!userProfile) {
@@ -151,6 +155,14 @@ export default function LectorQrLayout({
     );
   }
 
+  const handleBackToPanel = () => {
+    if (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) {
+      router.push('/business-panel/dashboard');
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-muted/40">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
@@ -172,6 +184,9 @@ export default function LectorQrLayout({
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {userProfile?.name || currentUser?.email || "Lector"}
           </span>
+           { (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && (
+            <Button onClick={handleBackToPanel} variant="outline" size="sm">Volver al Panel</Button>
+          )}
           <AlertDialog>
             <AlertDialogTrigger asChild>
                 <Button variant="outline" size="icon" title="Cerrar Sesión"><LogOut className="h-4 w-4" /><span className="sr-only">Cerrar Sesión</span></Button>

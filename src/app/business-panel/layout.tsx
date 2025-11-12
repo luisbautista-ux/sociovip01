@@ -106,7 +106,7 @@ export default function BusinessPanelLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || loadingProfile) {
+  if (loadingAuth || (currentUser && loadingProfile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -120,16 +120,7 @@ export default function BusinessPanelLayout({
   }
 
   if (!currentUser) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <div className="flex flex-col items-center justify-center text-center">
-            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-                <SocioVipLogo size={80} className="animate-pulse" />
-            </div>
-            <p className="mt-4 text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
   
   if (!userProfile) {

@@ -8,10 +8,9 @@ import { SocioVipLogo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -151,43 +150,21 @@ export default function PromoterLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth) {
+  if (loadingAuth || (currentUser && loadingProfile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
             <div className="relative p-1 rounded-full shadow-lg bg-white/90">
                 <SocioVipLogo size={80} className="animate-pulse" />
             </div>
-            <p className="mt-4 text-lg text-white/90">Verificando autenticación...</p>
+            <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
         </div>
       </div>
     );
   }
 
   if (!currentUser) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <div className="flex flex-col items-center justify-center text-center">
-            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-                <SocioVipLogo size={80} className="animate-pulse" />
-            </div>
-            <p className="mt-4 text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loadingProfile) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <div className="flex flex-col items-center justify-center text-center">
-            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-                <SocioVipLogo size={80} className="animate-pulse" />
-            </div>
-            <p className="mt-4 text-lg text-white/90">Cargando perfil de usuario...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (!userProfile) {

@@ -22,50 +22,32 @@ export default function AdminLayout({
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
+    // Solo redirigir si la carga ha terminado y no hay usuario.
     if (!loadingAuth && !currentUser) {
       router.push("/login");
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth) {
+  // Pantalla de carga unificada mientras se verifica Auth o Perfil.
+  if (loadingAuth || (currentUser && loadingProfile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
           <div className="relative p-1 rounded-full shadow-lg bg-white/90">
               <SocioVipLogo size={80} className="animate-pulse" />
           </div>
-          <p className="mt-4 text-lg text-white/90">Verificando autenticación...</p>
+          <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
         </div>
       </div>
     );
   }
 
+  // Si después de cargar, no hay usuario, no mostrar nada, el useEffect ya redirigió.
   if (!currentUser) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-              <SocioVipLogo size={80} className="animate-pulse" />
-          </div>
-          <p className="mt-4 text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
-  if (loadingProfile) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-              <SocioVipLogo size={80} className="animate-pulse" />
-          </div>
-          <p className="mt-4 text-lg text-white/90">Cargando perfil de usuario...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Si hay usuario pero no perfil (error irrecuperable)
   if (!userProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -87,6 +69,7 @@ export default function AdminLayout({
     );
   }
   
+  // Si hay usuario y perfil, pero sin el rol correcto
   if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('superadmin')) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -109,6 +92,7 @@ export default function AdminLayout({
     );
   }
 
+  // Renderizar el layout si todo es correcto
   return (
     <div className="flex min-h-screen bg-muted/40">
       <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
