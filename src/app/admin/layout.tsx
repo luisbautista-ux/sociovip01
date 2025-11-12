@@ -17,19 +17,17 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
+  const { currentUser, userProfile, loadingAuth, logout } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
-    // Solo redirigir si la carga ha terminado y no hay usuario.
     if (!loadingAuth && !currentUser) {
       router.push("/login");
     }
   }, [currentUser, loadingAuth, router]);
 
-  // Pantalla de carga unificada mientras se verifica Auth o Perfil.
-  if (loadingAuth || (currentUser && loadingProfile)) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -42,13 +40,11 @@ export default function AdminLayout({
     );
   }
 
-  // Si después de cargar, no hay usuario, no mostrar nada, el useEffect ya redirigió.
   if (!currentUser) {
-    return null;
+    return null; // The useEffect above is handling the redirect
   }
-
-  // Si hay usuario pero no perfil (error irrecuperable)
-  if (!userProfile) {
+  
+  if (!userProfile && !loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -69,8 +65,7 @@ export default function AdminLayout({
     );
   }
   
-  // Si hay usuario y perfil, pero sin el rol correcto
-  if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('superadmin')) {
+  if (userProfile && (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('superadmin'))) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -92,7 +87,6 @@ export default function AdminLayout({
     );
   }
 
-  // Renderizar el layout si todo es correcto
   return (
     <div className="flex min-h-screen bg-muted/40">
       <div className="hidden md:flex md:sticky md:top-0 md:h-screen">

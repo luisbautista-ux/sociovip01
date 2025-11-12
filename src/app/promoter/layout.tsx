@@ -23,7 +23,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DialogTitle } from "@/components/ui/dialog";
 
 const navItems = [
   { href: "/promoter/dashboard", label: "Dashboard", icon: BarChart2 },
@@ -141,7 +140,7 @@ export default function PromoterLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
+  const { currentUser, userProfile, loadingAuth, logout } = useAuth();
   const router = useRouter();
   
   useEffect(() => {
@@ -150,7 +149,7 @@ export default function PromoterLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || (currentUser && loadingProfile)) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -167,7 +166,7 @@ export default function PromoterLayout({
     return null;
   }
 
-  if (!userProfile) {
+  if (!userProfile && !loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -187,7 +186,7 @@ export default function PromoterLayout({
     );
   }
 
-  if (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('promoter')) {
+  if (userProfile && (!userProfile.roles || !Array.isArray(userProfile.roles) || !userProfile.roles.includes('promoter'))) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">

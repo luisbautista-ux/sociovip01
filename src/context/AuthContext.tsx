@@ -65,7 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<PlatformUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true); 
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(false); // Only true when fetching profile
   
   const router = useRouter(); 
 
@@ -75,19 +75,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
     } finally {
-      // These state updates will trigger the useEffect in the layout
       setCurrentUser(null);
       setUserProfile(null);
       Cookies.remove('idToken');
     }
   }, []);
 
-  const fetchUserProfile = useCallback(async (user: FirebaseUser | null): Promise<PlatformUser | null> => {
-    if (!user) {
-      setUserProfile(null);
-      setLoadingProfile(false);
-      return null;
-    }
+  const fetchUserProfile = useCallback(async (user: FirebaseUser): Promise<PlatformUser | null> => {
     setLoadingProfile(true);
     try {
       const userDocRef = doc(db, "platformUsers", user.uid);
@@ -102,11 +96,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUserProfile(profileData);
         return profileData;
       } else {
-        return null; // Return null if profile doesn't exist
+        return null;
       }
     } catch (error) {
       console.error("AuthContext: Error fetching user profile:", error);
-      setUserProfile(null);
       return null;
     } finally {
       setLoadingProfile(false);
@@ -121,26 +114,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoadingAuth(true); // Always start auth loading check
-      
+      setCurrentUser(user);
       if (user) {
-        setCurrentUser(user);
-        const profile = await fetchUserProfile(user);
-        if (!profile) {
-          console.warn(`Auth state changed, user ${user.uid} authenticated but no profile found. Logging out.`);
-          await logout();
-        }
+        await fetchUserProfile(user);
       } else {
-        setCurrentUser(null);
         setUserProfile(null);
         Cookies.remove('idToken');
-        setLoadingProfile(false); // No user, no profile to load
+        setLoadingProfile(false);
       }
-      
       setLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [fetchUserProfile, logout]);
+  }, [fetchUserProfile]);
   
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
@@ -241,9 +226,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
     
     const provider = new GoogleAuthProvider();
-    // ✅ **LA CORRECCIÓN CLAVE**
-    // Esto asegura que Google no restrinja el inicio de sesión a un dominio específico (como uai.edu.pe)
-    // y siempre muestre el selector de cuentas.
     provider.setCustomParameters({
       prompt: 'select_account',
       hd: undefined 

@@ -65,7 +65,7 @@ export default function LectorQrLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
+  const { currentUser, userProfile, loadingAuth, logout } = useAuth();
   const router = useRouter();
   const [businessDisplayName, setBusinessDisplayName] = useState("SocioVIP Lector QR");
   const [businessLogoUrl, setBusinessLogoUrl] = useState<string | null>(null);
@@ -91,14 +91,14 @@ export default function LectorQrLayout({
         }
       }
     };
-    if (!loadingProfile && userProfile) {
+    if (!loadingAuth && userProfile) {
       applyBusinessStyles();
     }
     return () => {
         document.documentElement.style.removeProperty('--primary');
         document.documentElement.style.removeProperty('--accent');
     };
-  }, [userProfile, loadingProfile]);
+  }, [userProfile, loadingAuth]);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -106,7 +106,7 @@ export default function LectorQrLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || (currentUser && loadingProfile)) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -123,7 +123,7 @@ export default function LectorQrLayout({
     return null;
   }
 
-  if (!userProfile) {
+  if (!userProfile && !loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -137,7 +137,7 @@ export default function LectorQrLayout({
     );
   }
 
-  const hasAccess = userProfile.roles?.includes('lector_qr') || userProfile.roles?.includes('host') || userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff');
+  const hasAccess = userProfile && (userProfile.roles?.includes('lector_qr') || userProfile.roles?.includes('host') || userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff'));
 
   if (!hasAccess || !userProfile.businessId) {
     return (

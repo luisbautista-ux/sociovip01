@@ -137,7 +137,7 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
+  const { currentUser, userProfile, loadingAuth, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function ClientLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || (currentUser && loadingProfile)) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -163,7 +163,7 @@ export default function ClientLayout({
     return null; // Don't render anything, the useEffect is handling the redirect.
   }
 
-  if (!userProfile) {
+  if (!userProfile && !loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -177,7 +177,7 @@ export default function ClientLayout({
     );
   }
   
-  if (!userProfile.roles.includes('client_gratis') && !userProfile.roles.includes('vip_premium')) {
+  if (userProfile && !userProfile.roles.includes('client_gratis') && !userProfile.roles.includes('vip_premium')) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">

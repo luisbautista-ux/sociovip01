@@ -57,7 +57,7 @@ export default function BusinessPanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
+  const { currentUser, userProfile, loadingAuth, logout } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
@@ -89,7 +89,7 @@ export default function BusinessPanelLayout({
       }
     };
 
-    if (!loadingProfile && userProfile) {
+    if (!loadingAuth && userProfile) {
       applyBusinessColorsAndName();
     }
     
@@ -97,7 +97,7 @@ export default function BusinessPanelLayout({
         document.documentElement.style.removeProperty('--primary');
         document.documentElement.style.removeProperty('--accent');
     };
-  }, [userProfile, loadingProfile]);
+  }, [userProfile, loadingAuth]);
 
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function BusinessPanelLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || (currentUser && loadingProfile)) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -123,7 +123,7 @@ export default function BusinessPanelLayout({
     return null;
   }
   
-  if (!userProfile) {
+  if (!userProfile && !loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -144,7 +144,7 @@ export default function BusinessPanelLayout({
     );
   }
   
-  if (!userProfile.roles || !Array.isArray(userProfile.roles) || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff'))) {
+  if (userProfile && (!userProfile.roles || !Array.isArray(userProfile.roles) || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff')))) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -165,7 +165,7 @@ export default function BusinessPanelLayout({
     );
   }
   
-  const requiresBusinessId = userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff');
+  const requiresBusinessId = userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'));
   if (requiresBusinessId && !userProfile.businessId) {
     return (
        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
