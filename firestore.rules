@@ -1,68 +1,79 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ===== REGLAS DE LECTURA PÚBLICA =====
+    // --- Funciones de Ayuda ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-    // Cualquiera puede leer la lista de negocios para la página principal
+    function getUserData() {
+      return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && 'superadmin' in getUserData().roles;
+    }
+    
+    function isBusinessAdmin(businessId) {
+      return isSignedIn() && 'business_admin' in getUserData().roles && getUserData().businessId == businessId;
+    }
+
+    // --- Reglas por Colección ---
+
+    // Perfiles de Usuario
+    match /platformUsers/{userId} {
+      // El SuperAdmin puede hacer todo.
+      allow read, write: if isSuperAdmin();
+
+      // Los usuarios autenticados pueden leer su propio perfil.
+      allow get: if isSignedIn() && request.auth.uid == userId;
+
+      // Los usuarios (promotores, clientes) pueden actualizar su propio nombre, teléfono y foto.
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL']);
+    }
+
+    // Negocios: Lectura pública, escritura solo para SuperAdmin.
     match /businesses/{businessId} {
       allow read: if true;
+      allow write: if isSuperAdmin();
     }
-
-    // Cualquiera puede leer las promociones/eventos para listarlas
+    
+    // Entidades del Negocio (Promociones/Eventos)
     match /businessEntities/{entityId} {
       allow read: if true;
+      allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
     }
-
-    // ===== REGLAS DE ESCRITURA Y LECTURA RESTRINGIDA =====
-
-    // Colección: platformUsers
-    // Almacena los perfiles de todos los usuarios de la plataforma (admins, staff, etc.)
-    match /platformUsers/{userId} {
-      // Un usuario solo puede leer su propio perfil.
-      allow read: if request.auth != null && request.auth.uid == userId;
-
-      // El Super Admin puede leer cualquier perfil.
-      allow read: if request.auth != null && isSuperAdmin();
-
-      // Un usuario puede actualizar su propio nombre, teléfono y foto.
-      // El DNI, email, roles y businessId solo los puede cambiar un Super Admin.
-      allow update: if request.auth != null && request.auth.uid == userId
-                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'lastLogin']);
-
-      // El Super Admin puede crear y actualizar cualquier perfil sin restricciones de campos.
-      allow write: if request.auth != null && isSuperAdmin();
-    }
-
-    // Colección: socioVipMembers
-    // Almacena a los clientes que son parte del programa Socio VIP.
-    match /socioVipMembers/{memberId} {
-      // El Super Admin puede hacer todo (CRUD).
-      allow read, write, delete: if request.auth != null && isSuperAdmin();
-    }
-
-    // Colección: qrClients
-    // Almacena a los clientes que han generado un QR al menos una vez.
+    
+    // Clientes QR: Creación pública, sin lectura/escritura directa.
     match /qrClients/{clientId} {
-      // El Super Admin puede leer todos los clientes.
-      allow read: if request.auth != null && isSuperAdmin();
-      // Nadie más debe poder escribir directamente aquí.
-      allow write: if false;
+      allow create: if true;
+      allow read, write: if false; 
+    }
+
+    // Socios VIP: Gestión solo por SuperAdmin.
+    match /socioVipMembers/{memberId} {
+       allow read, write: if isSuperAdmin();
     }
     
-    // Colección: businessPromoterLinks
-    // Almacena los vínculos entre un negocio y un promotor.
+    // Vínculos de Promotores
     match /businessPromoterLinks/{linkId} {
-        // Solo un Super Admin o un Admin/Staff del negocio correspondiente puede leer los vínculos.
-        allow read: if request.auth != null && (isSuperAdmin() || userIsAdminOrStaffOfBusiness(resource.data.businessId));
-        
-        // Solo un Super Admin o un Admin/Staff del negocio correspondiente puede crear, actualizar o borrar vínculos.
-        allow write: if request.auth != null && (isSuperAdmin() || userIsAdminOrStaffOfBusiness(request.resource.data.businessId));
+      allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || (isSignedIn() && getUserData().roles.hasAny(['promoter']));
+      allow write: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
     }
     
-    // Colección: promoterPayments
-    // Almacena los registros de pagos de comisiones a promotores.
+    // Pagos de Promotores
     match /promoterPayments/{paymentId} {
-      // Solo Super Admin o Admin/Staff del negocio pueden leer o escribir pagos.
-      allow read, write: if request.a
+        allow read, write: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+    }
+    
+    // Configuración de la plataforma
+    match /platformSettings/{configId} {
+      allow read: if isSignedIn(); // Permitir lectura a todos los usuarios logueados
+      allow write: if isSuperAdmin(); // Solo superadmin escribe
+    }
+  }
+}

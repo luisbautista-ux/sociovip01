@@ -34,8 +34,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
   refreshUserProfile: () => Promise<void>;
-  loginWithGoogle: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; // Updated
-  loginWithFacebook: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; // New
+  loginWithGoogle: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
+  loginWithFacebook: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -171,7 +171,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [logout]);
 
-  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'promoter'): Promise<UserCredential | AuthError> => {
+  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       if (userCredential.user) {
@@ -183,7 +183,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           roles: [role], 
           dni: "",
         };
-        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [], assignedBusinessId: null });
       }
       return userCredential;
     } catch (error) {
@@ -210,7 +210,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           roles: [role],
           dni: "",
         };
-        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [], assignedBusinessId: null });
       } else {
         // If user already exists, just update last login
         const token = await user.getIdToken();
@@ -267,7 +267,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshUserProfile,
     loginWithGoogle,
     loginWithFacebook,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile]);
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, loginWithFacebook]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
