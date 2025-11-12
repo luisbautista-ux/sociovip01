@@ -28,16 +28,16 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { Loader2 } from "lucide-react";
-import type { AuthError } from "firebase/auth";
-import { SocioVipLogo } from "@/components/icons";
+import { Loader2, ArrowLeft, Star, CheckCircle } from "lucide-react";
+import { SocioVipLogo, GoogleIcon } from "@/components/icons";
+import { Separator } from "@/components/ui/separator";
 
 const signupFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
   confirmPassword: z.string(),
+  plan: z.enum(['gratis', 'premium'], { required_error: "Debes seleccionar un plan." }),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden.",
   path: ["confirmPassword"],
@@ -47,8 +47,10 @@ type SignupFormValues = z.infer<typeof signupFormSchema>;
 
 export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [step, setStep] = useState<'selection' | 'form'>('selection');
+  const [selectedPlan, setSelectedPlan] = useState<'gratis' | 'premium' | null>(null);
   const { toast } = useToast();
-  const { signup } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const router = useRouter();
 
   const form = useForm<SignupFormValues>({
@@ -61,167 +63,170 @@ export default function SignupPage() {
     },
   });
 
+  const handleSelectPlan = (plan: 'gratis' | 'premium') => {
+    if (plan === 'premium') {
+        toast({
+            title: "Próximamente",
+            description: "La membresía Premium estará disponible muy pronto. ¡Gracias por tu interés!",
+        });
+        return;
+    }
+    setSelectedPlan(plan);
+    form.setValue('plan', plan);
+    setStep('form');
+  };
+
   const handleSignup = async (values: SignupFormValues) => {
     setIsSubmitting(true);
+    const roleToAssign = values.plan === 'gratis' ? 'client_gratis' : 'vip_premium';
+    
     try {
-      // Pass 'promoter' role to the signup function
-      const result = await signup(values.email, values.password, values.name, 'promoter');
+      const result = await signup(values.email, values.password, values.name, roleToAssign);
       if ("user" in result) { // UserCredential
         toast({
-          title: "Registro de Promotor Exitoso",
-          description: "Tu cuenta de Promotor ha sido creada. Por favor, inicia sesión.",
+          title: "¡Bienvenido/a a SocioVIP!",
+          description: "Tu cuenta ha sido creada. Ahora serás redirigido a tu panel.",
         });
-        router.push("/login");
+        router.push("/auth/dispatcher");
       } else { // AuthError
-        const errorCode = (result as AuthError).code;
+        const errorCode = result.code;
         let errorMessage = "Ocurrió un error durante el registro.";
         if (errorCode === "auth/email-already-in-use") {
-          errorMessage = "Este email ya está registrado.";
-        } else if (errorCode === "auth/invalid-email") {
-          errorMessage = "El formato del email no es válido.";
-        } else if (errorCode === "auth/weak-password") {
-          errorMessage = "La contraseña es demasiado débil.";
+          errorMessage = "Este email ya está en uso. Por favor, intenta iniciar sesión.";
         }
-        toast({
-          title: "Error de Registro",
-          description: errorMessage,
-          variant: "destructive",
-        });
+        toast({ title: "Error de Registro", description: errorMessage, variant: "destructive" });
       }
     } catch (error) {
       console.error("Unexpected signup error", error);
-      toast({
-        title: "Error de Registro",
-        description: "Ocurrió un error inesperado. Por favor, intenta de nuevo.",
-        variant: "destructive",
-      });
+      toast({ title: "Error de Registro", description: "Ocurrió un error inesperado.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleGoogleSignup = async () => {
+    // For now, Google sign-up will only create 'gratis' accounts.
+    // In the future, we can pass the selected plan.
+    setIsSubmitting(true);
+    try {
+        const result = await loginWithGoogle('client_gratis');
+        if ("code" in result) {
+            toast({
+                title: "Error de Registro",
+                description: result.message || "No se pudo registrar con Google.",
+                variant: "destructive"
+            });
+            setIsSubmitting(false);
+        } else {
+            toast({ title: "¡Bienvenido/a a SocioVIP!", description: "Redirigiendo a tu panel..." });
+            router.push("/auth/dispatcher");
+        }
+    } catch (err) {
+        console.error("Google signup error", err);
+        toast({ title: "Error", description: "Ocurrió un error inesperado con el registro de Google.", variant: "destructive" });
+        setIsSubmitting(false);
+    }
+  };
+
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#f4eef7]">
-      <Link
-        href="/"
-        className="z-10 absolute left-4 top-5 md:left-10 md:top-10 inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text hover:text-primary/80"
-      >
-        Volver al inicio
+    <div className="relative min-h-screen bg-[#f4eef7] p-4 flex items-center justify-center">
+      <Link href="/" className="z-10 absolute left-4 top-5 md:left-10 md:top-10 group">
+          <span className="inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
+              <ArrowLeft className="h-4 w-4 md:h-5 md:w-5 text-purple-800" />
+              Volver al inicio
+          </span>
       </Link>
-
-      <Card className="w-full max-w-md shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
-        <CardHeader className="items-center text-center py-6">
-          <div className="w-full flex justify-center mb-4">
-            <SocioVipLogo size={96} />
-          </div>
-          <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-500 to-purple-700 text-transparent bg-clip-text">
-            Crear Cuenta de Promotor
-          </CardTitle>
-          <CardDescription className="text-center">
-            Únete a SocioVIP para empezar a promocionar eventos y locales.
-          </CardDescription>
+      
+      <Card className="w-full max-w-4xl shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
+        <CardHeader className="text-center py-6">
+            <div className="w-full flex justify-center mb-4"><SocioVipLogo size={96} /></div>
+            <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text">
+                {step === 'selection' ? "Elige tu Membresía" : "Completa tu Registro"}
+            </CardTitle>
+            <CardDescription>
+                {step === 'selection' 
+                    ? "Únete a la comunidad SocioVIP y accede a beneficios exclusivos."
+                    : `Estás a un paso de ser SocioVIP ${selectedPlan === 'gratis' ? 'Gratis' : 'Premium'}.`
+                }
+            </CardDescription>
         </CardHeader>
-
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre Completo</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Tu nombre completo"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="tu@email.com"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contraseña</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmar Contraseña</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        {...field}
-                        disabled={isSubmitting}
-                        className="transition duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:outline-none border-2 border-gray-300 rounded-md p-2 w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-700 hover:bg-gradient-to-l text-white font-bold py-2 px-4 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  "Registrar con Email"
-                )}
-              </Button>
-            </form>
-          </Form>
-
+            {step === 'selection' ? (
+                <div className="grid md:grid-cols-2 gap-8">
+                    {/* Free Plan */}
+                    <Card className="flex flex-col">
+                        <CardHeader>
+                            <CardTitle>SocioVIP Gratis</CardTitle>
+                            <CardDescription>Acceso a beneficios seleccionados.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-grow space-y-3 text-sm">
+                            <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Genera QRs para promociones en negocios asignados.</span></p>
+                            <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Tu propio QR Fijo para un acceso rápido.</span></p>
+                            <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Entérate de los mejores eventos y ofertas.</span></p>
+                        </CardContent>
+                        <CardFooter>
+                            <Button onClick={() => handleSelectPlan('gratis')} variant="gradient" className="w-full">Registrarse Gratis</Button>
+                        </CardFooter>
+                    </Card>
+                    {/* Premium Plan */}
+                    <Card className="flex flex-col border-primary border-2 relative">
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-full flex items-center">
+                            <Star className="h-3 w-3 mr-1.5"/> MÁS POPULAR
+                        </div>
+                        <CardHeader>
+                            <CardTitle>SocioVIP Premium</CardTitle>
+                            <CardDescription>La experiencia completa sin límites.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-grow space-y-3 text-sm">
+                            <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Todos los beneficios del plan gratuito.</span></p>
+                            <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Acceso a TODOS los negocios de la red.</span></p>
+                            <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Descuentos y promociones exclusivas para miembros.</span></p>
+                            <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Acumula puntos con tus visitas y canjéalos.</span></p>
+                        </CardContent>
+                        <CardFooter>
+                            <Button onClick={() => handleSelectPlan('premium')} className="w-full" disabled>Próximamente (S/ 9.99/mes)</Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+            ) : (
+                <div className="w-full max-w-md mx-auto">
+                    <Button onClick={handleGoogleSignup} variant="outline" className="w-full" disabled={isSubmitting}>
+                        <GoogleIcon className="mr-2 h-5 w-5" /> Continuar con Google
+                    </Button>
+                    <div className="flex items-center my-4">
+                        <Separator className="flex-grow" /><span className="mx-4 text-xs text-muted-foreground">O</span><Separator className="flex-grow" />
+                    </div>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">
+                        <FormField control={form.control} name="name" render={({ field }) => (
+                            <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="Tu nombre y apellido" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={form.control} name="email" render={({ field }) => (
+                            <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={form.control} name="password" render={({ field }) => (
+                            <FormItem><FormLabel>Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                            <FormItem><FormLabel>Confirmar Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear Mi Cuenta Gratis"}
+                        </Button>
+                        </form>
+                    </Form>
+                     <Button variant="link" size="sm" className="mt-4 text-muted-foreground" onClick={() => setStep('selection')}>&larr; Volver a elegir plan</Button>
+                </div>
+            )}
         </CardContent>
-        <CardFooter className="flex-col items-center text-sm">
-          <p className="text-muted-foreground">
-            ¿Ya tienes una cuenta?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Inicia sesión aquí
-            </Link>
-          </p>
+         <CardFooter className="flex-col items-center text-sm pt-6">
+            <p className="text-muted-foreground">
+                ¿Ya tienes una cuenta?{" "}
+                <Link href="/login" className="font-medium text-primary hover:underline">
+                Inicia sesión aquí
+                </Link>
+            </p>
         </CardFooter>
       </Card>
     </div>

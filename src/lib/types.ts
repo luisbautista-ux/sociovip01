@@ -84,6 +84,8 @@ export interface PlatformUser {
   lastLogin: Timestamp | string; 
   phone?: string;
   photoURL?: string;
+  // New field for free clients
+  assignedBusinessId?: string | null;
 }
 
 export interface SocioVipMember {
