@@ -53,6 +53,9 @@ export default function AuthDispatcherPage() {
       } else if (userProfile.roles.includes('host') || userProfile.roles.includes('lector_qr')) {
         console.log("AuthDispatcher: Redirecting host/lector_qr to /lector-qr/validate");
         router.replace("/lector-qr/validate");
+      } else if (userProfile.roles.includes('client_gratis') || userProfile.roles.includes('vip_premium')) {
+        console.log("AuthDispatcher: Redirecting client to /client/dashboard");
+        router.replace("/client/dashboard");
       } else {
         // Rol no reconocido o sin roles asignados que tengan un dashboard específico.
         console.warn("AuthDispatcher: User has roles but none match a specific dashboard. Roles:", userProfile.roles, "Redirecting to /");
