@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DialogTitle } from "@/components/ui/dialog";
 
 const navItems = [
   { href: "/client/dashboard", label: "Mi QR y Negocios", icon: QrCode },
@@ -142,13 +143,16 @@ export default function ClientLayout({
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
 
+  // This effect handles redirection based on auth state
   useEffect(() => {
+    // Only redirect if authentication is no longer loading and there is no user
     if (!loadingAuth && !currentUser) {
       router.push("/login");
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || loadingProfile) {
+  // This displays a loading screen while auth or profile data is being fetched.
+  if (loadingAuth || (currentUser && loadingProfile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
@@ -161,6 +165,7 @@ export default function ClientLayout({
     );
   }
 
+  // If loading is finished and there's still no user, we show a redirection message
   if (!currentUser) {
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
@@ -281,4 +286,3 @@ function PromoterBottomNav() {
     </footer>
   );
 }
-
