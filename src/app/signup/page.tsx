@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,7 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Star, CheckCircle } from "lucide-react";
-import { SocioVipLogo, GoogleIcon } from "@/components/icons";
+import { SocioVipLogo, GoogleIcon, FacebookIcon } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 
 const signupFormSchema = z.object({
@@ -50,7 +49,7 @@ export default function SignupPage() {
   const [step, setStep] = useState<'selection' | 'form'>('selection');
   const [selectedPlan, setSelectedPlan] = useState<'gratis' | 'premium' | null>(null);
   const { toast } = useToast();
-  const { signup, loginWithGoogle } = useAuth();
+  const { signup, loginWithGoogle, loginWithFacebook } = useAuth();
   const router = useRouter();
 
   const form = useForm<SignupFormValues>({
@@ -104,16 +103,16 @@ export default function SignupPage() {
     }
   };
 
-  const handleGoogleSignup = async () => {
-    // For now, Google sign-up will only create 'gratis' accounts.
-    // In the future, we can pass the selected plan.
+  const handleSocialSignup = async (provider: 'google' | 'facebook') => {
+    const roleToAssign = selectedPlan === 'gratis' ? 'client_gratis' : 'vip_premium';
     setIsSubmitting(true);
     try {
-        const result = await loginWithGoogle('client_gratis');
+        const loginFunction = provider === 'google' ? loginWithGoogle : loginWithFacebook;
+        const result = await loginFunction(roleToAssign);
         if ("code" in result) {
             toast({
                 title: "Error de Registro",
-                description: result.message || "No se pudo registrar con Google.",
+                description: result.message || `No se pudo registrar con ${provider}.`,
                 variant: "destructive"
             });
             setIsSubmitting(false);
@@ -122,8 +121,8 @@ export default function SignupPage() {
             router.push("/auth/dispatcher");
         }
     } catch (err) {
-        console.error("Google signup error", err);
-        toast({ title: "Error", description: "Ocurrió un error inesperado con el registro de Google.", variant: "destructive" });
+        console.error(`${provider} signup error`, err);
+        toast({ title: "Error", description: `Ocurrió un error inesperado con el registro de ${provider}.`, variant: "destructive" });
         setIsSubmitting(false);
     }
   };
@@ -191,11 +190,21 @@ export default function SignupPage() {
                 </div>
             ) : (
                 <div className="w-full max-w-md mx-auto">
-                    <Button onClick={handleGoogleSignup} variant="outline" className="w-full" disabled={isSubmitting}>
-                        <GoogleIcon className="mr-2 h-5 w-5" /> Continuar con Google
-                    </Button>
-                    <div className="flex items-center my-4">
-                        <Separator className="flex-grow" /><span className="mx-4 text-xs text-muted-foreground">O</span><Separator className="flex-grow" />
+                    <div className="space-y-3">
+                        <Button onClick={() => handleSocialSignup('google')} variant="outline" className="w-full" disabled={isSubmitting}>
+                            <GoogleIcon className="mr-2 h-5 w-5" /> Continuar con Google
+                        </Button>
+                        <Button onClick={() => handleSocialSignup('facebook')} variant="outline" className="w-full" disabled={isSubmitting}>
+                            <FacebookIcon className="mr-2 h-5 w-5" /> Continuar con Facebook
+                        </Button>
+                    </div>
+                    <div className="relative py-4">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">O regístrate con tu email</span>
+                        </div>
                     </div>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">

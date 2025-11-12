@@ -10,7 +10,12 @@ import {
   createUserWithEmailAndPassword, 
   signOut,
   sendPasswordResetEmail,
-  UserCredential
+  UserCredential,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  signInWithPopup,
+  linkWithPopup,
+  getAdditionalUserInfo
 } from "firebase/auth";
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
@@ -28,7 +33,9 @@ interface AuthContextType {
   signup: (email: string, pass: string, name?: string, role?: PlatformUserRole) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
-  refreshUserProfile: () => Promise<void>; // Added this
+  refreshUserProfile: () => Promise<void>;
+  loginWithGoogle: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; // Updated
+  loginWithFacebook: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; // New
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -184,6 +191,61 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  const handleSocialLogin = async (provider: GoogleAuthProvider | FacebookAuthProvider, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
+    try {
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+      
+      const additionalInfo = getAdditionalUserInfo(userCredential);
+
+      const userDocRef = doc(db, "platformUsers", user.uid);
+      
+      if (additionalInfo?.isNewUser) {
+        // If it's a new user, create their profile document
+        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
+          uid: user.uid,
+          email: user.email || "",
+          name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
+          photoURL: user.photoURL || undefined,
+          roles: [role],
+          dni: "",
+        };
+        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+      } else {
+        // If user already exists, just update last login
+        const token = await user.getIdToken();
+        await fetch('/api/user/update-last-login', { 
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      
+      return userCredential;
+    } catch (error) {
+        const authError = error as AuthError;
+        if (authError.code === 'auth/account-exists-with-different-credential' && auth.currentUser) {
+            try {
+                const pendingCred = authError.customData?._tokenResponse?.pendingCredential;
+                if (!pendingCred) {
+                    throw new Error("Credencial pendiente no encontrada para la vinculación.");
+                }
+                const credential = provider.credentialFromError(authError);
+                if (credential) {
+                    await linkWithPopup(auth.currentUser, provider);
+                    return await signInWithPopup(auth, provider);
+                }
+            } catch (linkError) {
+                console.error("Error linking social account:", linkError);
+                return { code: 'auth/link-error', message: 'No se pudo vincular la cuenta social. Es posible que ya esté en uso.' } as AuthError;
+            }
+        }
+        return authError;
+    }
+  };
+
+  const loginWithGoogle = (role: PlatformUserRole = 'client_gratis') => handleSocialLogin(new GoogleAuthProvider(), role);
+  const loginWithFacebook = (role: PlatformUserRole = 'client_gratis') => handleSocialLogin(new FacebookAuthProvider(), role);
+
   const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
     try {
       await sendPasswordResetEmail(auth, email);
@@ -203,6 +265,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     logout,
     sendPasswordReset,
     refreshUserProfile,
+    loginWithGoogle,
+    loginWithFacebook,
   }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

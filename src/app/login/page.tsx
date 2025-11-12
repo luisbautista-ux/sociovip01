@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,7 +30,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import type { AuthError, UserCredential } from "firebase/auth";
-import { SocioVipLogo, GoogleIcon } from "@/components/icons";
+import { SocioVipLogo, GoogleIcon, FacebookIcon } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import { ResetPasswordModal } from "@/components/auth/ResetPasswordModal"; 
 
@@ -49,7 +48,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false); 
   const { toast } = useToast();
-  const { login, currentUser, userProfile, loadingAuth, loadingProfile, loginWithGoogle } = useAuth();
+  const { login, currentUser, userProfile, loadingAuth, loadingProfile, loginWithGoogle, loginWithFacebook } = useAuth();
   const router = useRouter();
 
   const form = useForm<LoginFormValues>({
@@ -108,22 +107,23 @@ export default function LoginPage() {
     }
   };
   
-  const handleGoogleLogin = async () => {
+  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
     setIsSubmitting(true);
     try {
-        const result = await loginWithGoogle();
+        const loginFunction = provider === 'google' ? loginWithGoogle : loginWithFacebook;
+        const result = await loginFunction();
         if ("code" in result) {
             toast({
                 title: "Error de Inicio de Sesión",
-                description: result.message || "No se pudo iniciar sesión con Google.",
+                description: result.message || `No se pudo iniciar sesión con ${provider}.`,
                 variant: "destructive"
             });
             setIsSubmitting(false);
         } else {
-            toast({ title: "Inicio de Sesión con Google Exitoso", description: "Redirigiendo..." });
+            toast({ title: `Inicio de Sesión con ${provider.charAt(0).toUpperCase() + provider.slice(1)} Exitoso`, description: "Redirigiendo..." });
         }
     } catch (err) {
-        console.error("Google login error", err);
+        console.error(`${provider} login error`, err);
         toast({ title: "Error", description: "Ocurrió un error inesperado.", variant: "destructive" });
         setIsSubmitting(false);
     }
@@ -178,14 +178,20 @@ export default function LoginPage() {
               </CardHeader>
 
               <CardContent className="pb-6">
-                <div className="space-y-4">
-                   <Button onClick={handleGoogleLogin} variant="outline" className="w-full" disabled={isSubmitting}>
+                 <div className="space-y-3">
+                    <Button onClick={() => handleSocialLogin('google')} variant="outline" className="w-full" disabled={isSubmitting}>
                         <GoogleIcon className="mr-2 h-5 w-5" /> Ingresar con Google
                     </Button>
-                    <div className="flex items-center">
-                        <Separator className="flex-grow" />
-                        <span className="mx-4 text-xs text-muted-foreground">O</span>
-                        <Separator className="flex-grow" />
+                    <Button onClick={() => handleSocialLogin('facebook')} variant="outline" className="w-full" disabled={isSubmitting}>
+                        <FacebookIcon className="mr-2 h-5 w-5" /> Ingresar con Facebook
+                    </Button>
+                    <div className="relative py-2">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground">O continúa con</span>
+                        </div>
                     </div>
                 </div>
                 <Form {...form}>
