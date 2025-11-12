@@ -16,7 +16,7 @@ import {
   signInWithPopup,
   linkWithPopup,
   getAdditionalUserInfo,
-  reauthenticateWithPopup // Importante para la vinculación segura
+  reauthenticateWithPopup
 } from "firebase/auth";
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
@@ -72,51 +72,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
+    } catch (error) {
+      console.error("AuthContext: Logout error:", error);
+    } finally {
+      // These state updates will trigger the useEffect in the layout
       setCurrentUser(null);
       setUserProfile(null);
       Cookies.remove('idToken');
-      router.push("/login"); 
-    } catch (error) {
-      console.error("AuthContext: Logout error:", error);
     }
-  }, [router]);
+  }, []);
 
-  const fetchUserProfile = useCallback(async (user: FirebaseUser | null) => {
+  const fetchUserProfile = useCallback(async (user: FirebaseUser | null): Promise<PlatformUser | null> => {
     if (!user) {
       setUserProfile(null);
       setLoadingProfile(false);
-      return;
+      return null;
     }
     setLoadingProfile(true);
     try {
       const userDocRef = doc(db, "platformUsers", user.uid);
       const userDocSnap = await getDoc(userDocRef);
+
       if (userDocSnap.exists()) {
-        const profileDataFromDb = userDocSnap.data();
-        let rolesArray: PlatformUser['roles'] = [];
-        if (profileDataFromDb.roles && Array.isArray(profileDataFromDb.roles)) {
-          rolesArray = profileDataFromDb.roles;
-        } else if (profileDataFromDb.role && typeof profileDataFromDb.role === 'string') {
-          rolesArray = [profileDataFromDb.role as PlatformUserRole];
-        }
-        const profileData: PlatformUser = {
+        const profileData = {
           id: userDocSnap.id,
           uid: user.uid,
-          ...profileDataFromDb,
-          roles: rolesArray,
+          ...userDocSnap.data(),
         } as PlatformUser;
         setUserProfile(profileData);
+        return profileData;
       } else {
-        console.error(`AuthContext: No profile found for UID ${user.uid}. Logging out.`);
-        await logout();
+        return null; // Return null if profile doesn't exist
       }
     } catch (error) {
       console.error("AuthContext: Error fetching user profile:", error);
-      await logout();
+      setUserProfile(null);
+      return null;
     } finally {
       setLoadingProfile(false);
     }
-  }, [logout]);
+  }, []);
   
   const refreshUserProfile = useCallback(async () => {
     if (currentUser) {
@@ -124,47 +119,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [currentUser, fetchUserProfile]);
 
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // Don't set loading to true here to avoid flashes
+      setLoadingAuth(true); // Always start auth loading check
+      
       if (user) {
-        if (user.uid !== currentUser?.uid) { // Only refetch if user is different
-            setCurrentUser(user);
-            await fetchUserProfile(user);
+        setCurrentUser(user);
+        const profile = await fetchUserProfile(user);
+        if (!profile) {
+          console.warn(`Auth state changed, user ${user.uid} authenticated but no profile found. Logging out.`);
+          await logout();
         }
       } else {
         setCurrentUser(null);
         setUserProfile(null);
         Cookies.remove('idToken');
-        setLoadingProfile(false);
+        setLoadingProfile(false); // No user, no profile to load
       }
+      
       setLoadingAuth(false);
     });
     return () => unsubscribe();
-  }, [fetchUserProfile, currentUser]); // Add currentUser to dependencies
+  }, [fetchUserProfile, logout]);
   
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       const user = userCredential.user;
       
-      const userDocRef = doc(db, "platformUsers", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (!userDocSnap.exists()) {
-          console.error(`AuthContext: Login successful but no profile found for UID ${user.uid}. Logging out.`);
+      const profile = await fetchUserProfile(user);
+      if (!profile) {
           toast({
               title: "Error de Perfil",
               description: "No se encontró un perfil para este usuario. Por favor, contacta al administrador.",
               variant: "destructive",
-              duration: 8000
           });
           await logout();
-          return {
-            code: 'auth/user-profile-not-found',
-            message: 'No se encontró perfil para este usuario.'
-          } as AuthError;
+          return { code: 'auth/user-profile-not-found', message: 'No se encontró perfil para este usuario.' } as AuthError;
       }
       
       const token = await user.getIdToken();
@@ -178,7 +169,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       return error as AuthError;
     }
-  }, [logout]);
+  }, [logout, fetchUserProfile]);
 
   const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'client_gratis', extraData?: ExtraSignupData): Promise<UserCredential | AuthError> => {
     try {
@@ -195,12 +186,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           dob: extraData?.dob ? extraData.dob.toISOString() : undefined,
         };
         await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [], assignedBusinessId: null });
+        await fetchUserProfile(userCredential.user);
       }
       return userCredential;
     } catch (error) {
       return error as AuthError;
     }
-  }, []);
+  }, [fetchUserProfile]);
 
   const handleSocialLogin = async (provider: GoogleAuthProvider | FacebookAuthProvider, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
     try {
@@ -208,7 +200,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const user = userCredential.user;
       
       const additionalInfo = getAdditionalUserInfo(userCredential);
-
       const userDocRef = doc(db, "platformUsers", user.uid);
       
       if (additionalInfo?.isNewUser) {
@@ -218,61 +209,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
           name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
           photoURL: user.photoURL || undefined,
           roles: [role],
-          dni: "", // Social signups won't have this initially
+          dni: "",
           phone: "",
           dob: undefined,
         };
-        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [], assignedBusinessId: null });
-      } else {
-        // If user already exists, just update last login
-        const token = await user.getIdToken();
-        await fetch('/api/user/update-last-login', { 
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
       }
+      
+      await fetchUserProfile(user); // Fetch profile for both new and existing users
+      
+      const token = await user.getIdToken();
+      await fetch('/api/user/update-last-login', { 
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+      });
       
       return userCredential;
     } catch (error) {
-        const authError = error as AuthError;
-        return authError;
+        return error as AuthError;
     }
   };
 
-  const loginWithGoogle = (role: PlatformUserRole = 'client_gratis') => handleSocialLogin(new GoogleAuthProvider(), role);
+  const loginWithGoogle = (role: PlatformUserRole = 'client_gratis') => {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      return handleSocialLogin(provider, role);
+  };
   const loginWithFacebook = (role: PlatformUserRole = 'client_gratis') => handleSocialLogin(new FacebookAuthProvider(), role);
 
   const linkGoogleAccount = useCallback(async (): Promise<{ success: boolean; error?: AuthError }> => {
     if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
     
     const provider = new GoogleAuthProvider();
+    // ✅ **LA CORRECCIÓN CLAVE**
+    // Esto asegura que Google no restrinja el inicio de sesión a un dominio específico (como uai.edu.pe)
+    // y siempre muestre el selector de cuentas.
+    provider.setCustomParameters({
+      prompt: 'select_account',
+      hd: undefined 
+    });
+
     try {
         await linkWithPopup(currentUser, provider);
-        await refreshUserProfile(); // Refresh profile to show updated provider data
+        await refreshUserProfile();
         return { success: true };
     } catch(error) {
         const authError = error as AuthError;
+        let userFriendlyError = { ...authError, message: "Ocurrió un error desconocido durante la vinculación." };
+        
         if (authError.code === 'auth/credential-already-in-use') {
-            console.warn("Attempted to link a credential that is already in use by another account.");
-            try {
-                // Important: Re-authenticate the current user to confirm their identity
-                await reauthenticateWithPopup(currentUser, new GoogleAuthProvider()); // This seems wrong, should be original provider
-                // The above line is problematic if the original provider isn't Google. A better UX would ask for the user's password if they signed up with email.
-                // For now, we will just show a more specific error.
-                return {
-                    success: false,
-                    error: {
-                        ...authError,
-                        message: "Esta cuenta de Google ya está registrada en la plataforma. Intenta iniciar sesión directamente con Google."
-                    } as AuthError,
-                };
-
-            } catch (reauthError) {
-                console.error("Re-authentication failed during link attempt", reauthError);
-                return { success: false, error: { code: 'auth/reauth-failed', message: "Se requiere re-autenticación para vincular, pero falló."} as AuthError };
-            }
+            userFriendlyError.message = "Esta cuenta de Google ya está vinculada a otro usuario de la plataforma. Intenta iniciar sesión directamente con esa cuenta de Google.";
+        } else if(authError.code === 'auth/popup-closed-by-user') {
+            userFriendlyError.message = "La ventana de vinculación fue cerrada antes de completarse.";
         }
-        return { success: false, error: authError };
+
+        console.error("Link Google Account Error:", authError.code, authError.message);
+        return { success: false, error: userFriendlyError };
     }
   }, [currentUser, refreshUserProfile]);
 
@@ -299,7 +291,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loginWithGoogle,
     loginWithFacebook,
     linkGoogleAccount,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, loginWithFacebook, linkGoogleAccount]);
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, linkGoogleAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

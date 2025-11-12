@@ -8,10 +8,9 @@ import { SocioVipLogo } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +23,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DialogTitle } from "@/components/ui/dialog";
 
 const navItems = [
   { href: "/client/dashboard", label: "Mi QR y Negocios", icon: QrCode },
@@ -105,9 +103,8 @@ function ClientSidebar({ userName, userEmail, userPhotoUrl }: { userName?: strin
   );
 }
 
-function ClientBottomNav() {
+function PromoterBottomNav() {
   const pathname = usePathname();
-
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg md:hidden">
       <nav className="flex items-center justify-around h-16 w-full max-w-full overflow-hidden">
@@ -143,15 +140,12 @@ export default function ClientLayout({
   const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
   const router = useRouter();
 
-  // This effect handles redirection based on auth state
   useEffect(() => {
-    // Only redirect if authentication is no longer loading and there is no user
     if (!loadingAuth && !currentUser) {
       router.push("/login");
     }
   }, [currentUser, loadingAuth, router]);
 
-  // This displays a loading screen while auth or profile data is being fetched.
   if (loadingAuth || (currentUser && loadingProfile)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
@@ -165,7 +159,6 @@ export default function ClientLayout({
     );
   }
 
-  // If loading is finished and there's still no user, we show a redirection message
   if (!currentUser) {
     return (
         <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
@@ -213,7 +206,6 @@ export default function ClientLayout({
 
   return (
     <div className="flex min-h-dvh bg-muted/40">
-      {/* Sidebar Desktop */}
       <div className="hidden md:flex md:sticky md:top-0 md:h-screen">
         <ClientSidebar
           userName={userName}
@@ -222,9 +214,7 @@ export default function ClientLayout({
         />
       </div>
 
-      {/* Contenedor principal */}
       <div className="flex flex-col flex-1 h-dvh">
-        {/* Header Móvil */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 md:hidden shrink-0">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
@@ -247,42 +237,12 @@ export default function ClientLayout({
           </AlertDialog>
         </header>
 
-        {/* Contenido principal con scroll */}
         <main className="flex-1 w-full overflow-y-auto p-4 sm:p-6 pb-20 md:pb-6">
           {children}
         </main>
 
-        {/* Footer Móvil fijo */}
         <PromoterBottomNav />
       </div>
     </div>
-  );
-}
-// Renombramos el componente de navegación inferior para evitar conflictos
-function PromoterBottomNav() {
-  const pathname = usePathname();
-  return (
-    <footer className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg md:hidden">
-      <nav className="flex items-center justify-around h-16 w-full max-w-full overflow-hidden">
-        {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center text-xs font-medium w-full h-full transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-              )}
-            >
-              <item.icon className="h-5 w-5 mb-0.5" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-    </footer>
   );
 }
