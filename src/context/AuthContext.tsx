@@ -258,12 +258,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const linkGoogleAccount = useCallback(async (): Promise<{ success: boolean; error?: AuthError }> => {
     if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
+    
     const provider = new GoogleAuthProvider();
     try {
         await linkWithPopup(currentUser, provider);
         return { success: true };
     } catch(error) {
-        return { success: false, error: error as AuthError };
+        const authError = error as AuthError;
+        // CORRECTAMENTE MANEJA EL ERROR "CREDENTIAL ALREADY IN USE"
+        if (authError.code === 'auth/credential-already-in-use') {
+            console.warn("Attempted to link a credential that is already in use by another account.");
+            // Aquí no se puede fusionar automáticamente, pero se informa al usuario.
+            // La lógica en `handleSocialLogin` ya maneja la fusión durante el login,
+            // pero el `link` es un caso de uso diferente (usuario ya logueado).
+            return {
+                success: false,
+                error: {
+                    ...authError,
+                    message: "Esta cuenta de Google ya está registrada en la plataforma. Intenta iniciar sesión directamente con Google."
+                } as AuthError,
+            };
+        }
+        return { success: false, error: authError };
     }
   }, [currentUser]);
 
