@@ -1,5 +1,4 @@
 
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -484,4 +483,9 @@ export interface InitialDataForPromoterLink {
   existingPlatformUserPromoter?: PlatformUser; 
   qrClientData?: QrClient; 
   socioVipData?: SocioVipMember;
+}
+
+// Nueva interfaz para la configuración de la plataforma
+export interface PlatformSettings {
+  defaultBusinessesForFreeUsers?: string[];
 }
