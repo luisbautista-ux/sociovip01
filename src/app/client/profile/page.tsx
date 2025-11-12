@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, UserCircle, Upload } from "lucide-react";
+import { Loader2, UserCircle, Upload, CheckCircle } from "lucide-react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
@@ -29,9 +29,10 @@ const profileFormSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 export default function ClientProfilePage() {
-  const { userProfile, currentUser, loadingAuth, loadingProfile, refreshUserProfile } = useAuth();
+  const { userProfile, currentUser, loadingAuth, loadingProfile, refreshUserProfile, linkGoogleAccount } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,6 +41,10 @@ export default function ClientProfilePage() {
     resolver: zodResolver(profileFormSchema),
     defaultValues: { name: "", dni: "", email: "", phone: "", photoURL: "" },
   });
+  
+  const isGoogleLinked = currentUser?.providerData.some(p => p.providerId === "google.com") ?? false;
+  const isFacebookLinked = currentUser?.providerData.some(p => p.providerId === "facebook.com") ?? false;
+
 
   useEffect(() => {
     if (userProfile) {
@@ -68,6 +73,23 @@ export default function ClientProfilePage() {
     }
   };
 
+  const handleLinkGoogle = async () => {
+    setIsLinking(true);
+    const result = await linkGoogleAccount();
+    if(result.success) {
+      toast({ title: "Cuenta de Google Vinculada", description: "Ahora puedes iniciar sesión con Google."});
+      await refreshUserProfile();
+    } else if (result.error) {
+      let message = "No se pudo vincular la cuenta. Inténtalo de nuevo.";
+      if(result.error.code === 'auth/credential-already-in-use') {
+        message = "Esta cuenta de Google ya está vinculada a otro usuario de la plataforma.";
+      }
+      toast({ title: "Error al Vincular", description: message, variant: "destructive"});
+    }
+    setIsLinking(false);
+  };
+
+
   const handleUpdateProfile = async (values: ProfileFormValues) => {
     if (!currentUser) {
       toast({ title: "Error", description: "No estás autenticado.", variant: "destructive" });
@@ -91,7 +113,6 @@ export default function ClientProfilePage() {
         name: values.name,
         phone: values.phone || null,
         photoURL: uploadedPhotoURL || null,
-        // DNI and Email are not updated from here
       });
       
       if (selectedFile && oldPhotoURL && oldPhotoURL.includes('firebase')) {
@@ -179,9 +200,17 @@ export default function ClientProfilePage() {
           <Card className="shadow-lg">
             <CardHeader><CardTitle>Cuentas Vinculadas</CardTitle><CardDescription>Conecta tus redes sociales para un inicio de sesión más rápido.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full" disabled={true}>
-                <GoogleIcon className="mr-2 h-5 w-5" /> Vincular con Google (Próximamente)
-              </Button>
+              {isGoogleLinked ? (
+                <Button variant="outline" className="w-full border-green-500 bg-green-50 text-green-700 cursor-not-allowed">
+                  <CheckCircle className="mr-2 h-5 w-5"/> Cuenta de Google Vinculada
+                </Button>
+              ) : (
+                <Button variant="outline" className="w-full" onClick={handleLinkGoogle} disabled={isLinking}>
+                   {isLinking ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <GoogleIcon className="mr-2 h-5 w-5" />}
+                   Vincular con Google
+                </Button>
+              )}
+
               <Button variant="outline" className="w-full" disabled={true}>
                 <FacebookIcon className="mr-2 h-5 w-5" /> Vincular con Facebook (Próximamente)
               </Button>

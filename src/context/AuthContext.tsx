@@ -43,6 +43,7 @@ interface AuthContextType {
   refreshUserProfile: () => Promise<void>;
   loginWithGoogle: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
   loginWithFacebook: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
+  linkGoogleAccount: () => Promise<{ success: boolean; error?: AuthError }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -235,18 +236,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const authError = error as AuthError;
         if (authError.code === 'auth/account-exists-with-different-credential' && auth.currentUser) {
             try {
-                const pendingCred = authError.customData?._tokenResponse?.pendingCredential;
-                if (!pendingCred) {
-                    throw new Error("Credencial pendiente no encontrada para la vinculación.");
+                if (authError.customData?._tokenResponse?.pendingCredential) {
+                    const credential = provider.credentialFromError(authError);
+                    if(credential) {
+                        await linkWithPopup(auth.currentUser, provider);
+                        return await signInWithPopup(auth, provider);
+                    }
                 }
-                const credential = provider.credentialFromError(authError);
-                if (credential) {
-                    await linkWithPopup(auth.currentUser, provider);
-                    return await signInWithPopup(auth, provider);
-                }
-            } catch (linkError) {
+                throw new Error("Credencial pendiente no encontrada para la vinculación.");
+            } catch (linkError: any) {
                 console.error("Error linking social account:", linkError);
-                return { code: 'auth/link-error', message: 'No se pudo vincular la cuenta social. Es posible que ya esté en uso.' } as AuthError;
+                return { code: 'auth/link-error', message: 'No se pudo vincular la cuenta social. Es posible que ya esté en uso por otro usuario.' } as AuthError;
             }
         }
         return authError;
@@ -255,6 +255,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const loginWithGoogle = (role: PlatformUserRole = 'client_gratis') => handleSocialLogin(new GoogleAuthProvider(), role);
   const loginWithFacebook = (role: PlatformUserRole = 'client_gratis') => handleSocialLogin(new FacebookAuthProvider(), role);
+
+  const linkGoogleAccount = useCallback(async (): Promise<{ success: boolean; error?: AuthError }> => {
+    if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
+    const provider = new GoogleAuthProvider();
+    try {
+        await linkWithPopup(currentUser, provider);
+        return { success: true };
+    } catch(error) {
+        return { success: false, error: error as AuthError };
+    }
+  }, [currentUser]);
+
 
   const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
     try {
@@ -277,7 +289,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshUserProfile,
     loginWithGoogle,
     loginWithFacebook,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, loginWithFacebook]);
+    linkGoogleAccount,
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, loginWithFacebook, linkGoogleAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
