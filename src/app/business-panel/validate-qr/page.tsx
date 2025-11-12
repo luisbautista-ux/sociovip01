@@ -2,14 +2,13 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, Ticket, CalendarDays, User, Info, Search, CheckCircle2, XCircle, AlertTriangle, Clock, Users, Camera, UserCheck } from "lucide-react";
-import type { BusinessManagedEntity, GeneratedCode, Business } from "@/lib/types";
+import { QrCode as QrCodeIcon, Ticket, CalendarDays, User, Info, Search, CheckCircle2, XCircle, AlertTriangle, Clock, Users, Camera, UserCheck, Star } from "lucide-react";
+import type { BusinessManagedEntity, GeneratedCode, Business, PlatformUser, PlatformUserRole } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -17,14 +16,25 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
 import { isEntityCurrentlyActivatable, anyToDate } from "@/lib/utils";
-import { GENERATED_CODE_STATUS_TRANSLATIONS } from "@/lib/constants";
+import { GENERATED_CODE_STATUS_TRANSLATIONS, PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 
 
 const QR_READER_ELEMENT_ID = "qr-reader-validator";
+
+// --- Tipos de Resultado para el Validador ---
+type ValidationResultType = 'promo_code' | 'user_qr' | 'not_found';
+
+interface ValidationResult {
+  type: ValidationResultType;
+  entity?: BusinessManagedEntity | null;
+  code?: GeneratedCode | null;
+  user?: PlatformUser | null;
+}
+
 
 interface QrScannerProps {
   onScanSuccess: (decodedText: string, decodedResult: Html5QrcodeResult) => void;
@@ -32,10 +42,9 @@ interface QrScannerProps {
 }
 
 const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) => {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRef = React.useRef<Html5Qrcode | null>(null);
 
-  useEffect(() => {
-    // Initialize the scanner instance only once
+  React.useEffect(() => {
     if (!scannerRef.current) {
         scannerRef.current = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
     }
@@ -53,15 +62,16 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
           );
         }
       } catch (err: any) {
-        if (isComponentMounted && err && typeof err.message === 'string' && !err.message.includes("Cannot transition")) {
-          console.error("Scanner start failed:", err);
+        if (isComponentMounted) {
+          if (err && typeof err.message === 'string' && !err.message.includes("Cannot transition")) {
+            console.error("Scanner start failed:", err);
+          }
         }
       }
     };
 
     startScanner();
 
-    // Cleanup function to stop the scanner
     return () => {
       isComponentMounted = false;
       if (html5Qrcode && html5Qrcode.isScanning) {
@@ -73,6 +83,7 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
       }
     };
   }, [onScanSuccess, onScanFailure]);
+
 
   return (
     <Card className="shadow-lg">
@@ -91,20 +102,19 @@ QrScanner.displayName = "QrScanner";
 
 
 export default function BusinessPanelValidateQrPage() {
-  const [scannedCodeId, setScannedCodeId] = useState("");
-  const [foundEntity, setFoundEntity] = useState<BusinessManagedEntity | null>(null);
-  const [foundCode, setFoundCode] = useState<GeneratedCode | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [searchPerformed, setSearchPerformed] = useState(false);
-  const [isVipCandidate, setIsVipCandidate] = useState(false);
+  const [scannedCodeId, setScannedCodeId] = React.useState("");
+  const [validationResult, setValidationResult] = React.useState<ValidationResult | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [searchPerformed, setSearchPerformed] = React.useState(false);
+  const [isVipCandidate, setIsVipCandidate] = React.useState(false);
   const { toast } = useToast();
   const { userProfile } = useAuth();
   const currentBusinessId = userProfile?.businessId;
-  const [isScannerActive, setIsScannerActive] = useState(false);
+  const [isScannerActive, setIsScannerActive] = React.useState(false);
   
-  const [activeBusinessEntities, setActiveBusinessEntities] = useState<BusinessManagedEntity[]>([]);
+  const [activeBusinessEntities, setActiveBusinessEntities] = React.useState<BusinessManagedEntity[]>([]);
 
-  const fetchActiveEntities = useCallback(async () => {
+  const fetchActiveEntities = React.useCallback(async () => {
     if (!currentBusinessId) return;
     try {
         const entitiesQuery = query(
@@ -120,22 +130,22 @@ export default function BusinessPanelValidateQrPage() {
     }
   }, [currentBusinessId]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchActiveEntities();
   }, [fetchActiveEntities]);
 
 
-  const findCodeInEntities = useCallback(async (codeIdToFind: string) => {
+  const findCodeInEntities = React.useCallback(async (codeIdToFind: string) => {
     if (!currentBusinessId) return;
 
     setIsLoading(true);
     setSearchPerformed(false);
-    setFoundEntity(null);
-    setFoundCode(null);
+    setValidationResult(null);
     setIsVipCandidate(false);
     setScannedCodeId(codeIdToFind);
 
     try {
+      // --- 1. Primero busca en códigos de promociones/eventos ---
       const entitiesQuery = query(
         collection(db, "businessEntities"),
         where("businessId", "==", currentBusinessId),
@@ -143,112 +153,131 @@ export default function BusinessPanelValidateQrPage() {
       );
       const querySnapshot = await getDocs(entitiesQuery);
 
-      let entityMatch: BusinessManagedEntity | null = null;
-      let codeMatch: GeneratedCode | null = null;
-
       for (const doc of querySnapshot.docs) {
         const entityData = { id: doc.id, ...doc.data() } as BusinessManagedEntity;
-        const found = entityData.generatedCodes?.find(c => c.id === codeIdToFind);
-        if (found) {
-          entityMatch = entityData;
-          codeMatch = found;
-          setIsVipCandidate(found.isVipCandidate || false);
-          break;
+        const foundCode = entityData.generatedCodes?.find(c => c.id === codeIdToFind);
+        if (foundCode) {
+            setValidationResult({
+                type: 'promo_code',
+                entity: entityData,
+                code: foundCode
+            });
+            setIsVipCandidate(foundCode.isVipCandidate || false);
+            setIsLoading(false);
+            setSearchPerformed(true);
+            return; // Encontrado, termina la función
         }
       }
-      
-      setFoundEntity(entityMatch);
-      setFoundCode(codeMatch);
 
+      // --- 2. Si no lo encontró, busca como UID de usuario ---
+      const userDocRef = doc(db, "platformUsers", codeIdToFind);
+      const userSnap = await getDoc(userDocRef);
+
+      if (userSnap.exists()) {
+        const userData = { id: userSnap.id, ...userSnap.data() } as PlatformUser;
+        // Valida que el usuario tenga un rol de cliente y que el negocio esté en su lista de asignados
+        const hasClientRole = userData.roles.includes('client_gratis') || userData.roles.includes('vip_premium');
+        
+        if (hasClientRole) {
+          let hasAccess = false;
+          if (userData.roles.includes('vip_premium')) {
+            hasAccess = true; // Premium tiene acceso a todo.
+          } else if (userData.assignedBusinessId === currentBusinessId || (userData.businessIds || []).includes(currentBusinessId)) {
+             hasAccess = true; // Gratis solo si el negocio está en su lista.
+          } else {
+             // Necesitamos cargar la config global para ver si este negocio es parte de la red gratuita.
+             const settingsDoc = await getDoc(doc(db, "platformSettings", "membershipConfig"));
+             if (settingsDoc.exists()) {
+                 const freeNetwork = settingsDoc.data().defaultBusinessesForFreeUsers || [];
+                 if (freeNetwork.includes(currentBusinessId)) {
+                     hasAccess = true;
+                 }
+             }
+          }
+
+          if (hasAccess) {
+             setValidationResult({ type: 'user_qr', user: userData });
+             setSearchPerformed(true);
+             setIsLoading(false);
+             return; // Usuario válido encontrado, termina.
+          }
+        }
+      }
+
+      // --- 3. Si no se encontró en ningún lado ---
+      setValidationResult({ type: 'not_found' });
+      
     } catch (e: any) {
       console.error("Error searching code by ID:", e);
       toast({ title: "Error de Búsqueda", description: `No se pudo buscar el código. ${e.message}`, variant: "destructive" });
+      setValidationResult({ type: 'not_found' });
     } finally {
       setIsLoading(false);
       setSearchPerformed(true);
     }
   }, [currentBusinessId, toast]);
 
-  const handleScanSuccess = useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
+  const handleScanSuccess = React.useCallback((decodedText: string, decodedResult: Html5QrcodeResult) => {
     setIsScannerActive(false); 
     toast({ title: "QR Escaneado", description: `Verificando código...` });
     findCodeInEntities(decodedText);
   }, [findCodeInEntities, toast]);
   
-  const handleScanFailure = useCallback((errorMessage: string, error: Html5QrcodeError) => {
+  const handleScanFailure = React.useCallback((errorMessage: string, error: Html5QrcodeError) => {
     // Silently ignore scan failures
   }, []);
 
   const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
-    if (!code.generatedByUid) {
-        return 0;
-    }
+    if (!code.generatedByUid) return 0;
     const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
-    
-    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) {
-      return 0;
-    }
-    
-    const generalRule = promoterAssignment.commissionRules.find(
-        r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number'
-    );
-    
-    if (generalRule) {
-      return generalRule.commissionValue;
-    }
-    
-    return 0;
+    if (!promoterAssignment || !promoterAssignment.commissionRules || promoterAssignment.commissionRules.length === 0) return 0;
+    const generalRule = promoterAssignment.commissionRules.find(r => r.appliesTo === 'event_general' && typeof r.commissionValue === 'number');
+    return generalRule ? generalRule.commissionValue : 0;
   };
 
-
   const handleValidateAndRedeem = async () => {
-    if (!foundEntity || !foundCode || !userProfile?.uid) {
+    if (validationResult?.type !== 'promo_code' || !validationResult.entity || !validationResult.code || !userProfile?.uid) {
       toast({ title: "Error", description: "No se puede validar sin datos de entidad, código o perfil de usuario.", variant: "destructive" });
       return;
     }
-    if (foundCode.status !== 'redeemed') {
+
+    const { entity, code } = validationResult;
+    
+    if (code.status !== 'redeemed') {
         toast({ title: "Acción no Válida", description: "Este código no está en el estado correcto para ser validado.", variant: "destructive" });
         return;
     }
 
     try {
-      const entityRef = doc(db, "businessEntities", foundEntity.id);
+      const entityRef = doc(db, "businessEntities", entity.id);
       await runTransaction(db, async (transaction) => {
           const entityDoc = await transaction.get(entityRef);
-          if (!entityDoc.exists) {
-              throw new Error("La promoción o evento ya no existe.");
-          }
+          if (!entityDoc.exists) throw new Error("La promoción o evento ya no existe.");
+          
           const entityData = entityDoc.data() as BusinessManagedEntity;
           const codes = entityData.generatedCodes || [];
-          const codeIndex = codes.findIndex(c => c.id === foundCode.id);
+          const codeIndex = codes.findIndex(c => c.id === code.id);
 
-          if (codeIndex === -1) {
-             throw new Error("El código ya no existe en esta entidad.");
-          }
-          if (codes[codeIndex].status !== 'redeemed') {
-             throw new Error(`Este QR ya fue utilizado o su estado es inválido (estado actual: ${GENERATED_CODE_STATUS_TRANSLATIONS[codes[codeIndex].status] || codes[codeIndex].status}).`);
-          }
+          if (codeIndex === -1) throw new Error("El código ya no existe en esta entidad.");
+          if (codes[codeIndex].status !== 'redeemed') throw new Error(`Este QR ya fue utilizado o su estado es inválido (estado actual: ${GENERATED_CODE_STATUS_TRANSLATIONS[codes[codeIndex].status] || codes[codeIndex].status}).`);
 
           codes[codeIndex].status = 'used'; 
           codes[codeIndex].usedDate = new Date().toISOString();
           codes[codeIndex].usedByInfo = { uid: userProfile.uid, name: userProfile.name };
           codes[codeIndex].isVipCandidate = isVipCandidate;
 
-          // --- Commission Logic ---
           if (codes[codeIndex].generatedByUid) {
             const commissionAmount = getCommissionValueForCode(entityData, codes[codeIndex]);
             codes[codeIndex].commissionGenerated = commissionAmount;
-            // Solo se marca como pendiente si la comisión es mayor a 0
-            if (commissionAmount > 0) {
-              codes[codeIndex].commissionStatus = 'unpaid';
-            }
+            if (commissionAmount > 0) codes[codeIndex].commissionStatus = 'unpaid';
           }
           
           transaction.update(entityRef, { generatedCodes: codes });
-          setFoundCode(codes[codeIndex]);
+
+          setValidationResult(prev => prev ? {...prev, code: codes[codeIndex]} : prev);
       });
       
-      toast({ title: "¡Código Utilizado Exitosamente!", description: `Código para "${foundEntity.name}" marcado como utilizado.`, className: "bg-green-500 text-white" });
+      toast({ title: "¡Código Utilizado Exitosamente!", description: `Código para "${entity.name}" marcado como utilizado.`, className: "bg-green-500 text-white" });
       fetchActiveEntities();
     } catch (e: any) {
         console.error("Error in redemption transaction:", e);
@@ -258,26 +287,29 @@ export default function BusinessPanelValidateQrPage() {
   };
 
   const isCodeCurrentlyRedeemableByHost = () => {
-    if (!foundEntity || !foundCode) return false;
-    if (!isEntityCurrentlyActivatable(foundEntity)) return false;
-    return foundCode.status === 'redeemed';
-  };
-
-   const getEventAttendance = (event: BusinessManagedEntity) => {
-    if (event.type !== 'event') return "";
-    const redeemedCount = event.generatedCodes?.filter(c => c.status === 'used').length || 0;
-    return `Asistencia: ${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
+    if (!validationResult || validationResult.type !== 'promo_code') return false;
+    const { entity, code } = validationResult;
+    if (!entity || !code) return false;
+    if (!isEntityCurrentlyActivatable(entity)) return false;
+    return code.status === 'redeemed';
   };
   
   const handleActivateScanner = () => {
     setSearchPerformed(false);
-    setFoundEntity(null);
-    setFoundCode(null);
+    setValidationResult(null);
     setIsScannerActive(true);
   }
 
   const activePromotions = activeBusinessEntities.filter(e => e.type === 'promotion');
   const activeEvents = activeBusinessEntities.filter(e => e.type === 'event');
+  
+  const getEventAttendance = (event: BusinessManagedEntity) => {
+    if (event.type !== 'event') return "";
+    const redeemedCount = event.generatedCodes?.filter(c => c.status === 'used').length || 0;
+    return `Asistencia: ${redeemedCount} / ${event.maxAttendance === 0 || !event.maxAttendance ? '∞' : event.maxAttendance}`;
+  };
+
+  const { entity: foundEntity, code: foundCode, user: foundUser } = validationResult || {};
 
   return (
     <div className="space-y-6">
@@ -303,16 +335,29 @@ export default function BusinessPanelValidateQrPage() {
         <Card className="shadow-xl animate-in fade-in-50">
           <CardHeader>
             <CardTitle>Resultado de la Verificación</CardTitle>
-            <CardDescription>Código verificado: <span className="font-mono font-semibold">{foundCode?.id || scannedCodeId}</span></CardDescription>
+            <CardDescription>Código verificado: <span className="font-mono font-semibold">{scannedCodeId}</span></CardDescription>
           </CardHeader>
           <CardContent>
-            {!foundCode || !foundEntity ? (
+            {validationResult?.type === 'not_found' ? (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Código No Encontrado</AlertTitle>
                 <AlertDescription>El código no se encontró o no es válido para este negocio.</AlertDescription>
               </Alert>
-            ) : (
+            ) : validationResult?.type === 'user_qr' && foundUser ? (
+                <div className="space-y-4">
+                    <Alert variant="default" className="bg-green-50 border-green-300">
+                        <Star className="h-5 w-5 text-green-600"/>
+                        <AlertTitle className="font-bold text-green-800">Usuario SocioVIP Válido</AlertTitle>
+                        <AlertDescription>Este usuario tiene una membresía activa y acceso a tu negocio.</AlertDescription>
+                    </Alert>
+                    <div className="text-sm space-y-2">
+                        <p><User className="inline mr-2 h-4 w-4 text-muted-foreground"/><strong>Nombre:</strong> {foundUser.name}</p>
+                        <p><User className="inline mr-2 h-4 w-4 text-muted-foreground opacity-0"/><strong>DNI/CE:</strong> {foundUser.dni}</p>
+                        <p><Badge className="ml-6">{PLATFORM_USER_ROLE_TRANSLATIONS[foundUser.roles[0] as PlatformUserRole]}</Badge></p>
+                    </div>
+                </div>
+            ) : validationResult?.type === 'promo_code' && foundEntity && foundCode ? (
               <div className="space-y-4">
                  <Alert variant={isCodeCurrentlyRedeemableByHost() ? "default" : "destructive"}
                        className={
@@ -366,9 +411,9 @@ export default function BusinessPanelValidateQrPage() {
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
           </CardContent>
-          {foundCode && foundEntity && isCodeCurrentlyRedeemableByHost() && (
+          {validationResult?.type === 'promo_code' && isCodeCurrentlyRedeemableByHost() && (
             <CardFooter>
               <Button onClick={handleValidateAndRedeem} className="w-full bg-green-600 hover:bg-green-700 text-white">
                 <CheckCircle2 className="mr-2 h-5 w-5" /> Validar Ingreso y Marcar como Utilizado
