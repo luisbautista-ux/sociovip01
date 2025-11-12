@@ -125,7 +125,7 @@ export default function ClientDashboardPage() {
               )}
               <div className="pt-2">
                 <p className="font-semibold text-lg">{userProfile?.name}</p>
-                <p className="text-sm text-muted-foreground">{userProfile?.dni || 'DNI no registrado'}</p>
+                <p className="text-sm text-muted-foreground">DNI: {userProfile?.dni || 'No registrado'}</p>
               </div>
             </CardContent>
              <CardContent className="p-4 pt-0">

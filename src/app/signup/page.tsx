@@ -27,12 +27,20 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Star, CheckCircle } from "lucide-react";
+import { Loader2, ArrowLeft, Star, CheckCircle, CalendarIcon } from "lucide-react";
 import { SocioVipLogo, GoogleIcon, FacebookIcon } from "@/components/icons";
-import { Separator } from "@/components/ui/separator";
+import { ResetPasswordModal } from "@/components/auth/ResetPasswordModal"; 
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 const signupFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
+  dni: z.string().min(8, { message: "El DNI debe tener 8 dígitos." }).max(8, "El DNI debe tener 8 dígitos."),
+  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9."),
+  dob: z.date({ required_error: "La fecha de nacimiento es requerida."}),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
   confirmPassword: z.string(),
@@ -56,6 +64,8 @@ export default function SignupPage() {
     resolver: zodResolver(signupFormSchema),
     defaultValues: {
       name: "",
+      dni: "",
+      phone: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -80,7 +90,13 @@ export default function SignupPage() {
     const roleToAssign = values.plan === 'gratis' ? 'client_gratis' : 'vip_premium';
     
     try {
-      const result = await signup(values.email, values.password, values.name, roleToAssign);
+      // Pass all form values to the signup function
+      const result = await signup(values.email, values.password, values.name, roleToAssign, {
+        dni: values.dni,
+        phone: values.phone,
+        dob: values.dob,
+      });
+
       if ("user" in result) { // UserCredential
         toast({
           title: "¡Bienvenido/a a SocioVIP!",
@@ -108,6 +124,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
     try {
         const loginFunction = provider === 'google' ? loginWithGoogle : loginWithFacebook;
+        // The role is passed to be used if a new user is created
         const result = await loginFunction(roleToAssign);
         if ("code" in result) {
             toast({
@@ -210,6 +227,29 @@ export default function SignupPage() {
                         <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">
                         <FormField control={form.control} name="name" render={({ field }) => (
                             <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="Tu nombre y apellido" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={form.control} name="dni" render={({ field }) => (
+                            <FormItem><FormLabel>DNI</FormLabel><FormControl><Input placeholder="Tu número de DNI" {...field} disabled={isSubmitting} maxLength={8} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={form.control} name="phone" render={({ field }) => (
+                            <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={form.control} name="dob" render={({ field }) => (
+                          <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
+                                    {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={1920} toYear={new Date().getFullYear() - 18} disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18))} locale={es} initialFocus />
+                              </PopoverContent>
+                            </Popover><FormMessage />
+                          </FormItem>
                         )}/>
                         <FormField control={form.control} name="email" render={({ field }) => (
                             <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>

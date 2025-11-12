@@ -83,6 +83,7 @@ export interface PlatformUser {
   lastLogin: Timestamp | string; 
   phone?: string;
   photoURL?: string;
+  dob?: Timestamp | string; // Date of Birth
   // New field for free clients
   assignedBusinessId?: string | null;
 }

@@ -24,13 +24,20 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import Cookies from "js-cookie";
 import { toast } from "@/hooks/use-toast";
 
+// New type for extra signup data
+interface ExtraSignupData {
+  dni: string;
+  phone: string;
+  dob: Date;
+}
+
 interface AuthContextType {
   currentUser: FirebaseUser | null;
   userProfile: PlatformUser | null; 
   loadingAuth: boolean; 
   loadingProfile: boolean; 
   login: (email: string, pass: string) => Promise<UserCredential | AuthError>;
-  signup: (email: string, pass: string, name?: string, role?: PlatformUserRole) => Promise<UserCredential | AuthError>;
+  signup: (email: string, pass: string, name?: string, role?: PlatformUserRole, extraData?: ExtraSignupData) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
   refreshUserProfile: () => Promise<void>;
@@ -171,7 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [logout]);
 
-  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
+  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'client_gratis', extraData?: ExtraSignupData): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       if (userCredential.user) {
@@ -181,7 +188,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           email: userCredential.user.email || "",
           name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
           roles: [role], 
-          dni: "",
+          dni: extraData?.dni || "",
+          phone: extraData?.phone || "",
+          dob: extraData?.dob ? extraData.dob.toISOString() : undefined,
         };
         await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [], assignedBusinessId: null });
       }
@@ -201,14 +210,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userDocRef = doc(db, "platformUsers", user.uid);
       
       if (additionalInfo?.isNewUser) {
-        // If it's a new user, create their profile document
         const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
           uid: user.uid,
           email: user.email || "",
           name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
           photoURL: user.photoURL || undefined,
           roles: [role],
-          dni: "",
+          dni: "", // Social signups won't have this initially
+          phone: "",
+          dob: undefined,
         };
         await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [], assignedBusinessId: null });
       } else {
