@@ -391,27 +391,35 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     setIsSubmitting(true);
     
     try {
-      if (member.role) { // Is a PlatformUser
-          if (!member.authUid) throw new Error("UID de autenticación no encontrado para este usuario.");
-          const idToken = await currentUser?.getIdToken();
-          if (!idToken) throw new Error("Token de administrador no disponible.");
-          
-          const response = await fetch('/api/admin/delete-user', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${idToken}`
-              },
-              body: JSON.stringify({ uidToDelete: member.authUid })
-          });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || 'Error al eliminar el usuario desde el servidor.');
+      // If member has authUid, it's a platform user and needs Auth deletion
+      if (member.authUid) {
+        const idToken = await currentUser?.getIdToken();
+        if (!idToken) throw new Error("Token de administrador no disponible.");
 
-      } else { // Is a legacy SocioVipMember
+        const response = await fetch('/api/admin/delete-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ uidToDelete: member.authUid })
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+           // Handle cases where user is in Firestore but not in Auth
+           if (result.error && result.error.includes("no existe en Firebase Authentication")) {
+              console.warn(`User ${member.authUid} not found in Auth, deleting from Firestore only.`);
+              await deleteDoc(doc(db, "platformUsers", member.authUid));
+           } else {
+              throw new Error(result.error || 'Error al eliminar el usuario desde el servidor.');
+           }
+        }
+      } else { // It's a legacy socioVipMember, just delete from Firestore
           await deleteDoc(doc(db, "socioVipMembers", member.id));
       }
       
-      toast({ title: "Socio VIP Eliminado", description: `El socio "${member.name} ${member.surname}" ha sido eliminado.`, variant: "destructive" });
+      toast({ title: "Socio Eliminado Exitosamente", description: `El socio "${member.name} ${member.surname}" ha sido eliminado.`, variant: "destructive" });
       fetchSocioVipMembers();
     } catch (error: any) {
       console.error("Failed to delete Socio VIP member:", error);
@@ -839,4 +847,5 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     
 
     
+
 
