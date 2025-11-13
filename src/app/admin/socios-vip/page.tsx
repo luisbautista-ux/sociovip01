@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import { z } from "zod";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn, anyToDate } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 const DniEntrySchema = z.object({
@@ -63,6 +65,8 @@ interface CheckSocioDniResult {
   platformUserData?: PlatformUser;
 }
 
+type CombinedMember = SocioVipMember & { role?: PlatformUserRole };
+
 
 export default function AdminSocioVipPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,7 +74,7 @@ export default function AdminSocioVipPage() {
   const [joinMonthFilter, setJoinMonthFilter] = useState<string>("all");
   
   const [editingMember, setEditingMember] = useState<SocioVipMember | null>(null);
-  const [members, setMembers] = useState<SocioVipMember[]>([]);
+  const [members, setMembers] = useState<CombinedMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -93,9 +97,8 @@ export default function AdminSocioVipPage() {
   const fetchSocioVipMembers = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch from socioVipMembers collection
       const socioVipQuery = await getDocs(collection(db, "socioVipMembers"));
-      const fetchedMembers: SocioVipMember[] = socioVipQuery.docs.map(docSnap => {
+      const fetchedMembers: CombinedMember[] = socioVipQuery.docs.map(docSnap => {
         const data = docSnap.data();
         return {
           id: docSnap.id,
@@ -113,41 +116,45 @@ export default function AdminSocioVipPage() {
           authUid: data.authUid,
           joinDate: anyToDate(data.joinDate)?.toISOString() || new Date().toISOString(),
           dob: anyToDate(data.dob)?.toISOString()
-        } as SocioVipMember;
+        } as CombinedMember;
       });
 
-      // 2. Fetch from platformUsers with client roles
       const clientRoles: PlatformUserRole[] = ['client_gratis', 'vip_premium'];
       const platformUsersQuery = query(collection(db, "platformUsers"), where("roles", "array-contains-any", clientRoles));
       const platformUsersSnap = await getDocs(platformUsersQuery);
 
-      const platformUserMembers: SocioVipMember[] = platformUsersSnap.docs.map(docSnap => {
+      const platformUserMembers: CombinedMember[] = platformUsersSnap.docs.map(docSnap => {
           const data = docSnap.data() as PlatformUser;
           const nameParts = data.name.split(' ');
           const surname = nameParts.length > 1 ? nameParts.slice(-1).join(' ') : '';
-          const name = nameParts.slice(0, -1).join(' ');
+          const name = nameParts.slice(0, -1).join(' ') || data.name;
 
           return {
-            id: docSnap.id, // Using doc ID as the unique key
+            id: docSnap.id,
             authUid: data.uid,
             dni: data.dni,
-            name: name || data.name, // Fallback if split fails
+            name: name,
             surname: surname,
             email: data.email,
             phone: data.phone || '',
             dob: anyToDate(data.dob)?.toISOString(),
-            joinDate: anyToDate(data.lastLogin)?.toISOString() || new Date().toISOString(), // Using lastLogin as an approximation
-            membershipStatus: data.roles.includes('vip_premium') ? 'active' : 'active', // Could be more nuanced
-            loyaltyPoints: 0, // platformUsers don't have points
-          } as SocioVipMember;
+            joinDate: anyToDate(data.lastLogin)?.toISOString() || new Date().toISOString(),
+            membershipStatus: data.roles.includes('vip_premium') ? 'active' : 'active',
+            loyaltyPoints: 0,
+            role: data.roles.find(r => clientRoles.includes(r)),
+          } as CombinedMember;
       });
       
-      // 3. Combine and deduplicate
-      const allMembersMap = new Map<string, SocioVipMember>();
-      fetchedMembers.forEach(m => allMembersMap.set(m.dni, m)); // Legacy members take precedence
+      const allMembersMap = new Map<string, CombinedMember>();
+      fetchedMembers.forEach(m => allMembersMap.set(m.dni, m));
       platformUserMembers.forEach(m => {
-          if (!allMembersMap.has(m.dni)) { // Add only if not already present from legacy collection
+          if (!allMembersMap.has(m.dni)) {
               allMembersMap.set(m.dni, m);
+          } else {
+             const existing = allMembersMap.get(m.dni)!;
+             if (!existing.role && m.role) {
+                 allMembersMap.set(m.dni, { ...existing, role: m.role });
+             }
           }
       });
       
@@ -197,7 +204,8 @@ export default function AdminSocioVipPage() {
     const rows = filteredMembers.map(mem => [
       mem.id, mem.name, mem.surname, mem.email, `'${mem.phone || "N/A"}`, `'${mem.dni}`,
       mem.dob && typeof mem.dob === 'string' ? format(parseISO(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
-      mem.loyaltyPoints, MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa',
+      mem.loyaltyPoints, 
+      mem.role ? PLATFORM_USER_ROLE_TRANSLATIONS[mem.role] : (MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa'),
       mem.joinDate ? format(parseISO(mem.joinDate as string), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.address || "N/A", mem.profession || "N/A", mem.preferences?.join(', ') || "N/A"
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
@@ -394,8 +402,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     }
     setIsSubmitting(true);
     try {
-      // For now, only deleting from socioVipMembers collection is supported from here.
-      // Deleting from platformUsers would require a backend function call to delete the auth user.
       await deleteDoc(doc(db, "socioVipMembers", member.id));
       toast({ title: "Socio VIP Eliminado", description: `El socio "${member.name} ${member.surname}" ha sido eliminado.`, variant: "destructive" });
       fetchSocioVipMembers();
@@ -406,6 +412,43 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
       setIsSubmitting(false);
     }
   };
+  
+    const MemberStatusBadge = ({ member }: { member: CombinedMember }) => {
+    let statusText: string = 'Inactivo';
+    let variant: "default" | "secondary" | "destructive" | "outline" = 'secondary';
+    let tooltipText: string = 'Estado del miembro';
+
+    if (member.role === 'vip_premium') {
+      statusText = "Premium";
+      variant = 'default';
+      tooltipText = 'Miembro SocioVIP Premium';
+    } else if (member.role === 'client_gratis') {
+      statusText = "Gratis";
+      variant = 'secondary';
+      tooltipText = 'Miembro SocioVIP Gratis';
+    } else {
+      statusText = MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus] || 'Legado';
+      variant = MEMBERSHIP_STATUS_COLORS[member.membershipStatus] || 'outline';
+      tooltipText = `Miembro Legado - ${statusText}`;
+    }
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge variant={variant} className={cn(member.role === 'vip_premium' && 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black')}>
+              {member.role === 'vip_premium' && <Star className="h-3 w-3 mr-1" />}
+              {statusText}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
 
   return (
     <div className="space-y-6">
@@ -509,9 +552,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">Estado</span>
-                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS] || 'default'}>
-                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa'}
-                            </Badge>
+                            <MemberStatusBadge member={member} />
                         </div>
                       </CardContent>
                       <CardFooter className="p-2 bg-muted/50">
@@ -576,9 +617,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                           <TableCell>{member.dob && typeof member.dob === 'string' ? format(parseISO(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
                           <TableCell>
-                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS] || 'default'}>
-                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa'}
-                            </Badge>
+                            <MemberStatusBadge member={member} />
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">{member.joinDate && typeof member.joinDate === 'string' ? format(parseISO(member.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-right space-x-1">
