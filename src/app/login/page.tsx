@@ -151,19 +151,18 @@ export default function LoginPage() {
 
   return (
     <>
-      <div className="relative min-h-screen bg-[#f4eef7]">
+      <div className="relative min-h-screen bg-[#f4eef7] flex items-center justify-center p-4">
         <Link
           href="/"
-          className="z-10 absolute left-4 top-5 md:left-10 md:top-10 group"
+          className="z-10 absolute left-4 top-4 md:left-8 md:top-6 group"
         >
-          <span className="inline-flex items-center gap-2 text-[17px] md:text-[20px] font-semibold bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
+          <span className="inline-flex items-center gap-1.5 text-sm md:text-base font-semibold bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
               <ArrowLeft className="h-4 w-4 md:h-5 md:w-5 text-purple-800" />
               Volver al inicio
           </span>
         </Link>
 
-        <div className="relative flex items-center justify-center min-h-screen">
-          <div className="w-full max-w-xl mx-auto px-6 md:px-12 pt-20 md:pt-28">
+        <div className="w-full max-w-md mx-auto">
             <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md md:shadow-lg">
               <CardHeader className="py-6">
                 <div className="w-full flex justify-center mb-4">
@@ -289,7 +288,6 @@ export default function LoginPage() {
               </CardFooter>
             </Card>
           </div>
-        </div>
       </div>
       <ResetPasswordModal open={showResetModal} onOpenChange={setShowResetModal} />
     </>
