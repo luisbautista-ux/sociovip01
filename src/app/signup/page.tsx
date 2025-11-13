@@ -28,7 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Star, CheckCircle, CalendarIcon } from "lucide-react";
-import { SocioVipLogo, GoogleIcon, FacebookIcon } from "@/components/icons";
+import { SocioVipLogo, GoogleIcon } from "@/components/icons";
 import { ResetPasswordModal } from "@/components/auth/ResetPasswordModal"; 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -57,7 +57,7 @@ export default function SignupPage() {
   const [step, setStep] = useState<'selection' | 'form'>('selection');
   const [selectedPlan, setSelectedPlan] = useState<'gratis' | 'premium' | null>(null);
   const { toast } = useToast();
-  const { signup, loginWithGoogle, loginWithFacebook } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const router = useRouter();
 
   const form = useForm<SignupFormValues>({
@@ -119,11 +119,11 @@ export default function SignupPage() {
     }
   };
 
-  const handleSocialSignup = async (provider: 'google' | 'facebook') => {
+  const handleSocialSignup = async (provider: 'google') => {
     const roleToAssign = selectedPlan === 'gratis' ? 'client_gratis' : 'vip_premium';
     setIsSubmitting(true);
     try {
-        const loginFunction = provider === 'google' ? loginWithGoogle : loginWithFacebook;
+        const loginFunction = loginWithGoogle;
         // The role is passed to be used if a new user is created
         const result = await loginFunction(roleToAssign);
         if ("code" in result) {
@@ -210,9 +210,6 @@ export default function SignupPage() {
                     <div className="space-y-3">
                         <Button onClick={() => handleSocialSignup('google')} variant="outline" className="w-full" disabled={isSubmitting}>
                             <GoogleIcon className="mr-2 h-5 w-5" /> Continuar con Google
-                        </Button>
-                        <Button onClick={() => handleSocialSignup('facebook')} variant="outline" className="w-full" disabled={isSubmitting}>
-                            <FacebookIcon className="mr-2 h-5 w-5" /> Continuar con Facebook
                         </Button>
                     </div>
                     <div className="relative py-4">

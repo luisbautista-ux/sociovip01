@@ -12,7 +12,6 @@ import {
   sendPasswordResetEmail,
   UserCredential,
   GoogleAuthProvider,
-  FacebookAuthProvider,
   signInWithPopup,
   linkWithPopup,
   getAdditionalUserInfo,
@@ -43,9 +42,7 @@ interface AuthContextType {
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
   refreshUserProfile: () => Promise<void>;
   loginWithGoogle: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
-  loginWithFacebook: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
   linkGoogleAccount: () => Promise<{ success: boolean; error?: AuthError }>;
-  linkFacebookAccount: () => Promise<{ success: boolean; error?: AuthError }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -187,7 +184,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [fetchUserProfile]);
 
-  const handleSocialLogin = async (provider: GoogleAuthProvider | FacebookAuthProvider, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
+  const handleSocialLogin = async (provider: GoogleAuthProvider, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
@@ -228,12 +225,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       provider.setCustomParameters({ hd: undefined });
       return handleSocialLogin(provider, role);
   };
-
-  const loginWithFacebook = (role: PlatformUserRole = 'client_gratis') => {
-    const provider = new FacebookAuthProvider();
-    provider.setCustomParameters({ display: 'popup' });
-    return handleSocialLogin(provider, role);
-  };
   
   const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
     try {
@@ -272,31 +263,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [currentUser, refreshUserProfile]);
   
-  const linkFacebookAccount = useCallback(async (): Promise<{ success: boolean; error?: AuthError }> => {
-    if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
-    
-    const provider = new FacebookAuthProvider();
-    provider.setCustomParameters({ display: 'popup' });
-
-    try {
-        await linkWithPopup(currentUser, provider);
-        await refreshUserProfile();
-        return { success: true };
-    } catch(error) {
-        const authError = error as AuthError;
-        let userFriendlyError = { ...authError, message: "Ocurrió un error desconocido durante la vinculación con Facebook." };
-        
-        if (authError.code === 'auth/credential-already-in-use') {
-            userFriendlyError.message = "Esta cuenta de Facebook ya está vinculada a otro usuario de la plataforma.";
-        } else if(authError.code === 'auth/popup-closed-by-user') {
-            userFriendlyError.message = "La ventana de vinculación fue cerrada antes de completarse.";
-        }
-
-        console.error("Link Facebook Account Error:", authError.code, authError.message);
-        return { success: false, error: userFriendlyError };
-    }
-  }, [currentUser, refreshUserProfile]);
-
   const value = useMemo(() => ({
     currentUser,
     userProfile,
@@ -308,10 +274,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     sendPasswordReset,
     refreshUserProfile,
     loginWithGoogle,
-    loginWithFacebook,
     linkGoogleAccount,
-    linkFacebookAccount,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, loginWithFacebook, linkGoogleAccount, linkFacebookAccount]);
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, linkGoogleAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

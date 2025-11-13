@@ -68,28 +68,6 @@ export function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-// Facebook Icon SVG Component
-export function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 48 48"
-      width="24px"
-      height="24px"
-      {...props}
-    >
-      <path 
-        fill="#1877F2" 
-        d="M24,4C12.954,4,4,12.954,4,24s8.954,20,20,20s20-8.954,20-20S35.046,4,24,4z"
-      />
-      <path 
-        fill="#fff" 
-        d="M26.707,29.301h5.2V24h-5.2v-2.83c0-1.448,0.258-2.318,2.318-2.318h2.882v-5.2h-4.882c-5.43,0-7.1,3.128-7.1,7.1v3.25H19.5v5.301h4.207V44h6V29.301z"
-      />
-    </svg>
-  );
-}
-
 
 // WhatsApp Icon ahora como una Imagen desde URL externa
 export function WhatsAppIcon({ className, ...props }: { className?: string } & Omit<ImageProps, 'src' | 'alt'>) {

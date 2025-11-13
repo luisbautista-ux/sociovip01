@@ -30,7 +30,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import type { AuthError, UserCredential } from "firebase/auth";
-import { SocioVipLogo, GoogleIcon, FacebookIcon } from "@/components/icons";
+import { SocioVipLogo, GoogleIcon } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import { ResetPasswordModal } from "@/components/auth/ResetPasswordModal"; 
 
@@ -48,7 +48,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false); 
   const { toast } = useToast();
-  const { login, currentUser, userProfile, loadingAuth, loadingProfile, loginWithGoogle, loginWithFacebook } = useAuth();
+  const { login, currentUser, userProfile, loadingAuth, loadingProfile, loginWithGoogle } = useAuth();
   const router = useRouter();
 
   const form = useForm<LoginFormValues>({
@@ -107,10 +107,10 @@ export default function LoginPage() {
     }
   };
   
-  const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+  const handleSocialLogin = async (provider: 'google') => {
     setIsSubmitting(true);
     try {
-        const loginFunction = provider === 'google' ? loginWithGoogle : loginWithFacebook;
+        const loginFunction = loginWithGoogle;
         const result = await loginFunction();
         if ("code" in result) {
             toast({
@@ -181,9 +181,6 @@ export default function LoginPage() {
                  <div className="space-y-3">
                     <Button onClick={() => handleSocialLogin('google')} variant="outline" className="w-full" disabled={isSubmitting}>
                         <GoogleIcon className="mr-2 h-5 w-5" /> Ingresar con Google
-                    </Button>
-                    <Button onClick={() => handleSocialLogin('facebook')} variant="outline" className="w-full" disabled={isSubmitting}>
-                        <FacebookIcon className="mr-2 h-5 w-5" /> Ingresar con Facebook
                     </Button>
                     <div className="relative py-2">
                         <div className="absolute inset-0 flex items-center">
