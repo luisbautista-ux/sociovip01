@@ -95,7 +95,7 @@
 /* Custom utility for gradient text */
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text;
+    @apply bg-gradient-to-r from-primary to-accent text-transparent bg-clip-text;
   }
   .hover-gradient {
     @apply hover:bg-gradient-to-r from-primary to-accent hover:text-primary-foreground;
