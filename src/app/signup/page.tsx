@@ -56,7 +56,7 @@ export default function SignupPage() {
   const [step, setStep] = useState<'selection' | 'form'>('selection');
   const [selectedPlan, setSelectedPlan] = useState<'gratis' | 'premium' | null>(null);
   const { toast } = useToast();
-  const { signup, loginWithGoogle } = useAuth();
+  const { signup } = useAuth();
   const router = useRouter();
 
   const form = useForm<SignupFormValues>({
@@ -117,38 +117,12 @@ export default function SignupPage() {
     }
   };
   
-  const handleSocialSignup = async (provider: 'google') => {
-    const roleToAssign = selectedPlan === 'gratis' ? 'client_gratis' : 'vip_premium';
-    setIsSubmitting(true);
-    try {
-        const loginFunction = loginWithGoogle;
-        const result = await loginFunction(roleToAssign);
-        if ("code" in result) {
-            toast({
-                title: "Error de Registro",
-                description: result.message || `No se pudo registrar con ${provider}.`,
-                variant: "destructive"
-            });
-            setIsSubmitting(false);
-        } else {
-            toast({ title: "¡Bienvenido/a a SocioVIP!", description: "Redirigiendo a tu panel..." });
-            router.push("/auth/dispatcher");
-        }
-    } catch (err) {
-        console.error(`${provider} signup error`, err);
-        toast({ title: "Error", description: `Ocurrió un error inesperado con el registro de ${provider}.`, variant: "destructive" });
-        setIsSubmitting(false);
-    }
-  };
-
   return (
-    <div className="relative min-h-screen bg-[#f4eef7] p-4 flex items-center justify-center">
-      <Link href="/" className="group absolute top-4 left-4 z-10">
-        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
-          <ArrowLeft className="h-4 w-4 text-purple-800" />
-          Volver al inicio
-        </span>
-      </Link>
+    <div className="relative min-h-screen bg-[#f4eef7] p-4 flex flex-col items-center justify-center">
+        <Link href="/" className="absolute top-4 left-4 z-10 text-sm font-semibold text-purple-800 hover:text-purple-600 transition-colors flex items-center">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Volver al inicio
+        </Link>
       
       <div className="w-full max-w-4xl mx-auto py-12">
         <Card className="w-full shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
@@ -202,19 +176,6 @@ export default function SignupPage() {
                   </div>
               ) : (
                   <div className="w-full max-w-md mx-auto">
-                      <div className="space-y-3">
-                          <Button onClick={() => handleSocialSignup('google')} variant="outline" className="w-full" disabled={isSubmitting}>
-                              <SocioVipLogo className="mr-2 h-5 w-5" /> Continuar con Google
-                          </Button>
-                      </div>
-                      <div className="relative py-4">
-                          <div className="absolute inset-0 flex items-center">
-                              <span className="w-full border-t" />
-                          </div>
-                          <div className="relative flex justify-center text-xs uppercase">
-                              <span className="bg-background px-2 text-muted-foreground">O regístrate con tu email</span>
-                          </div>
-                      </div>
                       <Form {...form}>
                           <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">
                           <FormField control={form.control} name="name" render={({ field }) => (
