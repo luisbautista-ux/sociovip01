@@ -142,135 +142,134 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#f4eef7] p-4">
+    <div className="relative min-h-screen bg-[#f4eef7] p-4 flex items-center justify-center">
       <Link href="/" className="group absolute top-4 left-4 z-10">
         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
           <ArrowLeft className="h-4 w-4 text-purple-800" />
           Volver al inicio
         </span>
       </Link>
-      <div className="flex flex-col items-center justify-center w-full min-h-full py-12">
-        <div className="w-full max-w-4xl mx-auto">
-          <Card className="w-full shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
-            <CardHeader className="text-center py-6">
-                <div className="w-full flex justify-center mb-4"><SocioVipLogo size={96} /></div>
-                <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text">
-                    {step === 'selection' ? "Elige tu Membresía" : "Completa tu Registro"}
-                </CardTitle>
-                <CardDescription>
-                    {step === 'selection' 
-                        ? "Únete a la comunidad SocioVIP y accede a beneficios exclusivos."
-                        : `Estás a un paso de ser SocioVIP ${selectedPlan === 'gratis' ? 'Gratis' : 'Premium'}.`
-                    }
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {step === 'selection' ? (
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <Card className="flex flex-col">
-                            <CardHeader>
-                                <CardTitle>SocioVIP Gratis</CardTitle>
-                                <CardDescription>Acceso a beneficios seleccionados.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-grow space-y-3 text-sm">
-                                <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Genera QRs para promociones en negocios asignados.</span></p>
-                                <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Tu propio QR Fijo para un acceso rápido.</span></p>
-                                <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Entérate de los mejores eventos y ofertas.</span></p>
-                            </CardContent>
-                            <CardFooter>
-                                <Button onClick={() => handleSelectPlan('gratis')} variant="gradient" className="w-full">Registrarse Gratis</Button>
-                            </CardFooter>
-                        </Card>
-                        <Card className="flex flex-col border-primary border-2 relative">
-                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-full flex items-center">
-                                <Star className="h-3 w-3 mr-1.5"/> MÁS POPULAR
-                            </div>
-                            <CardHeader>
-                                <CardTitle>SocioVIP Premium</CardTitle>
-                                <CardDescription>La experiencia completa sin límites.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-grow space-y-3 text-sm">
-                                <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Todos los beneficios del plan gratuito.</span></p>
-                                <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Acceso a TODOS los negocios de la red.</span></p>
-                                <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Descuentos y promociones exclusivas para miembros.</span></p>
-                                <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Acumula puntos con tus visitas y canjéalos.</span></p>
-                            </CardContent>
-                            <CardFooter>
-                                <Button onClick={() => handleSelectPlan('premium')} className="w-full" disabled>Próximamente (S/ 9.99/mes)</Button>
-                            </CardFooter>
-                        </Card>
-                    </div>
-                ) : (
-                    <div className="w-full max-w-md mx-auto">
-                        <div className="space-y-3">
-                            <Button onClick={() => handleSocialSignup('google')} variant="outline" className="w-full" disabled={isSubmitting}>
-                                <SocioVipLogo className="mr-2 h-5 w-5" /> Continuar con Google
-                            </Button>
-                        </div>
-                        <div className="relative py-4">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground">O regístrate con tu email</span>
-                            </div>
-                        </div>
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">
-                            <FormField control={form.control} name="name" render={({ field }) => (
-                                <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="Tu nombre y apellido" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <FormField control={form.control} name="dni" render={({ field }) => (
-                                <FormItem><FormLabel>DNI</FormLabel><FormControl><Input placeholder="Tu número de DNI" {...field} disabled={isSubmitting} maxLength={8} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <FormField control={form.control} name="phone" render={({ field }) => (
-                                <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <FormField control={form.control} name="dob" render={({ field }) => (
-                              <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento</FormLabel>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                                        {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
-                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={1920} toYear={new Date().getFullYear() - 18} disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18))} locale={es} initialFocus />
-                                  </PopoverContent>
-                                </Popover><FormMessage />
-                              </FormItem>
-                            )}/>
-                            <FormField control={form.control} name="email" render={({ field }) => (
-                                <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <FormField control={form.control} name="password" render={({ field }) => (
-                                <FormItem><FormLabel>Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                                <FormItem><FormLabel>Confirmar Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
-                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear Mi Cuenta Gratis"}
-                            </Button>
-                            </form>
-                        </Form>
-                         <Button variant="link" size="sm" className="mt-4 text-muted-foreground" onClick={() => setStep('selection')}>&larr; Volver a elegir plan</Button>
-                    </div>
-                )}
-            </CardContent>
-             <CardFooter className="flex-col items-center text-sm pt-6">
-                <p className="text-muted-foreground">
-                    ¿Ya tienes una cuenta?{" "}
-                    <Link href="/login" className="font-medium text-primary hover:underline">
-                    Inicia sesión aquí
-                    </Link>
-                </p>
-            </CardFooter>
-          </Card>
-        </div>
+      
+      <div className="w-full max-w-4xl mx-auto py-12">
+        <Card className="w-full shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
+          <CardHeader className="text-center py-6">
+              <div className="w-full flex justify-center mb-4"><SocioVipLogo size={96} /></div>
+              <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text">
+                  {step === 'selection' ? "Elige tu Membresía" : "Completa tu Registro"}
+              </CardTitle>
+              <CardDescription>
+                  {step === 'selection' 
+                      ? "Únete a la comunidad SocioVIP y accede a beneficios exclusivos."
+                      : `Estás a un paso de ser SocioVIP ${selectedPlan === 'gratis' ? 'Gratis' : 'Premium'}.`
+                  }
+              </CardDescription>
+          </CardHeader>
+          <CardContent>
+              {step === 'selection' ? (
+                  <div className="grid md:grid-cols-2 gap-8">
+                      <Card className="flex flex-col">
+                          <CardHeader>
+                              <CardTitle>SocioVIP Gratis</CardTitle>
+                              <CardDescription>Acceso a beneficios seleccionados.</CardDescription>
+                          </CardHeader>
+                          <CardContent className="flex-grow space-y-3 text-sm">
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Genera QRs para promociones en negocios asignados.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Tu propio QR Fijo para un acceso rápido.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Entérate de los mejores eventos y ofertas.</span></p>
+                          </CardContent>
+                          <CardFooter>
+                              <Button onClick={() => handleSelectPlan('gratis')} variant="gradient" className="w-full">Registrarse Gratis</Button>
+                          </CardFooter>
+                      </Card>
+                      <Card className="flex flex-col border-primary border-2 relative">
+                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-full flex items-center">
+                              <Star className="h-3 w-3 mr-1.5"/> MÁS POPULAR
+                          </div>
+                          <CardHeader>
+                              <CardTitle>SocioVIP Premium</CardTitle>
+                              <CardDescription>La experiencia completa sin límites.</CardDescription>
+                          </CardHeader>
+                          <CardContent className="flex-grow space-y-3 text-sm">
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Todos los beneficios del plan gratuito.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Acceso a TODOS los negocios de la red.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Descuentos y promociones exclusivas para miembros.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Acumula puntos con tus visitas y canjéalos.</span></p>
+                          </CardContent>
+                          <CardFooter>
+                              <Button onClick={() => handleSelectPlan('premium')} className="w-full" disabled>Próximamente (S/ 9.99/mes)</Button>
+                          </CardFooter>
+                      </Card>
+                  </div>
+              ) : (
+                  <div className="w-full max-w-md mx-auto">
+                      <div className="space-y-3">
+                          <Button onClick={() => handleSocialSignup('google')} variant="outline" className="w-full" disabled={isSubmitting}>
+                              <SocioVipLogo className="mr-2 h-5 w-5" /> Continuar con Google
+                          </Button>
+                      </div>
+                      <div className="relative py-4">
+                          <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t" />
+                          </div>
+                          <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-background px-2 text-muted-foreground">O regístrate con tu email</span>
+                          </div>
+                      </div>
+                      <Form {...form}>
+                          <form onSubmit={form.handleSubmit(handleSignup)} className="space-y-4">
+                          <FormField control={form.control} name="name" render={({ field }) => (
+                              <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="Tu nombre y apellido" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="dni" render={({ field }) => (
+                              <FormItem><FormLabel>DNI</FormLabel><FormControl><Input placeholder="Tu número de DNI" {...field} disabled={isSubmitting} maxLength={8} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="phone" render={({ field }) => (
+                              <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="dob" render={({ field }) => (
+                            <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento</FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
+                                      {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
+                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={1920} toYear={new Date().getFullYear() - 18} disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18))} locale={es} initialFocus />
+                                </PopoverContent>
+                              </Popover><FormMessage />
+                            </FormItem>
+                          )}/>
+                          <FormField control={form.control} name="email" render={({ field }) => (
+                              <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="password" render={({ field }) => (
+                              <FormItem><FormLabel>Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                              <FormItem><FormLabel>Confirmar Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                          )}/>
+                          <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
+                              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear Mi Cuenta Gratis"}
+                          </Button>
+                          </form>
+                      </Form>
+                       <Button variant="link" size="sm" className="mt-4 text-muted-foreground" onClick={() => setStep('selection')}>&larr; Volver a elegir plan</Button>
+                  </div>
+              )}
+          </CardContent>
+           <CardFooter className="flex-col items-center text-sm pt-6">
+              <p className="text-muted-foreground">
+                  ¿Ya tienes una cuenta?{" "}
+                  <Link href="/login" className="font-medium text-primary hover:underline">
+                  Inicia sesión aquí
+                  </Link>
+              </p>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );
