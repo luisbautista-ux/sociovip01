@@ -165,80 +165,49 @@ export default function ClientProfilePage() {
         <UserCircle className="h-8 w-8 text-primary !block" /> Mi Perfil
       </h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle>Información Personal</CardTitle>
-              <CardDescription>Actualiza tu nombre y datos de contacto.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleUpdateProfile)} className="space-y-6">
-                  <div className="flex flex-col items-center justify-center mb-6 space-y-3">
-                    <Avatar className="h-28 w-28 border-4 border-muted-foreground/20">
-                      <AvatarImage src={previewUrl || undefined} alt={userProfile.name} />
-                      <AvatarFallback className="text-4xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'C'}</AvatarFallback>
-                    </Avatar>
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp" />
-                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
-                      <Upload className="mr-2 h-4 w-4" /> Cambiar Foto
-                    </Button>
-                  </div>
+      <div className="lg:col-span-2">
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>Información Personal</CardTitle>
+            <CardDescription>Actualiza tu nombre y datos de contacto.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleUpdateProfile)} className="space-y-6">
+                <div className="flex flex-col items-center justify-center mb-6 space-y-3">
+                  <Avatar className="h-28 w-28 border-4 border-muted-foreground/20">
+                    <AvatarImage src={previewUrl || undefined} alt={userProfile.name} />
+                    <AvatarFallback className="text-4xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'C'}</AvatarFallback>
+                  </Avatar>
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/png, image/jpeg, image/webp" />
+                  <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
+                    <Upload className="mr-2 h-4 w-4" /> Cambiar Foto
+                  </Button>
+                </div>
 
-                  <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="Tu nombre" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="Tu nombre" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={form.control} name="dni" render={({ field }) => (
+                    <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} disabled={true} /></FormControl><FormMessage /></FormItem>
                   )}/>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={form.control} name="dni" render={({ field }) => (
-                      <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} disabled={true} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={form.control} name="phone" render={({ field }) => (
-                      <FormItem><FormLabel>Teléfono</FormLabel><FormControl><Input type="tel" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                  </div>
-                  <FormField control={form.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email (Cuenta)</FormLabel><FormControl><Input type="email" {...field} disabled={true} /></FormControl><FormMessage /></FormItem>
+                  <FormField control={form.control} name="phone" render={({ field }) => (
+                    <FormItem><FormLabel>Teléfono</FormLabel><FormControl><Input type="tel" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
                   )}/>
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={isSubmitting} variant="gradient">
-                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Guardar Cambios"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="shadow-lg">
-            <CardHeader><CardTitle>Cuentas Vinculadas</CardTitle><CardDescription>Conecta tus redes sociales para un inicio de sesión más rápido.</CardDescription></CardHeader>
-            <CardContent className="space-y-3">
-              {isGoogleLinked ? (
-                <Button variant="outline" className="w-full border-green-500 bg-green-50 text-green-700 cursor-not-allowed">
-                  <CheckCircle className="mr-2 h-5 w-5"/> Cuenta de Google Vinculada
-                </Button>
-              ) : (
-                <Button variant="outline" className="w-full" onClick={handleLinkGoogle} disabled={isLinking}>
-                   {isLinking ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <GoogleIcon className="mr-2 h-5 w-5" />}
-                   Vincular con Google
-                </Button>
-              )}
-
-              {isFacebookLinked ? (
-                <Button variant="outline" className="w-full border-blue-500 bg-blue-50 text-blue-700 cursor-not-allowed">
-                  <CheckCircle className="mr-2 h-5 w-5"/> Cuenta de Facebook Vinculada
-                </Button>
-              ) : (
-                <Button variant="outline" className="w-full" onClick={handleLinkFacebook} disabled={isLinking}>
-                   {isLinking ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <FacebookIcon className="mr-2 h-5 w-5" />}
-                   Vincular con Facebook
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                </div>
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem><FormLabel>Email (Cuenta)</FormLabel><FormControl><Input type="email" {...field} disabled={true} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={isSubmitting} variant="gradient">
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Guardar Cambios"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
