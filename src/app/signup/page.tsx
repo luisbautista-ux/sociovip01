@@ -28,8 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Star, CheckCircle, CalendarIcon } from "lucide-react";
-import { SocioVipLogo, GoogleIcon } from "@/components/icons";
-import { ResetPasswordModal } from "@/components/auth/ResetPasswordModal"; 
+import { SocioVipLogo } from "@/components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -90,20 +89,19 @@ export default function SignupPage() {
     const roleToAssign = values.plan === 'gratis' ? 'client_gratis' : 'vip_premium';
     
     try {
-      // Pass all form values to the signup function
       const result = await signup(values.email, values.password, values.name, roleToAssign, {
         dni: values.dni,
         phone: values.phone,
         dob: values.dob,
       });
 
-      if ("user" in result) { // UserCredential
+      if ("user" in result) {
         toast({
           title: "¡Bienvenido/a a SocioVIP!",
           description: "Tu cuenta ha sido creada. Ahora serás redirigido a tu panel.",
         });
         router.push("/auth/dispatcher");
-      } else { // AuthError
+      } else {
         const errorCode = result.code;
         let errorMessage = "Ocurrió un error durante el registro.";
         if (errorCode === "auth/email-already-in-use") {
@@ -118,13 +116,12 @@ export default function SignupPage() {
       setIsSubmitting(false);
     }
   };
-
+  
   const handleSocialSignup = async (provider: 'google') => {
     const roleToAssign = selectedPlan === 'gratis' ? 'client_gratis' : 'vip_premium';
     setIsSubmitting(true);
     try {
         const loginFunction = loginWithGoogle;
-        // The role is passed to be used if a new user is created
         const result = await loginFunction(roleToAssign);
         if ("code" in result) {
             toast({
@@ -144,16 +141,16 @@ export default function SignupPage() {
     }
   };
 
-
   return (
-    <div className="relative min-h-screen bg-[#f4eef7] flex flex-col items-center justify-center p-4">
+    <div className="relative min-h-screen bg-[#f4eef7] p-4">
       <Link href="/" className="group absolute top-4 left-4 z-10">
         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
           <ArrowLeft className="h-4 w-4 text-purple-800" />
           Volver al inicio
         </span>
       </Link>
-      <div className="w-full max-w-4xl mx-auto">
+      <div className="flex flex-col items-center justify-center w-full min-h-full py-12">
+        <div className="w-full max-w-4xl mx-auto">
           <Card className="w-full shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
             <CardHeader className="text-center py-6">
                 <div className="w-full flex justify-center mb-4"><SocioVipLogo size={96} /></div>
@@ -170,7 +167,6 @@ export default function SignupPage() {
             <CardContent>
                 {step === 'selection' ? (
                     <div className="grid md:grid-cols-2 gap-8">
-                        {/* Free Plan */}
                         <Card className="flex flex-col">
                             <CardHeader>
                                 <CardTitle>SocioVIP Gratis</CardTitle>
@@ -185,7 +181,6 @@ export default function SignupPage() {
                                 <Button onClick={() => handleSelectPlan('gratis')} variant="gradient" className="w-full">Registrarse Gratis</Button>
                             </CardFooter>
                         </Card>
-                        {/* Premium Plan */}
                         <Card className="flex flex-col border-primary border-2 relative">
                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-full flex items-center">
                                 <Star className="h-3 w-3 mr-1.5"/> MÁS POPULAR
@@ -209,7 +204,7 @@ export default function SignupPage() {
                     <div className="w-full max-w-md mx-auto">
                         <div className="space-y-3">
                             <Button onClick={() => handleSocialSignup('google')} variant="outline" className="w-full" disabled={isSubmitting}>
-                                <GoogleIcon className="mr-2 h-5 w-5" /> Continuar con Google
+                                <SocioVipLogo className="mr-2 h-5 w-5" /> Continuar con Google
                             </Button>
                         </div>
                         <div className="relative py-4">
@@ -275,6 +270,7 @@ export default function SignupPage() {
                 </p>
             </CardFooter>
           </Card>
+        </div>
       </div>
     </div>
   );
