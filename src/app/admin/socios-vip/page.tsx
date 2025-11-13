@@ -29,6 +29,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn, anyToDate } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/context/AuthContext";
 
 
 const DniEntrySchema = z.object({
@@ -65,15 +66,24 @@ interface CheckSocioDniResult {
   platformUserData?: PlatformUser;
 }
 
-type CombinedMember = SocioVipMember & { role?: PlatformUserRole };
+type CombinedMember = Partial<SocioVipMember> & {
+  id: string;
+  dni: string;
+  name: string;
+  surname: string;
+  email: string;
+  role?: PlatformUserRole;
+  authUid?: string; // UID from Firebase Auth, crucial for linking
+};
 
 
 export default function AdminSocioVipPage() {
+  const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [birthdayMonthFilter, setBirthdayMonthFilter] = useState<string>("all");
   const [joinMonthFilter, setJoinMonthFilter] = useState<string>("all");
   
-  const [editingMember, setEditingMember] = useState<SocioVipMember | null>(null);
+  const [editingMember, setEditingMember] = useState<CombinedMember | null>(null);
   const [members, setMembers] = useState<CombinedMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,8 +136,8 @@ export default function AdminSocioVipPage() {
       const platformUserMembers: CombinedMember[] = platformUsersSnap.docs.map(docSnap => {
           const data = docSnap.data() as PlatformUser;
           const nameParts = data.name.split(' ');
-          const surname = nameParts.length > 1 ? nameParts.slice(-1).join(' ') : '';
-          const name = nameParts.slice(0, -1).join(' ') || data.name;
+          const surname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+          const name = nameParts.length > 1 ? nameParts[0] : data.name;
 
           return {
             id: docSnap.id,
@@ -139,22 +149,18 @@ export default function AdminSocioVipPage() {
             phone: data.phone || '',
             dob: anyToDate(data.dob)?.toISOString(),
             joinDate: anyToDate(data.lastLogin)?.toISOString() || new Date().toISOString(),
-            membershipStatus: data.roles.includes('vip_premium') ? 'active' : 'active',
+            membershipStatus: 'active',
             loyaltyPoints: 0,
             role: data.roles.find(r => clientRoles.includes(r)),
           } as CombinedMember;
       });
       
       const allMembersMap = new Map<string, CombinedMember>();
-      fetchedMembers.forEach(m => allMembersMap.set(m.dni, m));
-      platformUserMembers.forEach(m => {
+      // Los usuarios de plataforma tienen prioridad porque son el nuevo sistema
+      platformUserMembers.forEach(m => allMembersMap.set(m.dni, m));
+      fetchedMembers.forEach(m => {
           if (!allMembersMap.has(m.dni)) {
               allMembersMap.set(m.dni, m);
-          } else {
-             const existing = allMembersMap.get(m.dni)!;
-             if (!existing.role && m.role) {
-                 allMembersMap.set(m.dni, { ...existing, role: m.role });
-             }
           }
       });
       
@@ -205,7 +211,7 @@ export default function AdminSocioVipPage() {
       mem.id, mem.name, mem.surname, mem.email, `'${mem.phone || "N/A"}`, `'${mem.dni}`,
       mem.dob && typeof mem.dob === 'string' ? format(parseISO(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.loyaltyPoints, 
-      mem.role ? PLATFORM_USER_ROLE_TRANSLATIONS[mem.role] : (MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa'),
+      mem.role ? PLATFORM_USER_ROLE_TRANSLATIONS[mem.role] : (MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Legado'),
       mem.joinDate ? format(parseISO(mem.joinDate as string), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.address || "N/A", mem.profession || "N/A", mem.preferences?.join(', ') || "N/A"
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
@@ -243,7 +249,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     if (!socioVipSnapshot.empty) {
       result.existsAsSocioVip = true;
       result.socioVipData = { id: socioVipSnapshot.docs[0].id, ...socioVipSnapshot.docs[0].data() } as SocioVipMember;
-      return result; // Si ya es Socio VIP, no necesitamos verificar más para este flujo
     }
 
     const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dniToVerify));
@@ -285,9 +290,9 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
 
     const dbCheckResult = await checkDniAcrossCollections(docNumberCleaned);
 
-    if (dbCheckResult.existsAsSocioVip && dbCheckResult.socioVipData) {
+    if (dbCheckResult.existsAsSocioVip || dbCheckResult.existsAsPlatformUser) {
         setIsSubmitting(false);
-        setExistingSocioVipToEdit(dbCheckResult.socioVipData);
+        setExistingSocioVipToEdit(dbCheckResult.socioVipData || (dbCheckResult.platformUserData as any));
         setShowDniIsAlreadySocioVipAlert(true);
         setShowDniEntryModal(false);
         return;
@@ -304,12 +309,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             const dobDate = dbCheckResult.qrClientData.dob instanceof Timestamp ? dbCheckResult.qrClientData.dob.toDate() : new Date(dbCheckResult.qrClientData.dob);
             initialData.dob = dobDate.toISOString();
         }
-    } else if (dbCheckResult.existsAsPlatformUser && dbCheckResult.platformUserData) {
-        initialData.existingUserType = 'PlatformUser';
-        const nameParts = dbCheckResult.platformUserData.name.split(' ');
-        initialData.surname = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
-        initialData.name = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-        initialData.email = dbCheckResult.platformUserData.email;
     }
 
     setIsSubmitting(false);
@@ -339,23 +338,19 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         setIsSubmitting(false);
         return;
       }
-
-      if (editingMember) { 
-        if (data.dni !== editingMember.dni) { 
-            const dniCheckResult = await checkDniAcrossCollections(data.dni);
-            if (dniCheckResult.existsAsSocioVip && dniCheckResult.socioVipData?.id !== editingMember.id) { 
-                toast({ title: "Error de DNI", description: `El DNI/CE ${data.dni} ya está registrado para otro Socio VIP.`, variant: "destructive" });
-                setIsSubmitting(false);
-                return;
-            }
-        }
-        const memberRef = doc(db, "socioVipMembers", editingMember.id);
-        await updateDoc(memberRef, {
+      
+      const payload = {
           ...data,
           dni: data.dni,
           dob: Timestamp.fromDate(data.dob),
           preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
-        });
+      };
+
+      if (editingMember) {
+        const docId = editingMember.authUid || editingMember.id;
+        const collectionName = editingMember.authUid ? "platformUsers" : "socioVipMembers";
+        const memberRef = doc(db, collectionName, docId);
+        await updateDoc(memberRef, payload);
         toast({ title: "Socio VIP Actualizado", description: `El socio "${data.name} ${data.surname}" ha sido actualizado.` });
       } else { 
         if (!verifiedSocioDniResult?.dni) { 
@@ -365,11 +360,8 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         }
         
         const newMemberPayload = {
-          ...data,
-          dni: verifiedSocioDniResult.dni, 
+          ...payload,
           joinDate: Timestamp.fromDate(new Date()),
-          dob: Timestamp.fromDate(data.dob),
-          preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
           staticQrCodeUrl: `https://placehold.co/100x100.png?text=${(data.name || '').substring(0,3).toUpperCase()}QR`,
           authUid: null, 
         };
@@ -394,29 +386,45 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     }
   };
 
-  const handleDeleteMember = async (member: SocioVipMember) => {
-    if (isSubmitting) return;
-    if (!member.authUid) {
-      toast({ title: "Acción no Permitida", description: "Este usuario es un Socio VIP legado y no puede ser eliminado desde aquí.", variant: "destructive"});
-      return;
-    }
+  const handleDeleteMember = async (member: CombinedMember) => {
+    if (isSubmitting || !member.id) return;
     setIsSubmitting(true);
+    
     try {
-      await deleteDoc(doc(db, "socioVipMembers", member.id));
+      if (member.role) { // Is a PlatformUser
+          if (!member.authUid) throw new Error("UID de autenticación no encontrado para este usuario.");
+          const idToken = await currentUser?.getIdToken();
+          if (!idToken) throw new Error("Token de administrador no disponible.");
+          
+          const response = await fetch('/api/admin/delete-user', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`
+              },
+              body: JSON.stringify({ uidToDelete: member.authUid })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Error al eliminar el usuario desde el servidor.');
+
+      } else { // Is a legacy SocioVipMember
+          await deleteDoc(doc(db, "socioVipMembers", member.id));
+      }
+      
       toast({ title: "Socio VIP Eliminado", description: `El socio "${member.name} ${member.surname}" ha sido eliminado.`, variant: "destructive" });
       fetchSocioVipMembers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete Socio VIP member:", error);
-      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el Socio VIP.", variant: "destructive"});
+      toast({ title: "Error al Eliminar", description: `No se pudo eliminar al socio. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
   };
   
     const MemberStatusBadge = ({ member }: { member: CombinedMember }) => {
-    let statusText: string = 'Inactivo';
-    let variant: "default" | "secondary" | "destructive" | "outline" = 'secondary';
-    let tooltipText: string = 'Estado del miembro';
+    let statusText: string = 'Legado';
+    let variant: "default" | "secondary" | "destructive" | "outline" = 'outline';
+    let tooltipText: string = 'Miembro SocioVIP Legado';
 
     if (member.role === 'vip_premium') {
       statusText = "Premium";
@@ -426,7 +434,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
       statusText = "Gratis";
       variant = 'secondary';
       tooltipText = 'Miembro SocioVIP Gratis';
-    } else {
+    } else if (member.membershipStatus) {
       statusText = MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus] || 'Legado';
       variant = MEMBERSHIP_STATUS_COLORS[member.membershipStatus] || 'outline';
       tooltipText = `Miembro Legado - ${statusText}`;
@@ -569,7 +577,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                                 <DropdownMenuSeparator />
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground" disabled={!member.authUid}>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground" disabled={isSubmitting}>
                                             <Trash2 className="h-4 w-4 mr-2" /> Eliminar
                                         </DropdownMenuItem>
                                     </AlertDialogTrigger>
@@ -615,7 +623,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                           <TableCell className="hidden md:table-cell">{member.phone}</TableCell>
                           <TableCell className="hidden xl:table-cell">{member.dni}</TableCell>
                           <TableCell>{member.dob && typeof member.dob === 'string' ? format(parseISO(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
-                          <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
+                          <TableCell className="text-center">{member.loyaltyPoints || 0}</TableCell>
                           <TableCell>
                             <MemberStatusBadge member={member} />
                           </TableCell>
@@ -631,7 +639,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || !member.authUid}>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
                                   <Trash2 className="h-4 w-4" />
                                   <span className="sr-only">Eliminar</span>
                                 </Button>
@@ -640,8 +648,8 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                                 <AlertDialogHeader>
                                   <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
                                   <UIDialogDescription2>
-                                    Esta acción no se puede deshacer. Esto eliminará permanentemente al socio
-                                    <span className="font-semibold"> {member.name} {member.surname}</span>.
+                                    Esta acción eliminará permanentemente al socio
+                                    <span className="font-semibold"> {member.name} {member.surname}</span>. Si tiene una cuenta de acceso, esta también será eliminada.
                                   </UIDialogDescription2>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -792,7 +800,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             </UIDialogDescription>
           </UIDialogHeader>
           <SocioVipMemberForm
-            member={editingMember || undefined}
+            member={editingMember as SocioVipMember | undefined}
             initialData={!editingMember && verifiedSocioDniResult ? verifiedSocioDniResult : undefined}
             onSubmit={handleCreateOrEditMember}
             onCancel={() => { setShowCreateEditModal(false); setEditingMember(null); setVerifiedSocioDniResult(null);}}
@@ -831,3 +839,4 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     
 
     
+
