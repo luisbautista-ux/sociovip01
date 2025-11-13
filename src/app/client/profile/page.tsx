@@ -29,7 +29,7 @@ const profileFormSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 export default function ClientProfilePage() {
-  const { userProfile, currentUser, loadingAuth, loadingProfile, refreshUserProfile, linkGoogleAccount } = useAuth();
+  const { userProfile, currentUser, loadingAuth, loadingProfile, refreshUserProfile, linkGoogleAccount, linkFacebookAccount } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
@@ -88,7 +88,22 @@ export default function ClientProfilePage() {
     }
     setIsLinking(false);
   };
-
+  
+  const handleLinkFacebook = async () => {
+    setIsLinking(true);
+    const result = await linkFacebookAccount();
+    if(result.success) {
+      toast({ title: "Cuenta de Facebook Vinculada", description: "Ahora puedes iniciar sesión con Facebook."});
+      await refreshUserProfile();
+    } else if (result.error) {
+      let message = "No se pudo vincular la cuenta. Inténtalo de nuevo.";
+      if(result.error.code === 'auth/credential-already-in-use') {
+        message = "Esta cuenta de Facebook ya está vinculada a otro usuario de la plataforma.";
+      }
+      toast({ title: "Error al Vincular", description: message, variant: "destructive"});
+    }
+    setIsLinking(false);
+  };
 
   const handleUpdateProfile = async (values: ProfileFormValues) => {
     if (!currentUser) {
@@ -211,9 +226,16 @@ export default function ClientProfilePage() {
                 </Button>
               )}
 
-              <Button variant="outline" className="w-full" disabled={true}>
-                <FacebookIcon className="mr-2 h-5 w-5" /> Vincular con Facebook (Próximamente)
-              </Button>
+              {isFacebookLinked ? (
+                <Button variant="outline" className="w-full border-blue-500 bg-blue-50 text-blue-700 cursor-not-allowed">
+                  <CheckCircle className="mr-2 h-5 w-5"/> Cuenta de Facebook Vinculada
+                </Button>
+              ) : (
+                <Button variant="outline" className="w-full" onClick={handleLinkFacebook} disabled={isLinking}>
+                   {isLinking ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <FacebookIcon className="mr-2 h-5 w-5" />}
+                   Vincular con Facebook
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

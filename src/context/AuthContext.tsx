@@ -45,6 +45,7 @@ interface AuthContextType {
   loginWithGoogle: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
   loginWithFacebook: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
   linkGoogleAccount: () => Promise<{ success: boolean; error?: AuthError }>;
+  linkFacebookAccount: () => Promise<{ success: boolean; error?: AuthError }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<PlatformUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true); 
-  const [loadingProfile, setLoadingProfile] = useState(false); // Only true when fetching profile
+  const [loadingProfile, setLoadingProfile] = useState(true); 
   
   const router = useRouter(); 
 
@@ -75,9 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error("AuthContext: Logout error:", error);
     } finally {
-      setCurrentUser(null);
-      setUserProfile(null);
-      Cookies.remove('idToken');
+      // States will be cleared by onAuthStateChanged
     }
   }, []);
 
@@ -96,10 +95,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUserProfile(profileData);
         return profileData;
       } else {
+        setUserProfile(null);
         return null;
       }
     } catch (error) {
       console.error("AuthContext: Error fetching user profile:", error);
+      setUserProfile(null);
       return null;
     } finally {
       setLoadingProfile(false);
@@ -107,24 +108,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
   
   const refreshUserProfile = useCallback(async () => {
-    if (currentUser) {
-        await fetchUserProfile(currentUser);
+    if (auth.currentUser) {
+        await fetchUserProfile(auth.currentUser);
     }
-  }, [currentUser, fetchUserProfile]);
+  }, [fetchUserProfile]);
 
   useEffect(() => {
+    let isMounted = true;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      if (user) {
-        await fetchUserProfile(user);
-      } else {
-        setUserProfile(null);
-        Cookies.remove('idToken');
-        setLoadingProfile(false);
+      if (isMounted) {
+        if (user) {
+          setCurrentUser(user);
+          await fetchUserProfile(user);
+        } else {
+          setCurrentUser(null);
+          setUserProfile(null);
+          Cookies.remove('idToken');
+        }
+        setLoadingAuth(false);
       }
-      setLoadingAuth(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [fetchUserProfile]);
   
   const login = useCallback(async (email: string, pass: string): Promise<UserCredential | AuthError> => {
@@ -217,10 +225,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const loginWithGoogle = (role: PlatformUserRole = 'client_gratis') => {
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
+      provider.setCustomParameters({ hd: undefined });
       return handleSocialLogin(provider, role);
   };
-  const loginWithFacebook = (role: PlatformUserRole = 'client_gratis') => handleSocialLogin(new FacebookAuthProvider(), role);
+
+  const loginWithFacebook = (role: PlatformUserRole = 'client_gratis') => {
+    const provider = new FacebookAuthProvider();
+    provider.setCustomParameters({ display: 'popup' });
+    return handleSocialLogin(provider, role);
+  };
+  
+  const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error as AuthError };
+    }
+  }, []);
 
   const linkGoogleAccount = useCallback(async (): Promise<{ success: boolean; error?: AuthError }> => {
     if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
@@ -245,20 +267,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
             userFriendlyError.message = "La ventana de vinculación fue cerrada antes de completarse.";
         }
 
-        console.error("Link Google Account Error:", authError.code, authError.message);
+        console.error("Error: Link Google Account Error:", authError.code, authError.message);
         return { success: false, error: userFriendlyError };
     }
   }, [currentUser, refreshUserProfile]);
+  
+  const linkFacebookAccount = useCallback(async (): Promise<{ success: boolean; error?: AuthError }> => {
+    if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
+    
+    const provider = new FacebookAuthProvider();
+    provider.setCustomParameters({ display: 'popup' });
 
-
-  const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
     try {
-      await sendPasswordResetEmail(auth, email);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error as AuthError };
+        await linkWithPopup(currentUser, provider);
+        await refreshUserProfile();
+        return { success: true };
+    } catch(error) {
+        const authError = error as AuthError;
+        let userFriendlyError = { ...authError, message: "Ocurrió un error desconocido durante la vinculación con Facebook." };
+        
+        if (authError.code === 'auth/credential-already-in-use') {
+            userFriendlyError.message = "Esta cuenta de Facebook ya está vinculada a otro usuario de la plataforma.";
+        } else if(authError.code === 'auth/popup-closed-by-user') {
+            userFriendlyError.message = "La ventana de vinculación fue cerrada antes de completarse.";
+        }
+
+        console.error("Link Facebook Account Error:", authError.code, authError.message);
+        return { success: false, error: userFriendlyError };
     }
-  }, []);
+  }, [currentUser, refreshUserProfile]);
 
   const value = useMemo(() => ({
     currentUser,
@@ -273,7 +310,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loginWithGoogle,
     loginWithFacebook,
     linkGoogleAccount,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, linkGoogleAccount]);
+    linkFacebookAccount,
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, loginWithFacebook, linkGoogleAccount, linkFacebookAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
