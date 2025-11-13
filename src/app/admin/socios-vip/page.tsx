@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
 import { Star, PlusCircle, Download, Search, Edit, Trash2, Mail, Phone, Award, ShieldCheck, CalendarDays, Cake, Filter, Loader2, AlertTriangle, Info, MoreVertical } from "lucide-react";
-import type { SocioVipMember, SocioVipMemberFormData, QrClient, PlatformUser, InitialDataForSocioVipCreation } from "@/lib/types";
+import type { SocioVipMember, SocioVipMemberFormData, QrClient, PlatformUser, InitialDataForSocioVipCreation, PlatformUserRole } from "@/lib/types";
 import { format, getMonth, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
+import { cn, anyToDate } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 
@@ -93,21 +93,10 @@ export default function AdminSocioVipPage() {
   const fetchSocioVipMembers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, "socioVipMembers"));
-      const fetchedMembers: SocioVipMember[] = querySnapshot.docs.map(docSnap => {
+      // 1. Fetch from socioVipMembers collection
+      const socioVipQuery = await getDocs(collection(db, "socioVipMembers"));
+      const fetchedMembers: SocioVipMember[] = socioVipQuery.docs.map(docSnap => {
         const data = docSnap.data();
-        
-        const toSafeISOString = (dateValue: any): string | undefined => {
-            if (!dateValue) return undefined;
-            if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
-            if (dateValue instanceof Date) return dateValue.toISOString();
-            if (typeof dateValue === 'string') {
-              const parsedDate = new Date(dateValue);
-              return isValid(parsedDate) ? parsedDate.toISOString() : undefined;
-            }
-            return undefined;
-        };
-
         return {
           id: docSnap.id,
           name: data.name,
@@ -122,11 +111,49 @@ export default function AdminSocioVipPage() {
           membershipStatus: data.membershipStatus || 'inactive',
           staticQrCodeUrl: data.staticQrCodeUrl,
           authUid: data.authUid,
-          joinDate: toSafeISOString(data.joinDate) || new Date().toISOString(),
-          dob: toSafeISOString(data.dob)
+          joinDate: anyToDate(data.joinDate)?.toISOString() || new Date().toISOString(),
+          dob: anyToDate(data.dob)?.toISOString()
         } as SocioVipMember;
       });
-      setMembers(fetchedMembers);
+
+      // 2. Fetch from platformUsers with client roles
+      const clientRoles: PlatformUserRole[] = ['client_gratis', 'vip_premium'];
+      const platformUsersQuery = query(collection(db, "platformUsers"), where("roles", "array-contains-any", clientRoles));
+      const platformUsersSnap = await getDocs(platformUsersQuery);
+
+      const platformUserMembers: SocioVipMember[] = platformUsersSnap.docs.map(docSnap => {
+          const data = docSnap.data() as PlatformUser;
+          const nameParts = data.name.split(' ');
+          const surname = nameParts.length > 1 ? nameParts.slice(-1).join(' ') : '';
+          const name = nameParts.slice(0, -1).join(' ');
+
+          return {
+            id: docSnap.id, // Using doc ID as the unique key
+            authUid: data.uid,
+            dni: data.dni,
+            name: name || data.name, // Fallback if split fails
+            surname: surname,
+            email: data.email,
+            phone: data.phone || '',
+            dob: anyToDate(data.dob)?.toISOString(),
+            joinDate: anyToDate(data.lastLogin)?.toISOString() || new Date().toISOString(), // Using lastLogin as an approximation
+            membershipStatus: data.roles.includes('vip_premium') ? 'active' : 'active', // Could be more nuanced
+            loyaltyPoints: 0, // platformUsers don't have points
+          } as SocioVipMember;
+      });
+      
+      // 3. Combine and deduplicate
+      const allMembersMap = new Map<string, SocioVipMember>();
+      fetchedMembers.forEach(m => allMembersMap.set(m.dni, m)); // Legacy members take precedence
+      platformUserMembers.forEach(m => {
+          if (!allMembersMap.has(m.dni)) { // Add only if not already present from legacy collection
+              allMembersMap.set(m.dni, m);
+          }
+      });
+      
+      const combinedMembers = Array.from(allMembersMap.values());
+      
+      setMembers(combinedMembers);
     } catch (error: any) {
       console.error("Failed to fetch Socio VIP members:", error);
       toast({
@@ -170,7 +197,7 @@ export default function AdminSocioVipPage() {
     const rows = filteredMembers.map(mem => [
       mem.id, mem.name, mem.surname, mem.email, `'${mem.phone || "N/A"}`, `'${mem.dni}`,
       mem.dob && typeof mem.dob === 'string' ? format(parseISO(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
-      mem.loyaltyPoints, MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS],
+      mem.loyaltyPoints, MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa',
       mem.joinDate ? format(parseISO(mem.joinDate as string), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.address || "N/A", mem.profession || "N/A", mem.preferences?.join(', ') || "N/A"
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
@@ -361,8 +388,14 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
 
   const handleDeleteMember = async (member: SocioVipMember) => {
     if (isSubmitting) return;
+    if (!member.authUid) {
+      toast({ title: "Acción no Permitida", description: "Este usuario es un Socio VIP legado y no puede ser eliminado desde aquí.", variant: "destructive"});
+      return;
+    }
     setIsSubmitting(true);
     try {
+      // For now, only deleting from socioVipMembers collection is supported from here.
+      // Deleting from platformUsers would require a backend function call to delete the auth user.
       await deleteDoc(doc(db, "socioVipMembers", member.id));
       toast({ title: "Socio VIP Eliminado", description: `El socio "${member.name} ${member.surname}" ha sido eliminado.`, variant: "destructive" });
       fetchSocioVipMembers();
@@ -377,7 +410,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
         <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
           <Star className="h-8 w-8 text-primary !block" />
           Socios VIP
@@ -395,7 +427,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Socios VIP</CardTitle>
-          <CardDescription>Miembros exclusivos de la plataforma SocioVIP.</CardDescription>
+          <CardDescription>Miembros exclusivos de la plataforma SocioVIP, incluyendo membresías gratuitas y de pago.</CardDescription>
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 items-end">
             <div className="relative">
               <Label htmlFor="search-members">Buscar Socio</Label>
@@ -477,8 +509,8 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">Estado</span>
-                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS]}>
-                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS]}
+                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS] || 'default'}>
+                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa'}
                             </Badge>
                         </div>
                       </CardContent>
@@ -490,13 +522,13 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                                   </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuItem onClick={() => { setEditingMember(member); setVerifiedSocioDniResult(null); setShowCreateEditModal(true);}} disabled={isSubmitting}>
+                                <DropdownMenuItem onClick={() => { setEditingMember(member); setVerifiedSocioDniResult(null); setShowCreateEditModal(true);}} disabled={isSubmitting || !member.authUid}>
                                   <Edit className="h-4 w-4 mr-2" /> Editar
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground">
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground" disabled={!member.authUid}>
                                             <Trash2 className="h-4 w-4 mr-2" /> Eliminar
                                         </DropdownMenuItem>
                                     </AlertDialogTrigger>
@@ -544,8 +576,8 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                           <TableCell>{member.dob && typeof member.dob === 'string' ? format(parseISO(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
                           <TableCell>
-                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS]}>
-                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS]}
+                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS] || 'default'}>
+                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Activa'}
                             </Badge>
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">{member.joinDate && typeof member.joinDate === 'string' ? format(parseISO(member.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
@@ -560,7 +592,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting}>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || !member.authUid}>
                                   <Trash2 className="h-4 w-4" />
                                   <span className="sr-only">Eliminar</span>
                                 </Button>
@@ -756,5 +788,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     </div>
   );
 }
+
+    
 
     
