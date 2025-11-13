@@ -146,7 +146,7 @@ export default function SignupPage() {
 
 
   return (
-    <div className="relative min-h-screen bg-[#f4eef7] p-4 flex flex-col items-center justify-center">
+    <div className="relative min-h-screen bg-[#f4eef7] flex flex-col items-center justify-center p-4">
       <Link href="/" className="group absolute top-4 left-4 z-10">
         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text group-hover:opacity-90 transition-opacity">
           <ArrowLeft className="h-4 w-4 text-purple-800" />
