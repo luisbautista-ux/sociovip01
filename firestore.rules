@@ -21,9 +21,13 @@ service cloud.firestore {
       return isSignedIn() && 'business_admin' in getUserData().roles && getUserData().businessId == businessId;
     }
 
+    function isStaff(businessId) {
+      return isSignedIn() && 'staff' in getUserData().roles && getUserData().businessId == businessId;
+    }
+
     // --- Reglas por Colección ---
 
-    // Perfiles de Usuario
+    // Perfiles de Usuario de la Plataforma
     match /platformUsers/{userId} {
       // El SuperAdmin puede hacer todo.
       allow read, write: if isSuperAdmin();
@@ -31,7 +35,7 @@ service cloud.firestore {
       // Los usuarios autenticados pueden leer su propio perfil.
       allow get: if isSignedIn() && request.auth.uid == userId;
 
-      // Los usuarios (promotores, clientes) pueden actualizar su propio nombre, teléfono y foto.
+      // Los usuarios pueden actualizar su propio nombre, teléfono y foto.
       allow update: if isSignedIn() && request.auth.uid == userId &&
                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL']);
     }
@@ -42,16 +46,18 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
     
-    // Entidades del Negocio (Promociones/Eventos)
+    // Entidades del Negocio (Promociones/Eventos): Lectura pública, escritura para miembros del negocio
     match /businessEntities/{entityId} {
       allow read: if true;
-      allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+      allow create: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
+      allow update: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
+      allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
     }
     
-    // Clientes QR: Creación pública, sin lectura/escritura directa.
+    // Clientes QR: Creación pública, sin lectura/escritura directa no autorizada.
     match /qrClients/{clientId} {
       allow create: if true;
-      allow read, write: if false; 
+      allow read, write: if false; // Por defecto denegado, la lectura se maneja por queries seguras
     }
 
     // Socios VIP: Gestión solo por SuperAdmin.
@@ -62,7 +68,7 @@ service cloud.firestore {
     // Vínculos de Promotores
     match /businessPromoterLinks/{linkId} {
       allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || (isSignedIn() && getUserData().roles.hasAny(['promoter']));
-      allow write: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+      allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
     }
     
     // Pagos de Promotores
