@@ -1,7 +1,7 @@
 
 import { type Metadata } from 'next';
 import BusinessPublicPageClient from '@/components/business/BusinessPublicPageClient';
-import { admin } from '@/lib/firebase/firebaseAdmin'; // Importamos admin directamente
+import { admin } from '@/lib/firebase/firebaseAdmin';
 import type { Business, BusinessManagedEntity } from '@/lib/types';
 import { isEntityCurrentlyActivatable, anyToDate } from '@/lib/utils';
 import { LOGO_URL } from '@/components/icons';
@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     for (const doc of entitiesSnapshot.docs) {
         const entity = { id: doc.id, ...doc.data() } as BusinessManagedEntity;
         
-        // Ensure dates are strings for isEntityCurrentlyActivatable
+        // Ensure dates are converted correctly for isEntityCurrentlyActivatable
         entity.startDate = anyToDate(entity.startDate)?.toISOString() || new Date(0).toISOString();
         entity.endDate = anyToDate(entity.endDate)?.toISOString() || new Date().toISOString();
 
