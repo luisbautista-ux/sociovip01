@@ -1,7 +1,7 @@
 
 import { type Metadata } from 'next';
 import BusinessPublicPageClient from '@/components/business/BusinessPublicPageClient';
-import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
+import { admin } from '@/lib/firebase/firebaseAdmin'; // Importamos admin directamente
 import type { Business, BusinessManagedEntity } from '@/lib/types';
 import { isEntityCurrentlyActivatable, anyToDate } from '@/lib/utils';
 import { LOGO_URL } from '@/components/icons';
@@ -15,7 +15,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { customUrlPath } = params;
 
   try {
-    await initializeAdminApp();
     const adminDb = admin.firestore();
 
     // 1. Fetch the business data
@@ -41,6 +40,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     
     for (const doc of entitiesSnapshot.docs) {
         const entity = { id: doc.id, ...doc.data() } as BusinessManagedEntity;
+        
+        // Ensure dates are strings for isEntityCurrentlyActivatable
         entity.startDate = anyToDate(entity.startDate)?.toISOString() || new Date(0).toISOString();
         entity.endDate = anyToDate(entity.endDate)?.toISOString() || new Date().toISOString();
 
@@ -52,7 +53,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     // 3. Build metadata based on what was found
     if (latestActiveEntity) {
-      // Use the latest active entity's data
       const title = latestActiveEntity.name;
       const description = latestActiveEntity.description || `Descubre más en ${businessData.name}.`;
       const imageUrl = latestActiveEntity.imageUrl;

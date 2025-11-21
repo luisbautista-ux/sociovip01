@@ -1,31 +1,18 @@
 
 import admin from 'firebase-admin';
-import serviceAccount from '../../../serviceAccountKey.json';
 
-// This function ensures that Firebase Admin is initialized only once.
-export function initializeAdminApp() {
-  if (admin.apps.length > 0) {
-    return admin.apps[0] as admin.app.App;
-  }
-
+// Check if the app is already initialized to prevent errors
+if (!admin.apps.length) {
   try {
-    const typedServiceAccount = serviceAccount as admin.ServiceAccount;
-    
-    // Check if the essential properties exist to avoid runtime errors
-    if (!typedServiceAccount.project_id || !typedServiceAccount.private_key || !typedServiceAccount.client_email) {
-      throw new Error("El archivo serviceAccountKey.json es inválido o está incompleto.");
-    }
-    
-    const app = admin.initializeApp({
-      credential: admin.credential.cert(typedServiceAccount),
-    });
-
+    // This will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment variable
+    // which should point to your serviceAccountKey.json file.
+    // Or, if not set, it might use other default credentials in a cloud environment.
+    admin.initializeApp();
     console.log("Firebase Admin SDK initialized successfully.");
-    return app;
-    
   } catch (error: any) {
-    console.error('Firebase Admin Init Error:', error.message);
-    throw new Error(`No se pudo inicializar el Firebase Admin SDK: ${error.message}`);
+    console.error("Firebase Admin Init Error from firebaseAdmin.ts:", error);
+    // We don't re-throw here to avoid breaking the app on module load,
+    // but the error will be logged. The functions using 'admin' will fail later.
   }
 }
 
