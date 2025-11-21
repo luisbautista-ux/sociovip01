@@ -1,30 +1,30 @@
 
 import type { Metadata } from "next";
-// Removed Geist imports as per new font instructions
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
+import { LOGO_URL } from "@/components/icons";
 
 export const metadata: Metadata = {
-  title: "sociovip",
-  description: "Dj Velmat || Dj Billy || Dj Yenpi",
+  title: "SocioVIP",
+  description: "Descubre las promociones y eventos más exclusivos.",
   openGraph: {
-    title: "sociovip",
-    description: "Dj Velmat || Dj Billy || Dj Yenpi",
+    title: "SocioVIP",
+    description: "Descubre las promociones y eventos más exclusivos.",
     images: [
       {
-        url: "https://i.ibb.co/HLwH0pSq/hallo.jpg",
-        width: 1200,
-        height: 630,
-        alt: "sociovip",
+        url: LOGO_URL,
+        width: 512,
+        height: 512,
+        alt: "Logo de SocioVIP",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "sociovip",
-    description: "Dj Velmat || Dj Billy || Dj Yenpi",
-    images: ["https://i.ibb.co/HLwH0pSq/hallo.jpg"],
+    title: "SocioVIP",
+    description: "Descubre las promociones y eventos más exclusivos.",
+    images: [LOGO_URL],
   },
 };
 
