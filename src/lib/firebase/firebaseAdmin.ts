@@ -1,17 +1,24 @@
 
 import admin from 'firebase-admin';
-import serviceAccount from '@/../serviceAccountKey.json';
 
-// Evita la reinicialización en entornos de desarrollo con recarga en caliente
+// Lee las credenciales directamente desde la variable de entorno
+// Se espera que esta variable contenga el JSON completo como un string
+const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+
 if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } catch (error) {
-    console.error('Firebase admin initialization error', error);
+  if (!serviceAccountString) {
+    console.error("La variable de entorno FIREBASE_SERVICE_ACCOUNT_JSON no está definida. La inicialización de Firebase Admin fallará en el servidor.");
+  } else {
+    try {
+      const serviceAccount = JSON.parse(serviceAccountString);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+    } catch (error) {
+      console.error('Error al parsear FIREBASE_SERVICE_ACCOUNT_JSON o al inicializar Firebase Admin:', error);
+    }
   }
 }
 
-// Exporta la instancia de administrador ya inicializada
+// Exporta la instancia de administrador ya inicializada (o un objeto vacío si falló)
 export { admin };
