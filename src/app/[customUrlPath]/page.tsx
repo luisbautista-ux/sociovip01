@@ -16,15 +16,22 @@ export async function generateMetadata(
 
   const { customUrlPath } = params;
 
+  // Si la ruta es 'pandoralounge', esta página no debe manejarla.
+  // La página estática dedicada en /app/pandoralounge/page.tsx se encargará.
+  if (customUrlPath === 'pandoralounge') {
+    return {
+      title: "Pandora Lounge | SocioVIP",
+      description: "Eventos y promociones en Pandora Lounge.",
+    };
+  }
+
   try {
-    // 1. Buscar el negocio por su customUrlPath
     const businessQuery = adminDb
       .collection('businesses')
       .where('customUrlPath', '==', customUrlPath)
       .limit(1);
     const businessSnap = await businessQuery.get();
 
-    // Si no se encuentra el negocio, devolver metadatos genéricos de SocioVIP
     if (businessSnap.empty) {
       return {
         title: "SocioVIP",
@@ -37,7 +44,6 @@ export async function generateMetadata(
     const business = businessDoc.data();
     const businessName = business.name || "Negocio";
 
-    // 2. Buscar el último evento activo para ese negocio, ordenado por fecha de creación descendente
     const eventsQuery = adminDb
       .collection('businessEntities')
       .where('businessId', '==', businessId)
@@ -55,12 +61,10 @@ export async function generateMetadata(
       business.logoUrl ||
       LOGO_IMAGE_URL;
 
-    // Asegurarse de que la URL sea absoluta
     const imageUrl = rawImage.startsWith("http")
       ? rawImage
       : `${BASE_URL}${rawImage}`;
       
-    // 3. Construir los metadatos con la información obtenida
     const title = lastEvent
       ? `${lastEvent.name} | ${businessName}`
       : `${businessName} | SocioVIP`;
@@ -69,7 +73,7 @@ export async function generateMetadata(
       || `Descubre los eventos y promociones de ${businessName}.`;
 
     return {
-      metadataBase: new URL("https://sociovip.app"),
+      metadataBase: new URL(BASE_URL),
       title,
       description,
       openGraph: {
@@ -90,7 +94,6 @@ export async function generateMetadata(
 
   } catch (error) {
     console.error(`Error generating metadata for /${customUrlPath}:`, error);
-    // Fallback en caso de error en la consulta
     return {
       title: "SocioVIP",
       description: "Descubre las promociones y eventos más exclusivos.",
@@ -98,7 +101,10 @@ export async function generateMetadata(
   }
 }
 
-// El componente de la página siempre renderiza el cliente.
 export default function BusinessPage({ params }: PageProps) {
+  if (params.customUrlPath === 'pandoralounge') {
+    // Renderiza el cliente, pero la metadata será manejada por la página estática.
+    return <BusinessPublicPageClient customUrlPath={params.customUrlPath} />;
+  }
   return <BusinessPublicPageClient customUrlPath={params.customUrlPath} />;
 }
