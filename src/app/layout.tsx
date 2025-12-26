@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
-// ✅ Se importa la constante de URL, no el componente.
-import { LOGO_IMAGE_URL } from "@/components/icons";
+// ✅ Se importa la constante de URL desde la nueva ubicación centralizada.
+import { LOGO_IMAGE_URL } from "@/lib/constants";
 
 export const metadata: Metadata = {
   title: "SocioVIP",

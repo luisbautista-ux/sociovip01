@@ -1,5 +1,9 @@
+
 // src/lib/constants.ts
 import type { GeneratedCode, SocioVipMember, PlatformUserRole } from "./types";
+
+// ✅ Se define la URL de la imagen como una constante de string aquí.
+export const LOGO_IMAGE_URL = "https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png";
 
 export const GENERATED_CODE_STATUS_TRANSLATIONS: Record<GeneratedCode['status'], string> = {
   available: "Disponible",
@@ -326,6 +330,7 @@ export const DEFAULT_COMMISSION_PER_CODE = 3;
     
 
     
+
 
 
 

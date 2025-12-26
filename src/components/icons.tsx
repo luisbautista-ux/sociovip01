@@ -3,8 +3,7 @@
 
 import Image, { type ImageProps } from "next/image";
 
-// ✅ Se define la URL de la imagen como una constante de string.
-export const LOGO_IMAGE_URL = "https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png";
+// Se mueve LOGO_IMAGE_URL a `src/lib/constants.ts` para evitar conflictos de importación en `layout.tsx`.
 
 type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
   size?: number;
@@ -13,7 +12,7 @@ type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
 
 /**
  * Logo de SocioVIP como componente de imagen.
- * Ahora usa la constante LOGO_IMAGE_URL.
+ * La URL ahora se gestiona centralmente en constants.ts.
  */
 export function SocioVipLogo({
   size = 28,
@@ -22,7 +21,7 @@ export function SocioVipLogo({
 }: SocioVipLogoProps) {
   return (
     <Image
-      src={LOGO_IMAGE_URL} // ✅ Se usa la constante de string.
+      src="https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png"
       alt="SocioVIP"
       width={size}
       height={size}
