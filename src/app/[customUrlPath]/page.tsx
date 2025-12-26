@@ -3,10 +3,8 @@ import BusinessPublicPageClient from '@/components/business/BusinessPublicPageCl
 import { adminDb } from '@/lib/firebase/firebaseAdmin';
 import { LOGO_IMAGE_URL } from '@/lib/constants';
 import type { Metadata } from 'next';
-import type { BusinessManagedEntity } from '@/lib/types';
 
-// ✅ AJUSTE CRÍTICO #2: Revalidación para asegurar que se obtenga el último evento.
-export const revalidate = 60; // Revalida la página y sus metadatos cada 60 segundos.
+export const revalidate = 60;
 
 interface PageProps {
   params: { customUrlPath: string };
@@ -50,7 +48,6 @@ export async function generateMetadata(
 
     const lastEvent = eventsSnap.empty ? null : eventsSnap.docs[0].data();
 
-    // ✅ AJUSTE CRÍTICO #1: La imagen debe ser una URL ABSOLUTA
     const BASE_URL = "https://sociovip.app";
     
     const rawImage =
@@ -72,21 +69,15 @@ export async function generateMetadata(
       || `Descubre los eventos y promociones de ${businessName}.`;
 
     return {
+      metadataBase: new URL("https://sociovip.app"),
       title,
       description,
       openGraph: {
         title,
         description,
-        url: `https://sociovip.app/${customUrlPath}`, // 🔴 CLAVE
-        type: 'website',                              // 🔴 CLAVE
-        images: [
-          {
-            url: imageUrl,
-            width: 1200,
-            height: 630,
-            alt: title,
-          },
-        ],
+        url: `/${customUrlPath}`,
+        type: 'website',
+        images: [imageUrl],
         locale: 'es_PE',
       },
       twitter: {
