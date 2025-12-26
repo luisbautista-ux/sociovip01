@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
-import { LOGO_URL } from "@/components/icons";
+// ✅ Se importa la constante de URL, no el componente.
+import { LOGO_IMAGE_URL } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "SocioVIP",
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
     description: "Descubre las promociones y eventos más exclusivos.",
     images: [
       {
-        url: LOGO_URL,
+        url: LOGO_IMAGE_URL, // ✅ Se usa el string de la URL.
         width: 512,
         height: 512,
         alt: "Logo de SocioVIP",
@@ -24,7 +25,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SocioVIP",
     description: "Descubre las promociones y eventos más exclusivos.",
-    images: [LOGO_URL],
+    images: [LOGO_IMAGE_URL], // ✅ Se usa el string de la URL.
   },
 };
 
