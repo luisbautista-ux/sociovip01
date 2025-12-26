@@ -21,6 +21,7 @@ export async function generateMetadata(
     const businessSnap = await businessQuery.get();
 
     if (businessSnap.empty) {
+      // Fallback si el negocio no se encuentra
       return {
         title: "Pandora Lounge | SocioVIP",
         description: "Promociones y eventos exclusivos en Pandora Lounge.",
@@ -44,6 +45,7 @@ export async function generateMetadata(
     const eventsSnap = await eventsQuery.get();
 
     if (eventsSnap.empty) {
+      // Fallback si no hay eventos
       return {
         title: `${businessName} | SocioVIP`,
         description: `Descubre las promociones y eventos de ${businessName}.`,
@@ -54,14 +56,14 @@ export async function generateMetadata(
     }
 
     const lastEvent = eventsSnap.docs[0].data() as BusinessManagedEntity;
-
-    // 3. Build and return the event metadata
     const eventImageUrl = lastEvent.imageUrl || businessData.logoUrl || LOGO_IMAGE_URL;
+
+    // 3. Build and return the event-specific metadata
     return {
-      title: lastEvent.name,
+      title: `${lastEvent.name} | ${businessName}`, // Título del evento
       description: lastEvent.description || `No te pierdas ${lastEvent.name} en ${businessName}.`,
       openGraph: {
-        title: lastEvent.name,
+        title: `${lastEvent.name} | ${businessName}`,
         description: lastEvent.description,
         images: [
           {
@@ -76,13 +78,14 @@ export async function generateMetadata(
       },
        twitter: {
         card: 'summary_large_image',
-        title: lastEvent.name,
+        title: `${lastEvent.name} | ${businessName}`,
         description: lastEvent.description,
         images: [eventImageUrl],
       },
     };
   } catch (error) {
     console.error('Error generating metadata for pandoralounge (static page):', error);
+    // Fallback en caso de error en la consulta
     return {
       title: "Pandora Lounge | SocioVIP",
       description: "Promociones y eventos exclusivos en Pandora Lounge.",
@@ -90,7 +93,7 @@ export async function generateMetadata(
   }
 }
 
-// This page component will render the client component responsible for the business page content.
+// Este componente renderiza el contenido de la página.
 export default function PandoraLoungePage() {
   return <BusinessPublicPageClient customUrlPath="pandoralounge" />;
 }

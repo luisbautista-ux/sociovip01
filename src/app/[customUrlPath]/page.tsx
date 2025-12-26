@@ -1,30 +1,24 @@
 
 import BusinessPublicPageClient from '@/components/business/BusinessPublicPageClient';
 import type { Metadata, ResolvingMetadata } from 'next';
-import { notFound } from 'next/navigation';
 
 interface PageProps {
   params: { customUrlPath: string };
 }
 
-// This metadata function now intentionally ignores 'pandoralounge'
-// as it's handled by its own static page.
+// Esta metadata es genérica y solo se aplicará a rutas que no sean 'pandoralounge'
 export async function generateMetadata(
   { params }: PageProps,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   
   if (params.customUrlPath === 'pandoralounge') {
-     // This case should not be hit if routing is correct, but as a fallback,
-     // we return generic metadata to avoid errors. The static page will be used instead.
-    return {
-        title: "SocioVIP",
-        description: "Descubre las promociones y eventos más exclusivos.",
-    };
+    // Devuelve metadatos vacíos para que Next.js no intente renderizar nada aquí.
+    // La página estática se encargará de los metadatos de pandoralounge.
+    return {};
   }
   
-  // For any other business, we can add dynamic logic here in the future
-  // For now, it returns generic metadata.
+  // Metadatos genéricos para cualquier otro negocio que no tenga una página estática.
   return {
     title: "SocioVIP",
     description: "Descubre las promociones y eventos más exclusivos.",
@@ -33,9 +27,12 @@ export async function generateMetadata(
 
 
 export default function BusinessPage({ params }: PageProps) {
-  // Prevent this dynamic route from handling the static 'pandoralounge' route
+  // Si la ruta es 'pandoralounge', no renderizamos nada aquí para permitir que 
+  // la página estática (pandoralounge/page.tsx) tome control total.
   if (params.customUrlPath === 'pandoralounge') {
-    notFound();
+    return null;
   }
+  
+  // Para cualquier otra URL, renderiza la página pública del negocio dinámicamente.
   return <BusinessPublicPageClient customUrlPath={params.customUrlPath} />;
 }
