@@ -5,6 +5,9 @@ import { LOGO_IMAGE_URL } from '@/lib/constants';
 import type { Metadata } from 'next';
 import type { BusinessManagedEntity } from '@/lib/types';
 
+// ✅ AJUSTE CRÍTICO #2: Revalidación para asegurar que se obtenga el último evento.
+export const revalidate = 60; // Revalida la página y sus metadatos cada 60 segundos.
+
 interface PageProps {
   params: { customUrlPath: string };
 }
@@ -23,8 +26,8 @@ export async function generateMetadata(
       .limit(1);
     const businessSnap = await businessQuery.get();
 
+    // Si no se encuentra el negocio, devolver metadatos genéricos de SocioVIP
     if (businessSnap.empty) {
-      // Si no se encuentra el negocio, devolver metadatos genéricos
       return {
         title: "SocioVIP",
         description: "Descubre las promociones y eventos más exclusivos.",
@@ -36,7 +39,7 @@ export async function generateMetadata(
     const business = businessDoc.data();
     const businessName = business.name || "Negocio";
 
-    // 2. Buscar el último evento para ese negocio
+    // 2. Buscar el último evento activo para ese negocio, ordenado por fecha de creación descendente
     const eventsQuery = adminDb
       .collection('businessEntities')
       .where('businessId', '==', businessId)
@@ -47,9 +50,20 @@ export async function generateMetadata(
 
     const lastEvent = eventsSnap.empty ? null : eventsSnap.docs[0].data();
 
-    // 3. Construir los metadatos
-    const imageUrl = lastEvent?.imageUrl || business.logoUrl || LOGO_IMAGE_URL;
+    // ✅ AJUSTE CRÍTICO #1: La imagen debe ser una URL ABSOLUTA
+    const BASE_URL = "https://sociosvip.app";
+    
+    const rawImage =
+      lastEvent?.imageUrl ||
+      business.logoUrl ||
+      LOGO_IMAGE_URL;
 
+    // Asegurarse de que la URL sea absoluta
+    const imageUrl = rawImage.startsWith("http")
+      ? rawImage
+      : `${BASE_URL}${rawImage}`;
+      
+    // 3. Construir los metadatos con la información obtenida
     const title = lastEvent
       ? `${lastEvent.name} | ${businessName}`
       : `${businessName} | SocioVIP`;
