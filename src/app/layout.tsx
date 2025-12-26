@@ -9,24 +9,6 @@ import { LOGO_IMAGE_URL } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "SocioVIP",
   description: "Descubre las promociones y eventos más exclusivos.",
-  openGraph: {
-    title: "SocioVIP",
-    description: "Descubre las promociones y eventos más exclusivos.",
-    images: [
-      {
-        url: LOGO_IMAGE_URL, // ✅ Se usa el string de la URL.
-        width: 512,
-        height: 512,
-        alt: "Logo de SocioVIP",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "SocioVIP",
-    description: "Descubre las promociones y eventos más exclusivos.",
-    images: [LOGO_IMAGE_URL], // ✅ Se usa el string de la URL.
-  },
 };
 
 export default function RootLayout({

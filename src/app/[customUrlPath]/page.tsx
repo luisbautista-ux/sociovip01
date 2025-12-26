@@ -51,7 +51,7 @@ export async function generateMetadata(
     const lastEvent = eventsSnap.empty ? null : eventsSnap.docs[0].data();
 
     // ✅ AJUSTE CRÍTICO #1: La imagen debe ser una URL ABSOLUTA
-    const BASE_URL = "https://sociosvip.app";
+    const BASE_URL = "https://sociovip.app";
     
     const rawImage =
       lastEvent?.imageUrl ||
@@ -77,6 +77,8 @@ export async function generateMetadata(
       openGraph: {
         title,
         description,
+        url: `https://sociovip.app/${customUrlPath}`, // 🔴 CLAVE
+        type: 'website',                              // 🔴 CLAVE
         images: [
           {
             url: imageUrl,
@@ -85,7 +87,6 @@ export async function generateMetadata(
             alt: title,
           },
         ],
-        type: 'website',
         locale: 'es_PE',
       },
       twitter: {

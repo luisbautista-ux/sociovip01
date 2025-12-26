@@ -194,7 +194,7 @@ export default function AdminUsersPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "sociosvip_usuarios_plataforma.csv");
+    link.setAttribute("download", "sociovip_usuarios_plataforma.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

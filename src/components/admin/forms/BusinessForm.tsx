@@ -196,7 +196,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
           <FormItem>
             <FormLabel>Ruta URL Personalizada (Slug)</FormLabel>
             <div className="flex items-center">
-              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociosvip.app/b/</span>
+              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociovip.app/b/</span>
               <FormControl>
                 <Input 
                   placeholder="mi-negocio-genial" 

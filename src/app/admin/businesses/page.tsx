@@ -106,7 +106,7 @@ export default function AdminBusinessesPage() {
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
       biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
       biz.managerName || "N/A", `'${biz.managerDni || "N/A"}`, 
-      biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : `sociosvip.app/business/${biz.id}`,
+      biz.customUrlPath ? `sociovip.app/b/${biz.customUrlPath}` : `sociovip.app/business/${biz.id}`,
       biz.logoUrl || "N/A", (biz.publicCoverImageUrls || []).join(', '), biz.slogan || "N/A",
       biz.publicContactEmail || "N/A", `'${biz.publicPhone || "N/A"}`, biz.publicAddress || "N/A",
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
@@ -120,7 +120,7 @@ export default function AdminBusinessesPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "sociosvip_negocios.csv");
+    link.setAttribute("download", "sociovip_negocios.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -345,7 +345,7 @@ export default function AdminBusinessesPage() {
                           ? `/b/${biz.customUrlPath.trim()}`
                           : `/business/${biz.id}`;
                         const displayUrl = biz.customUrlPath && biz.customUrlPath.trim() !== ""
-                          ? `sociosvip.app/b/${biz.customUrlPath.trim()}`
+                          ? `sociovip.app/b/${biz.customUrlPath.trim()}`
                           : `.../${biz.id.substring(0, 10)}...`;
 
                         return (

@@ -225,7 +225,7 @@ export default function AdminSocioVipPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "sociosvip_socios_vip.csv");
+    link.setAttribute("download", "sociovip_socios_vip.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

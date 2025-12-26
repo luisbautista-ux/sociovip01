@@ -5,7 +5,7 @@
 * [33m8552f62[m necesito implementar una funcionalidad en mi aplicación en React donde a
 * [33m4c792d6[m sigue lo mismo, no sé si revisas que los cambios se implementen correctamente, tengo la impresión que no implementas los cambios y por eso sigue igual
 * [33m2363511[m Te he explicado varias veces la diferencia entre códigos y QRS. Haré ultima explicación y por favor no vuelvas a cometer más errroes:
-* [33mecdd44d[m no logro entender porque en cada cambio cambias cosas que no he pedido. - Te dije en la página del negocio no debe ir logo ni nombre se SociosVIP y lo vueleves a poner. Ahí debe ir el logo y nombre del negocio. - En al bloque de sesión de usuario, decia Hola... y lo has sacado sin que te lo pida - Ese nombre grande del negocio no va eliminalo. - El ancho de la tarejeta, su input y boton debe ser igual que la pagina global
+* [33mecdd44d[m no logro entender porque en cada cambio cambias cosas que no he pedido. - Te dije en la página del negocio no debe ir logo ni nombre se sociovip y lo vueleves a poner. Ahí debe ir el logo y nombre del negocio. - En al bloque de sesión de usuario, decia Hola... y lo has sacado sin que te lo pida - Ese nombre grande del negocio no va eliminalo. - El ancho de la tarejeta, su input y boton debe ser igual que la pagina global
 * [33mf43af4f[m Los cambios solo estan en la pagina publica global, pero no en las pagina publica del negocio, corrige ello e implementa el flujo de "Obtener QR", recuerda que se llama "Generar QR"
 * [33me01d31e[m implementa lo de multiple roles
 * [33mf83ec84[m la generación de QR está implementada? estás usando alguna librería? lo menciono porque en la página que genera el QR solo esta una imagen de prueba, me aclaras esa duda por favor
