@@ -1,7 +1,8 @@
+
 'use server';
 
 import { NextResponse } from 'next/server';
-import { admin, initializeAdminApp } from '@/lib/firebase/firebaseAdmin';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import type { PlatformUser } from '@/lib/types';
 import { z } from 'zod';
@@ -18,7 +19,6 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     const idToken = authorizationHeader.split('Bearer ')[1];
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const uid = decodedToken.uid;
-    const adminDb = admin.firestore();
     const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
     if (!userDoc.exists) {
       throw new Error('Perfil del solicitante no encontrado.');
@@ -26,19 +26,25 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     return userDoc.data() as PlatformUser;
 }
 
-// ✅ Versión corregida: usa el endpoint actual (buscar_nombres)
-async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string } | null> {
+async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; fechaNacimiento: string | null }> {
+    let result = {
+        nombreCompleto: "",
+        nombres: null as string | null,
+        apellidoPaterno: null as string | null,
+        apellidoMaterno: null as string | null,
+        fechaNacimiento: null as string | null,
+    };
+
     try {
         const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
-        formNombres.append('company', '');
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', 'b8d55f5c4f'); // token estable (puede actualizarse si cambia)
+        formNombres.append('security', '6b5762d689');
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
-            headers: {
+            headers: { 
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
             },
@@ -46,34 +52,56 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         });
         
         if (responseNombres.ok) {
-            const data = await responseNombres.json();
-            if (data.success && data.data?.message) {
-                const lineas = data.data.message.split('\n');
-                let nombres = "";
-                let apellidoPaterno = "";
-                let apellidoMaterno = "";
-                lineas.forEach((linea: string) => {
-                    if (linea.startsWith("Nombres:")) nombres = linea.replace("Nombres:", "").trim();
-                    else if (linea.startsWith("Apellido Paterno:")) apellidoPaterno = linea.replace("Apellido Paterno:", "").trim();
-                    else if (linea.startsWith("Apellido Materno:")) apellidoMaterno = linea.replace("Apellido Materno:", "").trim();
+            const dataNombres = await responseNombres.json();
+            if (dataNombres.success && dataNombres.data?.message) {
+                const lines = dataNombres.data.message.split('\n');
+                lines.forEach((line: string) => {
+                    if (line.startsWith("Nombres:")) result.nombres = line.replace("Nombres:", "").trim();
+                    else if (line.startsWith("Apellido Paterno:")) result.apellidoPaterno = line.replace("Apellido Paterno:", "").trim();
+                    else if (line.startsWith("Apellido Materno:")) result.apellidoMaterno = line.replace("Apellido Materno:", "").trim();
                 });
-                const nombreCompleto = `${nombres} ${apellidoPaterno} ${apellidoMaterno}`.trim().replace(/\s+/g, ' ');
-                if (nombreCompleto) {
-                    return { nombreCompleto };
-                }
             }
         }
+
+        const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
+        const formFecha = new URLSearchParams();
+        formFecha.append('dni', dni);
+        formFecha.append('action', 'buscar_fecha');
+        formFecha.append('security', 'd65c3ae72d');
+
+        const responseFecha = await fetch(endpointFecha, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': 'https://dniperu.com/consultar-dni/',
+            },
+            body: formFecha.toString(),
+        });
+
+        if (responseFecha.ok) {
+            const dataFecha = await responseFecha.json();
+            if (dataFecha.success && dataFecha.data?.message) {
+                const lines = dataFecha.data.message.split('\n');
+                lines.forEach((line: string) => {
+                    if (line.startsWith("Fecha de Nacimiento:")) {
+                        result.fechaNacimiento = line.replace("Fecha de Nacimiento:", "").trim();
+                    }
+                });
+            }
+        }
+
+        result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
+
     } catch (e) {
-        console.warn("External DNI API call failed in get-client-name API route:", e);
+        console.error("Error fetching from external DNI API in get-client-name:", e);
     }
-    return null;
+    
+    return { nombreCompleto: result.nombreCompleto, fechaNacimiento: result.fechaNacimiento };
 }
+
 
 export async function GET(request: Request) {
   try {
-    await initializeAdminApp();
-    const adminDb = admin.firestore();
-
     const { searchParams } = new URL(request.url);
     const dni = searchParams.get('dni');
     const docType = searchParams.get('docType');
@@ -89,41 +117,28 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'No autenticado. Token no proporcionado.' }, { status: 401 });
     }
 
-    // Authenticate the caller (promoter)
     await getCallerProfile(authorization);
 
-    // --- Search in internal DB ---
-    // 1. qrClients
-    const qrClientQuery = adminDb.collection('qrClients').where('dni', '==', validatedDni).limit(1);
-    const qrClientSnap = await qrClientQuery.get();
-    if (!qrClientSnap.empty) {
-        const client = qrClientSnap.docs[0].data();
-        return NextResponse.json({
-            name: `${client.name} ${client.surname}`.trim(),
-            phone: client.phone || "No disponible",
-        });
-    }
-
-    // 2. socioVipMembers
-    const socioVipQuery = adminDb.collection('socioVipMembers').where('dni', '==', validatedDni).limit(1);
-    const socioVipSnap = await socioVipQuery.get();
-    if (!socioVipSnap.empty) {
-        const socio = socioVipSnap.docs[0].data();
-        return NextResponse.json({
-            name: `${socio.name} ${socio.surname}`.trim(),
-            phone: socio.phone || "No disponible",
-        });
-    }
-
-    // 3. If it's a DNI and not found internally, consult external API
-    if (validation.data.docType === 'dni') {
-        const externalData = await consultExternalDniApi(validatedDni);
-        if (externalData && externalData.nombreCompleto) {
-            return NextResponse.json({ name: externalData.nombreCompleto, phone: null });
+    const collectionsToSearch = ['qrClients', 'socioVipMembers'];
+    for (const collectionName of collectionsToSearch) {
+        const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', validatedDni).limit(1).get();
+        if (!querySnapshot.empty) {
+            const data = querySnapshot.docs[0].data();
+            const fullName = `${data.name} ${data.surname}`.trim();
+            const dobDate = data.dob?.toDate?.();
+            const fechaNacimiento = dobDate ? dobDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }) : null;
+            return NextResponse.json({ name: fullName, phone: data.phone || null, dob: fechaNacimiento });
         }
     }
 
-    return NextResponse.json({ name: null, phone: null });
+    if (validation.data.docType === 'dni') {
+        const externalData = await consultExternalDniApi(validatedDni);
+        if (externalData && externalData.nombreCompleto) {
+            return NextResponse.json({ name: externalData.nombreCompleto, phone: null, dob: externalData.fechaNacimiento });
+        }
+    }
+
+    return NextResponse.json({ name: null, phone: null, dob: null });
 
   } catch (error: any) {
     console.error("API Route (get-client-name): Error:", error);

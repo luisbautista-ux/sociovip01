@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
+import { admin } from '@/lib/firebase/firebaseAdmin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import type { PlatformUser, PlatformUserRole } from '@/lib/types';
@@ -41,11 +41,10 @@ export async function POST(request: Request) {
   let adminDb;
   
   try {
-    await initializeAdminApp();
     adminAuth = admin.auth();
     adminDb = admin.firestore();
   } catch (error: any) {
-    console.error('API Route (create-staff): Firebase Admin initialization failed.', error);
+    console.error('API Route (create-staff): Firebase Admin services not available.', error);
     return NextResponse.json(
       { error: `Error de inicialización del servidor: ${error.message}` },
       { status: 500 }
@@ -103,7 +102,7 @@ export async function POST(request: Request) {
       name: firestoreData.name,
       email: firestoreData.email,
       roles: finalRoles,
-      businessId: callerProfile.businessId, // Correctly assign the businessId of the creator
+      businessId: callerProfile.businessId,
       lastLogin: FieldValue.serverTimestamp() as any,
     };
     

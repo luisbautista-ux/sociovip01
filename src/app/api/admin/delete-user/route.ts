@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
+import { admin } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import { headers } from 'next/headers';
 import { z } from 'zod';
@@ -11,7 +11,6 @@ const DeleteUserSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    await initializeAdminApp();
     const adminAuth = admin.auth();
     const adminDb = admin.firestore();
 
@@ -21,7 +20,6 @@ export async function POST(request: Request) {
     }
     const idToken = authorization.split('Bearer ')[1];
     
-    // Verify the token of the user making the request (the admin)
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     const callerUid = decodedToken.uid;
     
@@ -38,21 +36,17 @@ export async function POST(request: Request) {
     
     const { uidToDelete } = validation.data;
 
-    // Prevent a superadmin from deleting themselves via this endpoint
     if (callerUid === uidToDelete) {
         return NextResponse.json({ error: 'No puedes eliminar tu propia cuenta desde este panel.' }, { status: 400 });
     }
     
     const batch = adminDb.batch();
 
-    // 1. Delete from Firebase Authentication
     await adminAuth.deleteUser(uidToDelete);
 
-    // 2. Delete from Firestore 'platformUsers' collection
     const userProfileRef = adminDb.collection('platformUsers').doc(uidToDelete);
     batch.delete(userProfileRef);
 
-    // Commit the batch to execute all deletions
     await batch.commit();
 
     return NextResponse.json({ success: true, message: `Usuario con UID ${uidToDelete} eliminado exitosamente.` });

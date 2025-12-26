@@ -45,12 +45,13 @@ export async function POST(request: Request) {
   let adminDb;
 
   try {
-    await initializeAdminApp();
+    // La inicialización ahora se maneja de forma centralizada.
+    // Solo necesitamos las instancias de los servicios.
     adminAuth = admin.auth();
     adminDb = admin.firestore();
   } catch (error: any) {
     console.error(
-      'API Route (create-promoter): Firebase Admin initialization failed.',
+      'API Route (create-promoter): Firebase Admin services not available.',
       error
     );
     return NextResponse.json(

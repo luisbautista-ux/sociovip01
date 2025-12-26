@@ -4,7 +4,7 @@
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
 import {z} from 'zod';
-import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue} from 'firebase-admin/firestore';
@@ -23,7 +23,6 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
   const idToken = authorizationHeader.split('Bearer ')[1];
   const decodedToken = await getAuth().verifyIdToken(idToken);
   const uid = decodedToken.uid;
-  const adminDb = admin.firestore();
   const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
   if (!userDoc.exists) {
     throw new Error('Caller profile not found.');
@@ -31,7 +30,6 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
   return userDoc.data() as PlatformUser;
 }
 
-// Función auxiliar para obtener el valor de la comisión de un código específico.
 const getCommissionValueForCode = (entity: BusinessManagedEntity, code: GeneratedCode): number => {
     if (!code.generatedByUid) return 0;
     const promoterAssignment = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid);
@@ -42,16 +40,6 @@ const getCommissionValueForCode = (entity: BusinessManagedEntity, code: Generate
 
 
 export async function POST(request: Request) {
-  let adminDb;
-
-  try {
-    await initializeAdminApp();
-    adminDb = admin.firestore();
-  } catch (error: any) {
-    console.error('API Route (register-payment): Firebase Admin initialization failed.', error);
-    return NextResponse.json({error: `Error de inicialización del servidor: ${error.message}`}, {status: 500});
-  }
-
   try {
     const authorization = headers().get('Authorization');
     if (!authorization) {
@@ -94,7 +82,6 @@ export async function POST(request: Request) {
 
         const originalCodes = entityData.generatedCodes || [];
         
-        // Filtra y ordena los códigos elegibles para garantizar un orden de pago consistente
         const eligibleCodes = originalCodes
             .filter(code => 
                 code.generatedByUid === promoterUid &&

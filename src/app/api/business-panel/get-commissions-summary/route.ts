@@ -3,7 +3,7 @@
 
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
-import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import type {
   PlatformUser,
   BusinessManagedEntity,
@@ -22,7 +22,6 @@ async function getCallerProfile(
   const idToken = authorizationHeader.split('Bearer ')[1];
   const decodedToken = await getAuth().verifyIdToken(idToken);
   const uid = decodedToken.uid;
-  const adminDb = admin.firestore();
   const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
   if (!userDoc.exists) {
     throw new Error('Caller profile not found.');
@@ -55,22 +54,6 @@ const getCommissionValueForCode = (entity: BusinessManagedEntity, code: Generate
 
 
 export async function GET(request: Request) {
-  let adminDb;
-
-  try {
-    await initializeAdminApp();
-    adminDb = admin.firestore();
-  } catch (error: any) {
-    console.error(
-      'API Route (get-commissions): Firebase Admin initialization failed.',
-      error
-    );
-    return NextResponse.json(
-      {error: `Error de inicialización del servidor: ${error.message}`},
-      {status: 500}
-    );
-  }
-
   try {
     const authorization = headers().get('Authorization');
     if (!authorization) {
@@ -95,7 +78,7 @@ export async function GET(request: Request) {
     }
 
     if (!businessIds || businessIds.length === 0) {
-        return NextResponse.json([]); // Return empty array if no businesses to check
+        return NextResponse.json([]);
     }
 
     const [businessesSnapshot, entitiesSnapshot] = await Promise.all([
@@ -107,7 +90,6 @@ export async function GET(request: Request) {
     
     const allEntities = entitiesSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}) as BusinessManagedEntity);
     
-    // Create a map to hold aggregated commissions per promoter per entity
     const commissionAggregator: Record<string, PromoterCommissionEntry> = {};
 
     allEntities.forEach(entity => {
@@ -151,8 +133,6 @@ export async function GET(request: Request) {
             }
         }
         
-        // This logic to set the display rate is simplified. If multiple rates apply, it might show the last one.
-        // A more robust implementation would handle variable rates.
         const generalRule = (entity.assignedPromoters || []).find(p => p.promoterProfileId === code.generatedByUid)?.commissionRules?.find(r => r.appliesTo === 'event_general');
         if (generalRule) {
              commissionAggregator[commissionKey].commissionRateApplied = `S/ ${generalRule.commissionValue.toFixed(2)}`;
@@ -165,7 +145,6 @@ export async function GET(request: Request) {
       paymentStatus: entry.commissionPending > 0 ? 'Pendiente' : 'Pagado'
     })).filter(entry => entry.commissionPaid > 0 || entry.commissionPending > 0);
     
-    // Filter for promoter view if necessary
     if (isPromoter) {
         return NextResponse.json(commissionEntries.filter(c => c.promoterId === callerProfile.uid));
     }

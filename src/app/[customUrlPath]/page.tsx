@@ -1,7 +1,7 @@
 
 import { type Metadata } from 'next';
 import BusinessPublicPageClient from '@/components/business/BusinessPublicPageClient';
-import { admin } from '@/lib/firebase/firebaseAdmin';
+import { adminDb } from '@/lib/firebase/firebaseAdmin'; // Usar la instancia centralizada
 import type { Business, BusinessManagedEntity } from '@/lib/types';
 import { isEntityCurrentlyActivatable, anyToDate } from '@/lib/utils';
 import { LOGO_URL } from '@/components/icons';
@@ -15,8 +15,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { customUrlPath } = params;
 
   try {
-    const adminDb = admin.firestore();
-
     // 1. Fetch the business data
     const businessQuery = adminDb.collection('businesses').where('customUrlPath', '==', customUrlPath).limit(1);
     const businessSnapshot = await businessQuery.get();
@@ -39,15 +37,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     let latestActiveEntity: BusinessManagedEntity | null = null;
     
     for (const doc of entitiesSnapshot.docs) {
-        const entity = { id: doc.id, ...doc.data() } as BusinessManagedEntity;
-        
-        // Ensure dates are converted correctly for isEntityCurrentlyActivatable
-        entity.startDate = anyToDate(entity.startDate)?.toISOString() || new Date(0).toISOString();
-        entity.endDate = anyToDate(entity.endDate)?.toISOString() || new Date().toISOString();
+        // Directamente crea un objeto plano, no uses la clase aquí.
+        const entity = { 
+            id: doc.id,
+            ...doc.data(),
+            startDate: anyToDate(doc.data().startDate)?.toISOString(),
+            endDate: anyToDate(doc.data().endDate)?.toISOString(),
+        } as BusinessManagedEntity;
 
         if (isEntityCurrentlyActivatable(entity)) {
             latestActiveEntity = entity;
-            break; // Found the most recent active one
+            break;
         }
     }
 
@@ -97,7 +97,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   } catch (error) {
     console.error(`[generateMetadata] Error for ${customUrlPath}:`, error);
-    // Return generic metadata on error to prevent crashes
+    // ¡IMPORTANTE! Devolver siempre un objeto de metadatos válido, incluso en caso de error.
     return {
       title: "SocioVIP",
       description: "Descubre promociones y eventos exclusivos.",

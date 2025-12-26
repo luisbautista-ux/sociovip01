@@ -1,11 +1,11 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
+import { admin } from '@/lib/firebase/firebaseAdmin'; // Importa admin, no adminDb
 import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import type { PlatformUser, PlatformUserRole } from '@/lib/types';
 import { getAuth } from 'firebase-admin/auth';
-import { headers } from 'next/headers'; // Import headers
+import { headers } from 'next/headers';
 
 const CreateUserSchema = z.object({
   email: z.string().email(),
@@ -21,11 +21,11 @@ const CreateUserSchema = z.object({
   }),
 });
 
-// Helper function to verify the token and get user profile
 async function getCallerProfile(idToken: string) {
-    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const adminAuth = admin.auth(); // Obtiene auth desde la instancia de admin
+    const adminDb = admin.firestore(); // Obtiene firestore desde la instancia de admin
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
     const uid = decodedToken.uid;
-    const adminDb = admin.firestore();
     const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
     if (!userDoc.exists) {
         throw new Error('Caller profile not found.');
@@ -38,11 +38,11 @@ export async function POST(request: Request) {
   let adminDb;
   
   try {
-    const adminApp = await initializeAdminApp();
+    // La inicialización se maneja de forma centralizada
     adminAuth = admin.auth();
     adminDb = admin.firestore();
   } catch (error: any) {
-    console.error('API Route (create-user): Firebase Admin initialization failed.', error);
+    console.error('API Route (create-user): Firebase Admin services not available.', error);
     return NextResponse.json(
       { error: `Error de inicialización del servidor: ${error.message}` },
       { status: 500 }
@@ -50,11 +50,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const authorization = headers().get('Authorization'); // Get Authorization header
+    const authorization = headers().get('Authorization');
     if (!authorization || !authorization.startsWith('Bearer ')) {
         return NextResponse.json({ error: 'No autenticado. Token no proporcionado.' }, { status: 401 });
     }
-    const idToken = authorization.split('Bearer ')[1]; // Extract token
+    const idToken = authorization.split('Bearer ')[1];
     
     const callerProfile = await getCallerProfile(idToken);
     const callerIsSuperAdmin = callerProfile.roles.includes('superadmin');
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       roles: firestoreData.roles as PlatformUserRole[],
       businessId: firestoreData.businessId,
       businessIds: firestoreData.businessIds || [],
-      lastLogin: FieldValue.serverTimestamp() as any, // Use admin SDK FieldValue
+      lastLogin: FieldValue.serverTimestamp() as any,
     };
     
     await adminDb.collection('platformUsers').doc(userRecord.uid).set(userProfilePayload);

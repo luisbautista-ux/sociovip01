@@ -1,11 +1,10 @@
 
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
-import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import {anyToDate, isEntityCurrentlyActivatable} from '@/lib/utils';
 import type {BusinessManagedEntity, GeneratedCode, QrClient} from '@/lib/types';
 
-// Esquema para validar el cuerpo de la solicitud
 const RedeemCodeSchema = z.object({
   entityId: z.string().min(1),
   codeId: z.string().min(1),
@@ -23,9 +22,6 @@ const RedeemCodeSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    await initializeAdminApp();
-    const adminDb = admin.firestore();
-
     const body = await request.json();
     const validation = RedeemCodeSchema.safeParse(body);
 
@@ -38,7 +34,6 @@ export async function POST(request: Request) {
 
     const {entityId, codeId, dni, businessId, newClientData} = validation.data;
 
-    // Verificar si el cliente ya existe por DNI
     const qrClientsRef = adminDb.collection('qrClients');
     const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
     const clientSnapshot = await clientQuery.get();
@@ -48,11 +43,9 @@ export async function POST(request: Request) {
     let clientAction: 'userExists' | 'newUser' = 'userExists';
 
     if (!clientSnapshot.empty) {
-      // El cliente ya existe
       clientDoc = clientSnapshot.docs[0];
       clientData = clientDoc.data() as Omit<QrClient, 'id'>;
     } else if (newClientData) {
-      // Es un nuevo cliente y se proporcionaron datos para crearlo
       clientAction = 'newUser';
       clientData = {
         dni: dni,
@@ -66,11 +59,9 @@ export async function POST(request: Request) {
         generatedForEntityId: entityId,
       } as Omit<QrClient, 'id'>;
     } else {
-      // El cliente no existe, pero no se proporcionaron datos para crearlo
       return NextResponse.json({action: 'newUser'});
     }
 
-    // --- Transacción para actualizar la entidad y crear el cliente si es necesario ---
     const entityRef = adminDb.collection('businessEntities').doc(entityId);
 
     const finalClientData = await adminDb.runTransaction(async transaction => {
@@ -80,12 +71,10 @@ export async function POST(request: Request) {
       }
       const entityData = entityDoc.data() as BusinessManagedEntity;
 
-      // Validar si la entidad está activa
       if (!isEntityCurrentlyActivatable(entityData)) {
         throw new Error('Esta promoción o evento no está vigente.');
       }
 
-      // Validar si este DNI ya canjeó un código para esta entidad
       const dniAlreadyUsed = (entityData.generatedCodes || []).some(
         c => c.redeemedByInfo?.dni === dni
       );
@@ -105,7 +94,6 @@ export async function POST(request: Request) {
         throw new Error('Este código ya ha sido utilizado o no está disponible.');
       }
 
-      // Actualizar el código
       codes[codeIndex] = {
         ...codes[codeIndex],
         status: 'redeemed',
@@ -118,14 +106,12 @@ export async function POST(request: Request) {
 
       transaction.update(entityRef, {generatedCodes: codes});
 
-      // Crear o actualizar cliente
       let finalClientId: string;
       if (clientAction === 'newUser') {
         const newClientRef = qrClientsRef.doc();
         transaction.set(newClientRef, clientData);
         finalClientId = newClientRef.id;
       } else {
-        // El cliente ya existe, solo se actualiza su lista de negocios asociados
         transaction.update(clientDoc!.ref, {
           associatedBusinessIds:
             admin.firestore.FieldValue.arrayUnion(businessId),
@@ -133,7 +119,6 @@ export async function POST(request: Request) {
         finalClientId = clientDoc!.id;
       }
 
-      // Preparar los datos del cliente para devolverlos (convirtiendo Timestamps)
       const dobDate =
         clientData.dob instanceof admin.firestore.Timestamp
           ? clientData.dob.toDate()

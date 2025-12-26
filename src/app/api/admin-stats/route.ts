@@ -1,13 +1,11 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 
 export async function GET(request: Request) {
   try {
-    // Inicializa la app de admin
-    await initializeAdminApp();
-    // Obtiene la instancia de Firestore desde el SDK de admin
-    const adminDb = admin.firestore();
+    // La inicialización ahora se maneja de forma centralizada.
+    // adminDb ya está disponible para su uso.
     
     const [
       businessesSnap, 

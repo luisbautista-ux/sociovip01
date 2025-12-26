@@ -2,7 +2,7 @@
 'use server';
 
 import { NextResponse } from 'next/server';
-import { admin, initializeAdminApp } from '@/lib/firebase/firebaseAdmin';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import type { PlatformUser } from '@/lib/types';
 import { z } from 'zod';
@@ -11,8 +11,6 @@ const GetClientSchema = z.object({
     dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(20, "DNI/CE no debe exceder 20 caracteres."),
 });
 
-
-// Helper to get caller profile and ensure they are authenticated
 async function getCallerProfile(authorizationHeader: string): Promise<PlatformUser> {
     if (!authorizationHeader || !authorizationHeader.startsWith('Bearer ')) {
       throw new Error('No se proporcionó un token de autorización válido.');
@@ -20,7 +18,6 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     const idToken = authorizationHeader.split('Bearer ')[1];
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const uid = decodedToken.uid;
-    const adminDb = admin.firestore();
     const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
     if (!userDoc.exists) {
       throw new Error('Perfil del solicitante no encontrado.');
@@ -30,9 +27,6 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
 
 export async function GET(request: Request) {
   try {
-    await initializeAdminApp();
-    const adminDb = admin.firestore();
-
     const { searchParams } = new URL(request.url);
     const dni = searchParams.get('dni');
     
@@ -46,15 +40,12 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'No autenticado. Token no proporcionado.' }, { status: 401 });
     }
 
-    // Authenticate the caller (e.g., business admin)
     const caller = await getCallerProfile(authorization);
     const isBusinessUser = caller.roles.includes('business_admin') || caller.roles.includes('staff');
     if (!isBusinessUser) {
         return NextResponse.json({ error: 'Permiso denegado.' }, { status: 403 });
     }
     
-    // --- Search in internal DB ---
-    // 1. qrClients
     const qrClientQuery = adminDb.collection('qrClients').where('dni', '==', validation.data.dni).limit(1);
     const qrClientSnap = await qrClientQuery.get();
     if (!qrClientSnap.empty) {
@@ -62,7 +53,6 @@ export async function GET(request: Request) {
         return NextResponse.json({ name: `${client.name} ${client.surname}`.trim(), source: 'qrClient' });
     }
 
-    // 2. socioVipMembers
     const socioVipQuery = adminDb.collection('socioVipMembers').where('dni', '==', validation.data.dni).limit(1);
     const socioVipSnap = await socioVipQuery.get();
     if (!socioVipSnap.empty) {
@@ -78,9 +68,9 @@ export async function GET(request: Request) {
     let errorMessage = error.message || 'Error interno del servidor.';
 
     if (errorMessage.includes('No se proporcionó un token') || errorMessage.includes('Perfil del solicitante no encontrado')) {
-        status = 403; // Forbidden
+        status = 403;
     } else if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
-        status = 401; // Unauthorized
+        status = 401;
         errorMessage = 'Token de sesión inválido o expirado.';
     }
     
