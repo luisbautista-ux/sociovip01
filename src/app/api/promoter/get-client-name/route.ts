@@ -6,7 +6,6 @@ import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import type { PlatformUser } from '@/lib/types';
 import { z } from 'zod';
-require('dotenv').config();
 
 const GetClientNameSchema = z.object({
     dni: z.string().min(7).max(20),

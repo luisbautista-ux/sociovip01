@@ -6,7 +6,6 @@ import { z } from 'zod';
 import type { PlatformUser, PlatformUserRole } from '@/lib/types';
 import { getAuth } from 'firebase-admin/auth';
 import { headers } from 'next/headers';
-require('dotenv').config();
 
 const CreateUserSchema = z.object({
   email: z.string().email(),

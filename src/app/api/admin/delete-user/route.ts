@@ -4,7 +4,6 @@ import { admin } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import { headers } from 'next/headers';
 import { z } from 'zod';
-require('dotenv').config();
 
 const DeleteUserSchema = z.object({
   uidToDelete: z.string().min(1, 'El UID del usuario a eliminar es requerido.'),

@@ -4,7 +4,6 @@ import {z} from 'zod';
 import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import {anyToDate, isEntityCurrentlyActivatable} from '@/lib/utils';
 import type {BusinessManagedEntity, GeneratedCode, QrClient} from '@/lib/types';
-require('dotenv').config();
 
 const RedeemCodeSchema = z.object({
   entityId: z.string().min(1),

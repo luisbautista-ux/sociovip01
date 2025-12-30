@@ -12,7 +12,6 @@ import type {
   PromoterCommissionEntry,
 } from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
-require('dotenv').config();
 
 async function getCallerProfile(
   authorizationHeader: string

@@ -3,6 +3,12 @@ require('dotenv').config();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ✅ Se asegura que la variable de entorno de las credenciales de Firebase Admin
+  // esté disponible en el entorno del servidor donde se ejecutan las API Routes.
+  env: {
+    FIREBASE_SERVICE_ACCOUNT_JSON: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+  },
+
   // ✅ Activa el modo estricto de React
   reactStrictMode: true,
 
