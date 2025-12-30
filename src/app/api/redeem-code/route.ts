@@ -24,15 +24,9 @@ const RedeemCodeSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    // ================== VERIFICACIÓN DE DIAGNÓSTICO MEJORADA ==================
     if (!adminDb) {
-      console.error("API Route (redeem-code): adminDb is not initialized. Check firebaseAdmin.ts and environment variables.");
-      return NextResponse.json(
-        { error: "Error Crítico del Servidor: La conexión a la base de datos no está disponible. Revisa la configuración de FIREBASE_SERVICE_ACCOUNT_JSON." },
-        { status: 500 }
-      );
+      throw new Error("Error Crítico del Servidor: La conexión a la base de datos no está disponible. Revisa la configuración de FIREBASE_SERVICE_ACCOUNT_JSON.");
     }
-    // =======================================================================
     
     const body = await request.json();
     const validation = RedeemCodeSchema.safeParse(body);
