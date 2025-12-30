@@ -1317,20 +1317,13 @@ export default function BusinessEventsPage() {
         <CreateCodesDialog
           open={showCreateCodesModal}
           onOpenChange={(isOpen) => { if(!isOpen) setSelectedEntityForCreatingCodes(null); setShowCreateCodesModal(isOpen);}}
-          entityName={selectedEntityForCreatingCodes.name}
-          entityId={selectedEntityForCreatingCodes.id!}
+          entity={selectedEntityForCreatingCodes}
           existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
           onCodesCreated={handleNewCodesCreated}
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
           currentUserRoles={userProfile.roles}
-          maxAttendance={
-            (selectedEntityForCreatingCodes.maxAttendance && selectedEntityForCreatingCodes.maxAttendance > 0)
-            ? selectedEntityForCreatingCodes.maxAttendance
-            : calculateMaxAttendance(selectedEntityForCreatingCodes.ticketTypes)
-          }
-          currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
         />
       )}
 

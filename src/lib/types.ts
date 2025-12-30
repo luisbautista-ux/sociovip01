@@ -165,6 +165,8 @@ export interface GeneratedCode {
   commissionGenerated?: number;
   commissionStatus?: CommissionStatus;
   paymentId?: string | null; // Links to a document in promoterPayments
+  ticketTypeId?: string;
+  ticketTypeName?: string;
 }
 
 export type CommissionRuleType = 'fixed' | 'percentage';

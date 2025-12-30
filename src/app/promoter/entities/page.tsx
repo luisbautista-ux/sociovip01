@@ -182,6 +182,8 @@ export default function PromoterEntitiesPage() {
                 ownerName: code.ownerName,
                 ownerDni: code.ownerDni,
                 ownerPhone: code.ownerPhone,
+                ticketTypeId: code.ticketTypeId,
+                ticketTypeName: code.ticketTypeName,
             }) as GeneratedCode));
             
             const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
@@ -513,16 +515,13 @@ export default function PromoterEntitiesPage() {
         <CreateCodesDialog
           open={showCreateCodesModal}
           onOpenChange={(isOpen) => { if(!isOpen) setSelectedEntityForCreatingCodes(null); setShowCreateCodesModal(isOpen);}}
-          entityName={selectedEntityForCreatingCodes.name}
-          entityId={selectedEntityForCreatingCodes.id!}
+          entity={selectedEntityForCreatingCodes}
           existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
           onCodesCreated={handleNewCodesCreated}
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
           currentUserRoles={userProfile.roles}
-          maxAttendance={selectedEntityForCreatingCodes.maxAttendance}
-          currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
         />
       )}
 

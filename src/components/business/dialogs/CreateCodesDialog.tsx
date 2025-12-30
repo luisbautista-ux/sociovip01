@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect, useMemo, useRef } from "react";
-import type { Business, GeneratedCode, PlatformUserRole } from "@/lib/types";
-import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info, Download } from "lucide-react";
+import type { Business, GeneratedCode, PlatformUserRole, BusinessManagedEntity, TicketType } from "@/lib/types";
+import { CheckCircle, Copy, PlusCircle, Loader2, AlertTriangle, Info, Download, Ticket } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormMessage, FormItem } from "@/components/ui/form";
@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { generateCodesPDF } from "@/lib/utils";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 function generateAlphanumericCode(length: number): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -28,95 +29,94 @@ function generateAlphanumericCode(length: number): string {
 interface CreateCodesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  entityName: string;
-  entityId: string;
+  entity: BusinessManagedEntity | null;
   onCodesCreated: (entityId: string, newCodes: GeneratedCode[], observation?: string, creatorUid?: string) => Promise<void>; 
   existingCodesValues: string[]; 
   isSubmittingMain?: boolean; 
   currentUserProfileName?: string;
   currentUserProfileUid?: string;
-  currentUserRoles?: PlatformUserRole[]; // Added roles
-  maxAttendance?: number;
-  currentCodeCount?: number;
+  currentUserRoles?: PlatformUserRole[];
 }
 
 export function CreateCodesDialog({ 
     open, 
     onOpenChange, 
-    entityName, 
-    entityId, 
+    entity,
     onCodesCreated,
     existingCodesValues,
     isSubmittingMain = false, 
     currentUserProfileName,
     currentUserProfileUid,
-    currentUserRoles = [], // Default to empty array
-    maxAttendance,
-    currentCodeCount = 0,
+    currentUserRoles = [],
 }: CreateCodesDialogProps) {
   const [numCodes, setNumCodes] = useState<number | string>(1);
   const [showSuccess, setShowSuccess] = useState(false);
   const [justCreatedCodes, setJustCreatedCodes] = useState<GeneratedCode[]>([]);
   const [isCreating, setIsCreating] = useState(false); 
   const { toast } = useToast();
-  const form = useForm(); // Create a dummy form context
+  const form = useForm();
   const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
+  const [selectedTicketTypeId, setSelectedTicketTypeId] = useState<string | undefined>(undefined);
 
   const canDownloadPdf = currentUserRoles.includes('business_admin') || currentUserRoles.includes('staff');
+  const isEventWithTickets = entity?.type === 'event' && entity.ticketTypes && entity.ticketTypes.length > 0;
 
   useEffect(() => {
     const fetchBusinessDetails = async () => {
-      if(open && entityId) {
-        const entityRef = doc(db, "businessEntities", entityId);
-        const entitySnap = await getDoc(entityRef);
-        if(entitySnap.exists()) {
-          const businessId = entitySnap.data().businessId;
-          if(businessId) {
-            const businessRef = doc(db, "businesses", businessId);
-            const businessSnap = await getDoc(businessRef);
-            if(businessSnap.exists()) {
-              setBusinessDetails({id: businessSnap.id, ...businessSnap.data()} as Business);
-            }
-          }
+      if(open && entity?.businessId) {
+        const businessRef = doc(db, "businesses", entity.businessId);
+        const businessSnap = await getDoc(businessRef);
+        if(businessSnap.exists()) {
+          setBusinessDetails({id: businessSnap.id, ...businessSnap.data()} as Business);
         }
       }
     };
     fetchBusinessDetails();
-  }, [open, entityId]);
-
+  }, [open, entity]);
 
   const maxCodesCanCreate = useMemo(() => {
-    if (maxAttendance && maxAttendance > 0) {
-      return Math.max(0, maxAttendance - currentCodeCount);
+    if (entity?.maxAttendance && entity.maxAttendance > 0) {
+      return Math.max(0, entity.maxAttendance - (entity.generatedCodes?.length || 0));
     }
-    return 50; // Default max per batch if no attendance limit
-  }, [maxAttendance, currentCodeCount]);
+    return 50; 
+  }, [entity]);
 
   useEffect(() => {
-    // Reset state only when the dialog is opened
     if (open) {
       setNumCodes(1);
       setShowSuccess(false);
       setJustCreatedCodes([]);
       setIsCreating(false);
+      setSelectedTicketTypeId(isEventWithTickets ? entity.ticketTypes?.[0]?.id : undefined);
     }
-  }, [open]);
+  }, [open, isEventWithTickets, entity]);
 
   const handleCreateCodes = async () => {
-    const numToCreate = Number(numCodes);
-    if (isNaN(numToCreate) || numToCreate < 1 || numToCreate > 50) { 
+    if (!entity) return;
+
+    if (isEventWithTickets && !selectedTicketTypeId) {
       toast({
-        title: "Cantidad inválida",
-        description: "Solo se permite crear 50 códigos a la vez.",
+        title: "Selección requerida",
+        description: "Por favor, selecciona un tipo de entrada para los códigos.",
         variant: "destructive",
       });
       return;
     }
 
-    if (maxAttendance && maxAttendance > 0 && (currentCodeCount + numToCreate > maxAttendance)) {
+    const numToCreate = Number(numCodes);
+    if (isNaN(numToCreate) || numToCreate < 1 || numToCreate > 50) { 
+      toast({
+        title: "Cantidad inválida",
+        description: "Solo se permite crear hasta 50 códigos a la vez.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (entity.maxAttendance && entity.maxAttendance > 0 && ((entity.generatedCodes?.length || 0) + numToCreate > entity.maxAttendance)) {
        toast({
         title: "Límite de Aforo Excedido",
-        description: `Solo puedes crear ${maxCodesCanCreate} código(s) más para no superar el aforo de ${maxAttendance}.`,
+        description: `Solo puedes crear ${maxCodesCanCreate} código(s) más para no superar el aforo de ${entity.maxAttendance}.`,
         variant: "destructive",
       });
       return;
@@ -126,6 +126,7 @@ export function CreateCodesDialog({
 
     const newCodesBatch: GeneratedCode[] = [];
     const currentAndNewCodes = new Set(existingCodesValues);
+    const selectedTicketType = entity.ticketTypes?.find(t => t.id === selectedTicketTypeId);
 
     for (let i = 0; i < numToCreate; i++) {
       let newCodeValue = generateAlphanumericCode(9); 
@@ -148,8 +149,8 @@ export function CreateCodesDialog({
 
       currentAndNewCodes.add(newCodeValue);
       newCodesBatch.push({
-        id: `code-${entityId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
-        entityId: entityId,
+        id: `code-${entity.id}-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
+        entityId: entity.id,
         value: newCodeValue,
         status: "available",
         generatedByName: currentUserProfileName || "Sistema",
@@ -159,17 +160,16 @@ export function CreateCodesDialog({
         redemptionDate: null, 
         redeemedByInfo: null, 
         isVipCandidate: false,
+        ticketTypeId: selectedTicketType?.id,
+        ticketTypeName: selectedTicketType?.name,
       });
     }
 
     try {
-        // Await the database operation
-        await onCodesCreated(entityId, newCodesBatch, undefined, currentUserProfileUid);
-        // On success, update the UI
+        await onCodesCreated(entity.id, newCodesBatch, undefined, currentUserProfileUid);
         setJustCreatedCodes(newCodesBatch);
         setShowSuccess(true);
     } catch (e) {
-        // onCodesCreated should handle its own errors/toasts
         console.error("Error passed up from onCodesCreated:", e);
     } finally {
         setIsCreating(false);
@@ -191,7 +191,7 @@ export function CreateCodesDialog({
     if (justCreatedCodes.length === 0 || !businessDetails) return;
     const businessUrl = businessDetails.customUrlPath
       ? `https://sociovip.app/${businessDetails.customUrlPath}`
-      : `https://sociovip.app/`;
+      : `https://sociovip.app/business/${entity?.businessId}`;
 
     generateCodesPDF(justCreatedCodes, businessDetails.name, businessUrl);
   };
@@ -200,7 +200,7 @@ export function CreateCodesDialog({
     onOpenChange(false); 
   };
 
-  const canCreateAnyCodes = !maxAttendance || maxAttendance === 0 || maxCodesCanCreate > 0;
+  const canCreateAnyCodes = !entity?.maxAttendance || entity.maxAttendance === 0 || maxCodesCanCreate > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,7 +210,7 @@ export function CreateCodesDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {showSuccess ? "Códigos Creados Exitosamente" : `Crear códigos para: ${entityName}`}
+            {showSuccess ? "Códigos Creados Exitosamente" : `Crear códigos para: ${entity?.name}`}
           </DialogTitle>
           {!showSuccess && (
             <DialogDescription>
@@ -222,16 +222,39 @@ export function CreateCodesDialog({
         {!showSuccess ? (
         <Form {...form}>
           <form className="space-y-4 py-4" onSubmit={(e) => { e.preventDefault(); handleCreateCodes(); }}>
-             {(maxAttendance ?? 0) > 0 && (
+             {(entity?.maxAttendance ?? 0) > 0 && (
                 <Alert variant={canCreateAnyCodes ? "default" : "destructive"}>
                     {canCreateAnyCodes ? <Info className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                     <AlertTitle>{canCreateAnyCodes ? "Información de Aforo" : "Aforo Completo"}</AlertTitle>
                     <DialogDescription>
-                    {canCreateAnyCodes ? `Este evento tiene un aforo de ${maxAttendance}. Actualmente hay ${currentCodeCount} códigos. Puedes crear hasta ${maxCodesCanCreate} más.` : `Ya se ha alcanzado el aforo máximo de ${maxAttendance} códigos para este evento.`}
+                    {canCreateAnyCodes ? `Este evento tiene un aforo de ${entity?.maxAttendance}. Actualmente hay ${entity?.generatedCodes?.length || 0} códigos. Puedes crear hasta ${maxCodesCanCreate} más.` : `Ya se ha alcanzado el aforo máximo de ${entity?.maxAttendance} códigos para este evento.`}
                     </DialogDescription>
                 </Alert>
              )}
             
+            {isEventWithTickets && (
+              <FormItem>
+                <Label htmlFor="ticketTypeSelect">
+                  Tipo de Entrada <span className="text-destructive">*</span>
+                </Label>
+                <Select value={selectedTicketTypeId} onValueChange={setSelectedTicketTypeId} disabled={isCreating || isSubmittingMain}>
+                  <SelectTrigger id="ticketTypeSelect">
+                    <SelectValue placeholder="Selecciona un tipo de entrada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {entity.ticketTypes?.map((ticket) => (
+                      <SelectItem key={ticket.id} value={ticket.id}>
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: ticket.color }}></div>
+                          {ticket.name} (S/ {ticket.cost.toFixed(2)})
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+
             <FormField
               control={form.control}
               name="numCodes"
@@ -265,6 +288,11 @@ export function CreateCodesDialog({
           <div className="py-6 text-center space-y-4">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
             <p className="text-lg font-medium">¡Has creado {justCreatedCodes.length} código(s)!</p>
+            {isEventWithTickets && (
+              <p className="text-sm text-muted-foreground">
+                Para el tipo de entrada: <span className="font-semibold">{entity?.ticketTypes?.find(t => t.id === selectedTicketTypeId)?.name}</span>
+              </p>
+            )}
             <div className="flex flex-col sm:flex-row sm:justify-center items-center gap-2">
               <Button onClick={handleCopyCreatedCodes} variant="outline" size="lg" className="w-full">
                 <Copy className="mr-2 h-4 w-4" /> Copiar códigos ({justCreatedCodes.length})
@@ -276,7 +304,7 @@ export function CreateCodesDialog({
               )}
             </div>
              <p className="text-sm text-muted-foreground">
-              Estos códigos se han añadido a '{entityName}'.
+              Estos códigos se han añadido a '{entity?.name}'.
             </p>
           </div>
         )}

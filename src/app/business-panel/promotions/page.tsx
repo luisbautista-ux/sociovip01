@@ -847,8 +847,7 @@ export default function BusinessPromotionsPage() {
             if (!isOpen) setSelectedEntityForCreatingCodes(null); 
             setShowCreateCodesModal(isOpen);
            }}
-          entityName={selectedEntityForCreatingCodes.name}
-          entityId={selectedEntityForCreatingCodes.id!}
+          entity={selectedEntityForCreatingCodes}
           existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
           onCodesCreated={handleNewCodesCreated}
           isSubmittingMain={isSubmitting}
