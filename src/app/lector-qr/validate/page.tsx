@@ -319,6 +319,9 @@ export default function LectorValidateQrPage() {
   };
 
   const { entity: foundEntity, code: foundCode, user: foundUser } = validationResult || {};
+  
+  // ✅ NUEVO: Busca el tipo de entrada correspondiente al código
+  const ticketType = foundEntity?.ticketTypes?.find(t => t.id === foundCode?.ticketTypeId);
 
   return (
     <div className="space-y-6">
@@ -401,9 +404,20 @@ export default function LectorValidateQrPage() {
 
                 <h3 className="text-xl font-semibold text-primary">{foundEntity.name}</h3>
                 <p className="text-sm text-muted-foreground">{foundEntity.description}</p>
+                
+                {/* ✅ CORREGIDO: Muestra el tipo de entrada si existe */}
+                {ticketType && (
+                  <div className="flex items-center space-x-2">
+                    <span className="font-semibold">Tipo de Entrada:</span>
+                    <Badge style={{ backgroundColor: ticketType.color || '#888' }} className="text-white text-xs">
+                      {ticketType.name}
+                    </Badge>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div><CalendarDays className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Vigencia:</strong> {anyToDate(foundEntity.startDate) ? format(anyToDate(foundEntity.startDate)!, "P", { locale: es }) : 'N/A'} - {anyToDate(foundEntity.endDate) ? format(anyToDate(foundEntity.endDate)!, "P", { locale: es }) : 'N/A'}</div>
-                  <div><Ticket className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Tipo:</strong> {foundEntity.type === "promotion" ? "Promoción" : "Evento"}</div>
+                  {!ticketType && <div><Ticket className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Tipo:</strong> {foundEntity.type === "promotion" ? "Promoción" : "Evento"}</div>}
                   {foundCode.redeemedByInfo && <div><User className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Cliente:</strong> {foundCode.redeemedByInfo.name} (DNI: {foundCode.redeemedByInfo.dni})</div>}
                   {foundCode.redemptionDate && <div><Clock className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Fecha de Canje (QR):</strong> {anyToDate(foundCode.redemptionDate) ? format(anyToDate(foundCode.redemptionDate)!, "Pp", { locale: es }) : 'N/A'}</div>}
                   {foundCode.usedByInfo && <div><UserCheck className="inline mr-1 h-4 w-4 text-muted-foreground" /> <strong>Validado por:</strong> {foundCode.usedByInfo.name}</div>}
