@@ -16,7 +16,7 @@ import { z } from "zod";
 import QRCode from 'qrcode';
 import type { BusinessManagedEntity, QrTemplateLayout } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, sanitizeObjectForFirestore } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { AVAILABLE_FONTS } from "@/lib/constants";
@@ -107,7 +107,9 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
     name: { x: 190, y: 450, size: 16, color: "#FFFFFF", fontFamily: "'Roboto', sans-serif" },
     dni: { x: 190, y: 470, size: 12, color: "#FFFFFF", fontFamily: "'Roboto', sans-serif" },
     promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF", fontFamily: "'Roboto', sans-serif" },
-    ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16, fontFamily: "'Roboto', sans-serif" },
+    ticketType: entity.type === 'event' 
+        ? { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16, fontFamily: "'Roboto', sans-serif" }
+        : undefined,
   };
 
   const form = useForm<TemplateFormValues>({
@@ -123,6 +125,9 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
   useEffect(() => {
     if (open && entity) {
       const initialLayout = { ...defaultLayout, ...entity.qrTemplateLayout };
+      if (entity.type !== 'event') {
+        delete initialLayout.ticketType;
+      }
       setTemplatePreview(entity.qrTemplateImageUrl || null);
       form.reset({ qrTemplateFile: null, qrTemplateLayout: initialLayout });
       const snapshot = {
@@ -442,7 +447,27 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
   };
 
   const handleSave = (values: TemplateFormValues) => {
-    onSave(entity.id, values.qrTemplateFile || null, values.qrTemplateLayout);
+    const { qrTemplateLayout, qrTemplateFile } = values;
+    
+    // Create a deep copy to avoid modifying the form state directly.
+    const layoutToSave: Partial<QrTemplateLayout> = JSON.parse(JSON.stringify(qrTemplateLayout));
+    
+    // If it's a promotion, ensure `ticketType` is not in the object to be saved.
+    if (entity.type === 'promotion') {
+        delete layoutToSave.ticketType;
+    }
+    
+    // Ensure all fontFamily fields are strings, not undefined.
+    // Use optional chaining for safety.
+    layoutToSave.name = { ...layoutToSave.name, fontFamily: layoutToSave.name?.fontFamily || "'Roboto', sans-serif" };
+    layoutToSave.dni = { ...layoutToSave.dni, fontFamily: layoutToSave.dni?.fontFamily || "'Roboto', sans-serif" };
+    layoutToSave.promoTitle = { ...layoutToSave.promoTitle, fontFamily: layoutToSave.promoTitle?.fontFamily || "'Roboto', sans-serif" };
+
+    if (layoutToSave.ticketType) {
+        layoutToSave.ticketType = { ...layoutToSave.ticketType, fontFamily: layoutToSave.ticketType.fontFamily || "'Roboto', sans-serif" };
+    }
+
+    onSave(entity.id, qrTemplateFile || null, sanitizeObjectForFirestore(layoutToSave) as QrTemplateLayout);
   };
   
   const handleAttemptClose = () => {
@@ -514,7 +539,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.x`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.y`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         
-                        {selectedElement === 'ticketType' ? (
+                        {selectedElement === 'ticketType' && entity.type === 'event' ? (
                             <>
                                 <FormField control={form.control} name={`qrTemplateLayout.ticketType.width`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Ancho</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl></FormItem>)}/>
                                 <FormField control={form.control} name={`qrTemplateLayout.ticketType.height`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Alto</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl></FormItem>)}/>
