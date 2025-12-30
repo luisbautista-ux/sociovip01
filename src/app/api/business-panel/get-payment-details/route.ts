@@ -1,5 +1,3 @@
-
-'use server';
 // This file is no longer needed as the logic is now handled client-side.
 // Deleting the file to avoid confusion and potential errors.
 

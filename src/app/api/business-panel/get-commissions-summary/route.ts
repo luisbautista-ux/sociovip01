@@ -1,6 +1,3 @@
-
-'use server';
-
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
 import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
