@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://firebasestorage.googleapis.com/v0/b/cloverpass.appspot.com/o/event-images%2F9g0IXZfAaoOCvkLJZuYL%2FQgKH2FVDQDPSD9RJZGDh%2F04%20abril%2025%20DJ%20Angello%20Traverso.png?alt=media&token=ef62ab69-48dc-42c2-a7d3-3faee0d5dafa",
+        url: "https://i.ibb.co/Y4yGhsyh/a-onuevo.png",
         width: 1200,
         height: 630,
         alt: "Fiesta de Año Nuevo en Pandora Lounge",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     title: "Fiesta Año Nuevo 2026",
     description: "DJ FEZZ | DJ CARRILLO | DJ NANDO | DJ LECCA",
     images: [
-      "https://firebasestorage.googleapis.com/v0/b/cloverpass.appspot.com/o/event-images%2F9g0IXZfAaoOCvkLJZuYL%2FQgKH2FVDQDPSD9RJZGDh%2F04%20abril%2025%20DJ%20Angello%20Traverso.png?alt=media&token=ef62ab69-48dc-42c2-a7d3-3faee0d5dafa",
+      "https://i.ibb.co/Y4yGhsyh/a-onuevo.png",
     ],
   },
 };

@@ -694,9 +694,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
             
             // --- Dibuja la pulsera del tipo de entrada ---
-            if (qrData.promotion.ticketType?.name) {
+            if (qrData.promotion.ticketType?.name && layout.ticketType) {
                 const ticketType = qrData.promotion.ticketType;
-                const ticketLayout = layout.ticketType || { x: 190, y: 530, width: 200, height: 30, textColor: '#FFFFFF', size: 16, fontFamily: 'Arial, sans-serif' };
+                const ticketLayout = layout.ticketType;
                 
                 const rectX = ticketLayout.x - (ticketLayout.width / 2);
                 const rectY = ticketLayout.y - (ticketLayout.height / 2);
@@ -1031,7 +1031,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
        <main className="flex-grow overflow-y-auto">
             <div className="max-w-7xl mx-auto w-full px-0 sm:px-6 lg:px-8 pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 mt-8 mb-8">
                     <div className="md:col-span-2">
                         <ImageCarousel
                           images={businessDetails.publicCoverImageUrls || []}
