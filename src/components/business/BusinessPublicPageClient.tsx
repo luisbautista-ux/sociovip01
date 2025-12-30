@@ -470,7 +470,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                         newQrClientForm.setValue('surname', surname || "");
                     } else if (apiData.nombres && apiData.apellidoPaterno) {
                         newQrClientForm.setValue('name', apiData.nombres || "");
-                        newQrClientForm.setValue('surname', `${apiData.apellidoPaterno || ''} ${apiData.apellidoMaterno || ''}`.trim());
+                        newQrClientForm.setValue('surname', `${''}${apiData.apellidoPaterno || ''} ${''}${apiData.apellidoMaterno || ''}`.trim());
                     }
 
                     if (apiData.fechaNacimiento) {
@@ -513,7 +513,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
              toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
         }
     } catch (e: any) {
-        toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
+        toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${''}${e.message}`, variant: "destructive" });
         resetQrFlow();
     } finally {
         setIsLoadingQrFlow(false);
@@ -615,7 +615,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           pixelRatio: 2,
         });
         const link = document.createElement('a');
-        link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
+        link.download = `SocioVIP_QR_${''}${qrData?.promotion.promoCode}.png`;
         link.href = dataUrl;
         link.click();
         toast({ title: "QR Guardado", description: "La imagen de la tarjeta se ha descargado." });
@@ -662,7 +662,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 margin: 1,
                 color: {
                   dark: layout.qr.color || '#000000',
-                  light: '#0000' // transparent
+                  light: '#0000' // Transparent background
                 }
             });
             const qrImage = new Image();
@@ -672,7 +672,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
             ctx.textAlign = 'center';
             
-            const fullName = `${qrData.user.name} ${qrData.user.surname}`;
+            const fullName = `${''}${qrData.user.name} ${''}${qrData.user.surname}`;
             let nameFontSize = layout.name.size || 16;
             ctx.font = `bold ${nameFontSize}px Arial`;
             ctx.fillStyle = layout.name.color || '#FFFFFF';
@@ -685,7 +685,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             
             ctx.font = `bold ${layout.dni.size || 12}px Arial`;
             ctx.fillStyle = layout.dni.color || '#FFFFFF';
-            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
+            ctx.fillText(`DNI/CE: ${''}${qrData.user.dni}`, layout.dni.x, layout.dni.y);
             
             let promoFontSize = layout.promoTitle.size || 14;
             ctx.font = `bold ${promoFontSize}px Arial`;
@@ -706,9 +706,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 const textY = ticketLayout.y + 6; // Ajuste vertical para centrar mejor
                 
                 ctx.fillStyle = ticketType.color || "#888888";
-                ctx.fillRect(rectX, rectY, ticketLayout.width, ticketLayout.height);
+                
+                ctx.beginPath();
+                ctx.roundRect(rectX, rectY, ticketLayout.width, ticketLayout.height, [10]); // Usar roundRect
+                ctx.fill();
 
-                ctx.font = `bold ${ticketLayout.size || 16}px Arial`;
+                ctx.font = `bold ${''}${ticketLayout.size || 16}px Arial`;
                 ctx.fillStyle = ticketLayout.textColor || "#FFFFFF";
                 ctx.textAlign = "center";
                 ctx.fillText(ticketType.name.toUpperCase(), ticketLayout.x, textY);
@@ -763,12 +766,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             name="specificCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel htmlFor={`specificCode-${entity.id}`} className="text-xs text-muted-foreground">
+                <FormLabel htmlFor={`specificCode-${''}${entity.id}`} className="text-xs text-muted-foreground">
                   Código Alfanumérico (9 dígitos) <span className="text-destructive">*</span>
                 </FormLabel>
                 <FormControl>
                   <Input
-                    id={`specificCode-${entity.id}`}
+                    id={`specificCode-${''}${entity.id}`}
                     placeholder="ABC123XYZ"
                     {...field}
                     onChange={(e) => field.onChange(normalizeCode(e.target.value))}
@@ -786,7 +789,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             size="sm"
             className="w-full h-9 text-white"
             style={{
-                backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`
+                backgroundImage: `linear-gradient(to right, ${''}${businessDetails?.primaryColor || '#B080D0'}, ${''}${businessDetails?.secondaryColor || '#8E5EA2'})`
             }}
             disabled={isLoadingQrFlow}
           >
@@ -904,7 +907,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         {businessDetails.logoUrl && (
                         <NextImage
                             src={businessDetails.logoUrl}
-                            alt={`${businessDetails.name} logo`}
+                            alt={`${''}${businessDetails.name} logo`}
                             width={40}
                             height={40}
                             className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
@@ -935,7 +938,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             {businessDetails.logoUrl && (
               <NextImage
                 src={businessDetails.logoUrl}
-                alt={`${businessDetails.name} logo`}
+                alt={`${''}${businessDetails.name} logo`}
                 width={40}
                 height={40}
                 className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
@@ -1109,7 +1112,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         <p className="font-semibold text-foreground mb-2">Información de Contacto</p>
                         {businessDetails.publicAddress && (<p>{businessDetails.publicAddress}</p>)}
                         {businessDetails.publicPhone && (<p>Teléfono: {businessDetails.publicPhone}</p>)}
-                        {businessDetails.publicContactEmail && (<p>Email: <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
+                        {businessDetails.publicContactEmail && (<p>Email: <a href={`mailto:${''}${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
                     </div>
                 </footer>
             ) : null}
@@ -1134,7 +1137,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             </UIDialogTitleComponent>
             <UIDialogDescriptionComponent>
               {currentStepInModal === "enterDni"
-                ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
+                ? `Para obtener tu QR para "${''}${activeEntityForQr?.name}".`
                 : "Necesitamos algunos datos para generar tu QR."}
             </UIDialogDescriptionComponent>
           </DialogHeader>
@@ -1230,7 +1233,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   </Button>
                   <Button type="submit" className="text-white font-bold shadow-lg" 
                     style={{
-                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                        backgroundImage: `linear-gradient(to right, ${''}${businessDetails.primaryColor || '#B080D0'}, ${''}${businessDetails.secondaryColor || '#8E5EA2'})`
                     }}
                     disabled={isLoadingQrFlow}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
@@ -1247,7 +1250,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         style={{
                             backgroundSize: '400% 400%',
                             animation: 'gradient-animation 15s ease infinite',
-                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
+                            backgroundImage: `linear-gradient(-45deg, ${''}${businessDetails.primaryColor}, ${''}${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
                         }}
                     >
                         <Loader2 className="h-8 w-8 animate-spin mb-3"/>
@@ -1387,7 +1390,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   </Button>
                   <Button type="submit" className="text-white font-bold shadow-lg" 
                     style={{
-                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                        backgroundImage: `linear-gradient(to right, ${''}${businessDetails.primaryColor || '#B080D0'}, ${''}${businessDetails.secondaryColor || '#8E5EA2'})`
                     }}
                     disabled={isLoadingQrFlow || isConsultingDni}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar y Generar QR"}
