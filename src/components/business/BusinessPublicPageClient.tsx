@@ -37,6 +37,7 @@ import type {
   QrCodeData,
   NewQrClientFormData,
   GeneratedCode,
+  TicketType
 } from "@/lib/types";
 import { format, isPast, parse } from "date-fns";
 import { es } from "date-fns/locale";
@@ -489,7 +490,8 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         } else if (result.action === 'userExists') {
             const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
             const clientForQr: QrClient = result.clientData;
-             const qrCodeDetails: QrCodeData["promotion"] = {
+            const ticketType = freshEntityData.ticketTypes?.find(t => t.id === validatedCodeObject.ticketTypeId);
+            const qrCodeDetails: QrCodeData["promotion"] = {
                 id: freshEntityData.id,
                 title: freshEntityData.name,
                 description: freshEntityData.description,
@@ -502,6 +504,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 termsAndConditions: freshEntityData.termsAndConditions,
                 qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
                 qrTemplateLayout: freshEntityData.qrTemplateLayout,
+                ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
             };
             setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
             setShowDniModal(false);
@@ -553,6 +556,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         
         const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
         const clientForQr: QrClient = result.clientData;
+        const ticketType = freshEntityData.ticketTypes?.find(t => t.id === validatedCodeObject.ticketTypeId);
         const qrCodeDetails: QrCodeData["promotion"] = {
             id: freshEntityData.id,
             title: freshEntityData.name,
@@ -566,6 +570,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             termsAndConditions: freshEntityData.termsAndConditions,
             qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
             qrTemplateLayout: freshEntityData.qrTemplateLayout,
+            ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
         };
   
         setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
@@ -944,6 +949,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 <Separator />
                 <div className="text-center">
                    <p className="font-semibold">{qrData.promotion.title}</p>
+                   {qrData.promotion.ticketType && (
+                     <div className="flex items-center justify-center gap-2 mt-1">
+                        <div style={{ backgroundColor: qrData.promotion.ticketType.color || '#ccc' }} className="w-3 h-3 rounded-full"></div>
+                        <p className="text-sm">{qrData.promotion.ticketType.name} (S/ {qrData.promotion.ticketType.cost.toFixed(2)})</p>
+                     </div>
+                   )}
                    <p className="text-xs text-muted-foreground">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
                 </div>
               </CardContent>

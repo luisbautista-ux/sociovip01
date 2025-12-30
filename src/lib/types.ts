@@ -3,6 +3,17 @@
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
 
+export interface TicketType {
+  id: string;
+  eventId: string; 
+  businessId: string;
+  name: string;
+  cost: number;
+  description?: string;
+  quantity?: number; 
+  color?: string; // Color para identificar el tipo de entrada
+}
+
 export interface PromotionDetails { 
   id: string;
   title: string;
@@ -16,6 +27,7 @@ export interface PromotionDetails {
   termsAndConditions?: string;
   qrTemplateImageUrl?: string;
   qrTemplateLayout?: QrTemplateLayout;
+  ticketType?: Pick<TicketType, 'name' | 'cost' | 'color'>; // ✅ AÑADIDO: Información del tipo de entrada
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'used' | 'expired';
@@ -187,17 +199,6 @@ export interface EventPromoterAssignment {
   promoterEmail?: string;
   commissionRules?: CommissionRule[];
   notes?: string;
-}
-
-export interface TicketType {
-  id: string;
-  eventId: string; 
-  businessId: string;
-  name: string;
-  cost: number;
-  description?: string;
-  quantity?: number; 
-  color?: string; // Color para identificar el tipo de entrada
 }
 
 export interface EventBox {
@@ -410,55 +411,6 @@ export interface DniEntryValues { // Para el input de DNI en varios flujos
   dni: string;
 }
 
-export interface PromoterCommissionEntry { 
-    id: string;
-    businessId: string;
-    businessName: string;
-    entityId: string;
-    entityName: string;
-    entityType: 'promotion' | 'event';
-    promoterId: string;
-    promoterName: string;
-    promoterCodesRedeemed: number; 
-    commissionRateApplied: string;
-    commissionPending: number;
-    commissionPaid: number;
-    paymentStatus: 'Pendiente' | 'Pagado';
-    period: string;
-    paymentId?: string | null;
-}
-
-export interface TicketTypeFormData {
-  name: string;
-  cost: number;
-  description?: string;
-  quantity?: number;
-  color?: string;
-}
-
-export interface EventBoxFormData {
-  name: string;
-  cost: number;
-  description?: string;
-  status: 'available' | 'reserved' | 'sold';
-  capacity?: number;
-  promoterName?: string;
-  ownerName?: string;
-  ownerDni?: string;
-  ownerPhone?: string;
-}
-
-export interface BatchBoxFormData {
-  prefix: string;
-  fromNumber: number;
-  toNumber: number;
-  cost: number;
-  capacity?: number;
-  description?: string;
-  status: 'available' | 'reserved' | 'sold';
-}
-
-// Para el flujo "DNI-primero"
 export interface InitialDataForPlatformUserCreation {
   dni: string;
   name?: string;
