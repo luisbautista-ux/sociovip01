@@ -2,7 +2,7 @@
 
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
-import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
+import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES, AVAILABLE_FONTS } from "./constants"; 
 
 export interface TicketType {
   id: string;
@@ -220,10 +220,10 @@ export interface EventBox {
 
 export interface QrTemplateLayout {
   qr: { x: number; y: number; size: number; color?: string; };
-  name: { x: number; y: number; size?: number; color?: string; };
-  dni: { x: number; y: number; size?: number; color?: string; };
-  promoTitle: { x: number; y: number; size?: number; color?: string; };
-  ticketType?: { x: number; y: number; width: number; height: number; textColor?: string; size?: number; };
+  name: { x: number; y: number; size?: number; color?: string; fontFamily?: string; };
+  dni: { x: number; y: number; size?: number; color?: string; fontFamily?: string; };
+  promoTitle: { x: number; y: number; size?: number; color?: string; fontFamily?: string; };
+  ticketType?: { x: number; y: number; width: number; height: number; textColor?: string; size?: number; fontFamily?: string; };
 }
 
 

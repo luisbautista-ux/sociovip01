@@ -73,6 +73,17 @@ export const BUSINESS_TYPES = [
   "Otro",
 ] as const;
 
+export const AVAILABLE_FONTS = [
+  { name: 'Roboto', value: "'Roboto', sans-serif" },
+  { name: 'Montserrat', value: "'Montserrat', sans-serif" },
+  { name: 'Oswald', value: "'Oswald', sans-serif" },
+  { name: 'Lato', value: "'Lato', sans-serif" },
+  { name: 'Playfair Display', value: "'Playfair Display', serif" },
+  { name: 'Bebas Neue', value: "'Bebas Neue', sans-serif" },
+  { name: 'Poppins', value: "'Poppins', sans-serif" },
+  { name: 'Arial', value: 'Arial, sans-serif' },
+] as const;
+
 
 // Ubigeo Data - Esta lista es un ejemplo y está incompleta.
 // DEBES REEMPLAZARLA con una lista completa y precisa para Perú.
@@ -330,6 +341,7 @@ export const DEFAULT_COMMISSION_PER_CODE = 3;
     
 
     
+
 
 
 

@@ -650,10 +650,10 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
             const layout = qrData.promotion.qrTemplateLayout || {
                 qr: { x: 190, y: 350, size: 80, color: '#000000' },
-                name: { x: 190, y: 450, size: 16, color: '#FFFFFF' },
-                dni: { x: 190, y: 470, size: 12, color: '#FFFFFF' },
-                promoTitle: { x: 190, y: 500, size: 14, color: '#FFFFFF' },
-                ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16 },
+                name: { x: 190, y: 450, size: 16, color: '#FFFFFF', fontFamily: 'Arial, sans-serif' },
+                dni: { x: 190, y: 470, size: 12, color: '#FFFFFF', fontFamily: 'Arial, sans-serif' },
+                promoTitle: { x: 190, y: 500, size: 14, color: '#FFFFFF', fontFamily: 'Arial, sans-serif' },
+                ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16, fontFamily: 'Arial, sans-serif' },
             };
 
             const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { 
@@ -671,38 +671,35 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             ctx.drawImage(qrImage, layout.qr.x - layout.qr.size / 2, layout.qr.y - layout.qr.size / 2, layout.qr.size, layout.qr.size);
 
             ctx.textAlign = 'center';
+            const maxWidth = canvas.width * 0.9;
             
+            // --- Dibuja Nombre ---
             const fullName = `${qrData.user.name} ${qrData.user.surname}`;
             let nameFontSize = layout.name.size || 16;
-            ctx.font = `bold ${nameFontSize}px Arial`;
+            ctx.font = `bold ${nameFontSize}px ${layout.name.fontFamily || 'Arial, sans-serif'}`;
             ctx.fillStyle = layout.name.color || '#FFFFFF';
-            const maxWidth = canvas.width * 0.9;
-            while(ctx.measureText(fullName).width > maxWidth && nameFontSize > 8) {
-                nameFontSize--;
-                ctx.font = `bold ${nameFontSize}px Arial`;
-            }
+            while(ctx.measureText(fullName).width > maxWidth && nameFontSize > 8) { nameFontSize--; ctx.font = `bold ${nameFontSize}px ${layout.name.fontFamily || 'Arial, sans-serif'}`; }
             ctx.fillText(fullName, layout.name.x, layout.name.y);
             
-            ctx.font = `bold ${layout.dni.size || 12}px Arial`;
+            // --- Dibuja DNI ---
+            ctx.font = `bold ${layout.dni.size || 12}px ${layout.dni.fontFamily || 'Arial, sans-serif'}`;
             ctx.fillStyle = layout.dni.color || '#FFFFFF';
             ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
             
+            // --- Dibuja Título de la Promoción ---
             let promoFontSize = layout.promoTitle.size || 14;
-            ctx.font = `bold ${promoFontSize}px Arial`;
+            ctx.font = `bold ${promoFontSize}px ${layout.promoTitle.fontFamily || 'Arial, sans-serif'}`;
             ctx.fillStyle = layout.promoTitle.color || '#FFFFFF';
-            while(ctx.measureText(qrData.promotion.title).width > maxWidth && promoFontSize > 8) {
-                promoFontSize--;
-                ctx.font = `bold ${promoFontSize}px Arial`;
-            }
+            while(ctx.measureText(qrData.promotion.title).width > maxWidth && promoFontSize > 8) { promoFontSize--; ctx.font = `bold ${promoFontSize}px ${layout.promoTitle.fontFamily || 'Arial, sans-serif'}`; }
             ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
             
+            // --- Dibuja la pulsera del tipo de entrada ---
             if (qrData.promotion.ticketType?.name) {
                 const ticketType = qrData.promotion.ticketType;
-                const ticketLayout = layout.ticketType || { x: 190, y: 530, width: 200, height: 30, textColor: '#FFFFFF', size: 16 };
+                const ticketLayout = layout.ticketType || { x: 190, y: 530, width: 200, height: 30, textColor: '#FFFFFF', size: 16, fontFamily: 'Arial, sans-serif' };
                 
                 const rectX = ticketLayout.x - (ticketLayout.width / 2);
                 const rectY = ticketLayout.y - (ticketLayout.height / 2);
-                const textY = ticketLayout.y;
                 const borderRadius = ticketLayout.height / 2;
                 
                 ctx.fillStyle = ticketType.color || "#888888";
@@ -710,13 +707,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 ctx.roundRect(rectX, rectY, ticketLayout.width, ticketLayout.height, borderRadius);
                 ctx.fill();
 
-                ctx.font = `bold ${ticketLayout.size || 16}px Arial`;
+                ctx.font = `bold ${ticketLayout.size || 16}px ${ticketLayout.fontFamily || 'Arial, sans-serif'}`;
                 ctx.fillStyle = ticketLayout.textColor || "#FFFFFF";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText(ticketType.name.toUpperCase(), ticketLayout.x, textY);
+                ctx.fillText(ticketType.name.toUpperCase(), ticketLayout.x, ticketLayout.y);
             }
-
 
         } catch (error) {
             console.error("Error drawing on canvas:", error);

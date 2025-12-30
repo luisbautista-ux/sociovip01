@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Loader2, Upload, Move, Settings, RefreshCw, Grab, ImageIcon as ImageIconLucide, Ticket } from "lucide-react";
+import { Loader2, Upload, Move, Settings, RefreshCw, Grab, ImageIcon as ImageIconLucide, Ticket, Type } from "lucide-react";
 import NextImage from "next/image";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,6 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AVAILABLE_FONTS } from "@/lib/constants";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 const templateFormSchema = z.object({
@@ -34,18 +37,21 @@ const templateFormSchema = z.object({
       y: z.coerce.number(),
       size: z.coerce.number().optional(),
       color: z.string().optional(),
+      fontFamily: z.string().optional(),
     }),
     dni: z.object({
       x: z.coerce.number(),
       y: z.coerce.number(),
       size: z.coerce.number().optional(),
       color: z.string().optional(),
+      fontFamily: z.string().optional(),
     }),
     promoTitle: z.object({
       x: z.coerce.number(),
       y: z.coerce.number(),
       size: z.coerce.number().optional(),
       color: z.string().optional(),
+      fontFamily: z.string().optional(),
     }),
     ticketType: z.object({
       x: z.coerce.number(),
@@ -54,6 +60,7 @@ const templateFormSchema = z.object({
       height: z.coerce.number(),
       size: z.coerce.number().optional(),
       textColor: z.string().optional(),
+      fontFamily: z.string().optional(),
     }).optional(),
   }),
 });
@@ -97,10 +104,10 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
 
   const defaultLayout: QrTemplateLayout = {
     qr: { x: 190, y: 350, size: 80, color: "#000000" },
-    name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
-    dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
-    promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
-    ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16 },
+    name: { x: 190, y: 450, size: 16, color: "#FFFFFF", fontFamily: "'Roboto', sans-serif" },
+    dni: { x: 190, y: 470, size: 12, color: "#FFFFFF", fontFamily: "'Roboto', sans-serif" },
+    promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF", fontFamily: "'Roboto', sans-serif" },
+    ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16, fontFamily: "'Roboto', sans-serif" },
   };
 
   const form = useForm<TemplateFormValues>({
@@ -152,7 +159,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
       return { x1: el.x - halfSize, y1: el.y - halfSize, x2: el.x + halfSize, y2: el.y + halfSize, cx: el.x, cy: el.y };
     } else {
       const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Campaña";
-      ctx.font = `bold ${size}px Arial`;
+      ctx.font = `bold ${size}px ${el.fontFamily || 'Arial, sans-serif'}`;
       const textMetrics = ctx.measureText(text);
       const textWidth = textMetrics.width;
       const textHeight = size;
@@ -253,19 +260,23 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
           } else if (key === 'ticketType') {
             const rect = getElementRect(key, layout, ctx);
             ctx.fillStyle = "#8E5EA2"; // Example color for wristband
-            ctx.fillRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+            const borderRadius = rect.y2 - rect.y1 > 0 ? (rect.y2 - rect.y1) / 2 : 0;
+            ctx.beginPath();
+            ctx.roundRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1, borderRadius);
+            ctx.fill();
+
             if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
 
             ctx.fillStyle = config.textColor || '#FFFFFF';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             let fontSize = config.size || 16;
-            ctx.font = `bold ${fontSize}px Arial`;
+            ctx.font = `bold ${fontSize}px ${config.fontFamily || 'Arial, sans-serif'}`;
             const text = "EJEMPLO ENTRADA";
             const maxWidth = rect.x2 - rect.x1;
             while(ctx.measureText(text).width > maxWidth && fontSize > 8) {
               fontSize--;
-              ctx.font = `bold ${fontSize}px Arial`;
+              ctx.font = `bold ${fontSize}px ${config.fontFamily || 'Arial, sans-serif'}`;
             }
             ctx.fillText(text, config.x, config.y);
           } else if (key !== 'qr') {
@@ -273,12 +284,12 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
             ctx.textAlign = 'center';
             const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Campaña";
             let fontSize = config.size || (key === 'name' ? 16 : key === 'dni' ? 12 : 14);
-            ctx.font = `bold ${fontSize}px Arial`;
+            ctx.font = `bold ${fontSize}px ${config.fontFamily || 'Arial, sans-serif'}`;
             
             const maxWidth = canvas.width * 0.9;
             while (ctx.measureText(text).width > maxWidth && fontSize > 8) {
               fontSize--;
-              ctx.font = `bold ${fontSize}px Arial`;
+              ctx.font = `bold ${fontSize}px ${config.fontFamily || 'Arial, sans-serif'}`;
             }
             
             const rect = getElementRect(key, layout, ctx);
@@ -509,15 +520,19 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
                                 <FormField control={form.control} name={`qrTemplateLayout.ticketType.height`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Alto</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl></FormItem>)}/>
                                 <FormField control={form.control} name={`qrTemplateLayout.ticketType.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Texto</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl></FormItem>)}/>
                                 <FormField control={form.control} name={`qrTemplateLayout.ticketType.textColor`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color Texto</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#FFFFFF'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                <FormField control={form.control} name={`qrTemplateLayout.ticketType.fontFamily`} render={({ field }) => (<FormItem className="col-span-2"><FormLabel className="text-xs">Tipografía</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent>{AVAILABLE_FONTS.map(f => <SelectItem key={f.name} value={f.value} style={{fontFamily: f.value}}>{f.name}</SelectItem>)}</SelectContent></Select></FormItem>)}/>
                             </>
                         ) : (
-                            <div className="col-span-2 grid grid-cols-2 gap-4 items-center">
+                            <div className="col-span-2 grid grid-cols-2 gap-4 items-end">
                                 <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} value={field.value || ""} /></FormControl></FormItem>)}/>
                                 {selectedElement !== 'qr' && (
                                     <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#FFFFFF'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
                                 )}
                                 {selectedElement === 'qr' && (
                                      <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#000000'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                )}
+                                {selectedElement !== 'qr' && (
+                                  <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.fontFamily`} render={({ field }) => (<FormItem className="col-span-2"><FormLabel className="text-xs">Tipografía</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{AVAILABLE_FONTS.map(f => <SelectItem key={f.name} value={f.value} style={{fontFamily: f.value}}>{f.name}</SelectItem>)}</SelectContent></Select></FormItem>)}/>
                                 )}
                             </div>
                         )}
