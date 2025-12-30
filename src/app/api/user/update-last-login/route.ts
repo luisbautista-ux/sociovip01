@@ -5,6 +5,7 @@ import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { headers } from 'next/headers';
+require('dotenv').config();
 
 async function getUidFromToken(authorizationHeader: string): Promise<string> {
   if (!authorizationHeader.startsWith('Bearer ')) {

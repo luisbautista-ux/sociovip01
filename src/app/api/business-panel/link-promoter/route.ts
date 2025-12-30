@@ -9,6 +9,7 @@ import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser} from '@/lib/types';
 import {FieldValue} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
+require('dotenv').config();
 
 const LinkPromoterSchema = z.object({
   promoterUid: z.string().min(1, 'UID del promotor es requerido.'),

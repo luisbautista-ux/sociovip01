@@ -9,6 +9,7 @@ import {admin} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser} from '@/lib/types';
 import {FieldValue} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
+require('dotenv').config();
 
 const CreatePromoterSchema = z.object({
   email: z.string().email(),

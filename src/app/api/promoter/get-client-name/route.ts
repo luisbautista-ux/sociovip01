@@ -6,6 +6,7 @@ import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import type { PlatformUser } from '@/lib/types';
 import { z } from 'zod';
+require('dotenv').config();
 
 const GetClientNameSchema = z.object({
     dni: z.string().min(7).max(20),
@@ -26,6 +27,7 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     return userDoc.data() as PlatformUser;
 }
 
+// ✅ CORREGIDO: Ahora devuelve la fecha de nacimiento.
 async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; fechaNacimiento: string | null }> {
     let result = {
         nombreCompleto: "",
@@ -36,11 +38,12 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
     };
 
     try {
+        // --- 1. Fetch names ---
         const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formNombres = new URLSearchParams();
         formNombres.append('dni4', dni);
         formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '6b5762d689');
+        formNombres.append('security', '6b5762d689'); // Token para nombres
 
         const responseNombres = await fetch(endpointNombres, {
             method: 'POST',
@@ -63,11 +66,12 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
             }
         }
 
+        // --- 2. Fetch birth date ---
         const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
         const formFecha = new URLSearchParams();
         formFecha.append('dni', dni);
         formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', 'd65c3ae72d');
+        formFecha.append('security', 'd65c3ae72d'); // Token para fecha
 
         const responseFecha = await fetch(endpointFecha, {
             method: 'POST',
@@ -119,6 +123,7 @@ export async function GET(request: Request) {
 
     await getCallerProfile(authorization);
 
+    // --- 1. Search in internal DB ---
     const collectionsToSearch = ['qrClients', 'socioVipMembers'];
     for (const collectionName of collectionsToSearch) {
         const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', validatedDni).limit(1).get();
@@ -131,6 +136,7 @@ export async function GET(request: Request) {
         }
     }
 
+    // --- 2. If it's a DNI and not found internally, consult external API ---
     if (validation.data.docType === 'dni') {
         const externalData = await consultExternalDniApi(validatedDni);
         if (externalData && externalData.nombreCompleto) {

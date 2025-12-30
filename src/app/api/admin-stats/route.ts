@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
+require('dotenv').config();
 
 export async function GET(request: Request) {
   try {

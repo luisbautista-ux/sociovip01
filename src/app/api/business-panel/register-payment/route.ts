@@ -8,6 +8,7 @@ import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser, BusinessManagedEntity, GeneratedCode} from '@/lib/types';
 import {getAuth} from 'firebase-admin/auth';
 import {FieldValue} from 'firebase-admin/firestore';
+require('dotenv').config();
 
 const RegisterPaymentSchema = z.object({
   promoterUid: z.string().min(1, 'El UID del promotor es requerido.'),
