@@ -1,9 +1,11 @@
 
-import {NextResponse} from 'next/server';
-import {z} from 'zod';
-import { adminDb, admin } from '@/lib/firebase/firebaseAdmin';
-import {anyToDate, isEntityCurrentlyActivatable} from '@/lib/utils';
-import type {BusinessManagedEntity, GeneratedCode, QrClient} from '@/lib/types';
+'use server';
+
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
+import { anyToDate, isEntityCurrentlyActivatable } from '@/lib/utils';
+import type { BusinessManagedEntity, GeneratedCode, QrClient } from '@/lib/types';
 
 const RedeemCodeSchema = z.object({
   entityId: z.string().min(1),
@@ -22,17 +24,27 @@ const RedeemCodeSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    // ================== NUEVA VERIFICACIÓN DE DIAGNÓSTICO ==================
+    if (!adminDb) {
+      console.error("API Route (redeem-code): adminDb is not initialized. Check firebaseAdmin.ts and environment variables.");
+      return NextResponse.json(
+        { error: "Error Crítico del Servidor: La conexión a la base de datos no está disponible. Revisa la configuración de FIREBASE_SERVICE_ACCOUNT_JSON." },
+        { status: 500 }
+      );
+    }
+    // =======================================================================
+    
     const body = await request.json();
     const validation = RedeemCodeSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
-        {error: 'Datos inválidos.', details: validation.error.flatten()},
-        {status: 400}
+        { error: 'Datos inválidos.', details: validation.error.flatten() },
+        { status: 400 }
       );
     }
 
-    const {entityId, codeId, dni, businessId, newClientData} = validation.data;
+    const { entityId, codeId, dni, businessId, newClientData } = validation.data;
 
     const qrClientsRef = adminDb.collection('qrClients');
     const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
@@ -59,12 +71,12 @@ export async function POST(request: Request) {
         generatedForEntityId: entityId,
       } as Omit<QrClient, 'id'>;
     } else {
-      return NextResponse.json({action: 'newUser'});
+      return NextResponse.json({ action: 'newUser' });
     }
 
     const entityRef = adminDb.collection('businessEntities').doc(entityId);
 
-    const finalClientData = await adminDb.runTransaction(async transaction => {
+    const finalClientData = await adminDb.runTransaction(async (transaction) => {
       const entityDoc = await transaction.get(entityRef);
       if (!entityDoc.exists) {
         throw new Error(`La entidad (promoción/evento) no fue encontrada.`);
@@ -76,7 +88,7 @@ export async function POST(request: Request) {
       }
 
       const dniAlreadyUsed = (entityData.generatedCodes || []).some(
-        c => c.redeemedByInfo?.dni === dni
+        (c) => c.redeemedByInfo?.dni === dni
       );
       if (dniAlreadyUsed) {
         throw new Error(
@@ -85,7 +97,7 @@ export async function POST(request: Request) {
       }
 
       const codes = (entityData.generatedCodes || []) as GeneratedCode[];
-      const codeIndex = codes.findIndex(c => c.id === codeId);
+      const codeIndex = codes.findIndex((c) => c.id === codeId);
 
       if (codeIndex === -1) {
         throw new Error('El código del promotor no es válido.');
@@ -104,7 +116,7 @@ export async function POST(request: Request) {
         },
       };
 
-      transaction.update(entityRef, {generatedCodes: codes});
+      transaction.update(entityRef, { generatedCodes: codes });
 
       let finalClientId: string;
       if (clientAction === 'newUser') {
@@ -124,9 +136,10 @@ export async function POST(request: Request) {
           ? clientData.dob.toDate()
           : new Date();
       const regDate =
-        clientData.registrationDate instanceof admin.firestore.Timestamp
-          ? clientData.registrationDate.toDate()
-          : new Date();
+        clientData.registrationDate instanceof admin.firestore.FieldValue
+          ? new Date() // Approximate for immediate return
+          : (clientData.registrationDate instanceof admin.firestore.Timestamp ? clientData.registrationDate.toDate() : new Date());
+
 
       return {
         id: finalClientId,
@@ -141,10 +154,10 @@ export async function POST(request: Request) {
       clientData: finalClientData,
     });
   } catch (error: any) {
-    console.error('API Route (redeem-code): Error:', error);
+    console.error('API Route (redeem-code): Error detallado:', error);
     return NextResponse.json(
-      {error: error.message || 'Ocurrió un error interno.'},
-      {status: 500}
+      { error: error.message || 'Ocurrió un error interno del servidor.' },
+      { status: 500 }
     );
   }
 }
