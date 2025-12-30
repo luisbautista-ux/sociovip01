@@ -195,6 +195,7 @@ export interface TicketType {
   cost: number;
   description?: string;
   quantity?: number; 
+  color?: string; // Color para identificar el tipo de entrada
 }
 
 export interface EventBox {
@@ -429,7 +430,8 @@ export interface TicketTypeFormData {
   name: string;
   cost: number;
   description?: string;
-  quantity?: number; 
+  quantity?: number;
+  color?: string;
 }
 
 export interface EventBoxFormData {

@@ -440,7 +440,10 @@ const ManageEventDialog = ({
                                          <TableBody>
                                              {ticketTypes.map(ticket => (
                                                  <TableRow key={ticket.id}>
-                                                     <TableCell>{ticket.name}</TableCell>
+                                                     <TableCell className="flex items-center">
+                                                       <div className="w-4 h-4 rounded-full mr-2" style={{ backgroundColor: ticket.color || 'hsl(var(--muted))' }}></div>
+                                                       {ticket.name}
+                                                     </TableCell>
                                                      <TableCell>{ticket.cost.toFixed(2)}</TableCell>
                                                      <TableCell>{ticket.quantity || 'Ilimitadas'}</TableCell>
                                                      <TableCell className="text-right">
