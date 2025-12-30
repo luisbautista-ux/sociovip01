@@ -1,80 +1,43 @@
 import BusinessPublicPageClient from "@/components/business/BusinessPublicPageClient";
-import { db } from "@/lib/firebase";
-import { Business } from "@/lib/types";
-import { collection, getDocs, query, where, limit } from "firebase/firestore";
-import type { Metadata, ResolvingMetadata } from "next";
+import type { Metadata } from "next";
 
-export const revalidate = 60; // Revalidate every 60 seconds
+export const revalidate = 60;
+
+// Metadata estática para todas las páginas de negocio, optimizada para redes sociales.
+export const metadata: Metadata = {
+  title: "Fiesta Año Nuevo 2026",
+  description: "DJ FEZZ | DJ CARRILLO | DJ NANDO | DJ LECCA",
+  openGraph: {
+    title: "Fiesta Año Nuevo 2026",
+    description: "DJ FEZZ | DJ CARRILLO | DJ NANDO | DJ LECCA",
+    url: "https://sociovip.app", // URL genérica del sitio
+    type: "website",
+    images: [
+      {
+        url: "https://firebasestorage.googleapis.com/v0/b/cloverpass.appspot.com/o/event-images%2F9g0IXZfAaoOCvkLJZuYL%2FQgKH2FVDQDPSD9RJZGDh%2F04%20abril%2025%20DJ%20Angello%20Traverso.png?alt=media&token=ef62ab69-48dc-42c2-a7d3-3faee0d5dafa",
+        width: 1200,
+        height: 630,
+        alt: "Fiesta de Año Nuevo en Pandora Lounge",
+      },
+    ],
+    locale: "es_PE",
+    siteName: "SocioVIP",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Fiesta Año Nuevo 2026",
+    description: "DJ FEZZ | DJ CARRILLO | DJ NANDO | DJ LECCA",
+    images: [
+      "https://firebasestorage.googleapis.com/v0/b/cloverpass.appspot.com/o/event-images%2F9g0IXZfAaoOCvkLJZuYL%2FQgKH2FVDQDPSD9RJZGDh%2F04%20abril%2025%20DJ%20Angello%20Traverso.png?alt=media&token=ef62ab69-48dc-42c2-a7d3-3faee0d5dafa",
+    ],
+  },
+};
 
 type Props = {
   params: { customUrlPath: string };
 };
 
-export async function generateMetadata(
-  { params }: Props,
-  parent: ResolvingMetadata
-): Promise<Metadata> {
-  try {
-    const { customUrlPath } = params;
-
-    const businessQuery = query(
-      collection(db, "businesses"),
-      where("customUrlPath", "==", customUrlPath.toLowerCase()),
-      limit(1)
-    );
-
-    const businessSnapshot = await getDocs(businessQuery);
-
-    if (businessSnapshot.empty) {
-      return {
-        title: "Negocio no encontrado",
-        description: "La página de este negocio no está disponible.",
-      };
-    }
-
-    const businessData = businessSnapshot.docs[0].data() as Business;
-    const businessName = businessData.name || "Negocio en SocioVIP";
-    const businessSlogan = businessData.slogan || "Descubre promociones y eventos exclusivos.";
-    const businessCover = businessData.publicCoverImageUrls?.[0] || 'https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png';
-    const pageUrl = `https://sociovip.app/${customUrlPath}`;
-
-    return {
-      title: businessName,
-      description: businessSlogan,
-      metadataBase: new URL(pageUrl),
-      openGraph: {
-        title: businessName,
-        description: businessSlogan,
-        url: pageUrl,
-        siteName: 'SocioVIP',
-        images: [
-          {
-            url: businessCover,
-            width: 1200,
-            height: 630,
-            alt: `Portada de ${businessName}`,
-          },
-        ],
-        locale: 'es_PE',
-        type: 'website',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: businessName,
-        description: businessSlogan,
-        images: [businessCover],
-      },
-    };
-  } catch (error) {
-    console.error("Error generating metadata:", error);
-    // Fallback metadata in case of an error
-    return {
-      title: "SocioVIP",
-      description: "Tus mejores experiencias, en un solo lugar.",
-    };
-  }
-}
-
 export default function BusinessPage({ params }: Props) {
+  // La metadata es estática, pero la página sigue renderizando el contenido dinámico del negocio.
   return <BusinessPublicPageClient customUrlPath={params.customUrlPath} />;
 }
