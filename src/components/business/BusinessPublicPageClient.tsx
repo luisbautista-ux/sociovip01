@@ -661,8 +661,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 errorCorrectionLevel: 'H', 
                 margin: 1,
                 color: {
-                  dark: layout.qr.color || '#000000',
-                  light: '#0000' // Transparent background
+                  dark: layout.qr.color || "#000000",
+                  light: "#0000" // Transparent background
                 }
             });
             const qrImage = new Image();
@@ -1031,7 +1031,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
        <main className="flex-grow overflow-y-auto">
             <div className="max-w-7xl mx-auto w-full px-0 sm:px-6 lg:px-8 pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 mt-8 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 md:mt-8 mb-8">
                     <div className="md:col-span-2">
                         <ImageCarousel
                           images={businessDetails.publicCoverImageUrls || []}
