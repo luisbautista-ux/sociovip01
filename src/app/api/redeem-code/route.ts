@@ -1,6 +1,7 @@
+
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { adminDb, admin } from '@/lib/firebase/firebaseAdmin'; // Se importa 'admin' para usar FieldValue
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { anyToDate, isEntityCurrentlyActivatable } from '@/lib/utils';
 import type { BusinessManagedEntity, GeneratedCode, QrClient } from '@/lib/types';
 
@@ -39,36 +40,12 @@ export async function POST(request: Request) {
 
     const qrClientsRef = adminDb.collection('qrClients');
     const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
-    const clientSnapshot = await clientQuery.get();
-
-    let clientDoc;
-    let clientData: Omit<QrClient, 'id'>;
-    let clientAction: 'userExists' | 'newUser' = 'userExists';
-
-    if (!clientSnapshot.empty) {
-      clientDoc = clientSnapshot.docs[0];
-      clientData = clientDoc.data() as Omit<QrClient, 'id'>;
-    } else if (newClientData) {
-      clientAction = 'newUser';
-      clientData = {
-        dni: dni,
-        name: newClientData.name,
-        surname: newClientData.surname,
-        phone: newClientData.phone,
-        dob: admin.firestore.Timestamp.fromDate(new Date(newClientData.dob)),
-        registrationDate: admin.firestore.FieldValue.serverTimestamp(),
-        generatedForBusinessId: businessId,
-        associatedBusinessIds: [businessId],
-        generatedForEntityId: entityId,
-      } as Omit<QrClient, 'id'>;
-    } else {
-      return NextResponse.json({ action: 'newUser' });
-    }
-
-    const entityRef = adminDb.collection('businessEntities').doc(entityId);
-
+    
     const finalClientData = await adminDb.runTransaction(async (transaction) => {
+      const clientSnapshot = await transaction.get(clientQuery);
+      const entityRef = adminDb.collection('businessEntities').doc(entityId);
       const entityDoc = await transaction.get(entityRef);
+      
       if (!entityDoc.exists) {
         throw new Error(`La entidad (promoción/evento) no fue encontrada.`);
       }
@@ -96,7 +73,42 @@ export async function POST(request: Request) {
       if (codes[codeIndex].status !== 'available') {
         throw new Error('Este código ya ha sido utilizado o no está disponible.');
       }
+      
+      let clientDoc;
+      let clientData: Omit<QrClient, 'id'>;
+      let finalClientId: string;
+      let clientAction: 'userExists' | 'newUser' = 'userExists';
 
+      if (!clientSnapshot.empty) {
+        clientDoc = clientSnapshot.docs[0];
+        clientData = clientDoc.data() as Omit<QrClient, 'id'>;
+        finalClientId = clientDoc.id;
+
+        const currentAssociatedIds = clientData.associatedBusinessIds || [];
+        if (!currentAssociatedIds.includes(businessId)) {
+            transaction.update(clientDoc.ref, {
+                associatedBusinessIds: [...currentAssociatedIds, businessId]
+            });
+        }
+      } else if (newClientData) {
+        clientAction = 'newUser';
+        clientData = {
+          dni: dni,
+          name: newClientData.name,
+          surname: newClientData.surname,
+          phone: newClientData.phone,
+          dob: admin.firestore.Timestamp.fromDate(new Date(newClientData.dob)),
+          registrationDate: admin.firestore.Timestamp.now(), // Usar Timestamp ahora
+          generatedForBusinessId: businessId,
+          associatedBusinessIds: [businessId],
+        } as Omit<QrClient, 'id'>;
+        const newClientRef = qrClientsRef.doc();
+        transaction.set(newClientRef, clientData);
+        finalClientId = newClientRef.id;
+      } else {
+        return { action: 'newUser' }; // Devuelve un objeto para que el frontend pida más datos
+      }
+      
       codes[codeIndex] = {
         ...codes[codeIndex],
         status: 'redeemed',
@@ -109,41 +121,29 @@ export async function POST(request: Request) {
 
       transaction.update(entityRef, { generatedCodes: codes });
 
-      let finalClientId: string;
-      if (clientAction === 'newUser') {
-        const newClientRef = qrClientsRef.doc();
-        transaction.set(newClientRef, clientData);
-        finalClientId = newClientRef.id;
-      } else {
-        transaction.update(clientDoc!.ref, {
-          associatedBusinessIds:
-            admin.firestore.FieldValue.arrayUnion(businessId),
-        });
-        finalClientId = clientDoc!.id;
-      }
-
-      const dobDate =
-        clientData.dob instanceof admin.firestore.Timestamp
+      const dobDate = clientData.dob instanceof admin.firestore.Timestamp
           ? clientData.dob.toDate()
           : new Date();
-      const regDate =
-        clientData.registrationDate instanceof admin.firestore.FieldValue
-          ? new Date() // Approximate for immediate return
-          : (clientData.registrationDate instanceof admin.firestore.Timestamp ? clientData.registrationDate.toDate() : new Date());
-
-
+      const regDate = clientData.registrationDate instanceof admin.firestore.Timestamp
+          ? clientData.registrationDate.toDate()
+          : new Date();
+          
       return {
-        id: finalClientId,
-        ...clientData,
-        dob: dobDate.toISOString(),
-        registrationDate: regDate.toISOString(),
+        action: clientAction,
+        clientData: {
+          id: finalClientId,
+          ...clientData,
+          dob: dobDate.toISOString(),
+          registrationDate: regDate.toISOString(),
+        }
       };
     });
 
-    return NextResponse.json({
-      action: clientAction,
-      clientData: finalClientData,
-    });
+    if(finalClientData.action === 'newUser' && !finalClientData.clientData) {
+        return NextResponse.json({ action: 'newUser' });
+    }
+
+    return NextResponse.json(finalClientData);
   } catch (error: any) {
     console.error('API Route (redeem-code): Error detallado:', error);
     return NextResponse.json(
