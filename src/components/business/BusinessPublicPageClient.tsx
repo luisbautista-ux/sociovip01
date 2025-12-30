@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -927,7 +928,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           </div>
         </header>
          <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
-            <Card ref={cardRef} className="w-full max-w-sm shadow-xl rounded-xl">
+            <Card ref={cardRef} className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden">
               <CardHeader className="text-center pb-4">
                 <CardTitle className="text-xl font-bold">
                   {activeEntityForQr.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}
@@ -949,13 +950,15 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 <Separator />
                 <div className="text-center">
                    <p className="font-semibold">{qrData.promotion.title}</p>
-                   {qrData.promotion.ticketType && (
-                     <div className="flex items-center justify-center gap-2 mt-1">
-                        <div style={{ backgroundColor: qrData.promotion.ticketType.color || '#ccc' }} className="w-3 h-3 rounded-full"></div>
-                        <p className="text-sm">{qrData.promotion.ticketType.name} (S/ {qrData.promotion.ticketType.cost.toFixed(2)})</p>
-                     </div>
-                   )}
-                   <p className="text-xs text-muted-foreground">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
+                    {qrData.promotion.ticketType && (
+                        <div 
+                            className="inline-block text-white rounded-full px-4 py-1 mt-1 text-sm font-bold shadow-md"
+                            style={{ backgroundColor: qrData.promotion.ticketType.color || '#ccc' }}
+                        >
+                            {qrData.promotion.ticketType.name}
+                        </div>
+                    )}
+                   <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
