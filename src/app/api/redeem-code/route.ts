@@ -1,9 +1,10 @@
-
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { anyToDate, isEntityCurrentlyActivatable } from '@/lib/utils';
 import type { BusinessManagedEntity, GeneratedCode, QrClient } from '@/lib/types';
+import { Timestamp } from 'firebase-admin/firestore';
+
 
 const RedeemCodeSchema = z.object({
   entityId: z.string().min(1),
@@ -22,10 +23,6 @@ const RedeemCodeSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    if (!adminDb) {
-      throw new Error("Error Crítico del Servidor: La conexión a la base de datos no está disponible. Revisa la configuración de FIREBASE_SERVICE_ACCOUNT_JSON.");
-    }
-    
     const body = await request.json();
     const validation = RedeemCodeSchema.safeParse(body);
 
@@ -97,8 +94,8 @@ export async function POST(request: Request) {
           name: newClientData.name,
           surname: newClientData.surname,
           phone: newClientData.phone,
-          dob: admin.firestore.Timestamp.fromDate(new Date(newClientData.dob)),
-          registrationDate: admin.firestore.Timestamp.now(), // Usar Timestamp ahora
+          dob: Timestamp.fromDate(new Date(newClientData.dob)),
+          registrationDate: Timestamp.now(),
           generatedForBusinessId: businessId,
           associatedBusinessIds: [businessId],
         } as Omit<QrClient, 'id'>;
@@ -121,10 +118,10 @@ export async function POST(request: Request) {
 
       transaction.update(entityRef, { generatedCodes: codes });
 
-      const dobDate = clientData.dob instanceof admin.firestore.Timestamp
+      const dobDate = clientData.dob instanceof Timestamp
           ? clientData.dob.toDate()
           : new Date();
-      const regDate = clientData.registrationDate instanceof admin.firestore.Timestamp
+      const regDate = clientData.registrationDate instanceof Timestamp
           ? clientData.registrationDate.toDate()
           : new Date();
           
