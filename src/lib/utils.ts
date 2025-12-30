@@ -5,6 +5,8 @@ import type { BusinessManagedEntity, GeneratedCode, TicketType } from "./types";
 import { Timestamp, FieldValue } from "firebase/firestore";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
+import { format, parse } from "date-fns";
+import { es } from "date-fns/locale";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -39,11 +41,22 @@ export function anyToDate(value: any): Date | null {
 
   // ISO string or other string parsable by Date constructor
   if (typeof value === "string") {
-    const parsed = new Date(value);
-    // Check if parsing resulted in a valid date and is not a nonsensical year like 0001
-    if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 1900) {
-      return parsed;
+    // Soporte a dd/MM/yyyy o dd-MM-yyyy (con o sin hora)
+    const m = value.match(
+      /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+    );
+    if (m) {
+      const norm = value.replace(/-/g, "/");
+      const hasTime = !!m[4];
+      const pattern = hasTime ? "dd/MM/yyyy HH:mm:ss" : "dd/MM/yyyy";
+      const candidate = hasTime && norm.length === 16 ? `${norm}:00` : norm; // completa :ss si falta
+      const d = parse(candidate, pattern, new Date());
+      return isNaN(d.getTime()) ? null : d;
     }
+
+    // ISO u otros formatos que Date pueda entender
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
   }
 
   // Number (milliseconds since epoch)
@@ -55,6 +68,12 @@ export function anyToDate(value: any): Date | null {
   console.warn("anyToDate: Could not parse date value:", value);
   return null;
 }
+
+export function renderDate(value: any, fmt = "P p") {
+  const d = anyToDate(value);
+  return d ? format(d, fmt, { locale: es }) : "N/A";
+}
+
 
 export function isEntityCurrentlyActivatable(
   entity: BusinessManagedEntity | null | undefined

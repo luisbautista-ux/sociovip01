@@ -21,62 +21,10 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { cn, renderDate, anyToDate } from "@/lib/utils";
 import * as ExcelJS from "exceljs";
 
 /* ===================== Helpers de fecha (aceptan Timestamp/Date/string/number) ===================== */
-function anyToDate(value: any): Date | null {
-  if (!value) return null;
-
-  // Date nativa
-  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-
-  // Firestore: objetos con toDate()
-  if (typeof value?.toDate === "function") {
-    const d = value.toDate();
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // Firestore: objetos { seconds, nanoseconds }
-  if (typeof value?.seconds === "number") {
-    const ms = value.seconds * 1000 + Math.floor((value.nanoseconds ?? 0) / 1e6);
-    const d = new Date(ms);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // Número: milisegundos epoch
-  if (typeof value === "number") {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // String
-  if (typeof value === "string") {
-    // Soporte a dd/MM/yyyy o dd-MM-yyyy (con o sin hora)
-    const m = value.match(
-      /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-    );
-    if (m) {
-      const norm = value.replace(/-/g, "/");
-      const hasTime = !!m[4];
-      const pattern = hasTime ? "dd/MM/yyyy HH:mm:ss" : "dd/MM/yyyy";
-      const candidate = hasTime && norm.length === 16 ? `${norm}:00` : norm; // completa :ss si falta
-      const d = parse(candidate, pattern, new Date());
-      return isNaN(d.getTime()) ? null : d;
-    }
-
-    // ISO u otros formatos que Date pueda entender
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  return null;
-}
-
-function renderDate(value: any, fmt = "P p") {
-  const d = anyToDate(value);
-  return d ? format(d, fmt, { locale: es }) : "N/A";
-}
 
 // Evita warnings de hidratación en Next (fecha se calcula 100% en el cliente)
 const ClientSideFormattedDateTime = ({ value, fmt = "P p" }: { value: any; fmt?: string }) => {
