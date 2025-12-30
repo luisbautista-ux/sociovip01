@@ -100,6 +100,15 @@ const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) 
 });
 QrScanner.displayName = "QrScanner";
 
+// Componente para evitar error de hidratación con fechas
+const ClientSideDate = () => {
+  const [date, setDate] = React.useState('');
+  React.useEffect(() => {
+    setDate(format(new Date(), "eeee d 'de' MMMM", { locale: es }));
+  }, []);
+  return <>{date || "..."}</>;
+};
+
 
 export default function LectorValidateQrPage() {
   const [scannedCodeId, setScannedCodeId] = React.useState("");
@@ -428,7 +437,7 @@ export default function LectorValidateQrPage() {
       <Card className="mt-8">
         <CardHeader>
           <CardTitle>Promociones y Eventos Disponibles</CardTitle>
-          <CardDescription>Actividades vigentes para {format(new Date(), "eeee d 'de' MMMM", {locale: es})}</CardDescription>
+          <CardDescription>Actividades vigentes para <ClientSideDate /></CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           
