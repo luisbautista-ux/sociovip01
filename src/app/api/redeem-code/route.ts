@@ -1,7 +1,7 @@
 
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
-import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
+import { adminDb, admin } from '@/lib/firebase/firebaseAdmin';
 import {anyToDate, isEntityCurrentlyActivatable} from '@/lib/utils';
 import type {BusinessManagedEntity, GeneratedCode, QrClient} from '@/lib/types';
 
