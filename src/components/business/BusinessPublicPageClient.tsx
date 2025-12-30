@@ -653,6 +653,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 name: { x: 190, y: 450, size: 16, color: '#FFFFFF' },
                 dni: { x: 190, y: 470, size: 12, color: '#FFFFFF' },
                 promoTitle: { x: 190, y: 500, size: 14, color: '#FFFFFF' },
+                ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF" }
             };
 
             const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { 
@@ -694,6 +695,25 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 ctx.font = `bold ${promoFontSize}px Arial`;
             }
             ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
+            
+            // --- Dibuja la pulsera del tipo de entrada ---
+            if (qrData.promotion.ticketType && qrData.promotion.ticketType.name) {
+                const ticketType = qrData.promotion.ticketType;
+                const ticketLayout = layout.ticketType || { x: canvas.width / 2, y: layout.promoTitle.y + 30, width: 200, height: 30, textColor: '#FFFFFF' };
+                
+                const rectX = ticketLayout.x - ticketLayout.width / 2;
+                const rectY = ticketLayout.y - ticketLayout.height / 2;
+                const textY = ticketLayout.y + 6; // Ajuste vertical para centrar mejor
+                
+                ctx.fillStyle = ticketType.color || "#888888";
+                ctx.fillRect(rectX, rectY, ticketLayout.width, ticketLayout.height);
+
+                ctx.font = `bold ${ticketLayout.size || 16}px Arial`;
+                ctx.fillStyle = ticketLayout.textColor || "#FFFFFF";
+                ctx.textAlign = "center";
+                ctx.fillText(ticketType.name.toUpperCase(), ticketLayout.x, textY);
+            }
+
 
         } catch (error) {
             console.error("Error drawing on canvas:", error);
@@ -950,7 +970,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 <Separator />
                 <div className="text-center">
                    <p className="font-semibold">{qrData.promotion.title}</p>
-                    {qrData.promotion.ticketType && (
+                   {qrData.promotion.ticketType && (
                         <div 
                             className="inline-block text-white rounded-full px-4 py-1 mt-1 text-sm font-bold shadow-md"
                             style={{ backgroundColor: qrData.promotion.ticketType.color || '#ccc' }}

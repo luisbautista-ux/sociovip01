@@ -1,4 +1,5 @@
 
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
@@ -222,6 +223,7 @@ export interface QrTemplateLayout {
   name: { x: number; y: number; size?: number; color?: string; };
   dni: { x: number; y: number; size?: number; color?: string; };
   promoTitle: { x: number; y: number; size?: number; color?: string; };
+  ticketType?: { x: number; y: number; width: number; height: number; textColor?: string; size?: number; };
 }
 
 
