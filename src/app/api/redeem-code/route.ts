@@ -24,7 +24,7 @@ const RedeemCodeSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    // ================== NUEVA VERIFICACIÓN DE DIAGNÓSTICO ==================
+    // ================== VERIFICACIÓN DE DIAGNÓSTICO MEJORADA ==================
     if (!adminDb) {
       console.error("API Route (redeem-code): adminDb is not initialized. Check firebaseAdmin.ts and environment variables.");
       return NextResponse.json(
