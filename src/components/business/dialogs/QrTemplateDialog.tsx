@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -8,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Loader2, Upload, Move, Settings, RefreshCw, Grab, ImageIcon as ImageIconLucide } from "lucide-react";
+import { Loader2, Upload, Move, Settings, RefreshCw, Grab, ImageIcon as ImageIconLucide, Ticket } from "lucide-react";
 import NextImage from "next/image";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,17 +47,26 @@ const templateFormSchema = z.object({
       size: z.coerce.number().optional(),
       color: z.string().optional(),
     }),
+    ticketType: z.object({
+      x: z.coerce.number(),
+      y: z.coerce.number(),
+      width: z.coerce.number(),
+      height: z.coerce.number(),
+      size: z.coerce.number().optional(),
+      textColor: z.string().optional(),
+    }).optional(),
   }),
 });
 
 type TemplateFormValues = z.infer<typeof templateFormSchema>;
-type DraggableElement = "qr" | "name" | "dni" | "promoTitle";
+type DraggableElement = "qr" | "name" | "dni" | "promoTitle" | "ticketType";
 
 const elementLabels: Record<DraggableElement, string> = {
   qr: "Código QR",
   name: "Nombre Cliente",
   dni: "DNI Cliente",
   promoTitle: "Título Campaña",
+  ticketType: "Tipo de Entrada",
 };
 
 interface QrTemplateDialogProps {
@@ -87,16 +95,19 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
   const [showUnsavedChangesAlert, setShowUnsavedChangesAlert] = useState(false);
   const initialDataSnapshot = useRef<string | null>(null);
 
+  const defaultLayout: QrTemplateLayout = {
+    qr: { x: 190, y: 350, size: 80, color: "#000000" },
+    name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
+    dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
+    promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
+    ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16 },
+  };
+
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateFormSchema),
     defaultValues: {
       qrTemplateFile: null,
-      qrTemplateLayout: entity.qrTemplateLayout || {
-        qr: { x: 190, y: 350, size: 80, color: "#000000" },
-        name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
-        dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
-        promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
-      },
+      qrTemplateLayout: entity.qrTemplateLayout || defaultLayout,
     }
   });
 
@@ -104,12 +115,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
 
   useEffect(() => {
     if (open && entity) {
-      const initialLayout = entity.qrTemplateLayout || {
-        qr: { x: 190, y: 350, size: 80, color: "#000000" },
-        name: { x: 190, y: 450, size: 16, color: "#FFFFFF" },
-        dni: { x: 190, y: 470, size: 12, color: "#FFFFFF" },
-        promoTitle: { x: 190, y: 500, size: 14, color: "#FFFFFF" },
-      };
+      const initialLayout = { ...defaultLayout, ...entity.qrTemplateLayout };
       setTemplatePreview(entity.qrTemplateImageUrl || null);
       form.reset({ qrTemplateFile: null, qrTemplateLayout: initialLayout });
       const snapshot = {
@@ -132,12 +138,20 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
 
   const getElementRect = useCallback((key: DraggableElement, layout: QrTemplateLayout, ctx: CanvasRenderingContext2D): { x1: number, y1: number, x2: number, y2: number, cx: number, cy: number } => {
     const el = layout[key];
+    if (!el) return { x1: 0, y1: 0, x2: 0, y2: 0, cx: 0, cy: 0 };
+    
+    if (key === 'ticketType') {
+        const width = el.width || 200;
+        const height = el.height || 30;
+        return { x1: el.x - width / 2, y1: el.y - height / 2, x2: el.x + width / 2, y2: el.y + height / 2, cx: el.x, cy: el.y };
+    }
+
     const size = el.size || 16;
     if (key === 'qr') {
       const halfSize = size / 2;
       return { x1: el.x - halfSize, y1: el.y - halfSize, x2: el.x + halfSize, y2: el.y + halfSize, cx: el.x, cy: el.y };
     } else {
-      const text = key === 'name' ? "Nombre1 Nombre2 Paterno Materno" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Promoción";
+      const text = key === 'name' ? "Nombre Completo Del Cliente" : key === 'dni' ? "DNI: 12345678" : entity.name || "Nombre Campaña";
       ctx.font = `bold ${size}px Arial`;
       const textMetrics = ctx.measureText(text);
       const textWidth = textMetrics.width;
@@ -236,6 +250,24 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
             const rect = getElementRect(key, layout, ctx);
             ctx.drawImage(qrImageRef.current, rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
             if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+          } else if (key === 'ticketType') {
+            const rect = getElementRect(key, layout, ctx);
+            ctx.fillStyle = "#8E5EA2"; // Example color for wristband
+            ctx.fillRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+            if (isHighlight) ctx.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+
+            ctx.fillStyle = config.textColor || '#FFFFFF';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            let fontSize = config.size || 16;
+            ctx.font = `bold ${fontSize}px Arial`;
+            const text = "EJEMPLO ENTRADA";
+            const maxWidth = rect.x2 - rect.x1;
+            while(ctx.measureText(text).width > maxWidth && fontSize > 8) {
+              fontSize--;
+              ctx.font = `bold ${fontSize}px Arial`;
+            }
+            ctx.fillText(text, config.x, config.y);
           } else if (key !== 'qr') {
             ctx.fillStyle = config.color || '#FFFFFF';
             ctx.textAlign = 'center';
@@ -307,7 +339,7 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return null;
     
-    const elements: DraggableElement[] = ['qr', 'name', 'dni', 'promoTitle'];
+    const elements: DraggableElement[] = ['qr', 'name', 'dni', 'promoTitle', 'ticketType'];
     for (const key of elements) {
       const rect = getElementRect(key, layout, ctx);
       if (x > rect.x1 && x < rect.x2 && y > rect.y1 && y < rect.y2) {
@@ -443,19 +475,22 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
                 <Card>
                     <CardHeader className="p-3"><CardTitle className="text-base">Caja de Herramientas</CardTitle></CardHeader>
                     <CardContent className="p-3 grid grid-cols-2 gap-2">
-                        {(Object.keys(elementLabels) as DraggableElement[]).map(key => (
-                            <Button 
-                                key={key} 
-                                type="button" 
-                                variant={selectedElement === key ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setSelectedElement(key)}
-                                className="flex items-center justify-start gap-2"
-                                onMouseDown={(e) => { e.preventDefault(); setDraggedElement(key); toast({title:"Arrastrando elemento", description: `Ahora mueve "${elementLabels[key]}" en la vista previa.`})}}
-                            >
-                                <Grab size={16} className="text-muted-foreground"/> {elementLabels[key]}
-                            </Button>
-                        ))}
+                        {(Object.keys(elementLabels) as DraggableElement[]).map(key => {
+                            if (key === 'ticketType' && entity.type !== 'event') return null;
+                            return (
+                                <Button 
+                                    key={key} 
+                                    type="button" 
+                                    variant={selectedElement === key ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setSelectedElement(key)}
+                                    className="flex items-center justify-start gap-2"
+                                    onMouseDown={(e) => { e.preventDefault(); setDraggedElement(key); toast({title:"Arrastrando elemento", description: `Ahora mueve "${elementLabels[key]}" en la vista previa.`})}}
+                                >
+                                    <Grab size={16} className="text-muted-foreground"/> {elementLabels[key]}
+                                </Button>
+                            )
+                        })}
                     </CardContent>
                 </Card>
                 
@@ -467,15 +502,26 @@ export function QrTemplateDialog({ open, onOpenChange, entity, onSave, isSubmitt
                     <CardContent className="p-3 grid grid-cols-2 gap-4">
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.x`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición X</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                         <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.y`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Posición Y</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                        <div className="col-span-2 grid grid-cols-2 gap-4 items-center">
-                            <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} value={field.value || ""} /></FormControl></FormItem>)}/>
-                            {selectedElement !== 'qr' && (
-                                <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#FFFFFF'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
-                            )}
-                            {selectedElement === 'qr' && (
-                                 <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#000000'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
-                            )}
-                        </div>
+                        
+                        {selectedElement === 'ticketType' ? (
+                            <>
+                                <FormField control={form.control} name={`qrTemplateLayout.ticketType.width`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Ancho</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl></FormItem>)}/>
+                                <FormField control={form.control} name={`qrTemplateLayout.ticketType.height`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Alto</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl></FormItem>)}/>
+                                <FormField control={form.control} name={`qrTemplateLayout.ticketType.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño Texto</FormLabel><FormControl><Input type="number" {...field} value={field.value || 0} /></FormControl></FormItem>)}/>
+                                <FormField control={form.control} name={`qrTemplateLayout.ticketType.textColor`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color Texto</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#FFFFFF'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                            </>
+                        ) : (
+                            <div className="col-span-2 grid grid-cols-2 gap-4 items-center">
+                                <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.size`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Tamaño</FormLabel><FormControl><Input type="number" {...field} value={field.value || ""} /></FormControl></FormItem>)}/>
+                                {selectedElement !== 'qr' && (
+                                    <FormField control={form.control} name={`qrTemplateLayout.${selectedElement}.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#FFFFFF'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                )}
+                                {selectedElement === 'qr' && (
+                                     <FormField control={form.control} name={`qrTemplateLayout.qr.color`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Color QR</FormLabel><FormControl><Input type="color" {...field} value={field.value || '#000000'} className="h-10 p-1 w-full" /></FormControl></FormItem>)}/>
+                                )}
+                            </div>
+                        )}
+
                     </CardContent>
                   </Card>
                 )}
