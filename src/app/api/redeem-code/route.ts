@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
@@ -56,9 +57,8 @@ export async function POST(request: Request) {
         (c) => c.redeemedByInfo?.dni === dni
       );
       if (dniAlreadyUsed) {
-        throw new Error(
-          'Este DNI ya ha generado un código QR para esta promoción/evento.'
-        );
+        // ✅ CORREGIDO: Se devuelve un mensaje de error específico y claro.
+        throw new Error('El DNI ingresado ya generó un QR para este evento.');
       }
 
       const codes = (entityData.generatedCodes || []) as GeneratedCode[];

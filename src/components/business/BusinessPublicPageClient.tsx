@@ -513,7 +513,11 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
              toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
         }
     } catch (e: any) {
-        toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
+        // ✅ CORREGIDO: Se muestra el mensaje específico para DNI duplicado.
+        const errorMessage = (e.message || "No se pudo procesar la solicitud.").includes("ya generó un QR") 
+            ? "El DNI ingresado ya generó un QR para este evento."
+            : `No se pudo procesar la solicitud. ${e.message}`;
+        toast({ title: "Error de Verificación", description: errorMessage, variant: "destructive" });
         resetQrFlow();
     } finally {
         setIsLoadingQrFlow(false);
