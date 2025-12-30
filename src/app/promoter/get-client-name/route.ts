@@ -2,7 +2,7 @@
 'use server';
 
 import { NextResponse } from 'next/server';
-import { admin, initializeAdminApp } from '@/lib/firebase/firebaseAdmin';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import type { PlatformUser } from '@/lib/types';
 import { z } from 'zod';
@@ -19,7 +19,6 @@ async function getCallerProfile(authorizationHeader: string): Promise<PlatformUs
     const idToken = authorizationHeader.split('Bearer ')[1];
     const decodedToken = await getAuth().verifyIdToken(idToken);
     const uid = decodedToken.uid;
-    const adminDb = admin.firestore();
     const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
     if (!userDoc.exists) {
       throw new Error('Perfil del solicitante no encontrado.');
@@ -106,9 +105,6 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
 
 export async function GET(request: Request) {
   try {
-    await initializeAdminApp();
-    const adminDb = admin.firestore();
-
     const { searchParams } = new URL(request.url);
     const dni = searchParams.get('dni');
     const docType = searchParams.get('docType');

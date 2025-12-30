@@ -1,7 +1,7 @@
 
 import {NextResponse} from 'next/server';
 import {z} from 'zod';
-import {admin, adminDb, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import {anyToDate, isEntityCurrentlyActivatable} from '@/lib/utils';
 import type {BusinessManagedEntity, GeneratedCode, QrClient} from '@/lib/types';
 
@@ -22,7 +22,6 @@ const RedeemCodeSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    await initializeAdminApp();
     const body = await request.json();
     const validation = RedeemCodeSchema.safeParse(body);
 

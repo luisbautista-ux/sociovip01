@@ -5,7 +5,7 @@ import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
 import {z} from 'zod';
 
-import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import {admin} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser} from '@/lib/types';
 import {FieldValue} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
