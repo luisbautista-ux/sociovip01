@@ -64,21 +64,22 @@ export async function POST(request: Request) {
             const clientDoc = existingClientSnap.docs[0];
             const clientData = clientDoc.data() as Omit<QrClient, 'id'>;
             
-            const dobDate = clientData.dob instanceof Timestamp ? clientData.dob.toDate() : new Date();
-            const regDate = clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate() : new Date();
+            const dobDate = anyToDate(clientData.dob);
+            const regDate = anyToDate(clientData.registrationDate);
 
             return {
                 action: 'alreadyRedeemed',
                 clientData: {
                     id: clientDoc.id,
                     ...clientData,
-                    dob: dobDate.toISOString(),
-                    registrationDate: regDate.toISOString(),
+                    dob: dobDate ? dobDate.toISOString() : null,
+                    registrationDate: regDate ? regDate.toISOString() : null,
                 },
                 code: existingRedemptionForDni
             };
         } else {
             console.warn(`DNI ${dni} found in entity ${entityId} but not in qrClients collection.`);
+             throw new Error(`El DNI ingresado ya generó un QR para este evento, pero no se encontró el perfil del cliente.`);
         }
       }
 
@@ -142,20 +143,16 @@ export async function POST(request: Request) {
 
       transaction.update(entityRef, { generatedCodes: codes });
 
-      const dobDate = clientData.dob instanceof Timestamp
-          ? clientData.dob.toDate()
-          : new Date();
-      const regDate = clientData.registrationDate instanceof Timestamp
-          ? clientData.registrationDate.toDate()
-          : new Date();
+      const dobDate = anyToDate(clientData.dob);
+      const regDate = anyToDate(clientData.registrationDate);
           
       return {
         action: clientAction,
         clientData: {
           id: finalClientId,
           ...clientData,
-          dob: dobDate.toISOString(),
-          registrationDate: regDate.toISOString(),
+          dob: dobDate ? dobDate.toISOString() : null,
+          registrationDate: regDate ? regDate.toISOString() : null,
         }
       };
     });

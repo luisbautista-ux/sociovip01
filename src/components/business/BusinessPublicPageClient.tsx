@@ -508,7 +508,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
             const clientForQr: QrClient = result.clientData;
             
-            // Si es 'alreadyRedeemed', el código viene en la respuesta, sino, lo tomamos del estado
+            // If it's 'alreadyRedeemed', the used code is in the response, otherwise use the one from the state.
             const finalCodeObject = result.code || validatedCodeObject;
 
             const ticketType = freshEntityData.ticketTypes?.find(t => t.id === finalCodeObject.ticketTypeId);
@@ -527,12 +527,12 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 qrTemplateLayout: freshEntityData.qrTemplateLayout,
                 ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
             };
-            setQrData({ user: clientForQr, promotion: qrCodeDetails, code: finalCodeObject.id, status: "redeemed" });
+            setQrData({ user: clientForQr, promotion: qrCodeDetails, code: finalCodeObject.id, status: finalCodeObject.status });
             setShowDniModal(false);
             setPageViewState("qrDisplay");
              
              if (result.action === 'alreadyRedeemed') {
-                 toast({ title: "QR Recuperado", description: "Este es el QR que ya habías generado para este evento." });
+                 toast({ title: "¡QR recuperado!", description: "Te mostramos el QR que ya habías generado con este código." });
              } else {
                  toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
              }
