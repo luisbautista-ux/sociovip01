@@ -353,11 +353,10 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
         const foundCodeObject = codes.find((c) => extractCodeString(c) === codeToValidate);
 
         if (!foundCodeObject) {
-            throw new Error(`El código "${codeToValidate}" no existe.`);
+            throw new Error(`El código "${codeToValidate}" no existe o no es válido para esta campaña.`);
         }
 
         if (foundCodeObject.status === 'redeemed' || foundCodeObject.status === 'used') {
-            // --- QR RECOVERY FLOW ---
             if (!foundCodeObject.redeemedByInfo?.dni) {
                 throw new Error("El código ya fue usado pero no tiene un DNI asociado para recuperarlo.");
             }
@@ -390,18 +389,17 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
             toast({ title: "¡QR recuperado!", description: "Te mostramos el QR que ya habías generado con este código." });
             
         } else if (foundCodeObject.status === 'available') {
-            // --- NEW QR GENERATION FLOW ---
             setActiveEntityForQr(realTimeEntityData);
             setValidatedCodeObject(foundCodeObject);
             setCurrentStepInModal("enterDni");
             dniForm.reset({ docType: 'dni', docNumber: "" });
             setShowDniModal(true);
         } else {
-            throw new Error(`Este código ya está ${foundCodeObject.status}.`);
+            throw new Error(`Este código ya está ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCodeObject.status] || 'en un estado no válido'}.`);
         }
 
     } catch (e: any) {
-        toast({ title: "Código inválido o no disponible", description: e.message || "No se pudo validar el código.", variant: "destructive" });
+        toast({ title: "Error de Validación", description: e.message || "No se pudo validar el código.", variant: "destructive" });
     } finally {
         setIsLoadingQrFlow(false);
     }
@@ -508,7 +506,6 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
             const clientForQr: QrClient = result.clientData;
             
-            // If it's 'alreadyRedeemed', the used code is in the response, otherwise use the one from the state.
             const finalCodeObject = result.code || validatedCodeObject;
 
             const ticketType = freshEntityData.ticketTypes?.find(t => t.id === finalCodeObject.ticketTypeId);
@@ -1272,7 +1269,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-white"
                         style={{
                             backgroundSize: '400% 400%',
-                            animation: 'gradient-animation 15s ease-infinite',
+                            animation: 'gradient-animation 15s ease-in-out infinite',
                             backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
                         }}
                     >

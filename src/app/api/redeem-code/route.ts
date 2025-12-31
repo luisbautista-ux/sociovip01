@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
     const qrClientsRef = adminDb.collection('qrClients');
     
-    const finalClientData = await adminDb.runTransaction(async (transaction) => {
+    const finalResult = await adminDb.runTransaction(async (transaction) => {
       const entityRef = adminDb.collection('businessEntities').doc(entityId);
       const entityDoc = await transaction.get(entityRef);
       
@@ -157,11 +157,11 @@ export async function POST(request: Request) {
       };
     });
 
-    if(finalClientData.action === 'newUser' && !finalClientData.clientData) {
+    if(finalResult.action === 'newUser' && !finalResult.clientData) {
         return NextResponse.json({ action: 'newUser' });
     }
 
-    return NextResponse.json(finalClientData);
+    return NextResponse.json(finalResult);
   } catch (error: any) {
     console.error('API Route (redeem-code): Error detallado:', error);
     return NextResponse.json(
