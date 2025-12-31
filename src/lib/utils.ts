@@ -268,18 +268,22 @@ export const generateCodesPDF = async (
         if (ticketType) {
           const pulseraY = textYPos + 11;
           const pulseraHeight = 6;
-          const borderRadius = pulseraHeight / 2; // Radio para puntas totalmente redondeadas
-          const pulseraWidth = cellWidth * 0.8;
+          
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8);
+          
+          const text = ticketType.name.toUpperCase();
+          const textWidth = doc.getTextWidth(text);
+          const pulseraWidth = textWidth + 4; // Add horizontal padding
           const pulseraX = x + (cellWidth - pulseraWidth) / 2;
+          const borderRadius = pulseraHeight / 2; // Fully rounded corners
 
           doc.setDrawColor(0);
           doc.setFillColor(ticketType.color || "#888888");
           doc.roundedRect(pulseraX, pulseraY, pulseraWidth, pulseraHeight, borderRadius, borderRadius, "F");
 
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(8);
           doc.setTextColor("#FFFFFF");
-          doc.text(ticketType.name.toUpperCase(), x + cellWidth / 2, pulseraY + 4, { align: "center" });
+          doc.text(text, x + cellWidth / 2, pulseraY + 4, { align: "center" });
           doc.setTextColor("#000000"); // Reset text color
         }
       }
@@ -288,3 +292,4 @@ export const generateCodesPDF = async (
 
   doc.save(`${businessDetails.name}_${entity.name}_codes.pdf`);
 };
+
