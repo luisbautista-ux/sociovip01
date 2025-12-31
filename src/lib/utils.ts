@@ -1,4 +1,5 @@
 
+
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { BusinessManagedEntity, GeneratedCode, TicketType, Business } from "./types";
@@ -267,9 +268,13 @@ export const generateCodesPDF = async (
         if (ticketType) {
           const pulseraY = textYPos + 11;
           const pulseraHeight = 6;
+          const borderRadius = pulseraHeight / 2; // Radio para puntas totalmente redondeadas
+          const pulseraWidth = cellWidth * 0.8;
+          const pulseraX = x + (cellWidth - pulseraWidth) / 2;
+
           doc.setDrawColor(0);
           doc.setFillColor(ticketType.color || "#888888");
-          doc.rect(x + 2, pulseraY, cellWidth - 4, pulseraHeight, "F");
+          doc.roundedRect(pulseraX, pulseraY, pulseraWidth, pulseraHeight, borderRadius, borderRadius, "F");
 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(8);
