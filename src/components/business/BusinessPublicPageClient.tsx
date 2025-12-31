@@ -98,6 +98,7 @@ import * as htmlToImage from 'html-to-image';
 import { ImageCarousel } from "@/components/business/ImageCarousel";
 import { VideoCarousel } from "@/components/business/VideoCarousel";
 import { parseISO } from "date-fns/parseISO";
+import { ToastAction } from "../ui/toast";
 
 
 // --- Helpers robustos para códigos ---
@@ -388,12 +389,26 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
               title: "¡QR recuperado!",
               description: "Te mostramos el QR que ya habías generado con este código.",
               action: (
-                <Button variant="outline" size="sm" onClick={() => {
-                  setQrData(recoveredQrData);
-                  setPageViewState("qrDisplay");
-                }}>
-                  Ver QR
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <ToastAction altText="Ver QR">Ver QR</ToastAction>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>QR Recuperado</AlertDialogTitle>
+                      <AlertDialogDescription>
+                         Se mostrará el QR que generaste previamente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => {
+                        setQrData(recoveredQrData);
+                        setPageViewState("qrDisplay");
+                      }}>Ver</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )
             });
             
@@ -1434,4 +1449,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
