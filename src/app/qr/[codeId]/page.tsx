@@ -32,6 +32,7 @@ export default function QrDisplayPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const [isDrawingCanvas, setIsDrawingCanvas] = useState(false); // <-- NUEVO ESTADO
 
   const cardRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -118,8 +119,12 @@ export default function QrDisplayPage() {
     const canvas = canvasRef.current;
     if (!canvas || !qrData || !qrData.promotion.qrTemplateImageUrl) return;
 
+    setIsDrawingCanvas(true); // <-- Inicia la carga del canvas
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      setIsDrawingCanvas(false);
+      return;
+    }
     
     try {
         const templateImg = new Image();
@@ -188,6 +193,8 @@ export default function QrDisplayPage() {
           ctx.fillStyle = 'red';
           ctx.fillText('Error al generar plantilla.', canvas.width / 2, canvas.height / 2);
         }
+    } finally {
+        setIsDrawingCanvas(false); // <-- Finaliza la carga del canvas
     }
   }, [qrData]);
 
@@ -280,7 +287,14 @@ export default function QrDisplayPage() {
       </header>
       <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
         {qrData.promotion.qrTemplateImageUrl ? (
-          <div className="w-full max-w-sm shadow-xl rounded-xl">
+          <div className="relative w-full max-w-sm shadow-xl rounded-xl">
+            {isDrawingCanvas && (
+              <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-xl">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <p className="text-lg font-semibold text-primary">Generando tu QR...</p>
+                <p className="text-sm text-muted-foreground">Espera un momento, por favor.</p>
+              </div>
+            )}
             <canvas ref={canvasRef} className="w-full h-auto" />
           </div>
         ) : (
