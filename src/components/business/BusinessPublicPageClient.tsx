@@ -467,16 +467,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         const result = await response.json();
 
         if (!response.ok) {
-            // Check for specific error message from backend
-            if (result.error && result.error.includes("El DNI ingresado ya generó un QR")) {
-                toast({
-                    title: "DNI ya utilizado",
-                    description: "El DNI ingresado ya generó un QR para este evento.",
-                    variant: "destructive",
-                });
-                return; // Stop the flow here
-            }
-            throw new Error(result.error || 'Ocurrió un error en el servidor.');
+             throw new Error(result.error || 'Ocurrió un error en el servidor.');
         }
 
         if (result.action === 'newUser') {
@@ -1281,7 +1272,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-white"
                         style={{
                             backgroundSize: '400% 400%',
-                            animation: 'gradient-animation 15s ease infinite',
+                            animation: 'gradient-animation 15s ease-infinite',
                             backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
                         }}
                     >
@@ -1437,6 +1428,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
-
-    

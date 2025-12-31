@@ -1,4 +1,5 @@
 
+
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
@@ -52,11 +53,10 @@ export async function POST(request: Request) {
       }
 
       // Check if DNI has already redeemed a code for this entity
-      const existingRedemption = (entityData.generatedCodes || []).find(
-        (c) => c.redeemedByInfo?.dni === dni
+      const existingRedemptionForDni = (entityData.generatedCodes || []).find(
+        (c) => c.redeemedByInfo?.dni === dni && (c.status === 'redeemed' || c.status === 'used')
       );
-      if (existingRedemption) {
-        // DNI already exists, retrieve the QR and client data
+      if (existingRedemptionForDni) {
         const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
         const existingClientSnap = await transaction.get(clientQuery);
 
@@ -75,11 +75,9 @@ export async function POST(request: Request) {
                     dob: dobDate.toISOString(),
                     registrationDate: regDate.toISOString(),
                 },
-                code: existingRedemption
+                code: existingRedemptionForDni
             };
         } else {
-            // This is an inconsistent state, but we should still handle it.
-            // Let the flow continue to create a new client, but log a warning.
             console.warn(`DNI ${dni} found in entity ${entityId} but not in qrClients collection.`);
         }
       }
