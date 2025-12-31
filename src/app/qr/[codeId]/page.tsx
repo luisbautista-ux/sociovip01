@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import NextImage from "next/image";
 import Link from 'next/link';
 import QRCode from "qrcode";
@@ -19,9 +19,11 @@ import * as htmlToImage from 'html-to-image';
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { anyToDate } from '@/lib/utils';
 
 export default function QrDisplayPage() {
   const params = useParams();
+  const router = useRouter();
   const { codeId } = params;
   const { toast } = useToast();
 
@@ -44,11 +46,6 @@ export default function QrDisplayPage() {
     setError(null);
     try {
       // 1. Find the entity containing the code
-      const entitiesQuery = query(
-        collection(db, "businessEntities"),
-        where("generatedCodes", "array-contains-any", [{id: codeId}]) // This is a trick, may not work as expected
-      );
-      
       const q = query(collection(db, "businessEntities"));
       const querySnapshot = await getDocs(q);
       
@@ -225,13 +222,22 @@ export default function QrDisplayPage() {
         toast({ title: "Error al Guardar", description: "No se pudo generar la imagen.", variant: "destructive" });
     }
   };
+  
+  const handleBackToBusinessPage = () => {
+    if (businessDetails?.customUrlPath) {
+      router.push(`/${businessDetails.customUrlPath}`);
+    } else {
+      router.push('/');
+    }
+  };
 
   const QrPageFooter = () => (
     <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
-      <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-3 items-center gap-2">
+      <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
         <Link href="/login" passHref><Button variant="outline" className="w-full font-bold"><UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión</Button></Link>
         <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold"><Download className="mr-2 h-4 w-4" /> Guardar QR</Button>
-        <Link href="/" passHref><Button variant="outline" className="w-full font-bold col-span-2 sm:col-span-1"><ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio</Button></Link>
+        <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold">Ver Otras del Negocio</Button>
+        <Link href="/" passHref><Button variant="outline" className="w-full font-bold sm:col-span-1"><ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio</Button></Link>
       </div>
     </footer>
   );
