@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -98,7 +99,6 @@ import * as htmlToImage from 'html-to-image';
 import { ImageCarousel } from "@/components/business/ImageCarousel";
 import { VideoCarousel } from "@/components/business/VideoCarousel";
 import { parseISO } from "date-fns/parseISO";
-import { ToastAction } from "../ui/toast";
 
 
 // --- Helpers robustos para códigos ---
@@ -110,12 +110,6 @@ const normalizeCode = (v: unknown) =>
 
 const extractCodeString = (codeObj: any) =>
   normalizeCode(codeObj?.value ?? codeObj?.code ?? codeObj?.codigo ?? codeObj?.val);
-
-const isCodeAvailableForUse = (codeObj: any) => {
-  const status = String(codeObj?.status ?? codeObj?.estado ?? "").toLowerCase();
-  return status === "available";
-};
-
 
 // helper `cn` local
 const cn = (...c: (string | false | undefined | null)[]) => c.filter(Boolean).join(" ");
@@ -175,21 +169,14 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
 
-  const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
+  // State for the modals and QR generation flow
   const [showDniModal, setShowDniModal] = useState(false);
   const [currentStepInModal, setCurrentStepInModal] = useState<"enterDni" | "newUserForm">("enterDni");
   const [activeEntityForQr, setActiveEntityForQr] = useState<BusinessManagedEntity | null>(null);
   const [validatedCodeObject, setValidatedCodeObject] = useState<GeneratedCode | null>(null);
   const [enteredDni, setEnteredDni] = useState<string>("");
-  const [qrData, setQrData] = useState<QrCodeData | null>(null);
-  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [isConsultingDni, setIsConsultingDni] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null); // For custom template rendering
 
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(DniEntrySchema),
@@ -201,6 +188,18 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
     resolver: zodResolver(newQrClientSchema),
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
+  
+  const resetQrFlow = useCallback(() => {
+    setShowDniModal(false);
+    setActiveEntityForQr(null);
+    setValidatedCodeObject(null);
+    setEnteredDni("");
+    dniForm.reset();
+    newQrClientForm.reset();
+    setCurrentStepInModal("enterDni");
+    setIsLoadingQrFlow(false);
+  }, [dniForm, newQrClientForm]);
+
 
   const fetchBusinessDataByCustomUrl = useCallback(async () => {
     if (!customUrlPath || typeof customUrlPath !== "string") {
@@ -358,39 +357,8 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
       }
   
       if (foundCodeObject.status === 'redeemed' || foundCodeObject.status === 'used') {
-        if (!foundCodeObject.redeemedByInfo?.dni) {
-          throw new Error("El código ya fue usado pero no tiene un DNI asociado para recuperarlo.");
-        }
-        const clientQuery = query(collection(db, "qrClients"), where("dni", "==", foundCodeObject.redeemedByInfo.dni), limit(1));
-        const clientSnap = await getDocs(clientQuery);
-  
-        if (clientSnap.empty) {
-          throw new Error("No se pudo encontrar el perfil del cliente que canjeó este código.");
-        }
-  
-        const clientData = { id: clientSnap.docs[0].id, ...clientSnap.docs[0].data() } as QrClient;
-        const ticketType = realTimeEntityData.ticketTypes?.find(t => t.id === foundCodeObject.ticketTypeId);
-  
-        const qrCodeDetails: QrCodeData["promotion"] = {
-          id: realTimeEntityData.id,
-          title: realTimeEntityData.name,
-          description: realTimeEntityData.description,
-          validUntil: realTimeEntityData.endDate,
-          imageUrl: realTimeEntityData.imageUrl || "",
-          promoCode: foundCodeObject.value,
-          qrValue: foundCodeObject.id,
-          aiHint: realTimeEntityData.aiHint || "",
-          type: realTimeEntityData.type,
-          termsAndConditions: realTimeEntityData.termsAndConditions,
-          qrTemplateImageUrl: realTimeEntityData.qrTemplateImageUrl,
-          qrTemplateLayout: realTimeEntityData.qrTemplateLayout,
-          ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
-        };
-  
-        setQrData({ user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status });
-        setPageViewState("qrDisplay");
-        toast({ title: "¡QR recuperado!", description: "Este código ya fue usado. Mostrando el QR generado anteriormente." });
-  
+        toast({ title: "¡QR recuperado!", description: "Este código ya fue usado. Te llevaremos a tu QR." });
+        router.push(`/qr/${foundCodeObject.id}`);
       } else if (foundCodeObject.status === 'available') {
         setActiveEntityForQr(realTimeEntityData);
         setValidatedCodeObject(foundCodeObject);
@@ -407,25 +375,6 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
       setIsLoadingQrFlow(false);
     }
   };
-
-const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEntity> => {
-    const entityRef = doc(db, "businessEntities", entityId);
-    const docSnap = await getDoc(entityRef);
-    if (!docSnap.exists()) {
-      throw new Error("La entidad ya no existe.");
-    }
-    const data = docSnap.data();
-    // Ensure all nested date-like fields are properly converted.
-    return { 
-        id: docSnap.id, 
-        ...data,
-        startDate: anyToDate(data.startDate)?.toISOString() || "",
-        endDate: anyToDate(data.endDate)?.toISOString() || "",
-        createdAt: anyToDate(data.createdAt)?.toISOString(),
-        qrTemplateImageUrl: data.qrTemplateImageUrl,
-        qrTemplateLayout: data.qrTemplateLayout,
-    } as BusinessManagedEntity;
-};
 
 const consultExternalDniApi = async (dni: string, docType: 'dni' | 'ce') => {
     try {
@@ -506,36 +455,9 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             }
             
         } else if (result.action === 'userExists' || result.action === 'alreadyRedeemed') {
-            const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
-            const clientForQr: QrClient = result.clientData;
-            
             const finalCodeObject = result.code || validatedCodeObject;
-
-            const ticketType = freshEntityData.ticketTypes?.find(t => t.id === finalCodeObject.ticketTypeId);
-            const qrCodeDetails: QrCodeData["promotion"] = {
-                id: freshEntityData.id,
-                title: freshEntityData.name,
-                description: freshEntityData.description,
-                validUntil: freshEntityData.endDate,
-                imageUrl: freshEntityData.imageUrl || "",
-                promoCode: finalCodeObject.value,
-                qrValue: finalCodeObject.id,
-                aiHint: freshEntityData.aiHint || "",
-                type: freshEntityData.type,
-                termsAndConditions: freshEntityData.termsAndConditions,
-                qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
-                qrTemplateLayout: freshEntityData.qrTemplateLayout,
-                ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
-            };
-            setQrData({ user: clientForQr, promotion: qrCodeDetails, code: finalCodeObject.id, status: finalCodeObject.status });
-            setShowDniModal(false);
-            setPageViewState("qrDisplay");
-             
-             if (result.action === 'alreadyRedeemed') {
-                 toast({ title: "¡QR recuperado!", description: "El DNI ingresado ya generó un QR para este evento." });
-             } else {
-                 toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
-             }
+            toast({ title: "¡Éxito!", description: result.action === 'alreadyRedeemed' ? "QR Recuperado. Redirigiendo..." : "QR Generado. Redirigiendo..." });
+            router.push(`/qr/${finalCodeObject.id}`);
         }
     } catch (e: any) {
         toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
@@ -579,193 +501,15 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         if (!response.ok) {
             throw new Error(result.error || 'Ocurrió un error al registrar el nuevo cliente.');
         }
-        
-        const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
-        const clientForQr: QrClient = result.clientData;
-        const ticketType = freshEntityData.ticketTypes?.find(t => t.id === validatedCodeObject.ticketTypeId);
-        const qrCodeDetails: QrCodeData["promotion"] = {
-            id: freshEntityData.id,
-            title: freshEntityData.name,
-            description: freshEntityData.description,
-            validUntil: freshEntityData.endDate,
-            imageUrl: freshEntityData.imageUrl || "",
-            promoCode: validatedCodeObject.value,
-            qrValue: validatedCodeObject.id,
-            aiHint: freshEntityData.aiHint || "",
-            type: freshEntityData.type,
-            termsAndConditions: freshEntityData.termsAndConditions,
-            qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
-            qrTemplateLayout: freshEntityData.qrTemplateLayout,
-            ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
-        };
   
-        setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
-        setShowDniModal(false);
-        setPageViewState("qrDisplay");
-        toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
-
+        toast({ title: "Registro Exitoso", description: "Cliente registrado. Redirigiendo a tu QR." });
+        router.push(`/qr/${validatedCodeObject.id}`);
     } catch (e: any) {
       toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
       resetQrFlow();
     } finally {
       setIsLoadingQrFlow(false);
     }
-  };
-
-
- useEffect(() => {
-    if (qrData?.promotion.qrValue && !qrData?.promotion.qrTemplateImageUrl) {
-      QRCode.toDataURL(qrData.promotion.qrValue, { width: 400, errorCorrectionLevel: 'H' }, (err, url) => {
-        if (err) {
-          console.error("Failed to generate QR code:", err);
-          setQrCodeImage(null);
-        } else {
-          setQrCodeImage(url);
-        }
-      });
-    } else {
-      setQrCodeImage(null);
-    }
-  }, [qrData]);
-
-  const handleSaveQrWithDetails = async () => {
-    const elementToCapture = qrData?.promotion.qrTemplateImageUrl ? canvasRef.current : cardRef.current;
-    if (!elementToCapture) {
-        toast({ title: "Error", description: "No se encontró el elemento para descargar.", variant: "destructive" });
-        return;
-    }
-    try {
-        const dataUrl = await htmlToImage.toPng(elementToCapture, {
-          quality: 1.0,
-          pixelRatio: 2,
-        });
-        const link = document.createElement('a');
-        link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
-        link.href = dataUrl;
-        link.click();
-        toast({ title: "QR Guardado", description: "La imagen de la tarjeta se ha descargado." });
-    } catch (error) {
-        console.error('oops, something went wrong!', error);
-        toast({ title: "Error al Guardar", description: "No se pudo generar la imagen de la tarjeta.", variant: "destructive" });
-    }
-  };
-  
-    const drawPreviewOnCanvas = useCallback(async () => {
-        const canvas = canvasRef.current;
-        if (!canvas || !qrData || !qrData.promotion.qrTemplateImageUrl) return;
-        
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        try {
-            const templateImg = new Image();
-            templateImg.crossOrigin = "anonymous";
-            templateImg.src = qrData.promotion.qrTemplateImageUrl;
-            await new Promise<void>((resolve, reject) => {
-                templateImg.onload = () => resolve();
-                templateImg.onerror = (err) => {
-                  console.error("Failed to load template image:", err);
-                  reject(new Error("Image load error"));
-                };
-            });
-
-            canvas.width = templateImg.width;
-            canvas.height = templateImg.height;
-            ctx.drawImage(templateImg, 0, 0);
-
-            const layout = qrData.promotion.qrTemplateLayout || {
-                qr: { x: 190, y: 350, size: 80, color: '#000000' },
-                name: { x: 190, y: 450, size: 16, color: '#FFFFFF', fontFamily: 'Arial, sans-serif' },
-                dni: { x: 190, y: 470, size: 12, color: '#FFFFFF', fontFamily: 'Arial, sans-serif' },
-                promoTitle: { x: 190, y: 500, size: 14, color: '#FFFFFF', fontFamily: 'Arial, sans-serif' },
-                ticketType: { x: 190, y: 530, width: 200, height: 30, textColor: "#FFFFFF", size: 16, fontFamily: 'Arial, sans-serif' },
-            };
-
-            const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { 
-                width: layout.qr.size, 
-                errorCorrectionLevel: 'H', 
-                margin: 1,
-                color: {
-                  dark: layout.qr.color || "#000000",
-                  light: "#0000" // Transparent background
-                }
-            });
-            const qrImage = new Image();
-            qrImage.src = qrDataUrl;
-            await new Promise(resolve => qrImage.onload = resolve);
-            ctx.drawImage(qrImage, layout.qr.x - layout.qr.size / 2, layout.qr.y - layout.qr.size / 2, layout.qr.size, layout.qr.size);
-
-            ctx.textAlign = 'center';
-            const maxWidth = canvas.width * 0.9;
-            
-            // --- Dibuja Nombre ---
-            const fullName = `${qrData.user.name} ${qrData.user.surname}`;
-            let nameFontSize = layout.name.size || 16;
-            ctx.font = `bold ${nameFontSize}px ${layout.name.fontFamily || 'Arial, sans-serif'}`;
-            ctx.fillStyle = layout.name.color || '#FFFFFF';
-            while(ctx.measureText(fullName).width > maxWidth && nameFontSize > 8) { nameFontSize--; ctx.font = `bold ${nameFontSize}px ${layout.name.fontFamily || 'Arial, sans-serif'}`; }
-            ctx.fillText(fullName, layout.name.x, layout.name.y);
-            
-            // --- Dibuja DNI ---
-            ctx.font = `bold ${layout.dni.size || 12}px ${layout.dni.fontFamily || 'Arial, sans-serif'}`;
-            ctx.fillStyle = layout.dni.color || '#FFFFFF';
-            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
-            
-            // --- Dibuja Título de la Promoción ---
-            let promoFontSize = layout.promoTitle.size || 14;
-            ctx.font = `bold ${promoFontSize}px ${layout.promoTitle.fontFamily || 'Arial, sans-serif'}`;
-            ctx.fillStyle = layout.promoTitle.color || '#FFFFFF';
-            while(ctx.measureText(qrData.promotion.title).width > maxWidth && promoFontSize > 8) { promoFontSize--; ctx.font = `bold ${promoFontSize}px ${layout.promoTitle.fontFamily || 'Arial, sans-serif'}`; }
-            ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
-            
-            // --- Dibuja la pulsera del tipo de entrada ---
-            if (qrData.promotion.ticketType?.name && layout.ticketType) {
-                const ticketType = qrData.promotion.ticketType;
-                const ticketLayout = layout.ticketType;
-                
-                const rectX = ticketLayout.x - (ticketLayout.width / 2);
-                const rectY = ticketLayout.y - (ticketLayout.height / 2);
-                const borderRadius = ticketLayout.height / 2;
-                
-                ctx.fillStyle = ticketType.color || "#888888";
-                ctx.beginPath();
-                ctx.roundRect(rectX, rectY, ticketLayout.width, ticketLayout.height, borderRadius);
-                ctx.fill();
-
-                ctx.font = `bold ${ticketLayout.size || 16}px ${ticketLayout.fontFamily || 'Arial, sans-serif'}`;
-                ctx.fillStyle = ticketLayout.textColor || "#FFFFFF";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText(ticketType.name.toUpperCase(), ticketLayout.x, ticketLayout.y);
-            }
-
-        } catch (error) {
-            console.error("Error drawing on canvas:", error);
-            ctx.fillStyle = '#f0f0f0';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = 'red';
-            ctx.font = '16px Arial';
-            ctx.fillText('Error al cargar plantilla.', canvas.width / 2, canvas.height / 2);
-        }
-    }, [qrData]);
-
-    useEffect(() => {
-        if (pageViewState === 'qrDisplay' && qrData?.promotion.qrTemplateImageUrl) {
-            drawPreviewOnCanvas();
-        }
-    }, [pageViewState, qrData, drawPreviewOnCanvas]);
-
-
-  const resetQrFlow = () => {
-    setPageViewState("entityList");
-    setQrData(null);
-    setQrCodeImage(null);
-    setActiveEntityForQr(null);
-    setValidatedCodeObject(null);
-    setEnteredDni("");
-    dniForm.reset();
-    newQrClientForm.reset();
-    setShowDniModal(false);
   };
 
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
@@ -894,128 +638,6 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     );
   }
   
-  if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
-    const QrPageFooter = () => (
-      <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
-        <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
-          <Link href="/login" passHref>
-            <Button variant="outline" className="w-full font-bold">
-              <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
-            </Button>
-          </Link>
-          <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold">
-            <Download className="mr-2 h-4 w-4" /> Guardar QR
-          </Button>
-          <Button onClick={resetQrFlow} variant="outline" className="w-full font-bold">
-            Ver Otras del Negocio
-          </Button>
-          <Link href="/" passHref>
-            <Button variant="outline" className="w-full font-bold">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
-            </Button>
-          </Link>
-        </div>
-      </footer>
-    );
-
-    if (qrData.promotion.qrTemplateImageUrl) {
-        return (
-            <div className="min-h-screen bg-background text-foreground flex flex-col">
-                 <header
-                    className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white"
-                    >
-                    <div className="max-w-7xl mx-auto flex items-center justify-start">
-                        {businessDetails.logoUrl && (
-                        <NextImage
-                            src={businessDetails.logoUrl}
-                            alt={`${businessDetails.name} logo`}
-                            width={40}
-                            height={40}
-                            className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
-                        />
-                        )}
-                        <h1 className="font-semibold text-xl" style={{ color: businessDetails.primaryColor }}>{businessDetails.name}</h1>
-                        {businessDetails.slogan && (
-                        <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>
-                        )}
-                    </div>
-                </header>
-                <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
-                   <div className="w-full max-w-sm shadow-xl rounded-xl">
-                      <canvas ref={canvasRef} className="w-full h-auto" />
-                   </div>
-                </main>
-                <QrPageFooter />
-            </div>
-        )
-    }
-
-    return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
-        <header
-          className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white"
-        >
-          <div className="max-w-7xl mx-auto flex items-center justify-start">
-            {businessDetails.logoUrl && (
-              <NextImage
-                src={businessDetails.logoUrl}
-                alt={`${businessDetails.name} logo`}
-                width={40}
-                height={40}
-                className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
-              />
-            )}
-            <h1 className="font-semibold text-xl" style={{ color: businessDetails.primaryColor }}>{businessDetails.name}</h1>
-            {businessDetails.slogan && (
-              <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>
-            )}
-          </div>
-        </header>
-         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
-            <Card ref={cardRef} className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden">
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-xl font-bold">
-                  {activeEntityForQr.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}
-                </CardTitle>
-                <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center space-y-4">
-                {qrCodeImage ? (
-                  <NextImage src={qrCodeImage} alt="Tu código QR" width={250} height={250} className="rounded-lg border p-1" />
-                ) : (
-                  <div className="h-[250px] w-[250px] flex items-center justify-center border rounded-lg bg-muted text-muted-foreground">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="text-lg font-semibold">Hola, {qrData.user.name} {qrData.user.surname}</p>
-                  <p className="text-sm text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
-                </div>
-                <Separator />
-                <div className="text-center">
-                   <p className="font-semibold">{qrData.promotion.title}</p>
-                   {qrData.promotion.ticketType && (
-                    <div className="flex justify-center mt-2">
-                        <div
-                        className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md"
-                        style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}
-                        >
-                        {qrData.promotion.ticketType.name.toUpperCase()}
-                        </div>
-                    </div>
-                  )}
-                   <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
-                </div>
-              </CardContent>
-              <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
-              </CardFooter>
-            </Card>
-        </main>
-        <QrPageFooter />
-      </div>
-    )
-  }
-
   if (!businessDetails) return null;
 
   return (
@@ -1145,10 +767,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         open={showDniModal}
         onOpenChange={(isOpen) => {
           if (!isOpen) {
-            dniForm.reset();
-            newQrClientForm.reset();
-            setEnteredDni("");
-            setCurrentStepInModal("enterDni");
+            resetQrFlow();
           }
           setShowDniModal(isOpen);
         }}
@@ -1246,10 +865,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => {
-                      setShowDniModal(false);
-                      resetQrFlow();
-                    }}
+                    onClick={() => setShowDniModal(false)}
                     disabled={isLoadingQrFlow}
                   >
                     Cancelar
@@ -1424,7 +1040,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           )}
         </DialogContent>
       </Dialog>
-      <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
     </div>
   );
 }
+

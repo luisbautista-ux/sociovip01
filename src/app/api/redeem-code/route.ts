@@ -69,16 +69,15 @@ export async function POST(request: Request) {
 
             return {
                 action: 'alreadyRedeemed',
+                code: existingRedemptionForDni,
                 clientData: {
                     id: clientDoc.id,
                     ...clientData,
                     dob: dobDate ? dobDate.toISOString() : null,
                     registrationDate: regDate ? regDate.toISOString() : null,
                 },
-                code: existingRedemptionForDni
             };
         } else {
-            console.warn(`DNI ${dni} found in entity ${entityId} but not in qrClients collection.`);
              throw new Error(`El DNI ingresado ya generó un QR para este evento, pero no se encontró el perfil del cliente.`);
         }
       }
@@ -148,6 +147,7 @@ export async function POST(request: Request) {
           
       return {
         action: clientAction,
+        code: codes[codeIndex], // Devolver el código actualizado
         clientData: {
           id: finalClientId,
           ...clientData,
@@ -170,3 +170,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
