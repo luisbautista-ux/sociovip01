@@ -8,7 +8,7 @@ import NextImage from "next/image";
 import Link from 'next/link';
 import QRCode from "qrcode";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, GeneratedCode, TicketType } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
