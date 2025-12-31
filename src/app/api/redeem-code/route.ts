@@ -37,10 +37,8 @@ export async function POST(request: Request) {
     const { entityId, codeId, dni, businessId, newClientData } = validation.data;
 
     const qrClientsRef = adminDb.collection('qrClients');
-    const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
     
     const finalClientData = await adminDb.runTransaction(async (transaction) => {
-      const clientSnapshot = await transaction.get(clientQuery);
       const entityRef = adminDb.collection('businessEntities').doc(entityId);
       const entityDoc = await transaction.get(entityRef);
       
@@ -53,12 +51,37 @@ export async function POST(request: Request) {
         throw new Error('Esta promoción o evento no está vigente.');
       }
 
-      const dniAlreadyUsed = (entityData.generatedCodes || []).some(
+      // Check if DNI has already redeemed a code for this entity
+      const existingRedemption = (entityData.generatedCodes || []).find(
         (c) => c.redeemedByInfo?.dni === dni
       );
-      if (dniAlreadyUsed) {
-        // ✅ CORREGIDO: Se devuelve un mensaje de error específico y claro.
-        throw new Error('El DNI ingresado ya generó un QR para este evento.');
+      if (existingRedemption) {
+        // DNI already exists, retrieve the QR and client data
+        const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
+        const existingClientSnap = await transaction.get(clientQuery);
+
+        if (!existingClientSnap.empty) {
+            const clientDoc = existingClientSnap.docs[0];
+            const clientData = clientDoc.data() as Omit<QrClient, 'id'>;
+            
+            const dobDate = clientData.dob instanceof Timestamp ? clientData.dob.toDate() : new Date();
+            const regDate = clientData.registrationDate instanceof Timestamp ? clientData.registrationDate.toDate() : new Date();
+
+            return {
+                action: 'alreadyRedeemed',
+                clientData: {
+                    id: clientDoc.id,
+                    ...clientData,
+                    dob: dobDate.toISOString(),
+                    registrationDate: regDate.toISOString(),
+                },
+                code: existingRedemption
+            };
+        } else {
+            // This is an inconsistent state, but we should still handle it.
+            // Let the flow continue to create a new client, but log a warning.
+            console.warn(`DNI ${dni} found in entity ${entityId} but not in qrClients collection.`);
+        }
       }
 
       const codes = (entityData.generatedCodes || []) as GeneratedCode[];
@@ -75,6 +98,9 @@ export async function POST(request: Request) {
       let clientData: Omit<QrClient, 'id'>;
       let finalClientId: string;
       let clientAction: 'userExists' | 'newUser' = 'userExists';
+
+      const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
+      const clientSnapshot = await transaction.get(clientQuery);
 
       if (!clientSnapshot.empty) {
         clientDoc = clientSnapshot.docs[0];

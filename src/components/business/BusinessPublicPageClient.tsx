@@ -488,18 +488,22 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 setIsConsultingDni(false);
             }
             
-        } else if (result.action === 'userExists') {
+        } else if (result.action === 'userExists' || result.action === 'alreadyRedeemed') {
             const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
             const clientForQr: QrClient = result.clientData;
-            const ticketType = freshEntityData.ticketTypes?.find(t => t.id === validatedCodeObject.ticketTypeId);
+            
+            // Si es 'alreadyRedeemed', el código viene en la respuesta, sino, lo tomamos del estado
+            const finalCodeObject = result.code || validatedCodeObject;
+
+            const ticketType = freshEntityData.ticketTypes?.find(t => t.id === finalCodeObject.ticketTypeId);
             const qrCodeDetails: QrCodeData["promotion"] = {
                 id: freshEntityData.id,
                 title: freshEntityData.name,
                 description: freshEntityData.description,
                 validUntil: freshEntityData.endDate,
                 imageUrl: freshEntityData.imageUrl || "",
-                promoCode: validatedCodeObject.value,
-                qrValue: validatedCodeObject.id,
+                promoCode: finalCodeObject.value,
+                qrValue: finalCodeObject.id,
                 aiHint: freshEntityData.aiHint || "",
                 type: freshEntityData.type,
                 termsAndConditions: freshEntityData.termsAndConditions,
@@ -507,17 +511,18 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
                 qrTemplateLayout: freshEntityData.qrTemplateLayout,
                 ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
             };
-            setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
+            setQrData({ user: clientForQr, promotion: qrCodeDetails, code: finalCodeObject.id, status: "redeemed" });
             setShowDniModal(false);
             setPageViewState("qrDisplay");
-             toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
+             
+             if (result.action === 'alreadyRedeemed') {
+                 toast({ title: "QR Recuperado", description: "Este es el QR que ya habías generado para este evento." });
+             } else {
+                 toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
+             }
         }
     } catch (e: any) {
-        // ✅ CORREGIDO: Se muestra el mensaje específico para DNI duplicado.
-        const errorMessage = (e.message || "No se pudo procesar la solicitud.").includes("ya generó un QR") 
-            ? "El DNI ingresado ya generó un QR para este evento."
-            : `No se pudo procesar la solicitud. ${e.message}`;
-        toast({ title: "Error de Verificación", description: errorMessage, variant: "destructive" });
+        toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
         resetQrFlow();
     } finally {
         setIsLoadingQrFlow(false);
