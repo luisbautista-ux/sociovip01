@@ -12,7 +12,7 @@ import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, GeneratedCode, TicketType } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle, Download, ArrowLeft, UserCircle } from "lucide-react";
+import { Loader2, AlertTriangle, Download, ArrowLeft, UserCircle, QrCode } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
@@ -245,8 +245,13 @@ export default function QrDisplayPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
-        <Loader2 className="h-12 w-12 animate-spin text-white" />
-        <p className="mt-4 text-lg text-white/90">Cargando tu entrada QR...</p>
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
+            <QrCode size={70} className="text-primary"/>
+          </div>
+          <p className="mt-4 text-lg font-semibold text-white/90">Generando tu entrada QR, por favor espera...</p>
+          <p className="mt-1 text-sm text-white/80">No cierres esta ventana.</p>
+        </div>
       </div>
     );
   }
@@ -304,4 +309,3 @@ export default function QrDisplayPage() {
     </div>
   );
 }
-
