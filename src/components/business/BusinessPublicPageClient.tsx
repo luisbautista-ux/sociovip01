@@ -113,9 +113,7 @@ const extractCodeString = (codeObj: any) =>
 
 const isCodeAvailableForUse = (codeObj: any) => {
   const status = String(codeObj?.status ?? codeObj?.estado ?? "").toLowerCase();
-  const usedFlag = Boolean(codeObj?.used ?? codeObj?.redeemed ?? codeObj?.isUsed);
-  // disponible si NO tiene flags de usado y su status es vacío/available/nuevo/libre
-  return !usedFlag && (status === "" || status === "available" || status === "nuevo" || status === "libre");
+  return status === "available";
 };
 
 
@@ -328,7 +326,6 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
     }
   }, [customUrlPath, fetchBusinessDataByCustomUrl]);
 
-
 const displayRecoveredQr = useCallback((qrDataToDisplay: QrCodeData) => {
     setQrData(qrDataToDisplay);
     setPageViewState("qrDisplay");
@@ -362,7 +359,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
         }
         
         if (foundCodeObject.status === 'redeemed' || foundCodeObject.status === 'used') {
-            if (!foundCodeObject.redeemedByInfo?.dni) {
+             if (!foundCodeObject.redeemedByInfo?.dni) {
                 throw new Error("El código ya fue usado pero no tiene un DNI asociado para recuperarlo.");
             }
             const clientQuery = query(collection(db, "qrClients"), where("dni", "==", foundCodeObject.redeemedByInfo.dni), limit(1));
@@ -392,19 +389,9 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
             };
             const recoveredQrData: QrCodeData = { user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status };
 
-            toast({
-              title: "¡QR recuperado!",
-              description: "Este código ya fue usado. Haz clic para ver el QR generado.",
-              action: (
-                  <ToastAction
-                    altText="Ver QR"
-                    onClick={() => displayRecoveredQr(recoveredQrData)}
-                  >
-                    Ver QR
-                  </ToastAction>
-              )
-            });
-            
+            displayRecoveredQr(recoveredQrData);
+            toast({ title: "¡QR recuperado!", description: "Este código ya fue usado. Mostrando el QR generado anteriormente." });
+
         } else if (foundCodeObject.status === 'available') {
             setActiveEntityForQr(realTimeEntityData);
             setValidatedCodeObject(foundCodeObject);
@@ -1442,3 +1429,5 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
+    
