@@ -83,8 +83,8 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
+  AlertDialogDescription as UIDialogDescription,
+  AlertDialogFooter as ShadcnAlertDialogFooterAliased,
   AlertDialogHeader,
   AlertDialogTitle as UIAlertDialogTitle,
   AlertDialogTrigger,
@@ -326,88 +326,87 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
     }
   }, [customUrlPath, fetchBusinessDataByCustomUrl]);
 
-const displayRecoveredQr = useCallback((qrDataToDisplay: QrCodeData) => {
-    setQrData(qrDataToDisplay);
-    setPageViewState("qrDisplay");
-}, []);
-
-const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
+  const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
     const codeToValidate = normalizeCode(codeInputValue);
-
+  
     if (codeToValidate.length !== 9) {
-        toast({ title: "Código inválido", description: "El código debe tener 9 caracteres alfanuméricos.", variant: "destructive" });
-        return;
+      toast({
+        title: "Código inválido",
+        description: "El código debe tener 9 caracteres alfanuméricos.",
+        variant: "destructive",
+      });
+      return;
     }
-
+  
     setIsLoadingQrFlow(true);
     try {
-        const entityRef = doc(db, "businessEntities", entity.id);
-        const snap = await getDoc(entityRef);
-        if (!snap.exists()) throw new Error("La promoción o evento ya no existe.");
-
-        const realTimeEntityData: BusinessManagedEntity = { id: snap.id, ...(snap.data() as any), startDate: anyToDate(snap.data().startDate)?.toISOString() || "", endDate: anyToDate(snap.data().endDate)?.toISOString() || "" };
-
-        if (!isEntityCurrentlyActivatable(realTimeEntityData)) {
-            throw new Error("Esta oferta no está vigente en este momento.");
+      const entityRef = doc(db, "businessEntities", entity.id);
+      const snap = await getDoc(entityRef);
+      if (!snap.exists()) throw new Error("La promoción o evento ya no existe.");
+  
+      const realTimeEntityData: BusinessManagedEntity = { id: snap.id, ...(snap.data() as any), startDate: anyToDate(snap.data().startDate)?.toISOString() || "", endDate: anyToDate(snap.data().endDate)?.toISOString() || "" };
+  
+      if (!isEntityCurrentlyActivatable(realTimeEntityData)) {
+        throw new Error("Esta oferta no está vigente en este momento.");
+      }
+  
+      const codes: GeneratedCode[] = Array.isArray(realTimeEntityData.generatedCodes) ? realTimeEntityData.generatedCodes : [];
+      const foundCodeObject = codes.find((c) => extractCodeString(c) === codeToValidate);
+  
+      if (!foundCodeObject) {
+        throw new Error(`El código "${codeToValidate}" no existe o no es válido para esta campaña.`);
+      }
+  
+      if (foundCodeObject.status === 'redeemed' || foundCodeObject.status === 'used') {
+        if (!foundCodeObject.redeemedByInfo?.dni) {
+          throw new Error("El código ya fue usado pero no tiene un DNI asociado para recuperarlo.");
         }
-
-        const codes: GeneratedCode[] = Array.isArray(realTimeEntityData.generatedCodes) ? realTimeEntityData.generatedCodes : [];
-        const foundCodeObject = codes.find((c) => extractCodeString(c) === codeToValidate);
-
-        if (!foundCodeObject) {
-            throw new Error(`El código "${codeToValidate}" no existe o no es válido para esta campaña.`);
+        const clientQuery = query(collection(db, "qrClients"), where("dni", "==", foundCodeObject.redeemedByInfo.dni), limit(1));
+        const clientSnap = await getDocs(clientQuery);
+  
+        if (clientSnap.empty) {
+          throw new Error("No se pudo encontrar el perfil del cliente que canjeó este código.");
         }
-        
-        if (foundCodeObject.status === 'redeemed' || foundCodeObject.status === 'used') {
-             if (!foundCodeObject.redeemedByInfo?.dni) {
-                throw new Error("El código ya fue usado pero no tiene un DNI asociado para recuperarlo.");
-            }
-            const clientQuery = query(collection(db, "qrClients"), where("dni", "==", foundCodeObject.redeemedByInfo.dni), limit(1));
-            const clientSnap = await getDocs(clientQuery);
-
-            if (clientSnap.empty) {
-                throw new Error("No se pudo encontrar el perfil del cliente que canjeó este código.");
-            }
-            
-            const clientData = { id: clientSnap.docs[0].id, ...clientSnap.docs[0].data() } as QrClient;
-            const ticketType = realTimeEntityData.ticketTypes?.find(t => t.id === foundCodeObject.ticketTypeId);
-            
-            const qrCodeDetails: QrCodeData["promotion"] = {
-                id: realTimeEntityData.id,
-                title: realTimeEntityData.name,
-                description: realTimeEntityData.description,
-                validUntil: realTimeEntityData.endDate,
-                imageUrl: realTimeEntityData.imageUrl || "",
-                promoCode: foundCodeObject.value,
-                qrValue: foundCodeObject.id,
-                aiHint: realTimeEntityData.aiHint || "",
-                type: realTimeEntityData.type,
-                termsAndConditions: realTimeEntityData.termsAndConditions,
-                qrTemplateImageUrl: realTimeEntityData.qrTemplateImageUrl,
-                qrTemplateLayout: realTimeEntityData.qrTemplateLayout,
-                ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
-            };
-            const recoveredQrData: QrCodeData = { user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status };
-
-            displayRecoveredQr(recoveredQrData);
-            toast({ title: "¡QR recuperado!", description: "Este código ya fue usado. Mostrando el QR generado anteriormente." });
-
-        } else if (foundCodeObject.status === 'available') {
-            setActiveEntityForQr(realTimeEntityData);
-            setValidatedCodeObject(foundCodeObject);
-            setCurrentStepInModal("enterDni");
-            dniForm.reset({ docType: 'dni', docNumber: "" });
-            setShowDniModal(true);
-        } else {
-            throw new Error(`Este código ya está en un estado no válido.`);
-        }
-
+  
+        const clientData = { id: clientSnap.docs[0].id, ...clientSnap.docs[0].data() } as QrClient;
+        const ticketType = realTimeEntityData.ticketTypes?.find(t => t.id === foundCodeObject.ticketTypeId);
+  
+        const qrCodeDetails: QrCodeData["promotion"] = {
+          id: realTimeEntityData.id,
+          title: realTimeEntityData.name,
+          description: realTimeEntityData.description,
+          validUntil: realTimeEntityData.endDate,
+          imageUrl: realTimeEntityData.imageUrl || "",
+          promoCode: foundCodeObject.value,
+          qrValue: foundCodeObject.id,
+          aiHint: realTimeEntityData.aiHint || "",
+          type: realTimeEntityData.type,
+          termsAndConditions: realTimeEntityData.termsAndConditions,
+          qrTemplateImageUrl: realTimeEntityData.qrTemplateImageUrl,
+          qrTemplateLayout: realTimeEntityData.qrTemplateLayout,
+          ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
+        };
+  
+        setQrData({ user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status });
+        setPageViewState("qrDisplay");
+        toast({ title: "¡QR recuperado!", description: "Este código ya fue usado. Mostrando el QR generado anteriormente." });
+  
+      } else if (foundCodeObject.status === 'available') {
+        setActiveEntityForQr(realTimeEntityData);
+        setValidatedCodeObject(foundCodeObject);
+        setCurrentStepInModal("enterDni");
+        dniForm.reset({ docType: 'dni', docNumber: "" });
+        setShowDniModal(true);
+      } else {
+        throw new Error(`Este código ya está en un estado no válido (${foundCodeObject.status}).`);
+      }
+  
     } catch (e: any) {
-        toast({ title: "Error de Validación", description: e.message || "No se pudo validar el código.", variant: "destructive" });
+      toast({ title: "Error de Validación", description: e.message || "No se pudo validar el código.", variant: "destructive" });
     } finally {
-        setIsLoadingQrFlow(false);
+      setIsLoadingQrFlow(false);
     }
-};
+  };
 
 const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEntity> => {
     const entityRef = doc(db, "businessEntities", entityId);
@@ -1429,5 +1428,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
-    
