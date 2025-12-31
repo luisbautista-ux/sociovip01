@@ -369,6 +369,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
             
             const clientData = { id: clientSnap.docs[0].id, ...clientSnap.docs[0].data() } as QrClient;
             const ticketType = realTimeEntityData.ticketTypes?.find(t => t.id === foundCodeObject.ticketTypeId);
+            
             const qrCodeDetails: QrCodeData["promotion"] = {
                 id: realTimeEntityData.id,
                 title: realTimeEntityData.name,
@@ -390,26 +391,15 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
               title: "¡QR recuperado!",
               description: "Te mostramos el QR que ya habías generado con este código.",
               action: (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <ToastAction altText="Ver QR" onClick={(e) => e.preventDefault()}>Ver QR</ToastAction>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>QR Recuperado</AlertDialogTitle>
-                      <AlertDialogDescription>
-                         Se mostrará el QR que generaste previamente.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => {
+                  <ToastAction
+                    altText="Ver QR"
+                    onClick={() => {
                         setQrData(recoveredQrData);
                         setPageViewState("qrDisplay");
-                      }}>Ver</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                    }}
+                  >
+                    Ver QR
+                  </ToastAction>
               )
             });
             
@@ -1450,3 +1440,4 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
