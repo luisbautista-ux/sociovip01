@@ -86,7 +86,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle as UIAlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import React from "react";
@@ -329,6 +329,11 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
   }, [customUrlPath, fetchBusinessDataByCustomUrl]);
 
 
+const displayRecoveredQr = useCallback((qrDataToDisplay: QrCodeData) => {
+    setQrData(qrDataToDisplay);
+    setPageViewState("qrDisplay");
+}, []);
+
 const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
     const codeToValidate = normalizeCode(codeInputValue);
 
@@ -385,18 +390,15 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
                 qrTemplateLayout: realTimeEntityData.qrTemplateLayout,
                 ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
             };
-            const recoveredQrData = { user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status };
+            const recoveredQrData: QrCodeData = { user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status };
 
             toast({
               title: "¡QR recuperado!",
-              description: "Te mostramos el QR que ya habías generado con este código.",
+              description: "Este código ya fue usado. Haz clic para ver el QR generado.",
               action: (
                   <ToastAction
                     altText="Ver QR"
-                    onClick={() => {
-                        setQrData(recoveredQrData);
-                        setPageViewState("qrDisplay");
-                    }}
+                    onClick={() => displayRecoveredQr(recoveredQrData)}
                   >
                     Ver QR
                   </ToastAction>
@@ -544,7 +546,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
             setPageViewState("qrDisplay");
              
              if (result.action === 'alreadyRedeemed') {
-                 toast({ title: "¡QR recuperado!", description: "Te mostramos el QR que ya habías generado con este código." });
+                 toast({ title: "¡QR recuperado!", description: "El DNI ingresado ya generó un QR para este evento." });
              } else {
                  toast({ title: "¡Éxito!", description: "Cliente verificado y código canjeado. Generando QR." });
              }
@@ -1440,4 +1442,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
