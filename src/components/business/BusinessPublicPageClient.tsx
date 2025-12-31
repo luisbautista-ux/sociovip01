@@ -83,10 +83,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as UIDialogDescription,
-  AlertDialogFooter as ShadcnAlertDialogFooterAliased,
+  AlertDialogDescription,
+  AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle as UIAlertDialogTitle,
+  AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import React from "react";
@@ -355,7 +355,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
         if (!foundCodeObject) {
             throw new Error(`El código "${codeToValidate}" no existe o no es válido para esta campaña.`);
         }
-
+        
         if (foundCodeObject.status === 'redeemed' || foundCodeObject.status === 'used') {
             if (!foundCodeObject.redeemedByInfo?.dni) {
                 throw new Error("El código ya fue usado pero no tiene un DNI asociado para recuperarlo.");
@@ -385,13 +385,14 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
                 ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
             };
             const recoveredQrData = { user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status };
+
             toast({
               title: "¡QR recuperado!",
               description: "Te mostramos el QR que ya habías generado con este código.",
               action: (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <ToastAction altText="Ver QR">Ver QR</ToastAction>
+                    <ToastAction altText="Ver QR" onClick={(e) => e.preventDefault()}>Ver QR</ToastAction>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -419,7 +420,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
             dniForm.reset({ docType: 'dni', docNumber: "" });
             setShowDniModal(true);
         } else {
-            throw new Error(`Este código ya está ${GENERATED_CODE_STATUS_TRANSLATIONS[foundCodeObject.status] || 'en un estado no válido'}.`);
+            throw new Error(`Este código ya está en un estado no válido.`);
         }
 
     } catch (e: any) {
