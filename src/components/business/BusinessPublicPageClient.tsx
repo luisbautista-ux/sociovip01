@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -384,9 +383,19 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
                 qrTemplateLayout: realTimeEntityData.qrTemplateLayout,
                 ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
             };
-            setQrData({ user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status });
-            setPageViewState("qrDisplay");
-            toast({ title: "¡QR recuperado!", description: "Te mostramos el QR que ya habías generado con este código." });
+            const recoveredQrData = { user: clientData, promotion: qrCodeDetails, code: foundCodeObject.id, status: foundCodeObject.status };
+            toast({
+              title: "¡QR recuperado!",
+              description: "Te mostramos el QR que ya habías generado con este código.",
+              action: (
+                <Button variant="outline" size="sm" onClick={() => {
+                  setQrData(recoveredQrData);
+                  setPageViewState("qrDisplay");
+                }}>
+                  Ver QR
+                </Button>
+              )
+            });
             
         } else if (foundCodeObject.status === 'available') {
             setActiveEntityForQr(realTimeEntityData);
@@ -1425,3 +1434,4 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
