@@ -188,12 +188,13 @@ export function CreateCodesDialog({
   };
 
   const handleDownloadPDF = () => {
-    if (justCreatedCodes.length === 0 || !businessDetails) return;
+    if (justCreatedCodes.length === 0 || !businessDetails || !entity) return;
+    
     const businessUrl = businessDetails.customUrlPath
       ? `https://sociovip.app/${businessDetails.customUrlPath}`
       : `https://sociovip.app/business/${entity?.businessId}`;
 
-    generateCodesPDF(justCreatedCodes, businessDetails.name, businessUrl);
+    generateCodesPDF(justCreatedCodes, businessDetails, entity);
   };
 
   const handleCloseAndReset = () => {

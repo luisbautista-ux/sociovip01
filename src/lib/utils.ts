@@ -1,7 +1,7 @@
 
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { BusinessManagedEntity, GeneratedCode, TicketType } from "./types";
+import type { BusinessManagedEntity, GeneratedCode, TicketType, Business } from "./types";
 import { Timestamp, FieldValue } from "firebase/firestore";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
@@ -175,8 +175,8 @@ export function sanitizeObjectForFirestore(obj: any): any {
 
 export const generateCodesPDF = async (
   codes: GeneratedCode[],
-  businessName: string,
-  businessUrl: string
+  businessDetails: Business,
+  entity: BusinessManagedEntity
 ) => {
   const doc = new jsPDF({
     orientation: "portrait",
@@ -217,17 +217,27 @@ export const generateCodesPDF = async (
 
       // Business Name
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(businessName, x + cellWidth / 2, y + 10, { align: "center" });
+      doc.setFontSize(10);
+      doc.text(businessDetails.name, x + cellWidth / 2, y + 8, { align: "center" });
+      
+      // Correlative Number
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      const correlative = page * codesPerPage + i + 1;
+      doc.text(`Entrada #${correlative}`, x + cellWidth / 2, y + 12, { align: "center" });
 
       // QR Code
-      const qrSize = cellWidth * 0.85;
+      const businessUrl = businessDetails.customUrlPath
+        ? `https://sociovip.app/${businessDetails.customUrlPath}`
+        : `https://sociovip.app/business/${entity.businessId}`;
+        
+      const qrSize = cellWidth * 0.7;
       const qrCodeDataUrl = await QRCode.toDataURL(businessUrl, {
         errorCorrectionLevel: "H",
         width: qrSize,
         margin: 1,
       });
-      const qrYPos = y + 12;
+      const qrYPos = y + 14;
       doc.addImage(
         qrCodeDataUrl,
         "PNG",
@@ -238,20 +248,38 @@ export const generateCodesPDF = async (
       );
 
       // Text below QR
-      const textYPos = qrYPos + qrSize + 6;
+      const textYPos = qrYPos + qrSize + 4;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.text("Genera tu entrada QR", x + cellWidth / 2, textYPos, { align: "center" });
-      doc.text("con este código:", x + cellWidth / 2, textYPos + 3.5, { align: "center" });
+      doc.text("con este código:", x + cellWidth / 2, textYPos + 3, { align: "center" });
 
       // Dynamic Code
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.text(code.value, x + cellWidth / 2, textYPos + 9, {
+      doc.setFontSize(10);
+      doc.text(code.value, x + cellWidth / 2, textYPos + 8, {
         align: "center",
       });
+
+      // Ticket Type "Pulsera"
+      if (code.ticketTypeId && entity.ticketTypes) {
+        const ticketType = entity.ticketTypes.find(t => t.id === code.ticketTypeId);
+        if (ticketType) {
+          const pulseraY = textYPos + 11;
+          const pulseraHeight = 6;
+          doc.setDrawColor(0);
+          doc.setFillColor(ticketType.color || "#888888");
+          doc.rect(x + 2, pulseraY, cellWidth - 4, pulseraHeight, "F");
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(8);
+          doc.setTextColor("#FFFFFF");
+          doc.text(ticketType.name.toUpperCase(), x + cellWidth / 2, pulseraY + 4, { align: "center" });
+          doc.setTextColor("#000000"); // Reset text color
+        }
+      }
     }
   }
 
-  doc.save(`${businessName}_codes.pdf`);
+  doc.save(`${businessDetails.name}_${entity.name}_codes.pdf`);
 };
