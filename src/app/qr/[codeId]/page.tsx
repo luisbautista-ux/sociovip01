@@ -17,7 +17,7 @@ import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { anyToDate } from '@/lib/utils';
 
@@ -80,12 +80,13 @@ export default function QrDisplayPage() {
       
       const clientData = { id: clientSnap.docs[0].id, ...clientSnap.docs[0].data() } as QrClient;
 
-      const ticketType = foundEntity.ticketTypes?.find(t => t.id === foundCode.ticketTypeId);
+      const ticketType = foundEntity.ticketTypes?.find(t => t.id === foundCode!.ticketTypeId);
+      
       const promotionDetails: QrCodeData["promotion"] = {
         id: foundEntity.id,
         title: foundEntity.name,
         description: foundEntity.description,
-        validUntil: foundEntity.endDate,
+        validUntil: anyToDate(foundEntity.endDate)?.toISOString() || new Date().toISOString(),
         imageUrl: foundEntity.imageUrl || "",
         promoCode: foundCode.value,
         qrValue: foundCode.id,
@@ -319,7 +320,7 @@ export default function QrDisplayPage() {
                      </div>
                    </div>
                  )}
-                 <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
+                 <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(anyToDate(qrData.promotion.validUntil)!, "dd MMMM, yyyy", { locale: es })}</p>
               </div>
             </CardContent>
           </Card>
@@ -329,4 +330,3 @@ export default function QrDisplayPage() {
     </div>
   );
 }
-
