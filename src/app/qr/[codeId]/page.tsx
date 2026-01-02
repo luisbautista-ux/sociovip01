@@ -32,7 +32,7 @@ export default function QrDisplayPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
-  const [isDrawingCanvas, setIsDrawingCanvas] = useState(false); // <-- NUEVO ESTADO
+  const [isDrawingCanvas, setIsDrawingCanvas] = useState(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -119,7 +119,7 @@ export default function QrDisplayPage() {
     const canvas = canvasRef.current;
     if (!canvas || !qrData || !qrData.promotion.qrTemplateImageUrl) return;
 
-    setIsDrawingCanvas(true); // <-- Inicia la carga del canvas
+    setIsDrawingCanvas(true);
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       setIsDrawingCanvas(false);
@@ -194,7 +194,7 @@ export default function QrDisplayPage() {
           ctx.fillText('Error al generar plantilla.', canvas.width / 2, canvas.height / 2);
         }
     } finally {
-        setIsDrawingCanvas(false); // <-- Finaliza la carga del canvas
+        setIsDrawingCanvas(false);
     }
   }, [qrData]);
 
@@ -312,7 +312,13 @@ export default function QrDisplayPage() {
               <Separator />
               <div className="text-center">
                  <p className="font-semibold">{qrData.promotion.title}</p>
-                 {qrData.promotion.ticketType && <div className="flex justify-center mt-2"><div className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md" style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}>{qrData.promotion.ticketType.name.toUpperCase()}</div></div>}
+                 {qrData.promotion.ticketType?.name && (
+                   <div className="flex justify-center mt-2">
+                     <div className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md" style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}>
+                       {qrData.promotion.ticketType.name.toUpperCase()}
+                     </div>
+                   </div>
+                 )}
                  <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
               </div>
             </CardContent>
@@ -323,3 +329,4 @@ export default function QrDisplayPage() {
     </div>
   );
 }
+
