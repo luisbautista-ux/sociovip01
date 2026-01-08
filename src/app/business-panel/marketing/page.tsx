@@ -7,25 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Megaphone, Send, Users, Activity, Repeat, UserCheck, Cake, Moon } from "lucide-react";
+import { Loader2, Megaphone, Send, Users, Activity, Repeat, UserCheck, Cake, Moon, Gift } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import type { BusinessManagedEntity, QrClient } from "@/lib/types";
-import { anyToDate } from "@/lib/utils";
+import { anyToDate, isEntityCurrentlyActivatable } from "@/lib/utils";
 import { isPast, getMonth, differenceInDays } from 'date-fns';
 import { MESES_DEL_ANO_ES } from "@/lib/constants";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from "@/components/ui/label";
+import { BirthdayCampaignModal } from '@/components/business/marketing/BirthdayCampaignModal';
 
 export default function MarketingPage() {
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
-  const [pastEvents, setPastEvents] = useState<BusinessManagedEntity[]>([]);
-  const [allClients, setAllClients] = useState<QrClient[]>([]);
   const [allEntities, setAllEntities] = useState<BusinessManagedEntity[]>([]);
+  const [allClients, setAllClients] = useState<QrClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Estados para segmentación
@@ -34,13 +34,25 @@ export default function MarketingPage() {
   const [loyaltyThreshold, setLoyaltyThreshold] = useState<number>(3);
   const [loyaltyClientsCount, setLoyaltyClientsCount] = useState<number | null>(null);
   const [birthdayMonth, setBirthdayMonth] = useState<string>('');
-  const [birthdayClientsCount, setBirthdayClientsCount] = useState<number | null>(null);
+  const [birthdayClients, setBirthdayClients] = useState<QrClient[]>([]);
   const [inactiveDays, setInactiveDays] = useState<number>(90);
   const [inactiveClientsCount, setInactiveClientsCount] = useState<number | null>(null);
   const [manualSelection, setManualSelection] = useState<Set<string>>(new Set());
   const [manualSearchTerm, setManualSearchTerm] = useState('');
 
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [showBirthdayModal, setShowBirthdayModal] = useState(false);
+
+  const pastEvents = useMemo(() => {
+    return allEntities
+        .filter(event => event.type === 'event' && event.endDate && isPast(anyToDate(event.endDate) || new Date()))
+        .sort((a,b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
+  }, [allEntities]);
+  
+  const activePromotions = useMemo(() => {
+    return allEntities
+        .filter(promo => promo.type === 'promotion' && isEntityCurrentlyActivatable(promo));
+  }, [allEntities]);
 
   const fetchData = useCallback(async () => {
     if (!userProfile?.businessId) {
@@ -55,12 +67,6 @@ export default function MarketingPage() {
       const entitiesSnap = await getDocs(entitiesQuery);
       const fetchedEntities = entitiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessManagedEntity));
       setAllEntities(fetchedEntities);
-
-      // Filter past events for the dropdown
-      const filteredPastEvents = fetchedEntities.filter(event => 
-        event.type === 'event' && event.endDate && isPast(anyToDate(event.endDate) || new Date())
-      ).sort((a,b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime());
-      setPastEvents(filteredPastEvents);
       
       // Fetch all clients related to the business
       const clientsQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
@@ -85,11 +91,11 @@ export default function MarketingPage() {
       setEventAttendeeCount(null);
       return;
     }
-    setIsProcessing(true);
+    setIsProcessing('event');
     const selectedEvent = allEntities.find(e => e.id === eventId);
     if (!selectedEvent || !selectedEvent.generatedCodes) {
       setEventAttendeeCount(0);
-      setIsProcessing(false);
+      setIsProcessing(null);
       return;
     }
     const attendees = new Set<string>();
@@ -99,11 +105,11 @@ export default function MarketingPage() {
       }
     });
     setEventAttendeeCount(attendees.size);
-    setIsProcessing(false);
+    setIsProcessing(null);
   };
 
   const handleSegmentByLoyalty = () => {
-    setIsProcessing(true);
+    setIsProcessing('loyalty');
     const visitCounts = new Map<string, number>();
     allEntities.forEach(entity => {
       entity.generatedCodes?.forEach(code => {
@@ -115,27 +121,27 @@ export default function MarketingPage() {
     });
     const loyalClients = Array.from(visitCounts.entries()).filter(([dni, count]) => count >= loyaltyThreshold);
     setLoyaltyClientsCount(loyalClients.length);
-    setIsProcessing(false);
+    setIsProcessing(null);
   };
   
   const handleSegmentByBirthday = (month: string) => {
     setBirthdayMonth(month);
     if (!month) {
-        setBirthdayClientsCount(null);
+        setBirthdayClients([]);
         return;
     }
-    setIsProcessing(true);
+    setIsProcessing('birthday');
     const monthIndex = parseInt(month, 10);
-    const birthdayClients = allClients.filter(client => {
+    const clients = allClients.filter(client => {
         const dob = anyToDate(client.dob);
         return dob && getMonth(dob) === monthIndex;
     });
-    setBirthdayClientsCount(birthdayClients.length);
-    setIsProcessing(false);
+    setBirthdayClients(clients);
+    setIsProcessing(null);
   };
 
   const handleSegmentByInactivity = () => {
-    setIsProcessing(true);
+    setIsProcessing('inactivity');
     const now = new Date();
     const inactiveClientDnis = new Set<string>();
     const activeClientDnis = new Set<string>();
@@ -157,7 +163,7 @@ export default function MarketingPage() {
         }
     });
     setInactiveClientsCount(inactiveClientDnis.size);
-    setIsProcessing(false);
+    setIsProcessing(null);
   };
 
   const filteredManualClients = useMemo(() => {
@@ -182,6 +188,7 @@ export default function MarketingPage() {
   };
 
   return (
+    <>
     <div className="space-y-8">
       <h1 className="text-3xl font-bold text-gradient flex items-center gap-3">
         <Megaphone className="h-8 w-8 text-primary" />
@@ -202,11 +209,11 @@ export default function MarketingPage() {
               <CardTitle className="text-lg flex items-center gap-2"><Activity className="h-5 w-5 text-primary"/>Segmentar por Asistencia a Evento Pasado</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Select onValueChange={handleSegmentByEvent} value={selectedEventId} disabled={isProcessing || isLoading}>
+              <Select onValueChange={handleSegmentByEvent} value={selectedEventId} disabled={!!isProcessing || isLoading}>
                 <SelectTrigger><SelectValue placeholder="Selecciona un evento pasado..." /></SelectTrigger>
                 <SelectContent>{pastEvents.length > 0 ? pastEvents.map(event => <SelectItem key={event.id} value={event.id}>{event.name}</SelectItem>) : <div className="p-4 text-center text-sm text-muted-foreground">No hay eventos pasados.</div>}</SelectContent>
               </Select>
-              {isProcessing && selectedEventId && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Contando...</div>}
+              {isProcessing === 'event' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Contando...</div>}
               {eventAttendeeCount !== null && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{eventAttendeeCount}</p><p className="text-sm text-muted-foreground">clientes únicos asistieron a este evento.</p><Button className="mt-4" variant="gradient" disabled={eventAttendeeCount === 0}><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
             </CardContent>
           </Card>
@@ -218,9 +225,9 @@ export default function MarketingPage() {
                     <Label htmlFor="loyalty" className="whitespace-nowrap">Clientes con al menos</Label>
                     <Input id="loyalty" type="number" value={loyaltyThreshold} onChange={e => setLoyaltyThreshold(Number(e.target.value))} className="w-20" min="1"/>
                     <Label htmlFor="loyalty">asistencias</Label>
-                    <Button onClick={handleSegmentByLoyalty} disabled={isProcessing || isLoading} className="ml-auto">Calcular</Button>
+                    <Button onClick={handleSegmentByLoyalty} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
                 </div>
-                {isProcessing && loyaltyClientsCount === null && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
+                {isProcessing === 'loyalty' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
                 {loyaltyClientsCount !== null && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{loyaltyClientsCount}</p><p className="text-sm text-muted-foreground">clientes leales encontrados.</p><Button className="mt-4" variant="gradient" disabled={loyaltyClientsCount === 0}><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
             </CardContent>
           </Card>
@@ -228,12 +235,13 @@ export default function MarketingPage() {
           <Card className="bg-muted/30">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Cake className="h-5 w-5 text-primary"/>Segmentar por Cumpleaños</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-                <Select onValueChange={handleSegmentByBirthday} value={birthdayMonth} disabled={isProcessing || isLoading}>
+                <Select onValueChange={handleSegmentByBirthday} value={birthdayMonth} disabled={!!isProcessing || isLoading}>
                   <SelectTrigger><SelectValue placeholder="Selecciona un mes..." /></SelectTrigger>
                   <SelectContent>{MESES_DEL_ANO_ES.map((mes, index) => <SelectItem key={index} value={String(index)}>{mes}</SelectItem>)}</SelectContent>
                 </Select>
-                {isProcessing && birthdayClientsCount === null && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Contando...</div>}
-                {birthdayClientsCount !== null && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{birthdayClientsCount}</p><p className="text-sm text-muted-foreground">clientes cumplen años en {MESES_DEL_ANO_ES[parseInt(birthdayMonth,10)]}.</p><Button className="mt-4" variant="gradient" disabled={birthdayClientsCount === 0}><Send className="mr-2 h-4 w-4"/>Enviar Felicitación</Button></div>}
+                {isProcessing === 'birthday' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Contando...</div>}
+                {birthdayClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{birthdayClients.length}</p><p className="text-sm text-muted-foreground">clientes cumplen años en {MESES_DEL_ANO_ES[parseInt(birthdayMonth,10)]}.</p><Button onClick={() => setShowBirthdayModal(true)} className="mt-4" variant="gradient" disabled={birthdayClients.length === 0}><Gift className="mr-2 h-4 w-4"/>Enviar Felicitación</Button></div>}
+                {birthdayMonth && !isProcessing && birthdayClients.length === 0 && <p className="text-center text-sm text-muted-foreground pt-2">No se encontraron clientes para este mes.</p>}
             </CardContent>
           </Card>
           
@@ -244,9 +252,9 @@ export default function MarketingPage() {
                     <Label htmlFor="inactivity" className="whitespace-nowrap">Clientes sin actividad en los últimos</Label>
                     <Input id="inactivity" type="number" value={inactiveDays} onChange={e => setInactiveDays(Number(e.target.value))} className="w-20" min="30"/>
                     <Label htmlFor="inactivity">días</Label>
-                    <Button onClick={handleSegmentByInactivity} disabled={isProcessing || isLoading} className="ml-auto">Calcular</Button>
+                    <Button onClick={handleSegmentByInactivity} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
                 </div>
-                {isProcessing && inactiveClientsCount === null && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
+                {isProcessing === 'inactivity' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
                 {inactiveClientsCount !== null && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{inactiveClientsCount}</p><p className="text-sm text-muted-foreground">clientes inactivos encontrados.</p><Button className="mt-4" variant="gradient" disabled={inactiveClientsCount === 0}><Send className="mr-2 h-4 w-4"/>Crear Campaña de Reactivación</Button></div>}
             </CardContent>
           </Card>
@@ -275,5 +283,17 @@ export default function MarketingPage() {
         </CardContent>
       </Card>
     </div>
+
+    {showBirthdayModal && (
+        <BirthdayCampaignModal
+            open={showBirthdayModal}
+            onOpenChange={setShowBirthdayModal}
+            birthdayMonthName={MESES_DEL_ANO_ES[parseInt(birthdayMonth, 10)]}
+            clients={birthdayClients}
+            availablePromotions={activePromotions}
+            businessId={userProfile?.businessId || ""}
+        />
+    )}
+    </>
   );
 }
