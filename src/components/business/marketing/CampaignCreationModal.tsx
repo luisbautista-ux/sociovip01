@@ -35,7 +35,7 @@ interface CampaignCreationModalProps {
   clients: QrClient[];
   availablePromotions: BusinessManagedEntity[];
   businessDetails: Business | null;
-  campaignType: CampaignType; // <-- Nuevo prop para saber el contexto
+  campaignType: CampaignType; 
 }
 
 export function CampaignCreationModal({
@@ -70,7 +70,7 @@ export function CampaignCreationModal({
 
   const STEPS = [
     { label: "Define el Regalo", description: "Elige qué promoción enviarás." },
-    { label: "Personaliza el Mensaje", description: "Crea el saludo de cumpleaños." },
+    { label: "Personaliza el Mensaje", description: "Crea el saludo para tu campaña." },
     { label: "Confirmar y Enviar", description: "Revisa y lanza tu campaña." },
   ];
   
@@ -156,11 +156,11 @@ export function CampaignCreationModal({
         }
         
         const clientsWithMessages = clients
-            .filter(client => client.phone && client.phone.length > 5) // Filtrar clientes sin teléfono
+            .filter(client => client.phone && client.phone.length > 5) 
             .map(client => ({
                 name: client.name,
                 phone: client.phone,
-                message: selectedMessage.replace(/\[Nombre\]/g, client.name.split(' ')[0]) // Reemplaza todas las ocurrencias y usa solo el primer nombre
+                message: selectedMessage.replace(/\[Nombre\]/g, client.name.split(' ')[0]) 
             }));
         setFinalClientList(clientsWithMessages);
     }
@@ -168,34 +168,42 @@ export function CampaignCreationModal({
     if (activeStep < STEPS.length - 1) {
       setActiveStep((prev) => prev + 1);
     } else {
-        // Lógica de envío en lote
+        // --- Envío con Twilio ---
         if (finalClientList.length === 0) {
             toast({title: "No hay clientes", description: "No hay clientes con números de teléfono válidos en este segmento para enviar la campaña.", variant: "destructive"});
             return;
         }
 
-        toast({title: "Iniciando envío...", description: `Se abrirán pestañas de WhatsApp para ${finalClientList.length} cliente(s).`});
-
-        finalClientList.forEach((client, index) => {
-            setTimeout(() => {
-                handleSendToWhatsApp(client.phone, client.message);
-            }, index * 2000); // Abre una nueva pestaña cada 2 segundos
+        setIsProcessing(true);
+        toast({title: "Iniciando envío...", description: `Tu campaña para ${finalClientList.length} cliente(s) se está enviando en segundo plano.`});
+        
+        fetch('/api/campaign/send-whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clients: finalClientList }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                toast({ title: "Éxito", description: `Campaña enviada a la cola para ${data.sentCount} clientes.` });
+            } else {
+                throw new Error(data.error || "Error desconocido en el servidor.");
+            }
+        })
+        .catch(error => {
+            toast({ title: "Error de Envío", description: `No se pudo iniciar la campaña: ${error.message}`, variant: "destructive"});
+        })
+        .finally(() => {
+            setIsProcessing(false);
+            handleClose();
         });
-
-        handleClose();
     }
   };
 
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
-  const handleSendToWhatsApp = (phone: string, message: string) => {
-    const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-  };
-
   const handleClose = () => {
     onOpenChange(false);
-    // Use a timeout to reset state after the dialog has closed
     setTimeout(() => {
         setActiveStep(0);
         setGiftType(null);
@@ -296,7 +304,7 @@ export function CampaignCreationModal({
                          <Card className="bg-muted/50">
                             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><List/>Paso 3: Revisión Final</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
-                               <p className="text-sm text-muted-foreground">Vas a enviar el siguiente mensaje a <span className="font-bold">{finalClientList.length}</span> cliente(s). Al hacer clic en 'Enviar Campaña', se abrirán las ventanas de WhatsApp correspondientes.</p>
+                               <p className="text-sm text-muted-foreground">Vas a enviar el siguiente mensaje a <span className="font-bold">{finalClientList.length}</span> cliente(s). La campaña se enviará en segundo plano.</p>
                                <div className="p-4 border rounded-md bg-background">
                                    <p className="text-sm italic">{selectedMessage.replace(/\[Nombre\]/g, '(Nombre del Cliente)')}</p>
                                </div>
