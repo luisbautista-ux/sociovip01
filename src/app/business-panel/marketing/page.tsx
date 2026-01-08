@@ -17,6 +17,7 @@ import { anyToDate } from "@/lib/utils";
 import { isPast, getMonth, differenceInDays } from 'date-fns';
 import { MESES_DEL_ANO_ES } from "@/lib/constants";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from "@/components/ui/label";
 
 export default function MarketingPage() {
   const { userProfile } = useAuth();
