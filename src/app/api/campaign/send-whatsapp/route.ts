@@ -1,4 +1,6 @@
 
+"use client";
+
 import { NextResponse } from 'next/server';
 import Twilio from 'twilio';
 
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
     let successCount = 0;
     const errors: { phone: string, message: string }[] = [];
 
-    // Usamos Promise.all para procesar todos los envíos
+    // Usamos Promise.all para procesar todos los envíos en paralelo
     await Promise.all(clients.map(async (clientData) => {
       try {
         const fullPhoneNumber = clientData.phone.startsWith('51') ? clientData.phone : `51${clientData.phone}`;
