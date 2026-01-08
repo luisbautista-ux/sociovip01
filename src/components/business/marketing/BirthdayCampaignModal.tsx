@@ -102,10 +102,14 @@ export function BirthdayCampaignModal({
         // Simulate AI message generation
         setTimeout(() => {
             const giftName = getGiftName();
+            const businessLink = businessDetails?.customUrlPath
+              ? `https://sociovip.app/${businessDetails.customUrlPath}`
+              : `https://sociovip.app`;
+
             const messages = [
-                `¡Feliz Cumpleaños, [Nombre]! 🥳 En ${businessDetails?.name || 'nuestro local'} celebramos contigo. Te regalamos ${giftName}. ¡Genera tu QR aquí: [Enlace]!`,
-                `¡Que los cumplas muy feliz, [Nombre]! 🎂 Tu regalo de ${giftName} te espera en ${businessDetails?.name || 'nuestro local'}. Reclámalo aquí: [Enlace]`,
-                `¡Celebra tu día con nosotros, [Nombre]! 🎉 Como regalo de cumpleaños de parte de ${businessDetails?.name || 'nosotros'}, te obsequiamos ${giftName}. Tu QR personalizado aquí: [Enlace]`
+                `¡Feliz Cumpleaños, [Nombre]! 🥳 En ${businessDetails?.name || 'nuestro local'} celebramos contigo. Te regalamos ${giftName}. ¡Genera tu QR aquí: ${businessLink}!`,
+                `¡Que los cumplas muy feliz, [Nombre]! 🎂 Tu regalo de ${giftName} te espera en ${businessDetails?.name || 'nuestro local'}. Reclámalo aquí: ${businessLink}`,
+                `¡Celebra tu día con nosotros, [Nombre]! 🎉 Como regalo de cumpleaños de parte de ${businessDetails?.name || 'nosotros'}, te obsequiamos ${giftName}. Tu QR personalizado aquí: ${businessLink}`
             ];
             setGeneratedMessages(messages);
             setSelectedMessage(messages[0]);
@@ -121,16 +125,12 @@ export function BirthdayCampaignModal({
             return;
         }
         
-        const businessLink = businessDetails?.customUrlPath 
-          ? `https://sociovip.app/${businessDetails.customUrlPath}`
-          : `https://sociovip.app/business/${businessDetails?.id}`;
-        
         const clientsWithMessages = clients
             .filter(client => client.phone && client.phone.length > 5) // Filtrar clientes sin teléfono
             .map(client => ({
                 name: client.name,
                 phone: client.phone,
-                message: selectedMessage.replace('[Nombre]', client.name).replace('[Enlace]', businessLink)
+                message: selectedMessage.replace('[Nombre]', client.name)
             }));
         setFinalClientList(clientsWithMessages);
     }
@@ -242,7 +242,7 @@ export function BirthdayCampaignModal({
                                     ))}
                                 </div>
                                 <Textarea value={selectedMessage} onChange={(e) => setSelectedMessage(e.target.value)} rows={4} placeholder="Escribe tu mensaje..."/>
-                                <p className="text-xs text-muted-foreground">Las etiquetas [Nombre] y [Enlace] se reemplazarán automáticamente para cada cliente.</p>
+                                <p className="text-xs text-muted-foreground">La etiqueta [Nombre] será reemplazada automáticamente para cada cliente.</p>
                             </CardContent>
                         </Card>
                     )}
