@@ -40,15 +40,19 @@ export default function MarketingPage() {
   const [birthdayClients, setBirthdayClients] = useState<QrClient[]>([]);
   
   const [inactiveDays, setInactiveDays] = useState<number>(90);
-  const [inactiveClientsCount, setInactiveClientsCount] = useState<number | null>(null);
+  const [inactiveClients, setInactiveClients] = useState<QrClient[]>([]);
   
   const [manualSelection, setManualSelection] = useState<Set<string>>(new Set());
   const [manualSearchTerm, setManualSearchTerm] = useState('');
 
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  
+  // Estados de los modales
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
   const [showEventCampaignModal, setShowEventCampaignModal] = useState(false);
+  const [showInactiveCampaignModal, setShowInactiveCampaignModal] = useState(false);
+  const [showManualCampaignModal, setShowManualCampaignModal] = useState(false);
 
   const pastEvents = useMemo(() => {
     return allEntities
@@ -165,26 +169,35 @@ export default function MarketingPage() {
   const handleSegmentByInactivity = () => {
     setIsProcessing('inactivity');
     const now = new Date();
-    const inactiveClientDnis = new Set<string>();
-    const activeClientDnis = new Set<string>();
+    const lastActivityMap = new Map<string, Date>();
 
     allEntities.forEach(entity => {
-        entity.generatedCodes?.forEach(code => {
-            if (code.redeemedByInfo?.dni) {
-                const redemptionDate = anyToDate(code.redemptionDate);
-                if(redemptionDate && differenceInDays(now, redemptionDate) <= inactiveDays) {
-                    activeClientDnis.add(code.redeemedByInfo.dni);
-                }
+      (entity.generatedCodes || []).forEach(code => {
+        if (code.redeemedByInfo?.dni) {
+          const redemptionDate = anyToDate(code.redemptionDate);
+          if (redemptionDate) {
+            const dni = code.redeemedByInfo.dni;
+            const lastDate = lastActivityMap.get(dni);
+            if (!lastDate || redemptionDate > lastDate) {
+              lastActivityMap.set(dni, redemptionDate);
             }
-        });
+          }
+        }
+      });
     });
 
-    allClients.forEach(client => {
-        if (!activeClientDnis.has(client.dni)) {
-            inactiveClientDnis.add(client.dni);
+    const inactiveClientList = allClients.filter(client => {
+        const lastActivity = lastActivityMap.get(client.dni);
+        if (!lastActivity) {
+            // Si nunca ha tenido actividad, considerar la fecha de registro
+            const registrationDate = anyToDate(client.registrationDate);
+            if (!registrationDate) return false; // Si no hay fecha de registro, no podemos calcular inactividad
+            return differenceInDays(now, registrationDate) > inactiveDays;
         }
+        return differenceInDays(now, lastActivity) > inactiveDays;
     });
-    setInactiveClientsCount(inactiveClientDnis.size);
+
+    setInactiveClients(inactiveClientList);
     setIsProcessing(null);
   };
 
@@ -208,6 +221,11 @@ export default function MarketingPage() {
       return newSet;
     });
   };
+
+  const manuallySelectedClients = useMemo(() => {
+      return allClients.filter(client => manualSelection.has(client.id));
+  }, [manualSelection, allClients]);
+
 
   const birthdayMonthName = useMemo(() => {
     if (birthdayMonth === '') return '';
@@ -289,7 +307,7 @@ export default function MarketingPage() {
                     <Button onClick={handleSegmentByInactivity} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
                 </div>
                 {isProcessing === 'inactivity' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
-                {inactiveClientsCount !== null && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{inactiveClientsCount}</p><p className="text-sm text-muted-foreground">clientes inactivos encontrados.</p><Button className="mt-4" variant="gradient" disabled={inactiveClientsCount === 0}><Send className="mr-2 h-4 w-4"/>Crear Campaña de Reactivación</Button></div>}
+                {inactiveClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{inactiveClients.length}</p><p className="text-sm text-muted-foreground">clientes inactivos encontrados.</p><Button className="mt-4" variant="gradient" onClick={() => setShowInactiveCampaignModal(true)}><Send className="mr-2 h-4 w-4"/>Crear Campaña de Reactivación</Button></div>}
             </CardContent>
           </Card>
 
@@ -310,7 +328,7 @@ export default function MarketingPage() {
                 <div className="p-4 bg-background rounded-md text-center">
                   <p className="text-3xl font-bold text-primary">{manualSelection.size}</p>
                   <p className="text-sm text-muted-foreground">clientes seleccionados.</p>
-                  <Button className="mt-4" variant="gradient" disabled={manualSelection.size === 0}><Send className="mr-2 h-4 w-4"/>Crear Campaña Manual</Button>
+                  <Button className="mt-4" variant="gradient" disabled={manualSelection.size === 0} onClick={() => setShowManualCampaignModal(true)}><Send className="mr-2 h-4 w-4"/>Crear Campaña Manual</Button>
                 </div>
             </CardContent>
           </Card>
@@ -348,10 +366,26 @@ export default function MarketingPage() {
             businessDetails={businessDetails}
         />
     )}
+    {showInactiveCampaignModal && (
+        <BirthdayCampaignModal
+            open={showInactiveCampaignModal}
+            onOpenChange={setShowInactiveCampaignModal}
+            campaignTitle={`Campaña de Reactivación para ${inactiveClients.length} clientes`}
+            clients={inactiveClients}
+            availablePromotions={activePromotions}
+            businessDetails={businessDetails}
+        />
+    )}
+    {showManualCampaignModal && (
+        <BirthdayCampaignModal
+            open={showManualCampaignModal}
+            onOpenChange={setShowManualCampaignModal}
+            campaignTitle={`Campaña Manual para ${manuallySelectedClients.length} clientes`}
+            clients={manuallySelectedClients}
+            availablePromotions={activePromotions}
+            businessDetails={businessDetails}
+        />
+    )}
     </>
   );
 }
-
-    
-
-    
