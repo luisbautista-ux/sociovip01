@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import type { BusinessManagedEntity, QrClient } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { useForm, zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 
@@ -286,3 +287,4 @@ export function BirthdayCampaignModal({
   );
 }
 
+    
