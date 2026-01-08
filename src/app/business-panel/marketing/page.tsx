@@ -11,7 +11,7 @@ import { Loader2, Megaphone, Send, Users, Activity, Repeat, UserCheck, Cake, Moo
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, QrClient, Business } from "@/lib/types";
 import { anyToDate, isEntityCurrentlyActivatable } from "@/lib/utils";
 import { isPast, getMonth, differenceInDays } from 'date-fns';
