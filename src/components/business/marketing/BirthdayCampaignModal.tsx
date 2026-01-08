@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, ArrowRight, Gift, Pencil, Wand2, Send, MessageSquare } from "lucide-react";
+import { Loader2, ArrowRight, Gift, Pencil, Wand2, Send, MessageSquare, List, Check } from "lucide-react";
 import { Stepper, Step, StepLabel, StepContent } from '@/components/ui/stepper'; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,17 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import type { BusinessManagedEntity, QrClient } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { useForm, zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+
+const newGiftSchema = z.object({
+  name: z.string().min(5, "El nombre del vale debe tener al menos 5 caracteres."),
+  description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
+  validityDays: z.coerce.number().min(1, "La vigencia debe ser de al menos 1 día.").max(90, "La vigencia no puede superar los 90 días."),
+});
+
+type NewGiftValues = z.infer<typeof newGiftSchema>;
 
 interface BirthdayCampaignModalProps {
   open: boolean;
@@ -33,76 +44,122 @@ export function BirthdayCampaignModal({
 }: BirthdayCampaignModalProps) {
   const { toast } = useToast();
   const [activeStep, setActiveStep] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Step 1 State
   const [giftType, setGiftType] = useState<'existing' | 'new' | null>(null);
   const [selectedPromotionId, setSelectedPromotionId] = useState<string>('');
 
+  const newGiftForm = useForm<NewGiftValues>({
+      resolver: zodResolver(newGiftSchema),
+      defaultValues: { name: "", description: "", validityDays: 30 }
+  });
+
   // Step 2 State
   const [generatedMessages, setGeneratedMessages] = useState<string[]>([]);
   const [selectedMessage, setSelectedMessage] = useState('');
+
+  // Step 3 State
+  const [finalClientList, setFinalClientList] = useState<{name: string, phone: string, message: string}[]>([]);
+
 
   const STEPS = [
     { label: "Define el Regalo", description: "Elige qué promoción enviarás." },
     { label: "Personaliza el Mensaje", description: "Crea el saludo de cumpleaños." },
     { label: "Confirmar y Enviar", description: "Revisa y lanza tu campaña." },
   ];
+  
+  const getGiftName = () => {
+    if (giftType === 'existing' && selectedPromotionId) {
+        return availablePromotions.find(p => p.id === selectedPromotionId)?.name || "un regalo especial";
+    }
+    if (giftType === 'new') {
+        return newGiftForm.getValues('name') || "un regalo especial";
+    }
+    return "un regalo especial";
+  }
 
-  const handleNext = () => {
-    if (activeStep === 0 && !giftType) {
-        toast({ title: "Acción requerida", description: "Debes seleccionar un tipo de regalo.", variant: "destructive" });
-        return;
-    }
-    if (activeStep === 0 && giftType === 'existing' && !selectedPromotionId) {
-        toast({ title: "Acción requerida", description: "Debes seleccionar una promoción existente.", variant: "destructive" });
-        return;
-    }
-    // TODO: Validate new gift form
-    
-    // Simulate AI message generation for Step 2
+  const handleNext = async () => {
     if (activeStep === 0) {
-        setIsSubmitting(true);
+        if (!giftType) {
+            toast({ title: "Acción requerida", description: "Debes seleccionar un tipo de regalo.", variant: "destructive" });
+            return;
+        }
+        if (giftType === 'existing' && !selectedPromotionId) {
+            toast({ title: "Acción requerida", description: "Debes seleccionar una promoción existente.", variant: "destructive" });
+            return;
+        }
+        if (giftType === 'new') {
+            const isValid = await newGiftForm.trigger();
+            if(!isValid) {
+                toast({ title: "Formulario incompleto", description: "Por favor, completa los campos del nuevo vale.", variant: "destructive" });
+                return;
+            }
+        }
+        
+        setIsProcessing(true);
+        // Simulate AI message generation
         setTimeout(() => {
-            const promotionName = selectedPromotionId ? availablePromotions.find(p => p.id === selectedPromotionId)?.name : "un regalo especial";
+            const giftName = getGiftName();
             const messages = [
-                `¡Feliz Cumpleaños, [Nombre]! 🥳 En [Tu Negocio] celebramos contigo. Te regalamos ${promotionName}. ¡Genera tu QR aquí: [Enlace]!`,
-                `¡Que los cumplas muy feliz, [Nombre]! 🎂 Tu regalo de ${promotionName} te espera en [Tu Negocio]. Reclámalo aquí: [Enlace]`,
-                `Celebra tu día con nosotros, [Nombre]! 🎉 Como regalo de cumpleaños, te obsequiamos ${promotionName}. Tu QR aquí: [Enlace]`
+                `¡Feliz Cumpleaños, [Nombre]! 🥳 En nuestro local celebramos contigo. Te regalamos ${giftName}. ¡Genera tu QR aquí: [Enlace]!`,
+                `¡Que los cumplas muy feliz, [Nombre]! 🎂 Tu regalo de ${giftName} te espera. Reclámalo aquí: [Enlace]`,
+                `Celebra tu día con nosotros, [Nombre]! 🎉 Como regalo de cumpleaños, te obsequiamos ${giftName}. Tu QR personalizado aquí: [Enlace]`
             ];
             setGeneratedMessages(messages);
             setSelectedMessage(messages[0]);
-            setIsSubmitting(false);
+            setIsProcessing(false);
             setActiveStep(1);
         }, 1500);
         return;
     }
 
-    setActiveStep((prev) => prev + 1);
+    if (activeStep === 1) {
+        if (!selectedMessage) {
+            toast({ title: "Acción requerida", description: "Debes seleccionar o escribir un mensaje.", variant: "destructive" });
+            return;
+        }
+        // Prepare final list for sending
+        const giftName = getGiftName();
+        // In a real scenario, the link would be unique per user. Here we use a placeholder.
+        const placeholderLink = "https://tu-negocio.com/qr/[codigo]"; 
+        
+        const clientsWithMessages = clients.map(client => ({
+            name: client.name,
+            phone: client.phone,
+            message: selectedMessage.replace('[Nombre]', client.name).replace('[Enlace]', placeholderLink)
+        }));
+        setFinalClientList(clientsWithMessages);
+    }
+    
+    if (activeStep < STEPS.length - 1) {
+      setActiveStep((prev) => prev + 1);
+    }
   };
 
   const handleBack = () => setActiveStep((prev) => prev - 1);
 
-  const handleLaunchCampaign = async () => {
-    setIsSubmitting(true);
-    toast({ title: "Enviando campaña...", description: "Esta es una simulación. En una implementación real, aquí se enviarían los mensajes." });
-    setTimeout(() => {
-        setIsSubmitting(false);
-        toast({ title: "Campaña 'Enviada' Exitosamente", description: `Se 'enviaron' mensajes a ${clients.length} clientes.` });
-        onOpenChange(false);
-    }, 2000);
+  const handleSendToWhatsApp = (phone: string, message: string) => {
+    const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
-  
-  const resetState = () => {
-    setActiveStep(0);
-    setGiftType(null);
-    setSelectedPromotionId('');
-    setGeneratedMessages([]);
-    setSelectedMessage('');
-  }
 
+  const handleClose = () => {
+    onOpenChange(false);
+    // Use a timeout to reset state after the dialog has closed
+    setTimeout(() => {
+        setActiveStep(0);
+        setGiftType(null);
+        setSelectedPromotionId('');
+        newGiftForm.reset();
+        setGeneratedMessages([]);
+        setSelectedMessage('');
+        setFinalClientList([]);
+    }, 300);
+  }
+  
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetState(); onOpenChange(isOpen); }}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Campaña de Cumpleaños para {birthdayMonthName}</DialogTitle>
@@ -121,7 +178,7 @@ export function BirthdayCampaignModal({
                         <Card className="bg-muted/50">
                             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Gift/>Paso 1: ¿Qué regalo enviarás?</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
-                                <Card>
+                                <Card className={giftType === 'existing' ? 'border-primary' : ''}>
                                     <CardHeader className="p-4 cursor-pointer" onClick={() => setGiftType('existing')}>
                                         <div className="flex items-center gap-3">
                                             <input type="radio" name="giftType" checked={giftType === 'existing'} onChange={() => setGiftType('existing')} className="form-radio h-5 w-5 text-primary"/>
@@ -133,20 +190,37 @@ export function BirthdayCampaignModal({
                                             <Select value={selectedPromotionId} onValueChange={setSelectedPromotionId}>
                                                 <SelectTrigger><SelectValue placeholder="Elige una promoción..."/></SelectTrigger>
                                                 <SelectContent>
-                                                    {availablePromotions.map(promo => <SelectItem key={promo.id} value={promo.id}>{promo.name}</SelectItem>)}
+                                                    {availablePromotions.length > 0 ? 
+                                                      availablePromotions.map(promo => <SelectItem key={promo.id} value={promo.id}>{promo.name}</SelectItem>)
+                                                      : <div className="p-4 text-center text-sm text-muted-foreground">No hay promociones activas para elegir.</div>
+                                                    }
                                                 </SelectContent>
                                             </Select>
                                         </CardContent>
                                     )}
                                 </Card>
-                                <Card>
+                                <Card className={giftType === 'new' ? 'border-primary' : ''}>
                                     <CardHeader className="p-4 cursor-pointer" onClick={() => setGiftType('new')}>
                                         <div className="flex items-center gap-3">
                                             <input type="radio" name="giftType" checked={giftType === 'new'} onChange={() => setGiftType('new')} className="form-radio h-5 w-5 text-primary"/>
                                             <Label>Crear un vale de consumo rápido</Label>
                                         </div>
                                     </CardHeader>
-                                    {giftType === 'new' && <CardContent className="p-4 pt-0 space-y-2"><p className="text-sm text-muted-foreground text-center p-4 border rounded-md">Próximamente: Aquí podrás crear un vale simple (ej: 'Vale por S/20').</p></CardContent>}
+                                    {giftType === 'new' && (
+                                        <CardContent className="p-4 pt-0 space-y-4">
+                                            <Form {...newGiftForm}>
+                                                <FormField control={newGiftForm.control} name="name" render={({ field }) => (
+                                                    <FormItem><Label>Nombre del Vale</Label><FormControl><Input placeholder="Ej: Trago de cortesía" {...field}/></FormControl><FormMessage/></FormItem>
+                                                )}/>
+                                                <FormField control={newGiftForm.control} name="description" render={({ field }) => (
+                                                    <FormItem><Label>Descripción</Label><FormControl><Textarea placeholder="Ej: Válido por un Pisco Sour en tu mes." {...field}/></FormControl><FormMessage/></FormItem>
+                                                )}/>
+                                                <FormField control={newGiftForm.control} name="validityDays" render={({ field }) => (
+                                                    <FormItem><Label>Vigencia (días)</Label><FormControl><Input type="number" {...field}/></FormControl><FormMessage/></FormItem>
+                                                )}/>
+                                            </Form>
+                                        </CardContent>
+                                    )}
                                 </Card>
                             </CardContent>
                         </Card>
@@ -171,25 +245,32 @@ export function BirthdayCampaignModal({
                     )}
                     {index === 2 && (
                          <Card className="bg-muted/50">
-                            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Send/>Paso 3: Confirmación</CardTitle></CardHeader>
-                            <CardContent className="space-y-4">
-                               <p>Estás a punto de enviar una campaña a <span className="font-bold">{clients.length}</span> clientes por su cumpleaños en {birthdayMonthName}.</p>
-                               <div className="p-4 border rounded-md bg-background space-y-2">
-                                  <h4 className="font-semibold">Resumen:</h4>
-                                  <p className="text-sm"><strong>Regalo:</strong> {giftType === 'existing' ? availablePromotions.find(p=>p.id === selectedPromotionId)?.name : 'Nuevo Vale'}</p>
-                                  <p className="text-sm"><strong>Mensaje a enviar:</strong></p>
-                                  <blockquote className="border-l-2 pl-3 text-sm italic text-muted-foreground">"{selectedMessage}"</blockquote>
+                            <CardHeader><CardTitle className="text-lg flex items-center gap-2"><List/>Paso 3: Lista de Envío</CardTitle></CardHeader>
+                            <CardContent className="space-y-2">
+                               <p className="text-sm text-muted-foreground">Revisa la lista de clientes. Haz clic en "Enviar" para abrir WhatsApp con el mensaje listo para cada uno.</p>
+                               <div className="max-h-60 overflow-y-auto border rounded-md">
+                                  {finalClientList.map((client, i) => (
+                                    <div key={i} className="flex items-center justify-between p-2 hover:bg-background">
+                                        <div>
+                                            <p className="font-semibold text-sm">{client.name}</p>
+                                            <p className="text-xs text-muted-foreground">{client.phone}</p>
+                                        </div>
+                                        <Button size="sm" variant="outline" onClick={() => handleSendToWhatsApp(client.phone, client.message)}>
+                                            <Send className="h-4 w-4 mr-2"/>Enviar
+                                        </Button>
+                                    </div>
+                                  ))}
                                </div>
                             </CardContent>
                         </Card>
                     )}
 
                     <div className="mt-4 flex gap-2">
-                      <Button onClick={handleNext} disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : (activeStep === STEPS.length - 1 ? 'Preparar Envíos' : 'Siguiente')}
+                      <Button onClick={handleNext} disabled={isProcessing}>
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : (activeStep < STEPS.length - 1 ? 'Siguiente' : 'Finalizar')}
                         {activeStep < STEPS.length - 1 && <ArrowRight className="ml-2 h-4 w-4"/>}
                       </Button>
-                      <Button variant="ghost" onClick={handleBack} disabled={activeStep === 0 || isSubmitting}>Atrás</Button>
+                      <Button variant="ghost" onClick={handleBack} disabled={activeStep === 0 || isProcessing}>Atrás</Button>
                     </div>
                 </StepContent>
               </Step>
@@ -198,13 +279,10 @@ export function BirthdayCampaignModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleLaunchCampaign} variant="gradient" disabled={activeStep !== STEPS.length - 1 || isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Lanzar Campaña
-          </Button>
+          <Button variant="outline" onClick={handleClose}>Cerrar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
