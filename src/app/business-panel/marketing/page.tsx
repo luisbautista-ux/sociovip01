@@ -32,17 +32,22 @@ export default function MarketingPage() {
   // Estados para segmentación
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [eventAttendeeCount, setEventAttendeeCount] = useState<number | null>(null);
+  
   const [loyaltyThreshold, setLoyaltyThreshold] = useState<number>(3);
-  const [loyaltyClientsCount, setLoyaltyClientsCount] = useState<number | null>(null);
+  const [loyalClients, setLoyalClients] = useState<QrClient[]>([]);
+
   const [birthdayMonth, setBirthdayMonth] = useState<string>('');
   const [birthdayClients, setBirthdayClients] = useState<QrClient[]>([]);
+  
   const [inactiveDays, setInactiveDays] = useState<number>(90);
   const [inactiveClientsCount, setInactiveClientsCount] = useState<number | null>(null);
+  
   const [manualSelection, setManualSelection] = useState<Set<string>>(new Set());
   const [manualSearchTerm, setManualSearchTerm] = useState('');
 
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
+  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
 
   const pastEvents = useMemo(() => {
     return allEntities
@@ -127,8 +132,17 @@ export default function MarketingPage() {
         }
       });
     });
-    const loyalClients = Array.from(visitCounts.entries()).filter(([dni, count]) => count >= loyaltyThreshold);
-    setLoyaltyClientsCount(loyalClients.length);
+    
+    const loyalClientDnis = new Set<string>();
+    visitCounts.forEach((count, dni) => {
+        if (count >= loyaltyThreshold) {
+            loyalClientDnis.add(dni);
+        }
+    });
+
+    const loyalClientsData = allClients.filter(client => loyalClientDnis.has(client.dni));
+    setLoyalClients(loyalClientsData);
+
     setIsProcessing(null);
   };
   
@@ -236,7 +250,8 @@ export default function MarketingPage() {
                     <Button onClick={handleSegmentByLoyalty} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
                 </div>
                 {isProcessing === 'loyalty' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
-                {loyaltyClientsCount !== null && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{loyaltyClientsCount}</p><p className="text-sm text-muted-foreground">clientes leales encontrados.</p><Button className="mt-4" variant="gradient" disabled={loyaltyClientsCount === 0}><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
+                {loyalClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{loyalClients.length}</p><p className="text-sm text-muted-foreground">clientes leales encontrados.</p><Button onClick={() => setShowLoyaltyModal(true)} className="mt-4" variant="gradient" disabled={loyalClients.length === 0}><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
+                {!isProcessing && loyalClients.length === 0 && <p className="text-center text-sm text-muted-foreground pt-2">No se encontraron clientes para este criterio.</p>}
             </CardContent>
           </Card>
           
@@ -296,8 +311,18 @@ export default function MarketingPage() {
         <BirthdayCampaignModal
             open={showBirthdayModal}
             onOpenChange={setShowBirthdayModal}
-            birthdayMonthName={MESES_DEL_ANO_ES[parseInt(birthdayMonth, 10)]}
+            campaignTitle={`Campaña de Cumpleaños para ${birthdayMonthName}`}
             clients={birthdayClients}
+            availablePromotions={activePromotions}
+            businessDetails={businessDetails}
+        />
+    )}
+    {showLoyaltyModal && (
+        <BirthdayCampaignModal
+            open={showLoyaltyModal}
+            onOpenChange={setShowLoyaltyModal}
+            campaignTitle={`Campaña para ${loyalClients.length} Clientes Leales`}
+            clients={loyalClients}
             availablePromotions={activePromotions}
             businessDetails={businessDetails}
         />
@@ -305,3 +330,5 @@ export default function MarketingPage() {
     </>
   );
 }
+
+    

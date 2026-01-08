@@ -29,16 +29,16 @@ type NewGiftValues = z.infer<typeof newGiftSchema>;
 interface BirthdayCampaignModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  birthdayMonthName: string;
+  campaignTitle: string;
   clients: QrClient[];
   availablePromotions: BusinessManagedEntity[];
-  businessDetails: Business | null; // Cambiado para recibir el objeto completo
+  businessDetails: Business | null;
 }
 
 export function BirthdayCampaignModal({
   open,
   onOpenChange,
-  birthdayMonthName,
+  campaignTitle,
   clients,
   availablePromotions,
   businessDetails,
@@ -165,7 +165,7 @@ export function BirthdayCampaignModal({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Campaña de Cumpleaños para {birthdayMonthName}</DialogTitle>
+          <DialogTitle>{campaignTitle}</DialogTitle>
           <DialogDescription>
             Estás creando una campaña para <span className="font-bold text-primary">{clients.length}</span> cliente(s).
           </DialogDescription>
@@ -288,3 +288,5 @@ export function BirthdayCampaignModal({
     </Dialog>
   );
 }
+
+    
