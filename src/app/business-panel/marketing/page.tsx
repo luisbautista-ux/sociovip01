@@ -18,7 +18,7 @@ import { isPast, getMonth, differenceInDays } from 'date-fns';
 import { MESES_DEL_ANO_ES } from "@/lib/constants";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from "@/components/ui/label";
-import { BirthdayCampaignModal } from '@/components/business/marketing/BirthdayCampaignModal';
+import { CampaignCreationModal, type CampaignType } from '@/components/business/marketing/CampaignCreationModal';
 
 export default function MarketingPage() {
   const { userProfile } = useAuth();
@@ -48,11 +48,9 @@ export default function MarketingPage() {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   
   // Estados de los modales
-  const [showBirthdayModal, setShowBirthdayModal] = useState(false);
-  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
-  const [showEventCampaignModal, setShowEventCampaignModal] = useState(false);
-  const [showInactiveCampaignModal, setShowInactiveCampaignModal] = useState(false);
-  const [showManualCampaignModal, setShowManualCampaignModal] = useState(false);
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{ title: string; clients: QrClient[], type: CampaignType } | null>(null);
+  
 
   const pastEvents = useMemo(() => {
     return allEntities
@@ -189,9 +187,8 @@ export default function MarketingPage() {
     const inactiveClientList = allClients.filter(client => {
         const lastActivity = lastActivityMap.get(client.dni);
         if (!lastActivity) {
-            // Si nunca ha tenido actividad, considerar la fecha de registro
             const registrationDate = anyToDate(client.registrationDate);
-            if (!registrationDate) return false; // Si no hay fecha de registro, no podemos calcular inactividad
+            if (!registrationDate) return false;
             return differenceInDays(now, registrationDate) > inactiveDays;
         }
         return differenceInDays(now, lastActivity) > inactiveDays;
@@ -236,6 +233,11 @@ export default function MarketingPage() {
     if (!selectedEventId) return '';
     return pastEvents.find(e => e.id === selectedEventId)?.name || '';
   }, [selectedEventId, pastEvents]);
+  
+  const openCampaignModal = (clients: QrClient[], title: string, type: CampaignType) => {
+    setModalConfig({ clients, title, type });
+    setShowCampaignModal(true);
+  };
 
 
   return (
@@ -265,7 +267,7 @@ export default function MarketingPage() {
                 <SelectContent>{pastEvents.length > 0 ? pastEvents.map(event => <SelectItem key={event.id} value={event.id}>{event.name}</SelectItem>) : <div className="p-4 text-center text-sm text-muted-foreground">No hay eventos pasados.</div>}</SelectContent>
               </Select>
               {isProcessing === 'event' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Contando...</div>}
-              {eventAttendeeClients.length > 0 && selectedEventId && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{eventAttendeeClients.length}</p><p className="text-sm text-muted-foreground">clientes únicos asistieron a este evento.</p><Button onClick={() => setShowEventCampaignModal(true)} className="mt-4" variant="gradient"><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
+              {eventAttendeeClients.length > 0 && selectedEventId && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{eventAttendeeClients.length}</p><p className="text-sm text-muted-foreground">clientes únicos asistieron a este evento.</p><Button onClick={() => openCampaignModal(eventAttendeeClients, `Campaña para Asistentes de "${selectedEventName}"`, 'event-attendee')} className="mt-4" variant="gradient"><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
             </CardContent>
           </Card>
 
@@ -279,7 +281,7 @@ export default function MarketingPage() {
                     <Button onClick={handleSegmentByLoyalty} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
                 </div>
                 {isProcessing === 'loyalty' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
-                {loyalClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{loyalClients.length}</p><p className="text-sm text-muted-foreground">clientes leales encontrados.</p><Button onClick={() => setShowLoyaltyModal(true)} className="mt-4" variant="gradient"><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
+                {loyalClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{loyalClients.length}</p><p className="text-sm text-muted-foreground">clientes leales encontrados.</p><Button onClick={() => openCampaignModal(loyalClients, `Campaña para ${loyalClients.length} Clientes Leales`, 'loyalty')} className="mt-4" variant="gradient"><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
                 {!isProcessing && loyalClients.length === 0 && <p className="text-center text-sm text-muted-foreground pt-2">No se encontraron clientes para este criterio.</p>}
             </CardContent>
           </Card>
@@ -292,7 +294,7 @@ export default function MarketingPage() {
                   <SelectContent>{MESES_DEL_ANO_ES.map((mes, index) => <SelectItem key={index} value={String(index)}>{mes}</SelectItem>)}</SelectContent>
                 </Select>
                 {isProcessing === 'birthday' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Contando...</div>}
-                {birthdayClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{birthdayClients.length}</p><p className="text-sm text-muted-foreground">clientes cumplen años en {birthdayMonthName}.</p><Button onClick={() => setShowBirthdayModal(true)} className="mt-4" variant="gradient"><Gift className="mr-2 h-4 w-4"/>Enviar Felicitación</Button></div>}
+                {birthdayClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{birthdayClients.length}</p><p className="text-sm text-muted-foreground">clientes cumplen años en {birthdayMonthName}.</p><Button onClick={() => openCampaignModal(birthdayClients, `Campaña de Cumpleaños para ${birthdayMonthName}`, 'birthday')} className="mt-4" variant="gradient"><Gift className="mr-2 h-4 w-4"/>Enviar Felicitación</Button></div>}
                 {birthdayMonth && !isProcessing && birthdayClients.length === 0 && <p className="text-center text-sm text-muted-foreground pt-2">No se encontraron clientes para este mes.</p>}
             </CardContent>
           </Card>
@@ -307,7 +309,7 @@ export default function MarketingPage() {
                     <Button onClick={handleSegmentByInactivity} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
                 </div>
                 {isProcessing === 'inactivity' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
-                {inactiveClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{inactiveClients.length}</p><p className="text-sm text-muted-foreground">clientes inactivos encontrados.</p><Button className="mt-4" variant="gradient" onClick={() => setShowInactiveCampaignModal(true)}><Send className="mr-2 h-4 w-4"/>Crear Campaña de Reactivación</Button></div>}
+                {inactiveClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{inactiveClients.length}</p><p className="text-sm text-muted-foreground">clientes inactivos encontrados.</p><Button className="mt-4" variant="gradient" onClick={() => openCampaignModal(inactiveClients, `Campaña de Reactivación para ${inactiveClients.length} clientes`, 'inactive')}><Send className="mr-2 h-4 w-4"/>Crear Campaña de Reactivación</Button></div>}
             </CardContent>
           </Card>
 
@@ -328,7 +330,7 @@ export default function MarketingPage() {
                 <div className="p-4 bg-background rounded-md text-center">
                   <p className="text-3xl font-bold text-primary">{manualSelection.size}</p>
                   <p className="text-sm text-muted-foreground">clientes seleccionados.</p>
-                  <Button className="mt-4" variant="gradient" disabled={manualSelection.size === 0} onClick={() => setShowManualCampaignModal(true)}><Send className="mr-2 h-4 w-4"/>Crear Campaña Manual</Button>
+                  <Button className="mt-4" variant="gradient" disabled={manualSelection.size === 0} onClick={() => openCampaignModal(manuallySelectedClients, `Campaña Manual para ${manuallySelectedClients.length} clientes`, 'manual')}><Send className="mr-2 h-4 w-4"/>Crear Campaña Manual</Button>
                 </div>
             </CardContent>
           </Card>
@@ -336,52 +338,13 @@ export default function MarketingPage() {
       </Card>
     </div>
 
-    {showBirthdayModal && (
-        <BirthdayCampaignModal
-            open={showBirthdayModal}
-            onOpenChange={setShowBirthdayModal}
-            campaignTitle={`Campaña de Cumpleaños para ${birthdayMonthName}`}
-            clients={birthdayClients}
-            availablePromotions={activePromotions}
-            businessDetails={businessDetails}
-        />
-    )}
-    {showLoyaltyModal && (
-        <BirthdayCampaignModal
-            open={showLoyaltyModal}
-            onOpenChange={setShowLoyaltyModal}
-            campaignTitle={`Campaña para ${loyalClients.length} Clientes Leales`}
-            clients={loyalClients}
-            availablePromotions={activePromotions}
-            businessDetails={businessDetails}
-        />
-    )}
-    {showEventCampaignModal && (
-        <BirthdayCampaignModal
-            open={showEventCampaignModal}
-            onOpenChange={setShowEventCampaignModal}
-            campaignTitle={`Campaña para Asistentes de "${selectedEventName}"`}
-            clients={eventAttendeeClients}
-            availablePromotions={activePromotions}
-            businessDetails={businessDetails}
-        />
-    )}
-    {showInactiveCampaignModal && (
-        <BirthdayCampaignModal
-            open={showInactiveCampaignModal}
-            onOpenChange={setShowInactiveCampaignModal}
-            campaignTitle={`Campaña de Reactivación para ${inactiveClients.length} clientes`}
-            clients={inactiveClients}
-            availablePromotions={activePromotions}
-            businessDetails={businessDetails}
-        />
-    )}
-    {showManualCampaignModal && (
-        <BirthdayCampaignModal
-            open={showManualCampaignModal}
-            onOpenChange={setShowManualCampaignModal}
-            campaignTitle={`Campaña Manual para ${manuallySelectedClients.length} clientes`}
-            clients={manuallySelectedClients}
+    {showCampaignModal && modalConfig && (
+        <CampaignCreationModal
+            open={showCampaignModal}
+            onOpenChange={setShowCampaignModal}
+            campaignTitle={modalConfig.title}
+            clients={modalConfig.clients}
+            campaignType={modalConfig.type}
             availablePromotions={activePromotions}
             businessDetails={businessDetails}
         />

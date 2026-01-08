@@ -283,7 +283,7 @@ export function CampaignCreationModal({
                                     {generatedMessages.map((msg, i) => (
                                         <div key={i} className="flex items-start gap-2 p-3 border rounded-md cursor-pointer bg-background hover:bg-accent/20" onClick={() => setSelectedMessage(msg)}>
                                             <input type="radio" name="messageOption" checked={selectedMessage === msg} onChange={() => setSelectedMessage(msg)} className="form-radio h-4 w-4 text-primary mt-1"/>
-                                            <p className="text-sm flex-1">{msg}</p>
+                                            <p className="text-sm flex-1" dangerouslySetInnerHTML={{ __html: msg.replace(/🥳/g, '&#129395;').replace(/🎂/g, '&#127874;').replace(/🎉/g, '&#127881;') }} />
                                         </div>
                                     ))}
                                 </div>
