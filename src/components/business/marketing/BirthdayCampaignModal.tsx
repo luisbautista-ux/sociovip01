@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import type { BusinessManagedEntity, QrClient } from '@/lib/types';
+import type { BusinessManagedEntity, QrClient, Business } from "@/lib/types";
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,7 +32,7 @@ interface BirthdayCampaignModalProps {
   birthdayMonthName: string;
   clients: QrClient[];
   availablePromotions: BusinessManagedEntity[];
-  businessId: string;
+  businessDetails: Business | null; // Cambiado para recibir el objeto completo
 }
 
 export function BirthdayCampaignModal({
@@ -41,7 +41,7 @@ export function BirthdayCampaignModal({
   birthdayMonthName,
   clients,
   availablePromotions,
-  businessId,
+  businessDetails,
 }: BirthdayCampaignModalProps) {
   const { toast } = useToast();
   const [activeStep, setActiveStep] = useState(0);
@@ -103,9 +103,9 @@ export function BirthdayCampaignModal({
         setTimeout(() => {
             const giftName = getGiftName();
             const messages = [
-                `¡Feliz Cumpleaños, [Nombre]! 🥳 En nuestro local celebramos contigo. Te regalamos ${giftName}. ¡Genera tu QR aquí: [Enlace]!`,
-                `¡Que los cumplas muy feliz, [Nombre]! 🎂 Tu regalo de ${giftName} te espera. Reclámalo aquí: [Enlace]`,
-                `Celebra tu día con nosotros, [Nombre]! 🎉 Como regalo de cumpleaños, te obsequiamos ${giftName}. Tu QR personalizado aquí: [Enlace]`
+                `¡Feliz Cumpleaños, [Nombre]! 🥳 En ${businessDetails?.name || 'nuestro local'} celebramos contigo. Te regalamos ${giftName}. ¡Genera tu QR aquí: [Enlace]!`,
+                `¡Que los cumplas muy feliz, [Nombre]! 🎂 Tu regalo de ${giftName} te espera en ${businessDetails?.name || 'nuestro local'}. Reclámalo aquí: [Enlace]`,
+                `¡Celebra tu día con nosotros, [Nombre]! 🎉 Como regalo de cumpleaños de parte de ${businessDetails?.name || 'nosotros'}, te obsequiamos ${giftName}. Tu QR personalizado aquí: [Enlace]`
             ];
             setGeneratedMessages(messages);
             setSelectedMessage(messages[0]);
@@ -120,16 +120,18 @@ export function BirthdayCampaignModal({
             toast({ title: "Acción requerida", description: "Debes seleccionar o escribir un mensaje.", variant: "destructive" });
             return;
         }
-        // Prepare final list for sending
-        const giftName = getGiftName();
-        // In a real scenario, the link would be unique per user. Here we use a placeholder.
-        const placeholderLink = "https://tu-negocio.com/qr/[codigo]"; 
         
-        const clientsWithMessages = clients.map(client => ({
-            name: client.name,
-            phone: client.phone,
-            message: selectedMessage.replace('[Nombre]', client.name).replace('[Enlace]', placeholderLink)
-        }));
+        const businessLink = businessDetails?.customUrlPath 
+          ? `https://sociovip.app/${businessDetails.customUrlPath}`
+          : `https://sociovip.app/business/${businessDetails?.id}`;
+        
+        const clientsWithMessages = clients
+            .filter(client => client.phone && client.phone.length > 5) // Filtrar clientes sin teléfono
+            .map(client => ({
+                name: client.name,
+                phone: client.phone,
+                message: selectedMessage.replace('[Nombre]', client.name).replace('[Enlace]', businessLink)
+            }));
         setFinalClientList(clientsWithMessages);
     }
     
@@ -286,5 +288,3 @@ export function BirthdayCampaignModal({
     </Dialog>
   );
 }
-
-    

@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import type { BusinessManagedEntity, QrClient } from "@/lib/types";
+import type { BusinessManagedEntity, QrClient, Business } from "@/lib/types";
 import { anyToDate, isEntityCurrentlyActivatable } from "@/lib/utils";
 import { isPast, getMonth, differenceInDays } from 'date-fns';
 import { MESES_DEL_ANO_ES } from "@/lib/constants";
@@ -27,6 +27,7 @@ export default function MarketingPage() {
   const [allEntities, setAllEntities] = useState<BusinessManagedEntity[]>([]);
   const [allClients, setAllClients] = useState<QrClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
 
   // Estados para segmentación
   const [selectedEventId, setSelectedEventId] = useState<string>('');
@@ -62,6 +63,13 @@ export default function MarketingPage() {
     setIsLoading(true);
     try {
       const businessId = userProfile.businessId;
+
+      // Fetch Business Details
+      const businessDoc = await getDoc(doc(db, "businesses", businessId));
+      if (businessDoc.exists()) {
+        setBusinessDetails({ id: businessDoc.id, ...businessDoc.data() } as Business);
+      }
+      
       // Fetch all entities (events and promotions)
       const entitiesQuery = query(collection(db, "businessEntities"), where("businessId", "==", businessId));
       const entitiesSnap = await getDocs(entitiesQuery);
@@ -291,7 +299,7 @@ export default function MarketingPage() {
             birthdayMonthName={MESES_DEL_ANO_ES[parseInt(birthdayMonth, 10)]}
             clients={birthdayClients}
             availablePromotions={activePromotions}
-            businessId={userProfile?.businessId || ""}
+            businessDetails={businessDetails}
         />
     )}
     </>
