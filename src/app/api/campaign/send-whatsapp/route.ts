@@ -30,6 +30,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "No se proporcionó una lista de clientes válida." }, { status: 400 });
     }
 
+    // Usar la plantilla predeterminada para la prueba.
+    // Una vez que tu plantilla personalizada esté aprobada, cambiaremos esto.
+    const TWILIO_TEMPLATE_SID = "HX5b83221aa281f6887745ceb886076dc8"; // SID de campana_bienvenida
+
     // Responder inmediatamente y procesar en segundo plano
     (async () => {
         let successCount = 0;
@@ -37,15 +41,20 @@ export async function POST(request: Request) {
         
         for (const clientData of clients) {
             try {
-                // Asegúrate de que el número de teléfono esté en el formato E.164 (ej: +51987654321)
-                // y que el número de Twilio esté en formato whatsapp:+...
+                // Para la prueba, enviamos el mensaje completo como el cuerpo.
+                // Esto podría no funcionar si la plantilla espera variables específicas,
+                // pero es la mejor aproximación para una prueba rápida.
                 await client.messages.create({
+                    contentSid: TWILIO_TEMPLATE_SID,
                     from: fromPhoneNumber,
                     to: `whatsapp:${clientData.phone}`,
-                    body: clientData.message,
+                    contentVariables: JSON.stringify({
+                        // Asumimos que la plantilla tiene una variable {{1}} para el cuerpo del mensaje.
+                        // Si no la tiene, el mensaje llegará con el texto por defecto de la plantilla.
+                        '1': clientData.message
+                    })
                 });
                 successCount++;
-                // Pausa corta para no saturar la API
                 await new Promise(resolve => setTimeout(resolve, 500)); 
             } catch (error: any) {
                 failureCount++;
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
         console.log(`WhatsApp campaign finished. Success: ${successCount}, Failures: ${failureCount}`);
     })();
 
-    return NextResponse.json({ success: true, message: `Campaña iniciada para ${clients.length} cliente(s). Los mensajes se están enviando en segundo plano.`, sentCount: clients.length });
+    return NextResponse.json({ success: true, message: `Campaña iniciada para ${clients.length} cliente(s) usando la plantilla de prueba. Los mensajes se están enviando en segundo plano.`, sentCount: clients.length });
 
   } catch (error: any) {
     console.error("API Error (send-whatsapp):", error);
