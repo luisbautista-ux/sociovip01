@@ -220,9 +220,9 @@ export default function HomePage() {
           </div>
       </div>
           <main className="flex-grow w-full py-8">
-            <div className="space-y-12">
+            <div className="max-w-7xl mx-auto space-y-12">
               {showEvents && (
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <section className="px-4 sm:px-6 lg:px-8">
                   <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center">
                     <Calendar className="h-7 w-7 mr-3 text-gradient" />
                     <span className="text-gradient">Próximos Eventos</span>
@@ -252,7 +252,7 @@ export default function HomePage() {
               )}
 
               {showPromotions && (
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <section className="px-4 sm:px-6 lg:px-8">
                   <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center">
                     <Tag className="h-7 w-7 mr-3 text-gradient" />
                     <span className="text-gradient">Promociones Vigentes</span>
