@@ -654,13 +654,13 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               </div>
               <div className="flex items-center gap-2">
                  <Link href="/" passHref>
-                    <Button variant="ghost" className="p-0 h-auto md:px-4 md:py-2 text-muted-foreground hover:bg-transparent focus-visible:ring-0 md:w-auto">
+                    <Button variant="ghost" className="p-0 h-auto md:px-4 md:py-2 text-muted-foreground hover:bg-transparent hover:text-muted-foreground focus-visible:ring-0 md:w-auto">
                       <ArrowLeft className="h-8 w-8 md:h-4 md:w-4 md:mr-2" />
                       <span className="hidden md:inline">Volver</span>
                     </Button>
                  </Link>
                   <Link href="/login" passHref>
-                     <Button variant="ghost" className="p-0 h-auto md:px-4 md:py-2 text-muted-foreground hover:bg-transparent focus-visible:ring-0 md:w-auto">
+                     <Button variant="ghost" className="p-0 h-auto md:px-4 md:py-2 text-muted-foreground hover:bg-transparent hover:text-muted-foreground focus-visible:ring-0 md:w-auto">
                       <UserCircle className="h-8 w-8 md:h-5 md:w-5 md:mr-2" />
                       <span className="hidden md:inline">Login</span>
                     </Button>
