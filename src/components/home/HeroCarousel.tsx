@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import NextImage from 'next/image';
-import { Search, UserCircle } from 'lucide-react';
+import { Search, UserCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -29,17 +29,26 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
   const [animationKey, setAnimationKey] = useState(0);
 
   useEffect(() => {
+    if (heroImages.length <= 1) return;
     const slideInterval = setInterval(() => {
       setCurrentIndex((prevIndex) =>
         prevIndex === heroImages.length - 1 ? 0 : prevIndex + 1
       );
     }, SLIDE_DURATION);
     return () => clearInterval(slideInterval);
-  }, []);
+  }, [heroImages.length]);
 
   useEffect(() => {
     setAnimationKey((prev) => prev + 1);
   }, [currentIndex]);
+  
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? heroImages.length - 1 : prev - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev === heroImages.length - 1 ? 0 : prev + 1));
+  };
   
   const goToSlide = (slideIndex: number) => {
     setCurrentIndex(slideIndex);
@@ -103,6 +112,26 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
             </div>
           </div>
         </div>
+
+        {/* Botones de navegación fijos */}
+        {heroImages.length > 1 && (
+          <>
+            <button
+              onClick={goToPrevious}
+              className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
+              aria-label="Imagen anterior"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <button
+              onClick={goToNext}
+              className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
+              aria-label="Siguiente imagen"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          </>
+        )}
 
         {/* Indicadores de Progreso */}
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center space-x-2">
