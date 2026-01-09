@@ -36,7 +36,7 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
       );
     }, SLIDE_DURATION);
     return () => clearInterval(slideInterval);
-  }, [heroImages.length]);
+  }, [currentIndex]); // Reinicia el intervalo en cada cambio de slide
 
   useEffect(() => {
     setAnimationKey((prev) => prev + 1);
