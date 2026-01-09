@@ -119,7 +119,7 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
                 {slideIndex === currentIndex && (
                   <div
                     key={animationKey}
-                    className="h-full rounded-full bg-header-gradient animate-progress-bar-fill"
+                    className="h-full rounded-full bg-header-gradient-static animate-progress-bar-fill"
                     style={{ animationDuration: `${SLIDE_DURATION}ms` }}
                   />
                 )}

@@ -167,3 +167,8 @@
   background-size: 400% 400%;
   animation: gradient-animation 15s ease infinite;
 }
+
+.bg-header-gradient-static {
+  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)));
+  background-size: 400% 400%;
+}
