@@ -133,7 +133,7 @@ export default function SignupPage() {
               </CardTitle>
               <CardDescription>
                   {step === 'selection' 
-                      ? "Únete a la comunidad SocioVIP y accede a beneficios exclusivos."
+                      ? "Únete a SocioVIP, genera tu carnet de socio y accede a beneficios exclusivos."
                       : `Estás a un paso de ser SocioVIP ${selectedPlan === 'gratis' ? 'Gratis' : 'Premium'}.`
                   }
               </CardDescription>
@@ -143,13 +143,14 @@ export default function SignupPage() {
                   <div className="grid md:grid-cols-2 gap-8">
                       <Card className="flex flex-col">
                           <CardHeader>
-                              <CardTitle>SocioVIP Gratis</CardTitle>
+                              <CardTitle>SocioVIP Estándar</CardTitle>
                               <CardDescription>Acceso a beneficios seleccionados.</CardDescription>
                           </CardHeader>
                           <CardContent className="flex-grow space-y-3 text-sm">
-                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Genera QRs para promociones en negocios asignados.</span></p>
-                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Tu propio QR Fijo para un acceso rápido.</span></p>
-                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Entérate de los mejores eventos y ofertas.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Genera QRs para promociones en restaurantes, salones de belleza, gimnasios y mucho más.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Carnet de socio con QR único para acceso a eventos.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Entérate de los mejores eventos y promociones.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Acumula puntos con tus visitas y canjéalos.</span></p>
                           </CardContent>
                           <CardFooter>
                               <Button onClick={() => handleSelectPlan('gratis')} variant="gradient" className="w-full">Registrarse Gratis</Button>
@@ -165,9 +166,9 @@ export default function SignupPage() {
                           </CardHeader>
                           <CardContent className="flex-grow space-y-3 text-sm">
                               <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Todos los beneficios del plan gratuito.</span></p>
-                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Acceso a TODOS los negocios de la red.</span></p>
-                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Descuentos y promociones exclusivas para miembros.</span></p>
-                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Acumula puntos con tus visitas y canjéalos.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Acceso VIP y reservas preferenciales a locales.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span className="font-bold">Regalos y descuentos de hasta 70% en consumos de negocios afiliados.</span></p>
+                              <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Invitación a eventos privados y exclusivos.</span></p>
                           </CardContent>
                           <CardFooter>
                               <Button onClick={() => handleSelectPlan('premium')} className="w-full" disabled>Próximamente (S/ 9.99/mes)</Button>
