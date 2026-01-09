@@ -75,7 +75,7 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
                     <span className="font-bold text-2xl text-white drop-shadow-lg">SocioVIP</span>
                 </Link>
                 <Link href="/login" passHref>
-                    <Button variant="ghost" className="bg-transparent border-none text-white hover:bg-white/20 backdrop-blur-sm font-bold flex items-center justify-center p-0 rounded-full md:w-auto md:px-4 md:border md:border-white/50 md:bg-white/10 md:rounded-md">
+                    <Button variant="ghost" className="bg-transparent border-none text-white hover:bg-white/20 p-0 md:w-auto md:px-4 md:py-2 md:border md:border-white/50 md:bg-white/10 md:rounded-md">
                         <UserCircle className="h-8 w-8 md:h-5 md:w-5 md:mr-2" />
                         <span className="hidden md:inline">Iniciar Sesión</span>
                     </Button>
@@ -89,7 +89,6 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
             Descubre las promociones y eventos más exclusivos
           </h1>
           <div className="relative w-full max-w-xl mt-8 group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-accent rounded-full blur opacity-0 group-focus-within:opacity-75 transition duration-1000 group-focus-within:duration-200 animate-tilt"></div>
             <div
               className="relative animated-gradient-border-wrapper rounded-full transition-transform duration-300 group-focus-within:-translate-y-1 group-focus-within:scale-105"
             >
@@ -120,7 +119,7 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
                 {slideIndex === currentIndex && (
                   <div
                     key={animationKey}
-                    className="h-full rounded-full bg-white/80 animate-progress-bar-fill"
+                    className="h-full rounded-full bg-header-gradient animate-progress-bar-fill"
                     style={{ animationDuration: `${SLIDE_DURATION}ms` }}
                   />
                 )}
