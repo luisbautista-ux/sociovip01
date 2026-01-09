@@ -75,8 +75,8 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
                     <span className="font-bold text-2xl text-white drop-shadow-lg">SocioVIP</span>
                 </Link>
                 <Link href="/login" passHref>
-                    <Button variant="outline" className="bg-white/10 text-white border-white/50 hover:bg-white/20 backdrop-blur-sm font-bold flex items-center justify-center sm:w-auto sm:px-4 size-10 p-0 rounded-full sm:rounded-md">
-                        <UserCircle className="h-6 w-6 sm:mr-2" />
+                    <Button variant="outline" className="bg-transparent border-none sm:border-white/50 sm:bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm font-bold flex items-center justify-center sm:w-auto sm:px-4 rounded-full sm:rounded-md p-0">
+                        <UserCircle className="h-8 w-8 sm:h-6 sm:w-6 sm:mr-2" />
                         <span className="hidden sm:inline">Iniciar Sesión</span>
                     </Button>
                 </Link>
