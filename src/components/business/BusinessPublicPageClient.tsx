@@ -664,7 +664,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   <Link href="/login" passHref>
                      <Button
                         variant="ghost"
-                        className="font-semibold text-sm text-white shadow-md hover:opacity-90 transition p-0 h-auto md:w-auto md:px-4 md:py-2 md:border md:border-white/50 md:bg-white/10 md:rounded-md"
+                        className="font-semibold text-sm text-white hover:opacity-90 transition p-0 h-auto md:w-auto md:px-4 md:py-2 md:rounded-md"
                         style={{ backgroundColor: businessDetails.primaryColor }}
                     >
                       <UserCircle className="h-8 w-8 md:h-5 md:w-5 md:mr-2" />
