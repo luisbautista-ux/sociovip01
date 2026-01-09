@@ -11,6 +11,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
+        // No se define 'sans' para evitar sobreescribir el default que necesita lucide
         headline: ['Inter', 'sans-serif'],
         body: ['Inter', 'sans-serif'],
       },
