@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -74,9 +75,9 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
                     <span className="font-bold text-2xl text-white drop-shadow-lg">SocioVIP</span>
                 </Link>
                 <Link href="/login" passHref>
-                    <Button variant="outline" className="bg-white/10 text-white border-white/50 hover:bg-white/20 backdrop-blur-sm font-bold flex items-center">
-                        <UserCircle className="mr-2 h-5 w-5" />
-                        <span className="sm:inline">Iniciar Sesión</span>
+                    <Button variant="outline" className="bg-white/10 text-white border-white/50 hover:bg-white/20 backdrop-blur-sm font-bold flex items-center sm:w-auto sm:px-4 w-10 px-0 rounded-full sm:rounded-md">
+                        <UserCircle className="h-5 w-5 sm:mr-2" />
+                        <span className="hidden sm:inline">Iniciar Sesión</span>
                     </Button>
                 </Link>
             </div>
