@@ -88,15 +88,20 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl">
             Descubre las promociones y eventos más exclusivos
           </h1>
-          <div className="relative w-full max-w-xl mt-8 animated-gradient-border-wrapper rounded-full group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-400 z-10" />
-            <Input
-              type="search"
-              placeholder="Buscar por nombre, negocio o descripción..."
-              className="pl-12 w-full rounded-full h-14 text-lg bg-white/90 text-black placeholder:text-gray-500 transition-all duration-300 focus:bg-white"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="relative w-full max-w-xl mt-8 group">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-accent rounded-full blur opacity-0 group-focus-within:opacity-75 transition duration-1000 group-focus-within:duration-200 animate-tilt"></div>
+            <div
+              className="relative animated-gradient-border-wrapper rounded-full transition-transform duration-300 group-focus-within:-translate-y-1 group-focus-within:scale-105"
+            >
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-400 z-10" />
+              <Input
+                type="search"
+                placeholder="Buscar por nombre, negocio o descripción..."
+                className="pl-12 w-full rounded-full h-14 text-lg bg-white/90 text-black placeholder:text-gray-500 transition-all duration-300 focus:bg-white"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

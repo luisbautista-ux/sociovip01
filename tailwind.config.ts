@@ -102,8 +102,12 @@ export default {
         },
         'border-gradient-animation': {
           '0%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-          '100%': { backgroundPosition: '0% 50%' },
+          '100%': { backgroundPosition: '200% 50%' },
+        },
+        tilt: {
+          '0%, 50%, 100%': { transform: 'rotate(0deg)' },
+          '25%': { transform: 'rotate(0.5deg)' },
+          '75%': { transform: 'rotate(-0.5deg)' },
         },
   		},
   		animation: {
@@ -112,7 +116,8 @@ export default {
         'drop-in': 'drop-in 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
         'float': 'float 3s ease-in-out 1.2s infinite',
         'progress-bar-fill': 'progress-bar-fill linear forwards',
-        'border-gradient': 'border-gradient-animation 4s linear infinite',
+        'border-gradient': 'border-gradient-animation 3s linear infinite',
+        'tilt': 'tilt 10s infinite linear',
   		}
   	}
   },
