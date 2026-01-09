@@ -109,10 +109,46 @@
   .no-spinner {
     -moz-appearance: textfield;
   }
+
+  .animated-gradient-border-wrapper {
+      position: relative;
+      background-color: hsl(var(--background));
+  }
+
+  .animated-gradient-border-wrapper::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px;
+      right: -2px; bottom: -2px;
+      background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)));
+      background-size: 400%;
+      border-radius: inherit; /* Usa el mismo borde que el contenedor */
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+  }
+  
+  .animated-gradient-border-wrapper:focus-within::before,
+  .group:focus-within .animated-gradient-border-wrapper::before {
+      opacity: 1;
+      animation: border-gradient-animation 4s linear infinite;
+  }
 }
 
 /* Custom Animated Gradient Background */
 @keyframes gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes border-gradient-animation {
   0% {
     background-position: 0% 50%;
   }

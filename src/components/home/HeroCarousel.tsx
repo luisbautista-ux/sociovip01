@@ -75,9 +75,9 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
                     <span className="font-bold text-2xl text-white drop-shadow-lg">SocioVIP</span>
                 </Link>
                 <Link href="/login" passHref>
-                    <Button variant="outline" className="bg-transparent border-none sm:border-white/50 sm:bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm font-bold flex items-center justify-center sm:w-auto sm:px-4 rounded-full sm:rounded-md p-0">
-                        <UserCircle className="h-8 w-8 sm:h-6 sm:w-6 sm:mr-2" />
-                        <span className="hidden sm:inline">Iniciar Sesión</span>
+                    <Button variant="ghost" className="bg-transparent border-none text-white hover:bg-white/20 backdrop-blur-sm font-bold flex items-center justify-center p-0 rounded-full md:w-auto md:px-4 md:border md:border-white/50 md:bg-white/10 md:rounded-md">
+                        <UserCircle className="h-8 w-8 md:h-5 md:w-5 md:mr-2" />
+                        <span className="hidden md:inline">Iniciar Sesión</span>
                     </Button>
                 </Link>
             </div>
@@ -88,12 +88,12 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl">
             Descubre las promociones y eventos más exclusivos
           </h1>
-          <div className="relative w-full max-w-xl mt-8">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-400" />
+          <div className="relative w-full max-w-xl mt-8 animated-gradient-border-wrapper rounded-full group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-400 z-10" />
             <Input
               type="search"
               placeholder="Buscar por nombre, negocio o descripción..."
-              className="pl-12 w-full rounded-full h-14 text-lg bg-white/90 text-black placeholder:text-gray-500"
+              className="pl-12 w-full rounded-full h-14 text-lg bg-white/90 text-black placeholder:text-gray-500 transition-all duration-300 focus:bg-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />

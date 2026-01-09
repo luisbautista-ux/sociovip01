@@ -100,6 +100,11 @@ export default {
           'from': { width: '0%' },
           'to': { width: '100%' },
         },
+        'border-gradient-animation': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
@@ -107,6 +112,7 @@ export default {
         'drop-in': 'drop-in 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
         'float': 'float 3s ease-in-out 1.2s infinite',
         'progress-bar-fill': 'progress-bar-fill linear forwards',
+        'border-gradient': 'border-gradient-animation 4s linear infinite',
   		}
   	}
   },
