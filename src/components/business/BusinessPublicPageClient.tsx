@@ -651,24 +651,24 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     <span className="font-bold text-xl text-gradient hidden sm:inline">SocioVIP</span>
                  </Link>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                  <Link href="/" passHref>
                     <Button
                         variant="ghost"
-                        className="font-semibold text-sm text-muted-foreground hover:text-primary transition"
+                        className="font-semibold text-sm text-muted-foreground hover:text-primary transition p-0 h-auto md:px-4 md:py-2"
                     >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Volver al Inicio
+                      <ArrowLeft className="h-8 w-8 md:h-4 md:w-4 md:mr-2" />
+                      <span className="hidden md:inline">Volver al Inicio</span>
                     </Button>
                  </Link>
                   <Link href="/login" passHref>
                      <Button
                         variant="ghost"
-                        className="font-semibold text-sm text-white shadow-md hover:opacity-90 transition"
+                        className="font-semibold text-sm text-white shadow-md hover:opacity-90 transition p-0 h-auto md:w-auto md:px-4 md:py-2 md:border md:border-white/50 md:bg-white/10 md:rounded-md"
                         style={{ backgroundColor: businessDetails.primaryColor }}
                     >
-                      <UserCircle className="mr-2 h-4 w-4" />
-                      Iniciar Sesión
+                      <UserCircle className="h-8 w-8 md:h-5 md:w-5 md:mr-2" />
+                      <span className="hidden md:inline">Iniciar Sesión</span>
                     </Button>
                   </Link>
               </div>
@@ -888,7 +888,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-white"
                         style={{
                             backgroundSize: '400% 400%',
-                            animation: 'gradient-animation 15s ease-in-out infinite',
+                            animation: 'gradient-animation 15s ease infinite',
                             backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
                         }}
                     >
@@ -1043,4 +1043,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
