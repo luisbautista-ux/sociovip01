@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,7 +28,7 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, ArrowLeft, Star, CheckCircle, CalendarIcon, Info } from "lucide-react";
+import { Loader2, ArrowLeft, Star, CheckCircle, CalendarIcon, Info, AlertTriangle } from "lucide-react";
 import { SocioVipLogo, GoogleIcon } from "@/components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -36,6 +37,17 @@ import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const dniEntrySchema = z.object({
   docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
@@ -56,6 +68,7 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'selection' | 'dniEntry' | 'form'>('selection');
   const [selectedPlan, setSelectedPlan] = useState<'gratis' | 'premium' | null>(null);
+  const [showUserExistsAlert, setShowUserExistsAlert] = useState(false);
   const { toast } = useToast();
   const { signupWithGoogle } = useAuth();
   const router = useRouter();
@@ -96,6 +109,11 @@ export default function SignupPage() {
         const data = await response.json();
 
         if (response.ok) {
+            if (data.isPlatformUser) {
+                setShowUserExistsAlert(true);
+                return;
+            }
+
             let toastTitle = "Nuevo Socio";
             let toastDescription = "Por favor, completa tu registro.";
 
@@ -156,7 +174,6 @@ export default function SignupPage() {
         dni: values.dni,
         phone: values.phone || "",
         dob: values.dob,
-        // Override Google's name with the one from the form
         overrideName: `${values.name} ${values.surname}`.trim()
       });
 
@@ -310,6 +327,7 @@ export default function SignupPage() {
   };
   
   return (
+    <>
     <div className="relative min-h-screen bg-[#f4eef7] p-4 flex flex-col items-center justify-center">
         <Link href="/" className="absolute top-4 left-4 z-10 text-sm font-semibold text-purple-800 hover:text-purple-600 transition-colors flex items-center">
             <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -344,5 +362,22 @@ export default function SignupPage() {
         </Card>
       </div>
     </div>
+    <AlertDialog open={showUserExistsAlert} onOpenChange={setShowUserExistsAlert}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> ¡Este DNI ya tiene una cuenta!</AlertDialogTitle>
+                <AlertDialogDescription>
+                    El documento que ingresaste ya está registrado en nuestra plataforma. No es necesario crear una nueva cuenta.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowUserExistsAlert(false)}>Volver</AlertDialogCancel>
+                <AlertDialogAction onClick={() => router.push('/login')} className="bg-primary hover:bg-primary/90">
+                    Ir a Iniciar Sesión
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
