@@ -144,7 +144,7 @@ export default function ClientDashboardPage() {
         <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-gradient">Mis Negocios Asignados</CardTitle>
+              <CardTitle className="text-gradient">Mis beneficios SocioVIP</CardTitle>
               <CardDescription>Con tu membresía gratuita, puedes usar tu carnet en los siguientes locales:</CardDescription>
             </CardHeader>
             <CardContent>
