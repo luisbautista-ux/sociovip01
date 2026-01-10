@@ -32,7 +32,7 @@ import { SocioVipLogo } from "@/components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn, anyToDate } from "@/lib/utils";
-import { format, parseISO } from "date-fns";
+import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -40,19 +40,17 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import type { QrClient, PlatformUserRole } from "@/lib/types";
 
-// Schema for Step 1: DNI Verification
 const dniEntrySchema = z.object({
   docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
   docNumber: z.string().min(8, "El documento debe tener al menos 8 dígitos.").max(15),
 });
 type DniEntryValues = z.infer<typeof dniEntrySchema>;
 
-// Schema for Step 2: Full Registration Form
 const signupFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   surname: z.string().min(2, "El apellido es requerido."),
   dni: z.string().min(8, "El DNI debe tener 8 dígitos.").max(15, "El DNI/CE es inválido."),
-  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9."),
+  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9.").optional().or(z.literal("")),
   dob: z.date({ required_error: "La fecha de nacimiento es requerida."}),
   email: z.string().email({ message: "Por favor, ingresa un email válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
@@ -68,7 +66,6 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'selection' | 'dniEntry' | 'form'>('selection');
   const [selectedPlan, setSelectedPlan] = useState<'gratis' | 'premium' | null>(null);
-  const [verifiedDni, setVerifiedDni] = useState<string | null>(null);
   const { toast } = useToast();
   const { signup } = useAuth();
   const router = useRouter();
@@ -98,32 +95,54 @@ export default function SignupPage() {
 
   const handleDniVerification = async (values: DniEntryValues) => {
     setIsSubmitting(true);
-    const dniToVerify = values.docNumber.trim();
-    setVerifiedDni(dniToVerify);
-    signupForm.setValue('dni', dniToVerify);
+    const docNumber = values.docNumber.trim();
+    signupForm.setValue('dni', docNumber);
 
     try {
-        const q = query(collection(db, "qrClients"), where("dni", "==", dniToVerify), limit(1));
-        const querySnapshot = await getDocs(q);
+        const response = await fetch('/api/public/consult-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni: docNumber, docType: values.docType }),
+        });
+        const data = await response.json();
 
-        if (!querySnapshot.empty) {
-            const clientData = querySnapshot.docs[0].data() as QrClient;
-            signupForm.setValue('name', clientData.name);
-            signupForm.setValue('surname', clientData.surname);
-            if (clientData.phone) signupForm.setValue('phone', clientData.phone);
-            const dobDate = anyToDate(clientData.dob);
-            if (dobDate) signupForm.setValue('dob', dobDate);
-            toast({ title: "¡Te encontramos!", description: "Hemos rellenado tus datos. Por favor, confírmalos y completa tu registro." });
+        if (response.ok) {
+            let toastTitle = "Nuevo Socio";
+            let toastDescription = "Por favor, completa tu registro.";
+
+            if (data.source !== 'not_found') {
+                toastTitle = data.source === 'internal' ? "¡Te encontramos!" : "Datos Encontrados";
+                toastDescription = "Hemos rellenado tus datos. Por favor, confírmalos y completa tu registro.";
+
+                const fullName = data.nombreCompleto || "";
+                const nameParts = fullName.split(' ');
+                const surname = nameParts.length > 2 ? nameParts.slice(-2).join(' ') : nameParts.slice(1).join(' ');
+                const name = nameParts.length > 2 ? nameParts.slice(0, -2).join(' ') : nameParts[0] || '';
+
+                signupForm.setValue('name', name);
+                signupForm.setValue('surname', surname);
+                if (data.phone) signupForm.setValue('phone', data.phone);
+                
+                if (data.fechaNacimiento) {
+                    const parsedDate = parse(data.fechaNacimiento, 'dd/MM/yyyy', new Date());
+                    if (!isNaN(parsedDate.getTime())) {
+                        signupForm.setValue('dob', parsedDate);
+                    }
+                }
+            } else {
+                 signupForm.reset({
+                    ...signupForm.getValues(),
+                    dni: docNumber,
+                    name: "", surname: "", phone: "", dob: undefined, email: "", password: "", confirmPassword: ""
+                });
+            }
+            toast({ title: toastTitle, description: toastDescription });
+            setStep('form');
         } else {
-            toast({ title: "Nuevo Socio", description: "No te encontramos en nuestra base de datos de clientes. Por favor, completa tu registro." });
-            signupForm.reset({
-                ...signupForm.getValues(),
-                name: "", surname: "", phone: "", dob: undefined, email: "", password: "", confirmPassword: ""
-            });
+            throw new Error(data.error || "No se pudo verificar el documento.");
         }
-        setStep('form');
-    } catch (error) {
-        toast({ title: "Error de Verificación", description: "No se pudo consultar la base de datos.", variant: "destructive" });
+    } catch (error: any) {
+        toast({ title: "Error de Verificación", description: error.message, variant: "destructive" });
     } finally {
         setIsSubmitting(false);
     }
@@ -136,7 +155,7 @@ export default function SignupPage() {
     try {
       const result = await signup(values.email, values.password, `${values.name} ${values.surname}`, roleToAssign, {
         dni: values.dni,
-        phone: values.phone,
+        phone: values.phone || "",
         dob: values.dob,
       });
 
@@ -230,7 +249,7 @@ export default function SignupPage() {
                   </FormItem>
                 )} />
                 <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar DNI"}
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar Documento"}
                 </Button>
                 <Button variant="link" size="sm" className="mt-2 text-muted-foreground w-full" onClick={() => setStep('selection')}>&larr; Volver a elegir plan</Button>
               </form>
@@ -243,14 +262,16 @@ export default function SignupPage() {
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
                 <FormField control={signupForm.control} name="dni" render={({ field }) => (
-                  <FormItem><FormLabel>DNI</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
                 )}/>
-                <FormField control={signupForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Nombre(s)</FormLabel><FormControl><Input placeholder="Tu nombre" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                 <FormField control={signupForm.control} name="surname" render={({ field }) => (
-                  <FormItem><FormLabel>Apellido(s)</FormLabel><FormControl><Input placeholder="Tu apellido" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                )}/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={signupForm.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Nombre(s)</FormLabel><FormControl><Input placeholder="Tu nombre" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <FormField control={signupForm.control} name="surname" render={({ field }) => (
+                    <FormItem><FormLabel>Apellido(s)</FormLabel><FormControl><Input placeholder="Tu apellido" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                </div>
                 <FormField control={signupForm.control} name="phone" render={({ field }) => (
                   <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
                 )}/>
