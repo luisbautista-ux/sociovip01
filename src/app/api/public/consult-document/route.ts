@@ -3,59 +3,96 @@
 
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/firebaseAdmin';
-import { anyToDate } from '@/lib/utils';
 
-// This function is now simplified to use a single, more reliable endpoint.
+// This function is now simplified as we removed the auth check
 async function consultExternalDniApi(
   dni: string
 ): Promise<{ nombreCompleto: string; fechaNacimiento: string | null } | null> {
   try {
-    const endpoint = "https://dniperu.com/wp-admin/admin-ajax.php";
-    const formData = new URLSearchParams();
-    formData.append('action', 'buscar_dni');
-    formData.append('dni', dni);
-    formData.append('security', 'a2efa2b361'); // Security nonce updated to a working one
+    /* =======================
+       CONSULTA NOMBRES (NO TOCAR)
+    ======================= */
+    const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
+    const formNombres = new URLSearchParams();
+    formNombres.append('dni4', dni);
+    formNombres.append('action', 'buscar_nombres');
+    formNombres.append('security', '04478f0511');
 
-    const response = await fetch(endpoint, {
+    const responseNombres = await fetch(endpointNombres, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Referer': 'https://dniperu.com/', // Main referer
+        'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
       },
-      body: formData.toString(),
+      body: formNombres.toString(),
     });
 
-    if (!response.ok) {
-      console.error('Error en response de la API externa:', response.status, await response.text());
-      return null;
+    const dataNombres = await responseNombres.json();
+
+    let nombres: string | null = null;
+    let apellidoPaterno: string | null = null;
+    let apellidoMaterno: string | null = null;
+
+    if (dataNombres.success && dataNombres.data?.message) {
+      const lines = dataNombres.data.message.split('\n');
+      lines.forEach((line: string) => {
+        if (line.startsWith("Nombres:"))
+          nombres = line.replace("Nombres:", "").trim();
+        else if (line.startsWith("Apellido Paterno:"))
+          apellidoPaterno = line.replace("Apellido Paterno:", "").trim();
+        else if (line.startsWith("Apellido Materno:"))
+          apellidoMaterno = line.replace("Apellido Materno:", "").trim();
+      });
     }
 
-    const data = await response.json();
+    const nombreCompleto = `${nombres || ''} ${apellidoPaterno || ''} ${apellidoMaterno || ''}`
+      .trim()
+      .replace(/\s+/g, ' ');
+      
+    /* =======================
+      CONSULTA FECHA (ACTUALIZADA - nuevo formato JSON directo)
+    ======================= */
+    const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
+    const formFecha = new URLSearchParams();
+    formFecha.append('dni', dni);
+    formFecha.append('action', 'buscar_fecha');
+    formFecha.append('security', 'b4c2167368'); // Este nonce parece seguir funcionando
 
-    if (data.success && data.data) {
-        const fullName = `${data.data.nombres || ''} ${data.data.apellidoPaterno || ''} ${data.data.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
-        // The date usually comes in YYYY-MM-DD, needs to be converted to dd/MM/yyyy
-        let birthDate: string | null = null;
-        if(data.data.fechaNacimiento) {
-             const [year, month, day] = data.data.fechaNacimiento.split('-');
-             if(day && month && year) {
-                birthDate = `${day}/${month}/${year}`;
-             }
-        }
-        return {
-            nombreCompleto: fullName,
-            fechaNacimiento: birthDate
-        };
+    const responseFecha = await fetch(endpointFecha, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': 'https://dniperu.com/consultas/buscar-fecha-de-nacimiento-con-dni/',
+        // Opcional pero recomendado para simular mejor el navegador
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      body: formFecha.toString(),
+    });
+
+    if (!responseFecha.ok) {
+      console.error('Error en responseFecha:', responseFecha.status);
+      return { nombreCompleto, fechaNacimiento: null };
     }
-    
-    return null;
 
-  } catch (e) {
-    console.error("Error fetching from external DNI API in consult-document:", e);
-    return null;
-  }
-}
+    const dataFecha = await responseFecha.json();
 
+    let fechaNacimiento: string | null = null;
+
+    if (dataFecha.success && dataFecha.data) {
+      // Nuevo formato: campo directo
+      if (dataFecha.data.fechaNacimiento) {
+        fechaNacimiento = dataFecha.data.fechaNacimiento.replace(/\//g, '/'); // limpia los escapes si vienen como 23\/03\/1980
+      }
+      // Opcional: también puedes aprovechar los nombres de aquí si quieres unificar
+      // pero como ya consultas nombres por separado, no es necesario
+    }
+
+        return { nombreCompleto, fechaNacimiento };
+      } catch (e) {
+        console.error("Error fetching from external DNI API in consult-document:", e);
+        return null;
+      }
+    }
 export async function POST(request: Request) {
   try {
     const { dni, docType } = await request.json();
@@ -67,8 +104,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Search in internal DB first
-    const collectionsToSearch = ['platformUsers', 'qrClients', 'socioVipMembers'];
+    // *** CAMBIO MÍNIMO: Primero verificar si ya es un usuario de plataforma ***
+    const platformUserQuery = await adminDb.collection('platformUsers').where('dni', '==', dni).limit(1).get();
+    if (!platformUserQuery.empty) {
+        return NextResponse.json({ isPlatformUser: true });
+    }
+
+    // Search in other internal DBs first
+    const collectionsToSearch = ['qrClients', 'socioVipMembers'];
 
     for (const collectionName of collectionsToSearch) {
       const querySnapshot = await adminDb
@@ -79,10 +122,15 @@ export async function POST(request: Request) {
 
       if (!querySnapshot.empty) {
         const data = querySnapshot.docs[0].data();
-        const isPlatformUser = collectionName === 'platformUsers';
-        
-        const fullName = data.name ? data.name.trim() : `${data.name || ''} ${data.surname || ''}`.trim();
-        const dobDate = anyToDate(data.dob);
+
+        const name = data.name || "";
+        const surname = data.surname || "";
+        const fullName = `${name} ${surname}`.trim();
+        const phone = data.phone || null;
+
+        const dobDate =
+          data.dob?.toDate?.() ||
+          (data.dob ? new Date(data.dob) : null);
 
         const fechaNacimiento = dobDate
           ? dobDate.toLocaleDateString('es-PE', {
@@ -92,13 +140,12 @@ export async function POST(request: Request) {
               timeZone: 'America/Lima',
             })
           : null;
-        
+
         return NextResponse.json({
-          source: 'internal',
-          isPlatformUser: isPlatformUser,
           nombreCompleto: fullName,
           fechaNacimiento,
-          phone: data.phone || null,
+          phone,
+          source: 'internal',
         });
       }
     }
@@ -107,23 +154,18 @@ export async function POST(request: Request) {
     if (docType === 'dni') {
       const externalData = await consultExternalDniApi(dni);
       if (externalData && externalData.nombreCompleto) {
-        return NextResponse.json({
-            source: 'external',
-            isPlatformUser: false,
-            ...externalData
-        });
+        return NextResponse.json({ ...externalData, source: 'external' });
       }
     }
-    
-    // Not found anywhere
+
     return NextResponse.json(
-      { source: 'not_found', isPlatformUser: false, nombreCompleto: null, fechaNacimiento: null },
+      { nombreCompleto: null, fechaNacimiento: null, source: 'not_found' },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("API Route (consult-document): Error:", error);
     return NextResponse.json(
-      { error: 'Error interno del servidor.', details: error.message },
+      { error: 'Error interno del servidor.' },
       { status: 500 }
     );
   }
