@@ -25,7 +25,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const navItems = [
-  { href: "/client/dashboard", label: "Mi QR y Negocios", icon: QrCode },
+  { href: "/client/dashboard", label: "Mi QR y Beneficios", icon: QrCode },
   { href: "/client/profile", label: "Mi Perfil", icon: UserCircle },
 ];
 
