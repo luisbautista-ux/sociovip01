@@ -23,22 +23,19 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowLeft, Star, CheckCircle, CalendarIcon, Info } from "lucide-react";
-import { SocioVipLogo } from "@/components/icons";
+import { SocioVipLogo, GoogleIcon } from "@/components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn, anyToDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
-import type { QrClient, PlatformUserRole } from "@/lib/types";
 
 const dniEntrySchema = z.object({
   docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
@@ -48,17 +45,10 @@ type DniEntryValues = z.infer<typeof dniEntrySchema>;
 
 const signupFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
-  surname: z.string().min(2, "El apellido es requerido."),
+  surname: z.string().min(2, { message: "El apellido es requerido." }),
   dni: z.string().min(8, "El DNI debe tener 8 dígitos.").max(15, "El DNI/CE es inválido."),
   phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9.").optional().or(z.literal("")),
   dob: z.date({ required_error: "La fecha de nacimiento es requerida."}),
-  email: z.string().email({ message: "Por favor, ingresa un email válido." }),
-  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
-  confirmPassword: z.string(),
-  plan: z.enum(['gratis', 'premium'], { required_error: "Debes seleccionar un plan." }),
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Las contraseñas no coinciden.",
-  path: ["confirmPassword"],
 });
 type SignupFormValues = z.infer<typeof signupFormSchema>;
 
@@ -67,7 +57,7 @@ export default function SignupPage() {
   const [step, setStep] = useState<'selection' | 'dniEntry' | 'form'>('selection');
   const [selectedPlan, setSelectedPlan] = useState<'gratis' | 'premium' | null>(null);
   const { toast } = useToast();
-  const { signup } = useAuth();
+  const { signupWithGoogle } = useAuth();
   const router = useRouter();
 
   const dniForm = useForm<DniEntryValues>({
@@ -79,7 +69,7 @@ export default function SignupPage() {
   const signupForm = useForm<SignupFormValues>({
     resolver: zodResolver(signupFormSchema),
     defaultValues: {
-      name: "", surname: "", dni: "", phone: "", email: "", password: "", confirmPassword: "",
+      name: "", surname: "", dni: "", phone: "",
     },
   });
 
@@ -89,7 +79,6 @@ export default function SignupPage() {
         return;
     }
     setSelectedPlan(plan);
-    signupForm.setValue('plan', plan);
     setStep('dniEntry');
   };
 
@@ -133,7 +122,7 @@ export default function SignupPage() {
                  signupForm.reset({
                     ...signupForm.getValues(),
                     dni: docNumber,
-                    name: "", surname: "", phone: "", dob: undefined, email: "", password: "", confirmPassword: ""
+                    name: "", surname: "", phone: "", dob: undefined
                 });
             }
             toast({ title: toastTitle, description: toastDescription });
@@ -147,16 +136,28 @@ export default function SignupPage() {
         setIsSubmitting(false);
     }
   };
+  
+  const handleSignupWithGoogle = async () => {
+    const isValid = await signupForm.trigger();
+    if (!isValid) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor, revisa y completa todos los campos requeridos.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const handleSignup = async (values: SignupFormValues) => {
     setIsSubmitting(true);
-    const roleToAssign = values.plan === 'gratis' ? 'client_gratis' : 'vip_premium';
+    const values = signupForm.getValues();
     
     try {
-      const result = await signup(values.email, values.password, `${values.name} ${values.surname}`, roleToAssign, {
+      const result = await signupWithGoogle('client_gratis', {
         dni: values.dni,
         phone: values.phone || "",
         dob: values.dob,
+        // Override Google's name with the one from the form
+        overrideName: `${values.name} ${values.surname}`.trim()
       });
 
       if ("user" in result) {
@@ -165,8 +166,8 @@ export default function SignupPage() {
       } else {
         const errorCode = result.code;
         let errorMessage = "Ocurrió un error durante el registro.";
-        if (errorCode === "auth/email-already-in-use") {
-          errorMessage = "Este email ya está en uso. Por favor, intenta iniciar sesión.";
+        if (errorCode === "auth/email-already-in-use" || errorCode === 'auth/credential-already-in-use') {
+          errorMessage = "Este email ya está en uso por otro usuario. Por favor, intenta iniciar sesión.";
         }
         toast({ title: "Error de Registro", description: errorMessage, variant: "destructive" });
       }
@@ -177,6 +178,7 @@ export default function SignupPage() {
       setIsSubmitting(false);
     }
   };
+
 
   const renderContent = () => {
     switch (step) {
@@ -260,7 +262,7 @@ export default function SignupPage() {
         return (
           <div className="w-full max-w-md mx-auto">
             <Form {...signupForm}>
-              <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
+              <form onSubmit={signupForm.handleSubmit(handleSignupWithGoogle)} className="space-y-4">
                 <FormField control={signupForm.control} name="dni" render={({ field }) => (
                   <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
                 )}/>
@@ -292,17 +294,10 @@ export default function SignupPage() {
                     </Popover><FormMessage />
                   </FormItem>
                 )}/>
-                <FormField control={signupForm.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="tu@email.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={signupForm.control} name="password" render={({ field }) => (
-                  <FormItem><FormLabel>Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={signupForm.control} name="confirmPassword" render={({ field }) => (
-                  <FormItem><FormLabel>Confirmar Contraseña</FormLabel><FormControl><Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear Mi Cuenta Gratis"}
+                
+                <Button type="button" onClick={handleSignupWithGoogle} variant="gradient" className="w-full flex items-center" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon className="mr-2 h-5 w-5" />}
+                  Continuar y Registrarse con Google
                 </Button>
               </form>
             </Form>

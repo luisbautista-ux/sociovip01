@@ -14,8 +14,7 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   linkWithPopup,
-  getAdditionalUserInfo,
-  reauthenticateWithPopup
+  getAdditionalUserInfo
 } from "firebase/auth";
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
@@ -29,6 +28,7 @@ interface ExtraSignupData {
   dni: string;
   phone: string;
   dob: Date;
+  overrideName?: string;
 }
 
 interface AuthContextType {
@@ -37,7 +37,7 @@ interface AuthContextType {
   loadingAuth: boolean; 
   loadingProfile: boolean; 
   login: (email: string, pass: string) => Promise<UserCredential | AuthError>;
-  signup: (email: string, pass: string, name?: string, role?: PlatformUserRole, extraData?: ExtraSignupData) => Promise<UserCredential | AuthError>;
+  signupWithGoogle: (role: PlatformUserRole, extraData: ExtraSignupData) => Promise<UserCredential | AuthError>;
   logout: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
   refreshUserProfile: () => Promise<void>;
@@ -161,29 +161,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [logout, fetchUserProfile]);
 
-  const signup = useCallback(async (email: string, pass: string, name?: string, role: PlatformUserRole = 'client_gratis', extraData?: ExtraSignupData): Promise<UserCredential | AuthError> => {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-      if (userCredential.user) {
-        const userDocRef = doc(db, "platformUsers", userCredential.user.uid);
-        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
-          uid: userCredential.user.uid,
-          email: userCredential.user.email || "",
-          name: name || userCredential.user.email?.split('@')[0] || "Nuevo Usuario",
-          roles: [role], 
-          dni: extraData?.dni || "",
-          phone: extraData?.phone || "",
-          dob: extraData?.dob ? extraData.dob.toISOString() : undefined,
-        };
-        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [], assignedBusinessId: null });
-        await fetchUserProfile(userCredential.user);
-      }
-      return userCredential;
-    } catch (error) {
-      return error as AuthError;
-    }
-  }, [fetchUserProfile]);
-
   const handleSocialLogin = async (provider: GoogleAuthProvider, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithPopup(auth, provider);
@@ -224,6 +201,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ hd: undefined });
       return handleSocialLogin(provider, role);
+  };
+  
+  const signupWithGoogle = async (role: PlatformUserRole = 'client_gratis', extraData: ExtraSignupData): Promise<UserCredential | AuthError> => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account', hd: undefined });
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        const additionalInfo = getAdditionalUserInfo(result);
+        const userDocRef = doc(db, "platformUsers", user.uid);
+        
+        if (additionalInfo?.isNewUser) {
+            const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
+              uid: user.uid,
+              email: user.email || "",
+              name: extraData.overrideName || user.displayName || "Nuevo Usuario",
+              photoURL: user.photoURL || undefined,
+              roles: [role],
+              dni: extraData.dni || "",
+              phone: extraData.phone || "",
+              dob: extraData.dob ? extraData.dob.toISOString() : undefined,
+            };
+            await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+            await fetchUserProfile(user);
+        } else {
+            // User already exists, but might not be in our DB
+            const existingProfile = await getDoc(userDocRef);
+            if (!existingProfile.exists()) {
+               const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
+                uid: user.uid,
+                email: user.email || "",
+                name: extraData.overrideName || user.displayName || "Usuario Existente",
+                photoURL: user.photoURL || undefined,
+                roles: [role],
+                dni: extraData.dni || "",
+                phone: extraData.phone || "",
+                dob: extraData.dob ? extraData.dob.toISOString() : undefined,
+               };
+               await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+            } else {
+                 return { code: 'auth/credential-already-in-use', message: 'Este usuario ya existe.' } as AuthError;
+            }
+             await fetchUserProfile(user);
+        }
+
+        return result;
+    } catch(error) {
+        return error as AuthError;
+    }
   };
   
   const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
@@ -269,13 +295,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadingAuth,
     loadingProfile,
     login,
-    signup,
+    signupWithGoogle,
     logout,
     sendPasswordReset,
     refreshUserProfile,
     loginWithGoogle,
     linkGoogleAccount,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signup, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, linkGoogleAccount]);
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, linkGoogleAccount]);
 
+  // Remove `signup` from the returned value, as it's no longer used.
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
