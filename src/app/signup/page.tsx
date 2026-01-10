@@ -38,7 +38,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
-import type { QrClient } from "@/lib/types";
+import type { QrClient, PlatformUserRole } from "@/lib/types";
 
 // Schema for Step 1: DNI Verification
 const dniEntrySchema = z.object({
@@ -110,7 +110,7 @@ export default function SignupPage() {
             const clientData = querySnapshot.docs[0].data() as QrClient;
             signupForm.setValue('name', clientData.name);
             signupForm.setValue('surname', clientData.surname);
-            signupForm.setValue('phone', clientData.phone);
+            if (clientData.phone) signupForm.setValue('phone', clientData.phone);
             const dobDate = anyToDate(clientData.dob);
             if (dobDate) signupForm.setValue('dob', dobDate);
             toast({ title: "¡Te encontramos!", description: "Hemos rellenado tus datos. Por favor, confírmalos y completa tu registro." });
@@ -164,11 +164,10 @@ export default function SignupPage() {
       case 'selection':
         return (
           <div className="grid md:grid-cols-2 gap-8">
-            {/* Card para SocioVIP Estándar */}
             <Card className="flex flex-col">
               <CardHeader>
                 <CardTitle>SocioVIP Gratis</CardTitle>
-                <CardDescription>Acceso a beneficios seleccionados.</CardDescription>
+                <CardDescription>Genera tu carnet de socio y accede a beneficios exclusivos en toda nuestra red de locales afiliados.</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-3 text-sm">
                 <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Genera QRs para promociones en restaurantes, salones de belleza, gimnasios y mucho más.</span></p>
@@ -180,14 +179,13 @@ export default function SignupPage() {
                 <Button onClick={() => handleSelectPlan('gratis')} variant="gradient" className="w-full">Registrarse Gratis</Button>
               </CardFooter>
             </Card>
-            {/* Card para SocioVIP Premium */}
             <Card className="flex flex-col border-primary border-2 relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-full flex items-center">
                 <Star className="h-3 w-3 mr-1.5"/> MÁS POPULAR
               </div>
               <CardHeader>
                 <CardTitle>SocioVIP Premium</CardTitle>
-                <CardDescription>La experiencia completa sin límites.</CardDescription>
+                <CardDescription>Acceso ilimitado a toda la red de locales afiliados, beneficios y descuentos exclusivos para socios premium.</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-3 text-sm">
                 <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 shrink-0"/> <span>Todos los beneficios del plan gratuito.</span></p>
@@ -244,7 +242,6 @@ export default function SignupPage() {
           <div className="w-full max-w-md mx-auto">
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
-                {/* DNI is pre-filled and disabled */}
                 <FormField control={signupForm.control} name="dni" render={({ field }) => (
                   <FormItem><FormLabel>DNI</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
                 )}/>
@@ -333,5 +330,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-```
