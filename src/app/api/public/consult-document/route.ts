@@ -15,7 +15,7 @@ async function consultExternalDniApi(
     const formNombres = new URLSearchParams();
     formNombres.append('dni4', dni);
     formNombres.append('action', 'buscar_nombres');
-    formNombres.append('security', 'f2338a412d');
+    formNombres.append('security', '54f40a55bd');
 
     const responseNombres = await fetch(endpointNombres, {
       method: 'POST',

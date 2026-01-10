@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle, QrCode, Star, Building, ExternalLink, Download } from "lucide-react";
 import * as htmlToImage from 'html-to-image';
 import { useToast } from '@/hooks/use-toast';
+import { SocioVipLogo } from '@/components/icons';
 
 export default function ClientDashboardPage() {
   const { currentUser, userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -76,19 +77,19 @@ export default function ClientDashboardPage() {
 
   const handleDownloadQrCard = async () => {
     if (!cardRef.current) {
-      toast({ title: "Error", description: "No se puede descargar la tarjeta QR en este momento.", variant: "destructive" });
+      toast({ title: "Error", description: "No se puede descargar el carnet en este momento.", variant: "destructive" });
       return;
     }
     try {
       const dataUrl = await htmlToImage.toPng(cardRef.current, { quality: 1.0, pixelRatio: 2 });
       const link = document.createElement('a');
-      link.download = `SocioVIP_QR_${userProfile?.name?.replace(/\s/g, '_') || currentUser?.uid}.png`;
+      link.download = `Carnet_SocioVIP_${userProfile?.name?.replace(/\s/g, '_') || currentUser?.uid}.png`;
       link.href = dataUrl;
       link.click();
-      toast({ title: "QR Guardado", description: "Tu tarjeta QR se ha descargado como imagen." });
+      toast({ title: "Carnet Guardado", description: "Tu carnet de socio se ha descargado como imagen." });
     } catch (err) {
-      console.error('Error al generar la imagen del QR:', err);
-      toast({ title: "Error al Guardar", description: "No se pudo generar la imagen de tu tarjeta QR.", variant: "destructive" });
+      console.error('Error al generar la imagen del carnet:', err);
+      toast({ title: "Error al Guardar", description: "No se pudo generar la imagen de tu carnet.", variant: "destructive" });
     }
   };
 
@@ -111,11 +112,14 @@ export default function ClientDashboardPage() {
         {/* QR Card */}
         <div className="md:col-span-1 md:sticky md:top-8">
           <Card ref={cardRef} className="shadow-lg text-center overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-primary to-accent text-primary-foreground p-4">
-              <CardTitle className="text-xl">Tu QR Fijo SocioVIP</CardTitle>
-              <CardDescription className="text-primary-foreground/90">
-                Presenta este QR en los negocios de tu red.
-              </CardDescription>
+            <CardHeader className="bg-gradient-to-r from-primary to-accent text-primary-foreground p-4 flex flex-row items-center justify-center space-x-3 space-y-0">
+               <SocioVipLogo size={40} className="bg-white/20 p-1 rounded-md" />
+               <div>
+                  <CardTitle className="text-xl">Carnet de SocioVIP</CardTitle>
+                  <CardDescription className="text-primary-foreground/90 text-left">
+                    Presenta este QR en los negocios de tu red.
+                  </CardDescription>
+              </div>
             </CardHeader>
             <CardContent className="p-4 space-y-3 flex flex-col items-center">
               {qrCodeImage ? (
@@ -130,7 +134,7 @@ export default function ClientDashboardPage() {
             </CardContent>
              <CardContent className="p-4 pt-0">
                 <Button onClick={handleDownloadQrCard} className="w-full" variant="outline">
-                    <Download className="mr-2 h-4 w-4"/> Descargar Tarjeta QR
+                    <Download className="mr-2 h-4 w-4"/> Descargar Carnet
                 </Button>
             </CardContent>
           </Card>
@@ -141,7 +145,7 @@ export default function ClientDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-gradient">Mis Negocios Asignados</CardTitle>
-              <CardDescription>Con tu membresía gratuita, puedes usar tu QR en los siguientes locales:</CardDescription>
+              <CardDescription>Con tu membresía gratuita, puedes usar tu carnet en los siguientes locales:</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingData ? (
@@ -186,7 +190,7 @@ export default function ClientDashboardPage() {
               <CardTitle className="text-primary flex items-center"><Star className="mr-2"/>¡Desbloquea el Acceso Total!</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-primary/90">Usa tu QR en <strong className="font-bold">TODOS</strong> los negocios de la red y accede a beneficios exclusivos con la membresía Premium.</p>
+              <p className="text-primary/90">Usa tu carnet en <strong className="font-bold">TODOS</strong> los negocios de la red y accede a beneficios exclusivos con la membresía Premium.</p>
               <Button variant="gradient" disabled>Obtener Premium (Próximamente)</Button>
             </CardContent>
           </Card>
