@@ -11,18 +11,21 @@ async function getUidFromIdToken(idToken: string): Promise<string> {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
-  const idTokenCookie = request.headers.get('cookie')?.split('; ').find(c => c.startsWith('idToken='))?.split('=')[1];
+  const state = url.searchParams.get('state');
+  
+  // El token ahora viene en el parámetro 'state'
+  const idToken = state ? decodeURIComponent(state) : null;
 
   if (!code) {
     return NextResponse.json({ error: 'Authorization code not found.' }, { status: 400 });
   }
 
-  if (!idTokenCookie) {
+  if (!idToken) {
     return NextResponse.json({ error: 'User not authenticated.' }, { status: 401 });
   }
 
   try {
-    const uid = await getUidFromIdToken(idTokenCookie);
+    const uid = await getUidFromIdToken(idToken);
     const userDocRef = adminDb.collection('platformUsers').doc(uid);
     const userDoc = await userDocRef.get();
 
@@ -52,15 +55,11 @@ export async function GET(request: Request) {
         gmailRefreshToken: refresh_token,
     });
 
-    // Clear the temporary cookie
-    const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/business-panel/email-campaigns`);
-    response.cookies.set('idToken', '', { maxAge: -1 }); // Delete cookie
-    return response;
+    // Redirect back to the email campaigns page upon success
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/business-panel/email-campaigns`);
 
   } catch (error: any) {
     console.error('Error during Google OAuth callback:', error);
     return NextResponse.json({ error: 'Failed to exchange authorization code.', details: error.message }, { status: 500 });
   }
 }
-
-    

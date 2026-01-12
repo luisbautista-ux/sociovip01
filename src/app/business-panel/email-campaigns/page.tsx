@@ -62,6 +62,7 @@ export default function EmailCampaignsPage() {
         snap.forEach(d => {
             if (!clientsMap.has(d.id)) {
                 const clientData = { id: d.id, ...d.data() } as QrClient;
+                // Only add clients that have a valid email
                 if (clientData.email && clientData.email.includes('@')) {
                    clientsMap.set(d.id, clientData);
                 }
@@ -170,10 +171,8 @@ export default function EmailCampaignsPage() {
         return;
     }
     currentUser.getIdToken().then(idToken => {
-        const currentUrl = new URL(window.location.href);
-        const redirectUrl = `${currentUrl.protocol}//${currentUrl.host}/api/auth/google/initiate`;
-        
-        document.cookie = `idToken=${idToken}; path=/; secure; samesite=strict`;
+        const encodedToken = encodeURIComponent(idToken);
+        const redirectUrl = `/api/auth/google/initiate?token=${encodedToken}`;
         window.location.href = redirectUrl;
     }).catch(err => {
         toast({title: "Error de autenticación", description: "No se pudo obtener tu token de sesión.", variant: "destructive" });
