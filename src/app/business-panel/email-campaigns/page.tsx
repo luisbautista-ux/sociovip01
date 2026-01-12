@@ -47,13 +47,37 @@ export default function EmailCampaignsPage() {
           setIsGmailConnected(true);
         }
       }
+      
+      // Query 1: For new data model (array contains)
+      const newModelQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
+      
+      // Query 2: For old data model (single ID)
+      const oldModelQuery = query(collection(db, "qrClients"), where("generatedForBusinessId", "==", businessId));
 
-      const clientsQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
-      const clientsSnap = await getDocs(clientsQuery);
-      const fetchedClients: QrClient[] = clientsSnap.docs
-        .map(d => ({ id: d.id, ...d.data() } as QrClient))
-        .filter(c => c.email); // Solo clientes con email
-      setAllClients(fetchedClients);
+      const [newClientsSnap, oldClientsSnap] = await Promise.all([
+          getDocs(newModelQuery),
+          getDocs(oldModelQuery),
+      ]);
+      
+      const clientsMap = new Map<string, QrClient>();
+
+      const processSnapshot = (snap: typeof newClientsSnap) => {
+        snap.forEach(d => {
+            if (!clientsMap.has(d.id)) {
+                const clientData = { id: d.id, ...d.data() } as QrClient;
+                if (clientData.email) { // Only add clients with email
+                   clientsMap.set(d.id, clientData);
+                }
+            }
+        });
+      };
+
+      processSnapshot(newClientsSnap);
+      processSnapshot(oldClientsSnap);
+
+      const combinedClients = Array.from(clientsMap.values());
+      setAllClients(combinedClients);
+
     } catch (error: any) {
       toast({ title: "Error", description: `No se pudieron cargar los clientes: ${error.message}`, variant: "destructive" });
     } finally {
@@ -101,9 +125,15 @@ export default function EmailCampaignsPage() {
     setIsSending(true);
     
     const recipientEmails = allClients
-      .filter(client => selectedClients.has(client.id))
-      .map(client => client.email);
+      .filter(client => selectedClients.has(client.id) && client.email)
+      .map(client => client.email as string);
       
+    if (recipientEmails.length === 0) {
+        toast({ title: "Sin Destinatarios", description: "No has seleccionado clientes con email para enviar la campaña.", variant: "destructive"});
+        setIsSending(false);
+        return;
+    }
+
     try {
       const response = await fetch('/api/business-panel/send-email-campaign', {
         method: 'POST',
