@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import type { QrClient, Business } from "@/lib/types";
-import { Alert, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export default function EmailCampaignsPage() {
   const { userProfile } = useAuth();
