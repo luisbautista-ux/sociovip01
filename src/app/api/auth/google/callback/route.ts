@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
-import { getAuth } from 'firebase-admin/auth';
 
 async function getUidFromIdToken(idToken: string): Promise<string> {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -27,7 +26,7 @@ export async function GET(request: Request) {
     const userDocRef = adminDb.collection('platformUsers').doc(uid);
     const userDoc = await userDocRef.get();
 
-    if (!userDoc.exists || !userDoc.data()?.businessId) {
+    if (!userDoc.exists() || !userDoc.data()?.businessId) {
         return NextResponse.json({ error: 'User profile or business ID not found.' }, { status: 404 });
     }
     const businessId = userDoc.data()?.businessId;
@@ -42,20 +41,26 @@ export async function GET(request: Request) {
     const { refresh_token } = tokens;
 
     if (!refresh_token) {
-        // This happens if the user has already granted consent before and didn't re-consent.
-        // It's not a fatal error if we already have a token.
-        console.warn("No refresh token received. User might have already granted consent.");
+        // This can happen if the user has already granted consent and didn't re-consent ("offline" access type is key).
+        console.warn("No refresh token received. This is expected if consent was already granted. The existing refresh token will be used if available.");
+        // Redirect without updating, as we have nothing new to save.
+        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/business-panel/email-campaigns`);
     }
 
     const businessDocRef = adminDb.collection('businesses').doc(businessId);
     await businessDocRef.update({
-        gmailRefreshToken: refresh_token || admin.firestore.FieldValue.delete(),
+        gmailRefreshToken: refresh_token,
     });
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/business-panel/email-campaigns`);
+    // Clear the temporary cookie
+    const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/business-panel/email-campaigns`);
+    response.cookies.set('idToken', '', { maxAge: -1 }); // Delete cookie
+    return response;
 
   } catch (error: any) {
     console.error('Error during Google OAuth callback:', error);
     return NextResponse.json({ error: 'Failed to exchange authorization code.', details: error.message }, { status: 500 });
   }
 }
+
+    

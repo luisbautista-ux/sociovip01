@@ -18,7 +18,7 @@ import type { QrClient, Business } from "@/lib/types";
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export default function EmailCampaignsPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, currentUser } = useAuth(); // Agregado currentUser
   const { toast } = useToast();
   
   const [allClients, setAllClients] = useState<QrClient[]>([]);
@@ -48,10 +48,7 @@ export default function EmailCampaignsPage() {
         }
       }
       
-      // Query 1: For new data model (array contains)
       const newModelQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
-      
-      // Query 2: For old data model (single ID)
       const oldModelQuery = query(collection(db, "qrClients"), where("generatedForBusinessId", "==", businessId));
 
       const [newClientsSnap, oldClientsSnap] = await Promise.all([
@@ -65,7 +62,8 @@ export default function EmailCampaignsPage() {
         snap.forEach(d => {
             if (!clientsMap.has(d.id)) {
                 const clientData = { id: d.id, ...d.data() } as QrClient;
-                if (clientData.email) { // Only add clients with email
+                // CORRECCIÓN: Filtrar para incluir solo clientes con un email válido.
+                if (clientData.email && clientData.email.includes('@')) {
                    clientsMap.set(d.id, clientData);
                 }
             }
@@ -124,6 +122,12 @@ export default function EmailCampaignsPage() {
     if (isSending) return;
     setIsSending(true);
     
+    if (!currentUser) {
+        toast({ title: "No autenticado", description: "Debes estar logueado para enviar campañas.", variant: "destructive" });
+        setIsSending(false);
+        return;
+    }
+    
     const recipientEmails = allClients
       .filter(client => selectedClients.has(client.id) && client.email)
       .map(client => client.email as string);
@@ -135,9 +139,10 @@ export default function EmailCampaignsPage() {
     }
 
     try {
+      const idToken = await currentUser.getIdToken();
       const response = await fetch('/api/business-panel/send-email-campaign', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({ recipientEmails, subject, body }),
       });
       const data = await response.json();
@@ -161,7 +166,20 @@ export default function EmailCampaignsPage() {
   const canSend = isGmailConnected && selectedClients.size > 0 && subject.trim().length > 0 && body.trim().length > 10;
 
   const handleGmailConnect = () => {
-    window.location.href = '/api/auth/google/initiate';
+    if (!currentUser) {
+        toast({title: "No autenticado", description: "Por favor, inicia sesión de nuevo para conectar tu cuenta.", variant: "destructive" });
+        return;
+    }
+    currentUser.getIdToken().then(idToken => {
+        const currentUrl = new URL(window.location.href);
+        const redirectUrl = `${currentUrl.protocol}//${currentUrl.host}/api/auth/google/initiate`;
+        
+        // Adjuntamos el token al cookie para que el backend lo pueda leer
+        document.cookie = `idToken=${idToken}; path=/; secure; samesite=strict`;
+        window.location.href = redirectUrl;
+    }).catch(err => {
+        toast({title: "Error de autenticación", description: "No se pudo obtener tu token de sesión.", variant: "destructive" });
+    });
   };
 
   return (
@@ -283,3 +301,5 @@ export default function EmailCampaignsPage() {
     </div>
   );
 }
+
+    

@@ -1,13 +1,12 @@
 
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import { adminDb } from '@/lib/firebase/firebaseAdmin';
-import { getAuth } from 'firebase-admin/auth';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin'; // Usando la instancia unificada
 import type { PlatformUser, Business } from '@/lib/types';
-import jsCookie from 'js-cookie';
+import { headers } from 'next/headers';
 
 async function getCallerProfile(idToken: string): Promise<PlatformUser> {
-    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
     const uid = decodedToken.uid;
     const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
     if (!userDoc.exists) {
@@ -19,19 +18,23 @@ async function getCallerProfile(idToken: string): Promise<PlatformUser> {
 export async function POST(request: Request) {
     const { recipientEmails, subject, body } = await request.json();
 
-    const idTokenCookie = request.headers.get('cookie')?.split('; ').find(c => c.startsWith('idToken='))?.split('=')[1];
-    if (!idTokenCookie) {
-        return NextResponse.json({ error: 'User not authenticated.' }, { status: 401 });
+    const authorization = headers().get('Authorization');
+    if (!authorization || !authorization.startsWith('Bearer ')) {
+        return NextResponse.json({ error: 'User not authenticated. No token provided.' }, { status: 401 });
+    }
+    const idToken = authorization.split('Bearer ')[1];
+    if (!idToken) {
+        return NextResponse.json({ error: 'User not authenticated. Token is empty.' }, { status: 401 });
     }
 
     try {
-        const caller = await getCallerProfile(idTokenCookie);
+        const caller = await getCallerProfile(idToken);
         if (!caller.businessId) {
             return NextResponse.json({ error: 'User is not associated with a business.' }, { status: 403 });
         }
 
         const businessDoc = await adminDb.collection('businesses').doc(caller.businessId).get();
-        if (!businessDoc.exists) {
+        if (!businessDoc.exists()) {
             return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
         }
 
@@ -39,7 +42,7 @@ export async function POST(request: Request) {
         const refreshToken = businessData.gmailRefreshToken;
 
         if (!refreshToken) {
-            return NextResponse.json({ error: 'Gmail account not connected for this business.' }, { status: 400 });
+            return NextResponse.json({ error: 'Gmail account not connected for this business. Please connect it in the settings.' }, { status: 400 });
         }
 
         const oauth2Client = new google.auth.OAuth2(
@@ -50,15 +53,16 @@ export async function POST(request: Request) {
 
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-        const sendEmail = async (to: string) => {
+        const sendEmail = async (to: string, name: string) => {
+            const personalizedBody = body.replace(/\[Nombre\]/g, name.split(' ')[0]);
             const rawMessage = [
-                `From: "SocioVIP - ${businessData.name}" <me>`,
+                `From: "${businessData.name}" <me>`,
                 `To: ${to}`,
                 `Subject: ${subject}`,
                 'Content-Type: text/html; charset=utf-8',
                 'MIME-Version: 1.0',
                 '',
-                body,
+                personalizedBody, // Usar cuerpo personalizado
             ].join('\n');
 
             const encodedMessage = Buffer.from(rawMessage).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -71,8 +75,18 @@ export async function POST(request: Request) {
             });
         };
         
+        const allClientsQuery = query(collection(db, "qrClients"), where('email', 'in', recipientEmails));
+        const clientsSnap = await getDocs(allClientsQuery);
+        const clientsDataMap = new Map(clientsSnap.docs.map(doc => [doc.data().email, doc.data() as QrClient]));
+
         // Don't await, send in background
-        Promise.all(recipientEmails.map(sendEmail)).catch(err => {
+        const emailPromises = recipientEmails.map((email: string) => {
+            const clientData = clientsDataMap.get(email);
+            const clientName = clientData ? clientData.name : "Socio";
+            return sendEmail(email, clientName);
+        });
+
+        Promise.all(emailPromises).catch(err => {
             console.error("Error sending bulk emails:", err);
             // Optionally, log this failure to a specific collection in Firestore
         });
@@ -84,3 +98,5 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to send email campaign.', details: error.message }, { status: 500 });
     }
 }
+
+    
