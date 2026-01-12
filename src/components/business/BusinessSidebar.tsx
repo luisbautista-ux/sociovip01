@@ -17,7 +17,8 @@ import {
   Contact,
   LogOut,
   QrCode,
-  Megaphone, // Importado
+  Megaphone,
+  Mail, // Importado
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,8 @@ const navItems = [
   { href: "/business-panel/promotions", label: "Promociones", icon: Ticket },
   { href: "/business-panel/events", label: "Eventos", icon: Calendar },
   { href: "/business-panel/clients", label: "Mis Clientes", icon: Contact },
-  { href: "/business-panel/marketing", label: "Marketing", icon: Megaphone }, // Añadido
+  { href: "/business-panel/marketing", label: "Marketing (WhatsApp)", icon: Megaphone },
+  { href: "/business-panel/email-campaigns", label: "Campañas de Email", icon: Mail }, // Añadido
   { href: "/business-panel/promoters", label: "Mis Promotores", icon: UserPlus },
   { href: "/business-panel/staff", label: "Mi Personal", icon: Users },
   { href: "/business-panel/analytics", label: "Analíticas", icon: BarChart3 },
