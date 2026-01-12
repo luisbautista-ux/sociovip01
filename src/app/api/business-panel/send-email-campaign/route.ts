@@ -20,36 +20,54 @@ function encodeSubject(subject: string) {
     return `=?UTF-8?B?${utf8Subject}?=`;
 }
 
-// NUEVA plantilla HTML para los correos
-function createHtmlBody(messageBody: string, businessName: string, businessLogoUrl?: string): string {
+// ✅ NUEVA plantilla HTML para los correos, más llamativa.
+function createHtmlBody(
+    messageBody: string, 
+    businessName: string, 
+    businessLogoUrl?: string, 
+    primaryColor: string = '#8E5EA2', 
+    secondaryColor: string = '#B080D0',
+    businessUrl: string = 'https://sociovip.app'
+): string {
     const finalBody = messageBody.replace(/\n/g, '<br>');
-    const logoHtml = businessLogoUrl 
-        ? `<img src="${businessLogoUrl}" alt="${businessName} Logo" style="max-width: 120px; height: auto; margin-bottom: 20px;" />` 
-        : `<h1 style="color: #333; font-size: 24px;">${businessName}</h1>`;
+    const lighterPrimary = primaryColor + '1A'; // 10% opacity
 
     return `
       <!DOCTYPE html>
-      <html>
-      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; margin-top: 20px; background-color: #ffffff;">
-          <tr>
-            <td align="center" style="padding: 40px 0 30px 0; border-bottom: 1px solid #eeeeee;">
-              ${logoHtml}
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 40px 30px 40px 30px;">
-              <p style="color: #555555; font-size: 16px; line-height: 1.6;">
-                ${finalBody}
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding: 20px; background-color: #eeeeee; color: #888888; font-size: 12px;">
-              Enviado desde la plataforma SocioVIP para ${businessName}.
-            </td>
-          </tr>
-        </table>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+            body { margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif; background-color: #f4f7f6; color: #333; }
+            .container { max-width: 600px; margin: 20px auto; background: linear-gradient(180deg, ${lighterPrimary} 0%, #ffffff 25%); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
+            .header { padding: 30px; text-align: center; }
+            .header img { max-width: 100px; height: auto; margin-bottom: 16px; border-radius: 8px; background-color: white; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+            .content { padding: 10px 30px 30px 30px; }
+            .content h1 { color: ${primaryColor}; font-size: 24px; margin-bottom: 16px; font-weight: 700; }
+            .content p { font-size: 16px; line-height: 1.7; color: #555; }
+            .cta-button { display: inline-block; background-image: linear-gradient(to right, ${primaryColor} 0%, ${secondaryColor} 51%, ${primaryColor} 100%); padding: 14px 30px; text-align: center; text-transform: uppercase; transition: 0.5s; background-size: 200% auto; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.5px; box-shadow: 0 4px 15px 0 rgba(142, 94, 162, 0.45); }
+            .cta-button:hover { background-position: right center; }
+            .footer { padding: 20px; text-align: center; font-size: 12px; color: #999; background-color: #f8f9fa; border-top: 1px solid #e2e8f0;}
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            ${businessLogoUrl ? `<img src="${businessLogoUrl}" alt="${businessName} Logo" />` : ''}
+            <h1 style="color: ${primaryColor}; font-size: 28px; margin:0;">${businessName}</h1>
+          </div>
+          <div class="content">
+            <p>${finalBody}</p>
+            <p style="text-align:center; margin-top: 30px;">
+              <a href="${businessUrl}" class="cta-button">Ver Promociones</a>
+            </p>
+          </div>
+          <div class="footer">
+            Enviado desde la plataforma SocioVIP para ${businessName}.
+          </div>
+        </div>
       </body>
       </html>
     `;
@@ -90,7 +108,7 @@ export async function POST(request: Request) {
             process.env.GOOGLE_CLIENT_SECRET
         );
         oauth2Client.setCredentials({ refresh_token: refreshToken });
-
+        
         const { token: accessToken } = await oauth2Client.getAccessToken();
         if (!accessToken) {
             throw new Error("No se pudo obtener un nuevo token de acceso de Google.");
@@ -111,7 +129,9 @@ export async function POST(request: Request) {
             
             const personalizedBody = body.replace(/\[Nombre\]/g, clientName);
             const personalizedSubject = subject.replace(/\[Nombre\]/g, clientName);
-            const htmlBody = createHtmlBody(personalizedBody, businessData.name, businessData.logoUrl);
+            
+            const businessUrl = businessData.customUrlPath ? `https://sociovip.app/${businessData.customUrlPath}` : 'https://sociovip.app';
+            const htmlBody = createHtmlBody(personalizedBody, businessData.name, businessData.logoUrl, businessData.primaryColor, businessData.secondaryColor, businessUrl);
 
             const fromHeader = `"${businessData.name}" <${senderEmail}>`;
             const encodedSubject = encodeSubject(personalizedSubject);
