@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         }
 
         const businessDoc = await adminDb.collection('businesses').doc(caller.businessId).get();
-        if (!businessDoc.exists) { // <-- CORRECCIÓN AQUÍ
+        if (!businessDoc.exists) {
             return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
         }
 
@@ -52,9 +52,19 @@ export async function POST(request: Request) {
         );
         oauth2Client.setCredentials({ refresh_token: refreshToken });
 
+        // --- CORRECCIÓN: Forzar la obtención de un nuevo Access Token ---
+        // Esto asegura que siempre tengamos un token válido antes de hacer la llamada a la API.
+        const { token: accessToken } = await oauth2Client.getAccessToken();
+        if (!accessToken) {
+            throw new Error("No se pudo obtener un nuevo token de acceso de Google.");
+        }
+        oauth2Client.setCredentials({ ...oauth2Client.credentials, access_token: accessToken });
+        // --- FIN DE LA CORRECCIÓN ---
+
+
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
         
-        const userInfo = await oauth2Client.getTokenInfo(oauth2Client.credentials.access_token!);
+        const userInfo = await oauth2Client.getTokenInfo(accessToken);
         const senderEmail = userInfo.email;
 
         if (!senderEmail) {
@@ -95,7 +105,16 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error('Error detallado al enviar campaña de email:', error.response?.data?.error || error.message);
+        
+        // --- CORRECCIÓN: Devolver el mensaje de error específico de la API ---
         const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to send email campaign.';
+        const errorCode = error.response?.data?.error?.code;
+
+        // Específicamente para el error de token inválido
+        if (errorCode === 401 || (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('invalid_token'))) {
+             return NextResponse.json({ error: 'invalid_token' }, { status: 401 });
+        }
+        
         return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
