@@ -9,11 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mail, Send, Users, AlertCircle, Unplug, DatabaseZap } from "lucide-react";
+import { Loader2, Mail, Send, Users, Unplug, DatabaseZap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, writeBatch, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, writeBatch, Timestamp, limit } from "firebase/firestore";
 import type { QrClient, Business } from "@/lib/types";
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
