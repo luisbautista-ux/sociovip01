@@ -54,6 +54,9 @@ const nextConfig = {
       "http://localhost:9002",           // para desarrollo local
     ],
   },
+  env: {
+    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
+  }
 };
 
 module.exports = nextConfig;
