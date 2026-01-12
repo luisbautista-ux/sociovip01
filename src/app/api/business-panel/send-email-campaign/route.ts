@@ -2,8 +2,9 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin'; // Usando la instancia unificada
-import type { PlatformUser, Business } from '@/lib/types';
+import type { PlatformUser, Business, QrClient } from '@/lib/types';
 import { headers } from 'next/headers';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 async function getCallerProfile(idToken: string): Promise<PlatformUser> {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -52,44 +53,46 @@ export async function POST(request: Request) {
         oauth2Client.setCredentials({ refresh_token: refreshToken });
 
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-
-        const sendEmail = async (to: string, name: string) => {
-            const personalizedBody = body.replace(/\[Nombre\]/g, name.split(' ')[0]);
-            const rawMessage = [
-                `From: "${businessData.name}" <me>`,
-                `To: ${to}`,
-                `Subject: ${subject}`,
-                'Content-Type: text/html; charset=utf-8',
-                'MIME-Version: 1.0',
-                '',
-                personalizedBody, // Usar cuerpo personalizado
-            ].join('\n');
-
-            const encodedMessage = Buffer.from(rawMessage).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-            
-            await gmail.users.messages.send({
-                userId: 'me',
-                requestBody: {
-                    raw: encodedMessage,
-                },
-            });
-        };
         
         const allClientsQuery = query(collection(db, "qrClients"), where('email', 'in', recipientEmails));
         const clientsSnap = await getDocs(allClientsQuery);
         const clientsDataMap = new Map(clientsSnap.docs.map(doc => [doc.data().email, doc.data() as QrClient]));
 
-        // Don't await, send in background
-        const emailPromises = recipientEmails.map((email: string) => {
+        const emailPromises = recipientEmails.map(async (email: string) => {
             const clientData = clientsDataMap.get(email);
-            const clientName = clientData ? clientData.name : "Socio";
-            return sendEmail(email, clientName);
+            const clientName = clientData ? clientData.name.split(' ')[0] : "Socio";
+            
+            const personalizedBody = body.replace(/\[Nombre\]/g, clientName);
+            const personalizedSubject = subject.replace(/\[Nombre\]/g, clientName);
+
+            const rawMessage = [
+                `From: "${businessData.name}" <me>`,
+                `To: ${email}`,
+                `Subject: ${personalizedSubject}`,
+                'Content-Type: text/html; charset=utf-8',
+                'MIME-Version: 1.0',
+                '',
+                personalizedBody,
+            ].join('\n');
+
+            const encodedMessage = Buffer.from(rawMessage).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            
+            try {
+                await gmail.users.messages.send({
+                    userId: 'me',
+                    requestBody: {
+                        raw: encodedMessage,
+                    },
+                });
+            } catch (sendError: any) {
+                console.error(`Failed to send email to ${email}:`, sendError.message);
+                // No lanzamos un error aquí para no detener toda la campaña
+            }
         });
 
-        Promise.all(emailPromises).catch(err => {
-            console.error("Error sending bulk emails:", err);
-            // Optionally, log this failure to a specific collection in Firestore
-        });
+        // Esperamos a que todas las promesas de envío se inicien, pero no fallamos si una falla.
+        // El envío real ocurre en segundo plano.
+        await Promise.all(emailPromises);
 
         return NextResponse.json({ message: `Campaign sending initiated to ${recipientEmails.length} recipients.` });
 
@@ -98,5 +101,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to send email campaign.', details: error.message }, { status: 500 });
     }
 }
-
-    
