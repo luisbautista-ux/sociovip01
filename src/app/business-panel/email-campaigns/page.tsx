@@ -9,19 +9,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mail, Send, Users, Unplug, DatabaseZap } from "lucide-react";
+import { Loader2, Mail, Send, Users, Unplug } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, writeBatch, Timestamp, limit } from "firebase/firestore";
-import type { QrClient, Business } from "@/lib/types";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import type { QrClient, Business, PlatformUser } from "@/lib/types";
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+
+// Interfaz unificada para mostrar clientes en la lista
+interface ClientRecipient {
+  id: string; // Puede ser el UID del platformUser o el ID del qrClient
+  dni: string;
+  name: string;
+  email: string;
+}
 
 export default function EmailCampaignsPage() {
   const { userProfile, currentUser } = useAuth();
   const { toast } = useToast();
   
-  const [allClients, setAllClients] = useState<QrClient[]>([]);
+  const [allClients, setAllClients] = useState<ClientRecipient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,31 +56,46 @@ export default function EmailCampaignsPage() {
         }
       }
       
-      const newModelQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
-      const oldModelQuery = query(collection(db, "qrClients"), where("generatedForBusinessId", "==", businessId));
+      const clientsMap = new Map<string, ClientRecipient>();
 
-      const [newClientsSnap, oldClientsSnap] = await Promise.all([
-          getDocs(newModelQuery),
-          getDocs(oldModelQuery),
-      ]);
+      // 1. Fetch from qrClients (legacy and QR-specific clients)
+      const qrClientsQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
+      const qrClientsSnap = await getDocs(qrClientsQuery);
+      qrClientsSnap.forEach(d => {
+        const data = d.data() as QrClient;
+        if (data.email && data.dni && !clientsMap.has(data.dni)) {
+          clientsMap.set(data.dni, {
+            id: d.id,
+            dni: data.dni,
+            name: `${data.name} ${data.surname}`,
+            email: data.email,
+          });
+        }
+      });
       
-      const clientsMap = new Map<string, QrClient>();
+      // 2. Fetch from platformUsers with client roles associated with this business
+      const platformUsersQuery = query(
+        collection(db, "platformUsers"), 
+        where("roles", "array-contains-any", ["client_gratis", "vip_premium"])
+      );
+      const platformUsersSnap = await getDocs(platformUsersQuery);
+      platformUsersSnap.forEach(d => {
+        const data = d.data() as PlatformUser;
+        // Check if user is associated with the business. For free clients, it might be through a general network.
+        // This logic might need refinement based on how free clients are associated.
+        // For now, let's assume `businessIds` or a similar field.
+        const isAssociated = data.businessIds?.includes(businessId) || data.businessId === businessId;
 
-      const processSnapshot = (snap: typeof newClientsSnap) => {
-        snap.forEach(d => {
-            if (!clientsMap.has(d.id)) {
-                const clientData = { id: d.id, ...d.data() } as QrClient;
-                // Only add clients that have a valid email
-                if (clientData.email && clientData.email.includes('@')) {
-                   clientsMap.set(d.id, clientData);
-                }
-            }
-        });
-      };
-
-      processSnapshot(newClientsSnap);
-      processSnapshot(oldClientsSnap);
-
+        if (data.email && data.dni && !clientsMap.has(data.dni) && isAssociated) {
+          clientsMap.set(data.dni, {
+            id: d.id, // Use UID as the unique ID for platform users
+            dni: data.dni,
+            name: data.name,
+            email: data.email,
+          });
+        }
+      });
+      
       const combinedClients = Array.from(clientsMap.values());
       setAllClients(combinedClients);
 
@@ -91,10 +114,9 @@ export default function EmailCampaignsPage() {
     if (!searchTerm) return allClients;
     const lowercasedTerm = searchTerm.toLowerCase();
     return allClients.filter(c =>
-      (c.name && c.name.toLowerCase().includes(lowercasedTerm)) ||
-      (c.surname && c.surname.toLowerCase().includes(lowercasedTerm)) ||
-      (c.email && c.email.toLowerCase().includes(lowercasedTerm)) ||
-      (c.dni && c.dni.includes(lowercasedTerm))
+      c.name.toLowerCase().includes(lowercasedTerm) ||
+      c.email.toLowerCase().includes(lowercasedTerm) ||
+      c.dni.includes(lowercasedTerm)
     );
   }, [allClients, searchTerm]);
 
@@ -120,23 +142,22 @@ export default function EmailCampaignsPage() {
 
   const handleSendCampaign = async () => {
     if (isSending) return;
-    setIsSending(true);
     
     if (!currentUser) {
         toast({ title: "No autenticado", description: "Debes estar logueado para enviar campañas.", variant: "destructive" });
-        setIsSending(false);
         return;
     }
     
     const recipientEmails = allClients
       .filter(client => selectedClients.has(client.id) && client.email)
-      .map(client => client.email as string);
+      .map(client => client.email);
       
     if (recipientEmails.length === 0) {
         toast({ title: "Sin Destinatarios", description: "No has seleccionado clientes con email para enviar la campaña.", variant: "destructive"});
-        setIsSending(false);
         return;
     }
+
+    setIsSending(true);
 
     try {
       const idToken = await currentUser.getIdToken();
@@ -146,16 +167,24 @@ export default function EmailCampaignsPage() {
         body: JSON.stringify({ recipientEmails, subject, body }),
       });
       const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error(data.error || 'Error desconocido en el servidor');
+        if(data.error === 'invalid_token') {
+            toast({ title: "Sesión Expirada", description: "Tu conexión con Google ha expirado. Por favor, vuelve a conectar tu cuenta.", variant: "destructive"});
+            setIsGmailConnected(false);
+        } else {
+            throw new Error(data.error || 'Error desconocido en el servidor');
+        }
+      } else {
+          toast({
+            title: "Campaña en Proceso",
+            description: data.message || `Se inició el envío a ${recipientEmails.length} cliente(s).`,
+          });
+          setSelectedClients(new Set());
+          setSubject('');
+          setBody('');
       }
-      toast({
-        title: "Campaña en Proceso",
-        description: data.message || `Se inició el envío a ${recipientEmails.length} cliente(s).`,
-      });
-      setSelectedClients(new Set());
-      setSubject('');
-      setBody('');
+
     } catch (error: any) {
       toast({ title: "Error al Enviar", description: error.message, variant: "destructive" });
     } finally {
@@ -265,7 +294,7 @@ export default function EmailCampaignsPage() {
                             onCheckedChange={(checked) => handleSelectClient(client.id, !!checked)}
                           />
                           <Label htmlFor={`client-${client.id}`} className="font-normal flex flex-col">
-                            <span>{client.name} {client.surname}</span>
+                            <span>{client.name}</span>
                             <span className="text-xs text-muted-foreground">{client.email}</span>
                           </Label>
                         </div>
