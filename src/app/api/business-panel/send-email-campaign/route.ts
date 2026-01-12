@@ -16,6 +16,12 @@ async function getCallerProfile(idToken: string): Promise<PlatformUser> {
     return userDoc.data() as PlatformUser;
 }
 
+// Función para codificar correctamente el asunto para el header del email
+function encodeSubject(subject: string) {
+    const utf8Subject = Buffer.from(subject, 'utf-8').toString('base64');
+    return `=?UTF-8?B?${utf8Subject}?=`;
+}
+
 export async function POST(request: Request) {
     const { recipientEmails, subject, body } = await request.json();
 
@@ -52,15 +58,11 @@ export async function POST(request: Request) {
         );
         oauth2Client.setCredentials({ refresh_token: refreshToken });
 
-        // --- CORRECCIÓN: Forzar la obtención de un nuevo Access Token ---
-        // Esto asegura que siempre tengamos un token válido antes de hacer la llamada a la API.
         const { token: accessToken } = await oauth2Client.getAccessToken();
         if (!accessToken) {
             throw new Error("No se pudo obtener un nuevo token de acceso de Google.");
         }
         oauth2Client.setCredentials({ ...oauth2Client.credentials, access_token: accessToken });
-        // --- FIN DE LA CORRECCIÓN ---
-
 
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
         
@@ -78,11 +80,14 @@ export async function POST(request: Request) {
             const personalizedSubject = subject.replace(/\[Nombre\]/g, clientName);
 
             const fromHeader = `"${businessData.name}" <${senderEmail}>`;
+            
+            // ✅ CORRECCIÓN: Se codifica el asunto para soportar caracteres especiales (UTF-8)
+            const encodedSubject = encodeSubject(personalizedSubject);
 
             const rawMessage = [
                 `From: ${fromHeader}`,
                 `To: ${email}`,
-                `Subject: ${personalizedSubject}`,
+                `Subject: ${encodedSubject}`, // Se usa el asunto codificado
                 'Content-Type: text/html; charset=utf-8',
                 'MIME-Version: 1.0',
                 '',
@@ -106,11 +111,9 @@ export async function POST(request: Request) {
     } catch (error: any) {
         console.error('Error detallado al enviar campaña de email:', error.response?.data?.error || error.message);
         
-        // --- CORRECCIÓN: Devolver el mensaje de error específico de la API ---
         const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to send email campaign.';
         const errorCode = error.response?.data?.error?.code;
 
-        // Específicamente para el error de token inválido
         if (errorCode === 401 || (typeof errorMessage === 'string' && errorMessage.toLowerCase().includes('invalid_token'))) {
              return NextResponse.json({ error: 'invalid_token' }, { status: 401 });
         }
