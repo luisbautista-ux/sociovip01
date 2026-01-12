@@ -20,7 +20,7 @@ function encodeSubject(subject: string) {
     return `=?UTF-8?B?${utf8Subject}?=`;
 }
 
-// ✅ NUEVA plantilla HTML para los correos, más llamativa.
+// ✅ PLANTILLA HTML MEJORADA CON ESTILOS EN LÍNEA PARA MÁXIMA COMPATIBILIDAD
 function createHtmlBody(
     messageBody: string, 
     businessName: string, 
@@ -30,7 +30,7 @@ function createHtmlBody(
     businessUrl: string = 'https://sociovip.app'
 ): string {
     const finalBody = messageBody.replace(/\n/g, '<br>');
-    const lighterPrimary = primaryColor + '1A'; // 10% opacity
+    const lighterPrimary = primaryColor + '1A'; 
 
     return `
       <!DOCTYPE html>
@@ -41,30 +41,21 @@ function createHtmlBody(
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
             body { margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif; background-color: #f4f7f6; color: #333; }
-            .container { max-width: 600px; margin: 20px auto; background: linear-gradient(180deg, ${lighterPrimary} 0%, #ffffff 25%); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-            .header { padding: 30px; text-align: center; }
-            .header img { max-width: 100px; height: auto; margin-bottom: 16px; border-radius: 8px; background-color: white; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
-            .content { padding: 10px 30px 30px 30px; }
-            .content h1 { color: ${primaryColor}; font-size: 24px; margin-bottom: 16px; font-weight: 700; }
-            .content p { font-size: 16px; line-height: 1.7; color: #555; }
-            .cta-button { display: inline-block; background-image: linear-gradient(to right, ${primaryColor} 0%, ${secondaryColor} 51%, ${primaryColor} 100%); padding: 14px 30px; text-align: center; text-transform: uppercase; transition: 0.5s; background-size: 200% auto; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.5px; box-shadow: 0 4px 15px 0 rgba(142, 94, 162, 0.45); }
-            .cta-button:hover { background-position: right center; }
-            .footer { padding: 20px; text-align: center; font-size: 12px; color: #999; background-color: #f8f9fa; border-top: 1px solid #e2e8f0;}
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            ${businessLogoUrl ? `<img src="${businessLogoUrl}" alt="${businessName} Logo" />` : ''}
-            <h1 style="color: ${primaryColor}; font-size: 28px; margin:0;">${businessName}</h1>
+        <div style="max-width: 600px; margin: 20px auto; background: linear-gradient(180deg, ${lighterPrimary} 0%, #ffffff 25%); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+          <div style="padding: 30px; text-align: center;">
+            ${businessLogoUrl ? `<img src="${businessLogoUrl}" alt="${businessName} Logo" style="max-width: 100px; height: auto; margin-bottom: 16px; border-radius: 8px; background-color: white; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);" />` : ''}
+            <h1 style="color: ${primaryColor}; font-size: 28px; margin:0; font-weight: 700;">${businessName}</h1>
           </div>
-          <div class="content">
-            <p>${finalBody}</p>
+          <div style="padding: 10px 30px 30px 30px;">
+            <p style="font-size: 16px; line-height: 1.7; color: #555;">${finalBody}</p>
             <p style="text-align:center; margin-top: 30px;">
-              <a href="${businessUrl}" class="cta-button">Ver Promociones</a>
+              <a href="${businessUrl}" target="_blank" style="display: inline-block; padding: 14px 30px; text-align: center; text-transform: uppercase; transition: 0.5s; background-image: linear-gradient(to right, ${primaryColor} 0%, ${secondaryColor} 51%, ${primaryColor} 100%); background-size: 200% auto; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.5px; box-shadow: 0 4px 15px 0 rgba(142, 94, 162, 0.45);">Ver Promociones</a>
             </p>
           </div>
-          <div class="footer">
+          <div style="padding: 20px; text-align: center; font-size: 12px; color: #999; background-color: #f8f9fa; border-top: 1px solid #e2e8f0;">
             Enviado desde la plataforma SocioVIP para ${businessName}.
           </div>
         </div>
