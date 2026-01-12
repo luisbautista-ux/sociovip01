@@ -74,19 +74,17 @@ export default function EmailCampaignsPage() {
       });
       
       // 2. Fetch from platformUsers with client roles associated with this business
+      // ✅ CORRECCIÓN: Se añade el filtro por 'businessId' para asegurar que solo se listen los clientes del negocio actual.
       const platformUsersQuery = query(
         collection(db, "platformUsers"), 
-        where("roles", "array-contains-any", ["client_gratis", "vip_premium"])
+        where("roles", "array-contains-any", ["client_gratis", "vip_premium"]),
+        where("businessId", "==", businessId)
       );
       const platformUsersSnap = await getDocs(platformUsersQuery);
+      
       platformUsersSnap.forEach(d => {
         const data = d.data() as PlatformUser;
-        // Check if user is associated with the business. For free clients, it might be through a general network.
-        // This logic might need refinement based on how free clients are associated.
-        // For now, let's assume `businessIds` or a similar field.
-        const isAssociated = data.businessIds?.includes(businessId) || data.businessId === businessId;
-
-        if (data.email && data.dni && !clientsMap.has(data.dni) && isAssociated) {
+        if (data.email && data.dni && !clientsMap.has(data.dni)) {
           clientsMap.set(data.dni, {
             id: d.id, // Use UID as the unique ID for platform users
             dni: data.dni,
