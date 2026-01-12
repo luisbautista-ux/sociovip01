@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     const userDocRef = adminDb.collection('platformUsers').doc(uid);
     const userDoc = await userDocRef.get();
 
-    if (!userDoc.exists() || !userDoc.data()?.businessId) {
+    if (!userDoc.exists || !userDoc.data()?.businessId) {
         return NextResponse.json({ error: 'User profile or business ID not found.' }, { status: 404 });
     }
     const businessId = userDoc.data()?.businessId;
