@@ -9,16 +9,44 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mail, Send, Users, AlertCircle, Unplug } from "lucide-react";
+import { Loader2, Mail, Send, Users, AlertCircle, Unplug, DatabaseZap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, writeBatch, Timestamp } from "firebase/firestore";
 import type { QrClient, Business } from "@/lib/types";
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
+// --- One-time migration utility ---
+const MIGRATION_EMAILS = [
+  "kerenarango123@gmail.com", "gcarocolquepisco@gmail.com", "wdlcm.2710@gmail.com",
+  "dachocachete13@gmail.com", "dimart996@gmail.com", "claudio.elevated@gmail.com",
+  "canvapro202521@gmail.com", "innovacionuai2025@gmail.com", "jefersonmondalgo229@gmail.com",
+  "anaceciliaroman@gmail.com", "bautistamolinasimon@gmail.com", "rosangela.graziani.vicente@gmail.com",
+  "angel13nov13@gmail.com", "melissa.pp.2018@gmail.com", "gabrielapachasportuguez@gmail.com",
+  "dianasalazar120@gmail.com", "angellrodriguez78@gmail.com", "carlitos120519@gmail.com",
+  "jhancarlossg@gmail.com", "elizabethanchante@gmail.com", "ronaldo.sanchez2003@gmail.com",
+  "diegobautista150@gmail.com", "carmenvilcapoma@gmail.com", "juanmiguelcc17@gmail.com",
+  "kevinandres2007@gmail.com", "angiequintana1504@gmail.com", "jenniferrojas2807@gmail.com",
+  "jhordy.gomez.22@gmail.com", "michaelalexis2022@gmail.com", "cristopherleonm@gmail.com",
+  "samuelramirez2021@gmail.com", "erickchavez1510@gmail.com", "angelo2004p@gmail.com",
+  "jersonhuamani24@gmail.com", "carlosdanielpoma@gmail.com", "bryanlopez0806@gmail.com",
+  "edisonbautista998@gmail.com", "josealberto120@gmail.com", "marcosrivera2005@gmail.com",
+  "luisfernando1507@gmail.com", "fernandoramos23@gmail.com", "jorgeluisperez@gmail.com",
+  "rafaelhuaman150@gmail.com", "andreaquiroz2006@gmail.com", "oscarvilcapoma@gmail.com",
+  "paolavargas150@gmail.com", "sebastianrojas17@gmail.com", "alonsochavez04@gmail.com",
+  "karlaquintana22@gmail.com", "pedrohuaman2003@gmail.com", "allanrivera150@gmail.com",
+  "danielmedina150@gmail.com", "jhoelcastro2004@gmail.com", "rodrigobautista@gmail.com",
+  "alldalex10@gmail.com", "luis.bautista@uai.edu.pe", "danielalex.atuncar@gmail.com",
+  "christophercardenas63@gmail.com", "bautistaluis989@gmail.com", "correacondec@gmail.com",
+  "andrevaleri2013@gmail.com", "mauriciovelamateo@gmail.com", "alejanius.123@gmail.com",
+  "adrianmateo32@gmail.com", "hugofelix8301@gmail.com", "aymaralvarez040920@gmail.com",
+  "et5744454@gmail.com", "ivonme2997@gmail.com",
+];
+const MIGRATION_FLAG_KEY = 'clientEmailMigrationDone';
+
 export default function EmailCampaignsPage() {
-  const { userProfile, currentUser } = useAuth(); // Agregado currentUser
+  const { userProfile, currentUser } = useAuth();
   const { toast } = useToast();
   
   const [allClients, setAllClients] = useState<QrClient[]>([]);
@@ -29,8 +57,20 @@ export default function EmailCampaignsPage() {
   const [body, setBody] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isGmailConnected, setIsGmailConnected] = useState(false);
+  
+  // Migration state
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationDone, setMigrationDone] = useState(false);
 
   const businessId = userProfile?.businessId;
+  
+  useEffect(() => {
+    // Check if migration has been done using localStorage
+    const flag = localStorage.getItem(MIGRATION_FLAG_KEY);
+    if (flag) {
+      setMigrationDone(true);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!businessId) {
@@ -62,7 +102,6 @@ export default function EmailCampaignsPage() {
         snap.forEach(d => {
             if (!clientsMap.has(d.id)) {
                 const clientData = { id: d.id, ...d.data() } as QrClient;
-                // CORRECCIÓN: Filtrar para incluir solo clientes con un email válido.
                 if (clientData.email && clientData.email.includes('@')) {
                    clientsMap.set(d.id, clientData);
                 }
@@ -87,14 +126,67 @@ export default function EmailCampaignsPage() {
     fetchData();
   }, [fetchData]);
 
+  // Migration function
+  const handleRunMigration = async () => {
+    if (!businessId) {
+      toast({ title: "Error", description: "No se encontró el ID de tu negocio.", variant: "destructive" });
+      return;
+    }
+    setIsMigrating(true);
+    toast({ title: "Iniciando migración...", description: "Por favor, espera un momento." });
+
+    try {
+      const batch = writeBatch(db);
+      let count = 0;
+      
+      for (const email of MIGRATION_EMAILS) {
+        // Simple check to avoid creating duplicates based on email for THIS business.
+        const q = query(collection(db, "qrClients"), where("email", "==", email), where("associatedBusinessIds", "array-contains", businessId), limit(1));
+        const existing = await getDocs(q);
+        
+        if (existing.empty) {
+          const newClientRef = doc(collection(db, "qrClients"));
+          const newClientData: Partial<QrClient> = {
+            email,
+            name: "Cliente Antiguo",
+            surname: "",
+            dni: `MIGRATED${Math.floor(Math.random() * 900000) + 100000}`,
+            phone: "",
+            dob: Timestamp.fromDate(new Date(2000, 0, 1)),
+            registrationDate: Timestamp.now(),
+            associatedBusinessIds: [businessId],
+          };
+          batch.set(newClientRef, newClientData);
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
+        toast({ title: "Migración Completada", description: `${count} nuevos clientes fueron añadidos y asociados a tu negocio.` });
+      } else {
+        toast({ title: "Migración Finalizada", description: "No se encontraron nuevos clientes para añadir." });
+      }
+
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      setMigrationDone(true);
+      fetchData(); // Refresh client list
+
+    } catch (error: any) {
+      toast({ title: "Error en la Migración", description: error.message, variant: "destructive" });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   const filteredClients = useMemo(() => {
     if (!searchTerm) return allClients;
     const lowercasedTerm = searchTerm.toLowerCase();
     return allClients.filter(c =>
-      c.name.toLowerCase().includes(lowercasedTerm) ||
-      c.surname.toLowerCase().includes(lowercasedTerm) ||
+      (c.name && c.name.toLowerCase().includes(lowercasedTerm)) ||
+      (c.surname && c.surname.toLowerCase().includes(lowercasedTerm)) ||
       (c.email && c.email.toLowerCase().includes(lowercasedTerm)) ||
-      c.dni.includes(lowercasedTerm)
+      (c.dni && c.dni.includes(lowercasedTerm))
     );
   }, [allClients, searchTerm]);
 
@@ -174,7 +266,6 @@ export default function EmailCampaignsPage() {
         const currentUrl = new URL(window.location.href);
         const redirectUrl = `${currentUrl.protocol}//${currentUrl.host}/api/auth/google/initiate`;
         
-        // Adjuntamos el token al cookie para que el backend lo pueda leer
         document.cookie = `idToken=${idToken}; path=/; secure; samesite=strict`;
         window.location.href = redirectUrl;
     }).catch(err => {
@@ -198,6 +289,24 @@ export default function EmailCampaignsPage() {
             <Button onClick={handleGmailConnect} variant="gradient">Conectar Cuenta de Gmail</Button>
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Migration Utility */}
+      {!migrationDone && (
+        <Card className="border-amber-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><DatabaseZap className="text-amber-600"/>Utilidad de Migración de Clientes</CardTitle>
+            <CardDescription>
+              Detectamos que podrías tener clientes de un sistema anterior. Usa este botón una sola vez para añadirlos a tu lista de contactos para campañas de email.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleRunMigration} disabled={isMigrating}>
+              {isMigrating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <DatabaseZap className="mr-2 h-4 w-4"/>}
+              {isMigrating ? 'Migrando...' : 'Migrar Clientes Antiguos'}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -241,6 +350,8 @@ export default function EmailCampaignsPage() {
             <CardContent>
               {isLoading ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+              ) : allClients.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No se encontraron clientes con email.</div>
               ) : (
                 <div className="space-y-3">
                   <Input
@@ -301,5 +412,3 @@ export default function EmailCampaignsPage() {
     </div>
   );
 }
-
-    
