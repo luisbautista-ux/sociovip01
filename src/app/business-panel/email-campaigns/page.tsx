@@ -9,12 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Mail, Send, Users, AlertCircle } from "lucide-react";
+import { Loader2, Mail, Send, Users, AlertCircle, Unplug } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import type { QrClient } from "@/lib/types";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import type { QrClient, Business } from "@/lib/types";
+import { Alert, AlertTitle } from '@/components/ui/alert';
 
 export default function EmailCampaignsPage() {
   const { userProfile } = useAuth();
@@ -27,6 +28,7 @@ export default function EmailCampaignsPage() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isGmailConnected, setIsGmailConnected] = useState(false);
 
   const businessId = userProfile?.businessId;
 
@@ -37,6 +39,15 @@ export default function EmailCampaignsPage() {
     }
     setIsLoading(true);
     try {
+      const businessDocRef = doc(db, 'businesses', businessId);
+      const businessDoc = await getDoc(businessDocRef);
+      if (businessDoc.exists()) {
+        const businessData = businessDoc.data() as Business;
+        if (businessData.gmailRefreshToken) {
+          setIsGmailConnected(true);
+        }
+      }
+
       const clientsQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
       const clientsSnap = await getDocs(clientsQuery);
       const fetchedClients: QrClient[] = clientsSnap.docs
@@ -85,19 +96,43 @@ export default function EmailCampaignsPage() {
     });
   };
 
-  const handleSendCampaign = () => {
-    // This is a placeholder for the actual email sending logic
+  const handleSendCampaign = async () => {
+    if (isSending) return;
     setIsSending(true);
-    toast({
-      title: "Función en desarrollo",
-      description: "El envío de campañas de email se activará una vez configurada la API de Gmail en la consola de Google Cloud.",
-      variant: "default",
-      duration: 8000
-    });
-    setTimeout(() => setIsSending(false), 2000);
+    
+    const recipientEmails = allClients
+      .filter(client => selectedClients.has(client.id))
+      .map(client => client.email);
+      
+    try {
+      const response = await fetch('/api/business-panel/send-email-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientEmails, subject, body }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Error desconocido en el servidor');
+      }
+      toast({
+        title: "Campaña en Proceso",
+        description: data.message || `Se inició el envío a ${recipientEmails.length} cliente(s).`,
+      });
+      setSelectedClients(new Set());
+      setSubject('');
+      setBody('');
+    } catch (error: any) {
+      toast({ title: "Error al Enviar", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
   };
-  
-  const canSend = selectedClients.size > 0 && subject.trim().length > 0 && body.trim().length > 10;
+
+  const canSend = isGmailConnected && selectedClients.size > 0 && subject.trim().length > 0 && body.trim().length > 10;
+
+  const handleGmailConnect = () => {
+    window.location.href = '/api/auth/google/initiate';
+  };
 
   return (
     <div className="space-y-6">
@@ -106,6 +141,17 @@ export default function EmailCampaignsPage() {
         Campañas de Email
       </h1>
       
+      {!isGmailConnected && !isLoading && (
+        <Alert>
+          <Unplug className="h-4 w-4" />
+          <AlertTitle>Conexión Requerida</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            Para enviar campañas de email, primero debes conectar tu cuenta de Gmail.
+            <Button onClick={handleGmailConnect} variant="gradient">Conectar Cuenta de Gmail</Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 shadow-lg">
           <CardHeader>
@@ -120,7 +166,7 @@ export default function EmailCampaignsPage() {
                 placeholder="Ej: ¡Una oferta especial para ti!"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                disabled={isSending}
+                disabled={isSending || !isGmailConnected}
               />
             </div>
             <div>
@@ -131,7 +177,7 @@ export default function EmailCampaignsPage() {
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={12}
-                disabled={isSending}
+                disabled={isSending || !isGmailConnected}
               />
               <p className="text-xs text-muted-foreground mt-2">Puedes usar [Nombre] y se reemplazará automáticamente.</p>
             </div>
@@ -193,15 +239,6 @@ export default function EmailCampaignsPage() {
                     <Users className="mx-auto h-8 w-8 text-primary"/>
                     <p className="text-2xl font-bold text-primary mt-2">{selectedClients.size}</p>
                     <p className="text-sm font-semibold text-muted-foreground">Cliente(s) seleccionado(s)</p>
-                </div>
-            </CardContent>
-            <CardContent>
-                <div className="flex items-start p-4 bg-amber-50 border border-amber-200 rounded-md">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mr-3 mt-1 shrink-0"/>
-                    <div>
-                        <h4 className="font-semibold text-amber-800">Próximamente: Envío Real</h4>
-                        <p className="text-xs text-amber-700">Esta función requiere configurar la API de Gmail en Google Cloud. Por ahora, este botón solo simulará el proceso.</p>
-                    </div>
                 </div>
             </CardContent>
             <CardContent>

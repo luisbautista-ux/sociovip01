@@ -41,6 +41,7 @@ export interface QrClient {
   phone: string;
   dob: Timestamp | string; 
   registrationDate: Timestamp | string;
+  email?: string; // Added for email campaigns
   generatedForBusinessId?: string; // Legacy field
   associatedBusinessIds?: string[]; // New field for multiple associations
 }
@@ -80,6 +81,7 @@ export interface Business {
   customUrlPath?: string | null; 
   primaryColor?: string;
   secondaryColor?: string;
+  gmailRefreshToken?: string; // For Gmail API
 }
 
 export type PlatformUserRole = typeof ALL_PLATFORM_USER_ROLES[number];
