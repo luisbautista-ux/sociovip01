@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import { admin, adminDb } from '@/lib/firebase/firebaseAdmin'; // Usando la instancia unificada
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import type { PlatformUser, Business, QrClient } from '@/lib/types';
 import { headers } from 'next/headers';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -54,19 +54,26 @@ export async function POST(request: Request) {
 
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
         
-        const allClientsQuery = query(collection(db, "qrClients"), where('email', 'in', recipientEmails));
-        const clientsSnap = await getDocs(allClientsQuery);
-        const clientsDataMap = new Map(clientsSnap.docs.map(doc => [doc.data().email, doc.data() as QrClient]));
+        // Se obtiene el email del usuario conectado para el campo "From"
+        const userInfo = await oauth2Client.getTokenInfo(oauth2Client.credentials.access_token!);
+        const senderEmail = userInfo.email;
 
+        if (!senderEmail) {
+            throw new Error("No se pudo obtener el email del remitente desde la cuenta de Google conectada.");
+        }
+        
         const emailPromises = recipientEmails.map(async (email: string) => {
-            const clientData = clientsDataMap.get(email);
-            const clientName = clientData ? clientData.name.split(' ')[0] : "Socio";
+            // Se asume que el nombre del cliente no está disponible aquí para simplificar
+            const clientName = "Socio"; // Saludo genérico
             
             const personalizedBody = body.replace(/\[Nombre\]/g, clientName);
             const personalizedSubject = subject.replace(/\[Nombre\]/g, clientName);
 
+            // Se construye el encabezado "From" correctamente
+            const fromHeader = `"${businessData.name}" <${senderEmail}>`;
+
             const rawMessage = [
-                `From: "${businessData.name}" <me>`,
+                `From: ${fromHeader}`,
                 `To: ${email}`,
                 `Subject: ${personalizedSubject}`,
                 'Content-Type: text/html; charset=utf-8',
@@ -77,27 +84,22 @@ export async function POST(request: Request) {
 
             const encodedMessage = Buffer.from(rawMessage).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
             
-            try {
-                await gmail.users.messages.send({
-                    userId: 'me',
-                    requestBody: {
-                        raw: encodedMessage,
-                    },
-                });
-            } catch (sendError: any) {
-                console.error(`Failed to send email to ${email}:`, sendError.message);
-                // No lanzamos un error aquí para no detener toda la campaña
-            }
+            return gmail.users.messages.send({
+                userId: 'me',
+                requestBody: {
+                    raw: encodedMessage,
+                },
+            });
         });
 
-        // Esperamos a que todas las promesas de envío se inicien, pero no fallamos si una falla.
-        // El envío real ocurre en segundo plano.
         await Promise.all(emailPromises);
 
         return NextResponse.json({ message: `Campaign sending initiated to ${recipientEmails.length} recipients.` });
 
     } catch (error: any) {
-        console.error('Error sending email campaign:', error);
-        return NextResponse.json({ error: 'Failed to send email campaign.', details: error.message }, { status: 500 });
+        // Mejor log de error para diagnóstico
+        console.error('Error detallado al enviar campaña de email:', error.response?.data?.error || error.message);
+        const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to send email campaign.';
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
