@@ -14,7 +14,8 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   linkWithPopup,
-  getAdditionalUserInfo
+  getAdditionalUserInfo,
+  FacebookAuthProvider
 } from "firebase/auth";
 import type { AuthError } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
@@ -43,6 +44,7 @@ interface AuthContextType {
   refreshUserProfile: () => Promise<void>;
   loginWithGoogle: (role?: PlatformUserRole) => Promise<UserCredential | AuthError>; 
   linkGoogleAccount: () => Promise<{ success: boolean; error?: AuthError }>;
+  linkFacebookAccount: () => Promise<{ success: boolean; error?: AuthError }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -161,7 +163,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [logout, fetchUserProfile]);
 
-  const handleSocialLogin = async (provider: GoogleAuthProvider, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
+  const handleSocialLogin = async (provider: GoogleAuthProvider | FacebookAuthProvider, role: PlatformUserRole = 'client_gratis'): Promise<UserCredential | AuthError> => {
     try {
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
@@ -170,7 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userDocRef = doc(db, "platformUsers", user.uid);
       
       if (additionalInfo?.isNewUser) {
-        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
+        const newProfile: Omit<PlatformUser, 'id' | 'lastLogin'> = {
           uid: user.uid,
           email: user.email || "",
           name: user.displayName || user.email?.split('@')[0] || "Nuevo Usuario",
@@ -179,8 +181,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           dni: "",
           phone: "",
           dob: undefined,
+          businessId: null,
+          businessIds: [], 
         };
-        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+        await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp() });
       }
       
       await fetchUserProfile(user); // Fetch profile for both new and existing users
@@ -213,7 +217,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const userDocRef = doc(db, "platformUsers", user.uid);
         
         if (additionalInfo?.isNewUser) {
-            const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
+            const newProfile: Omit<PlatformUser, 'id' | 'lastLogin'> = {
               uid: user.uid,
               email: user.email || "",
               name: extraData.overrideName || user.displayName || "Nuevo Usuario",
@@ -222,14 +226,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
               dni: extraData.dni || "",
               phone: extraData.phone || "",
               dob: extraData.dob ? extraData.dob.toISOString() : undefined,
+              businessId: null, // Los clientes no tienen un businessId principal
+              businessIds: [], // Inicia vacío, se llenará con la interacción
             };
-            await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+            await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp() });
             await fetchUserProfile(user);
         } else {
-            // User already exists, but might not be in our DB
             const existingProfile = await getDoc(userDocRef);
             if (!existingProfile.exists()) {
-               const newProfile: Omit<PlatformUser, 'id' | 'lastLogin' | 'businessId' | 'businessIds'> = {
+               const newProfile: Omit<PlatformUser, 'id' | 'lastLogin'> = {
                 uid: user.uid,
                 email: user.email || "",
                 name: extraData.overrideName || user.displayName || "Usuario Existente",
@@ -238,8 +243,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 dni: extraData.dni || "",
                 phone: extraData.phone || "",
                 dob: extraData.dob ? extraData.dob.toISOString() : undefined,
+                businessId: null,
+                businessIds: [],
                };
-               await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp(), businessId: null, businessIds: [] });
+               await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp() });
             } else {
                  return { code: 'auth/credential-already-in-use', message: 'Este usuario ya existe.' } as AuthError;
             }
@@ -261,14 +268,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  const linkGoogleAccount = useCallback(async (): Promise<{ success: boolean; error?: AuthError }> => {
+  const linkAccount = useCallback(async (provider: GoogleAuthProvider | FacebookAuthProvider): Promise<{ success: boolean; error?: AuthError }> => {
     if (!currentUser) return { success: false, error: { code: 'auth/no-current-user', message: 'No hay un usuario activo para vincular.' } as AuthError };
-    
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({
-      prompt: 'select_account',
-      hd: undefined 
-    });
 
     try {
         await linkWithPopup(currentUser, provider);
@@ -279,15 +280,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         let userFriendlyError = { ...authError, message: "Ocurrió un error desconocido durante la vinculación." };
         
         if (authError.code === 'auth/credential-already-in-use') {
-            userFriendlyError.message = "Esta cuenta de Google ya está vinculada a otro usuario de la plataforma. Intenta iniciar sesión directamente con esa cuenta de Google.";
+            userFriendlyError.message = "Esta cuenta ya está vinculada a otro usuario de la plataforma.";
         } else if(authError.code === 'auth/popup-closed-by-user') {
             userFriendlyError.message = "La ventana de vinculación fue cerrada antes de completarse.";
         }
 
-        console.error("Error: Link Google Account Error:", authError.code, authError.message);
+        console.error("Error linking account:", authError.code, authError.message);
         return { success: false, error: userFriendlyError };
     }
   }, [currentUser, refreshUserProfile]);
+  
+  const linkGoogleAccount = () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account', hd: undefined });
+    return linkAccount(provider);
+  };
+  
+  const linkFacebookAccount = () => {
+    const provider = new FacebookAuthProvider();
+    return linkAccount(provider);
+  };
   
   const value = useMemo(() => ({
     currentUser,
@@ -301,8 +313,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshUserProfile,
     loginWithGoogle,
     linkGoogleAccount,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, linkGoogleAccount]);
+    linkFacebookAccount,
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, linkGoogleAccount, linkFacebookAccount]);
 
-  // Remove `signup` from the returned value, as it's no longer used.
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

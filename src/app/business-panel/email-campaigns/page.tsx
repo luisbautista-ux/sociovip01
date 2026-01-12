@@ -59,10 +59,12 @@ export default function EmailCampaignsPage() {
       const clientsMap = new Map<string, ClientRecipient>();
 
       // 1. Fetch from qrClients (legacy and QR-specific clients)
+      // This now also checks the new `associatedBusinessIds` field
       const qrClientsQuery = query(collection(db, "qrClients"), where("associatedBusinessIds", "array-contains", businessId));
       const qrClientsSnap = await getDocs(qrClientsQuery);
       qrClientsSnap.forEach(d => {
         const data = d.data() as QrClient;
+        // Use a consistent ID format, and ensure DNI exists for deduplication
         if (data.email && data.dni && !clientsMap.has(data.dni)) {
           clientsMap.set(data.dni, {
             id: d.id,
@@ -74,19 +76,19 @@ export default function EmailCampaignsPage() {
       });
       
       // 2. Fetch from platformUsers with client roles associated with this business
-      // ✅ CORRECCIÓN: Se añade el filtro por 'businessId' para asegurar que solo se listen los clientes del negocio actual.
       const platformUsersQuery = query(
         collection(db, "platformUsers"), 
-        where("roles", "array-contains-any", ["client_gratis", "vip_premium"]),
-        where("businessId", "==", businessId)
+        where("businessIds", "array-contains", businessId) // New query for clients associated with business
       );
       const platformUsersSnap = await getDocs(platformUsersQuery);
       
       platformUsersSnap.forEach(d => {
         const data = d.data() as PlatformUser;
-        if (data.email && data.dni && !clientsMap.has(data.dni)) {
+        // Check if the user has a client role
+        const isClient = data.roles.includes("client_gratis") || data.roles.includes("vip_premium");
+        if (isClient && data.email && data.dni && !clientsMap.has(data.dni)) {
           clientsMap.set(data.dni, {
-            id: d.id, // Use UID as the unique ID for platform users
+            id: data.uid, // Use UID as the unique ID for platform users
             dni: data.dni,
             name: data.name,
             email: data.email,
