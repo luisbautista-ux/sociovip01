@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         }
 
         const businessDoc = await adminDb.collection('businesses').doc(caller.businessId).get();
-        if (!businessDoc.exists()) {
+        if (!businessDoc.exists) { // <-- CORRECCIÓN AQUÍ
             return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
         }
 
@@ -54,7 +54,6 @@ export async function POST(request: Request) {
 
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
         
-        // Se obtiene el email del usuario conectado para el campo "From"
         const userInfo = await oauth2Client.getTokenInfo(oauth2Client.credentials.access_token!);
         const senderEmail = userInfo.email;
 
@@ -63,13 +62,11 @@ export async function POST(request: Request) {
         }
         
         const emailPromises = recipientEmails.map(async (email: string) => {
-            // Se asume que el nombre del cliente no está disponible aquí para simplificar
             const clientName = "Socio"; // Saludo genérico
             
             const personalizedBody = body.replace(/\[Nombre\]/g, clientName);
             const personalizedSubject = subject.replace(/\[Nombre\]/g, clientName);
 
-            // Se construye el encabezado "From" correctamente
             const fromHeader = `"${businessData.name}" <${senderEmail}>`;
 
             const rawMessage = [
@@ -97,7 +94,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: `Campaign sending initiated to ${recipientEmails.length} recipients.` });
 
     } catch (error: any) {
-        // Mejor log de error para diagnóstico
         console.error('Error detallado al enviar campaña de email:', error.response?.data?.error || error.message);
         const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to send email campaign.';
         return NextResponse.json({ error: errorMessage }, { status: 500 });
