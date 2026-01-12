@@ -48,7 +48,7 @@ type QrClient = {
 };
 
 export default function BusinessClientsPage() {
-  const { userProfile } = useAuth(); // debe proveer roles[] y businessId
+  const { userProfile } = useAuth(); // solo para verificar si es superadmin
   const { toast } = useToast();
 
   const [qrClients, setQrClients] = useState<QrClient[]>([]);
@@ -61,55 +61,13 @@ export default function BusinessClientsPage() {
 
   useEffect(() => {
     const load = async () => {
-      if (!userProfile) return;
-      if (!isSuperAdmin && !userProfile.businessId) return;
-
       setLoading(true);
       try {
         const qrRef = collection(db, "qrClients");
-        
-        // Superadmin gets all clients without filtering
-        if (isSuperAdmin) {
-            const allClientsSnap = await getDocs(qrRef);
-            const allClients = allClientsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
-            setQrClients(allClients);
-            return; // Termina la función para superadmin
-        }
-        
-        // Business admin logic with two queries
-        const businessId = userProfile.businessId;
-        if (!businessId) {
-          setQrClients([]);
-          return;
-        }
-
-        // Query 1: For new data model (array contains)
-        const newModelQuery = query(qrRef, where("associatedBusinessIds", "array-contains", businessId));
-        
-        // Query 2: For old data model (single ID)
-        const oldModelQuery = query(qrRef, where("generatedForBusinessId", "==", businessId));
-
-        const [newClientsSnap, oldClientsSnap] = await Promise.all([
-            getDocs(newModelQuery),
-            getDocs(oldModelQuery),
-        ]);
-        
-        const clientsMap = new Map<string, QrClient>();
-
-        newClientsSnap.forEach(d => {
-            if (!clientsMap.has(d.id)) {
-                clientsMap.set(d.id, { id: d.id, ...(d.data() as any) });
-            }
-        });
-        
-        oldClientsSnap.forEach(d => {
-            if (!clientsMap.has(d.id)) {
-                clientsMap.set(d.id, { id: d.id, ...(d.data() as any) });
-            }
-        });
-
-        const combinedClients = Array.from(clientsMap.values());
-        setQrClients(combinedClients);
+        // Se elimina la lógica de filtrado por negocio. Ahora siempre obtiene todos los clientes.
+        const allClientsSnap = await getDocs(qrRef);
+        const allClients = allClientsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
+        setQrClients(allClients);
 
       } catch (e: any) {
         console.error("Error cargando clientes:", e?.code, e?.message);
@@ -124,7 +82,7 @@ export default function BusinessClientsPage() {
     };
 
     load();
-  }, [userProfile, isSuperAdmin, toast]);
+  }, [toast]);
   
   const filteredClients = useMemo(() => {
     return qrClients.filter((c) => {
@@ -216,7 +174,7 @@ export default function BusinessClientsPage() {
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `SocioVip_Clientes_QR_${userProfile?.businessId ?? 'negocio'}.xlsx`;
+    link.download = `SocioVip_Clientes_QR_Todos.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -230,7 +188,7 @@ export default function BusinessClientsPage() {
     <div className="space-y-6">
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-primary flex items-center self-start">
-          <Contact className="h-8 w-8 mr-2" /> Mis Clientes
+          <Contact className="h-8 w-8 mr-2" /> Clientes de la Plataforma
         </h1>
         <div className="self-end sm:self-center">
             <Button onClick={handleExport} variant="gradient">
@@ -243,7 +201,7 @@ export default function BusinessClientsPage() {
         <CardHeader>
           <CardTitle>Listado de Clientes QR</CardTitle>
           <CardDescription>
-            {isSuperAdmin ? "Visualizando clientes de todos los negocios." : "Visualizando todos los clientes que han generado un QR para tu negocio."}
+            Visualizando todos los clientes que han generado un QR en la plataforma.
           </CardDescription>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
             <div className="relative">
