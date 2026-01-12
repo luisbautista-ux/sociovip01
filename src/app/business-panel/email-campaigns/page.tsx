@@ -41,24 +41,22 @@ export default function EmailCampaignsPage() {
   const businessId = userProfile?.businessId;
   
   const fetchData = useCallback(async () => {
-    if (!businessId) {
-      setIsLoading(false);
-      return;
-    }
     setIsLoading(true);
     try {
-      const businessDocRef = doc(db, 'businesses', businessId);
-      const businessDoc = await getDoc(businessDocRef);
-      if (businessDoc.exists()) {
-        const businessData = businessDoc.data() as Business;
-        if (businessData.gmailRefreshToken) {
-          setIsGmailConnected(true);
+      if (businessId) {
+        const businessDocRef = doc(db, 'businesses', businessId);
+        const businessDoc = await getDoc(businessDocRef);
+        if (businessDoc.exists()) {
+          const businessData = businessDoc.data() as Business;
+          if (businessData.gmailRefreshToken) {
+            setIsGmailConnected(true);
+          }
         }
       }
       
       const clientsMap = new Map<string, ClientRecipient>();
 
-      // 1. Fetch from qrClients (legacy and QR-specific clients)
+      // 1. Fetch from qrClients
       const qrClientsQuery = query(collection(db, "qrClients"));
       const qrClientsSnap = await getDocs(qrClientsQuery);
       qrClientsSnap.forEach(d => {
@@ -79,6 +77,7 @@ export default function EmailCampaignsPage() {
       
       platformUsersSnap.forEach(d => {
         const data = d.data() as PlatformUser;
+        // Solo añadir si tiene DNI y email, y no ha sido añadido ya desde qrClients
         if (data.email && data.dni && !clientsMap.has(data.dni)) {
           clientsMap.set(data.dni, {
             id: data.uid,
@@ -141,11 +140,11 @@ export default function EmailCampaignsPage() {
         return;
     }
     
-    const recipientEmails = allClients
+    const recipients = allClients
       .filter(client => selectedClients.has(client.id) && client.email)
-      .map(client => client.email);
+      .map(client => ({ email: client.email, name: client.name }));
       
-    if (recipientEmails.length === 0) {
+    if (recipients.length === 0) {
         toast({ title: "Sin Destinatarios", description: "No has seleccionado clientes con email para enviar la campaña.", variant: "destructive"});
         return;
     }
@@ -157,7 +156,7 @@ export default function EmailCampaignsPage() {
       const response = await fetch('/api/business-panel/send-email-campaign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({ recipientEmails, subject, body }),
+        body: JSON.stringify({ recipients, subject, body }),
       });
       const data = await response.json();
       
@@ -171,7 +170,7 @@ export default function EmailCampaignsPage() {
       } else {
           toast({
             title: "Campaña en Proceso",
-            description: data.message || `Se inició el envío a ${recipientEmails.length} cliente(s).`,
+            description: data.message || `Se inició el envío a ${recipients.length} cliente(s).`,
           });
           setSelectedClients(new Set());
           setSubject('');
@@ -230,7 +229,7 @@ export default function EmailCampaignsPage() {
               <Label htmlFor="subject">Asunto</Label>
               <Input
                 id="subject"
-                placeholder="Ej: ¡Una oferta especial para ti!"
+                placeholder="Ej: ¡Una oferta especial para ti, [Nombre]!"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 disabled={isSending || !isGmailConnected}

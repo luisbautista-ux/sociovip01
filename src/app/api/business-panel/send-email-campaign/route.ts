@@ -2,9 +2,8 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
-import type { PlatformUser, Business, QrClient } from '@/lib/types';
+import type { PlatformUser, Business } from '@/lib/types';
 import { headers } from 'next/headers';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 
 async function getCallerProfile(idToken: string): Promise<PlatformUser> {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -16,14 +15,48 @@ async function getCallerProfile(idToken: string): Promise<PlatformUser> {
     return userDoc.data() as PlatformUser;
 }
 
-// Función para codificar correctamente el asunto para el header del email
 function encodeSubject(subject: string) {
     const utf8Subject = Buffer.from(subject, 'utf-8').toString('base64');
     return `=?UTF-8?B?${utf8Subject}?=`;
 }
 
+// NUEVA plantilla HTML para los correos
+function createHtmlBody(messageBody: string, businessName: string, businessLogoUrl?: string): string {
+    const finalBody = messageBody.replace(/\n/g, '<br>');
+    const logoHtml = businessLogoUrl 
+        ? `<img src="${businessLogoUrl}" alt="${businessName} Logo" style="max-width: 120px; height: auto; margin-bottom: 20px;" />` 
+        : `<h1 style="color: #333; font-size: 24px;">${businessName}</h1>`;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; margin-top: 20px; background-color: #ffffff;">
+          <tr>
+            <td align="center" style="padding: 40px 0 30px 0; border-bottom: 1px solid #eeeeee;">
+              ${logoHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px 40px 30px;">
+              <p style="color: #555555; font-size: 16px; line-height: 1.6;">
+                ${finalBody}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding: 20px; background-color: #eeeeee; color: #888888; font-size: 12px;">
+              Enviado desde la plataforma SocioVIP para ${businessName}.
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+}
+
 export async function POST(request: Request) {
-    const { recipientEmails, subject, body } = await request.json();
+    const { recipients, subject, body } = await request.json();
 
     const authorization = headers().get('Authorization');
     if (!authorization || !authorization.startsWith('Bearer ')) {
@@ -73,25 +106,24 @@ export async function POST(request: Request) {
             throw new Error("No se pudo obtener el email del remitente desde la cuenta de Google conectada.");
         }
         
-        const emailPromises = recipientEmails.map(async (email: string) => {
-            const clientName = "Socio"; // Saludo genérico
+        const emailPromises = recipients.map(async (recipient: { email: string; name: string }) => {
+            const clientName = recipient.name.split(' ')[0] || 'Socio';
             
             const personalizedBody = body.replace(/\[Nombre\]/g, clientName);
             const personalizedSubject = subject.replace(/\[Nombre\]/g, clientName);
+            const htmlBody = createHtmlBody(personalizedBody, businessData.name, businessData.logoUrl);
 
             const fromHeader = `"${businessData.name}" <${senderEmail}>`;
-            
-            // ✅ CORRECCIÓN: Se codifica el asunto para soportar caracteres especiales (UTF-8)
             const encodedSubject = encodeSubject(personalizedSubject);
 
             const rawMessage = [
                 `From: ${fromHeader}`,
-                `To: ${email}`,
-                `Subject: ${encodedSubject}`, // Se usa el asunto codificado
+                `To: ${recipient.email}`,
+                `Subject: ${encodedSubject}`,
                 'Content-Type: text/html; charset=utf-8',
                 'MIME-Version: 1.0',
                 '',
-                personalizedBody,
+                htmlBody,
             ].join('\n');
 
             const encodedMessage = Buffer.from(rawMessage).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -106,7 +138,7 @@ export async function POST(request: Request) {
 
         await Promise.all(emailPromises);
 
-        return NextResponse.json({ message: `Campaign sending initiated to ${recipientEmails.length} recipients.` });
+        return NextResponse.json({ message: `Campaign sending initiated to ${recipients.length} recipients.` });
 
     } catch (error: any) {
         console.error('Error detallado al enviar campaña de email:', error.response?.data?.error || error.message);
