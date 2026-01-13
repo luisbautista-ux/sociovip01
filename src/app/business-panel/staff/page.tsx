@@ -506,9 +506,10 @@ export default function BusinessStaffPage() {
                 <ShadcnAlertDialogDescription>
                     El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-semibold">{(existingPlatformUserToEdit?.roles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
                     <br/><br/>
-                    ¿Deseas reasignarlo a tu negocio como <span className="font-semibold">Staff</span>?
+                    ¿Deseas reasignarlo a tu negocio con un nuevo rol?
                     <br/><br/>
-                    <span className="font-bold text-destructive">Advertencia:</span> Esta acción cambiará su rol actual y lo desvinculará de cualquier otro negocio al que pertenezca.
+                    <span className="font-bold text-destructive">Advertencia:</span> Esta acción cambiará su rol actual y lo desvinculará de
+                    cualquier otro negocio al que pertenezca.
                 </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
             <ShadcnAlertDialogFooter>
@@ -522,5 +523,6 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
 
 
