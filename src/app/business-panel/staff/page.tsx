@@ -30,6 +30,8 @@ import { Alert, AlertTitle } from "@/components/ui/alert";
 import { DialogFooter } from "@/components/ui/dialog";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { errorEmitter } from "@/lib/error-emitter";
+import { FirestorePermissionError } from "@/lib/errors";
 
 
 const DniEntrySchema = z.object({
@@ -201,44 +203,67 @@ export default function BusinessStaffPage() {
     }
     setIsSubmitting(true);
 
-    try {
-      if (isEditing && data.uid) {
-        // --- EDITING LOGIC (INCLUDING REASSIGNMENT) ---
-        const userRef = doc(db, "platformUsers", data.uid);
-        const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
-        const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'host', 'lector_qr'] : ['business_admin', 'staff', 'host', 'lector_qr'];
-        const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
-        
-        if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
-          toast({ title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive" });
-          setIsSubmitting(false);
-          return;
-        }
-        
-        const userPayload: Partial<PlatformUser> = {
-          name: data.name,
-          roles: finalRoles,
-          businessId: isReassigning ? currentBusinessId : data.businessId,
-        };
-
-        if(isReassigning) {
-            userPayload.businessIds = []; // Clear old businessIds if reassigning from another role
-        }
-
-        await updateDoc(userRef, userPayload);
-        toast({ title: isReassigning ? "Usuario Reasignado" : "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+    if (isEditing && data.uid) {
+      // --- EDITING LOGIC (INCLUDING REASSIGNMENT) ---
+      const userRef = doc(db, "platformUsers", data.uid);
+      const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
+      const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'host', 'lector_qr'] : ['business_admin', 'staff', 'host', 'lector_qr'];
+      const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
       
-      } else {
-        // --- CREATION LOGIC ---
-        if (!data.email || !data.password) {
-          throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
-        }
-        const rolesAllowed: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
-        const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
-        if (finalRoles.length === 0) {
-          throw new Error("Rol no válido. Solo puedes asignar 'Staff', 'Anfitrión' o 'Lector QR'.")
-        }
-        
+      if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
+        toast({ title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const userPayload: Partial<PlatformUser> = {
+        name: data.name,
+        roles: finalRoles,
+        businessId: isReassigning ? currentBusinessId : data.businessId,
+      };
+
+      if(isReassigning) {
+          userPayload.businessIds = []; // Clear old businessIds if reassigning from another role
+      }
+
+      updateDoc(userRef, userPayload)
+        .then(() => {
+            toast({ title: isReassigning ? "Usuario Reasignado" : "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+            setShowDniEntryModal(false);
+            setShowUserFormModal(false);
+            setEditingUser(null);
+            setVerifiedDniResult(null);
+            fetchStaffMembers();
+        })
+        .catch(async (error) => {
+            console.error("Firebase update error:", error);
+            const permissionError = new FirestorePermissionError({
+                path: userRef.path,
+                operation: 'update',
+                requestResourceData: userPayload,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        })
+        .finally(() => {
+            setIsSubmitting(false);
+        });
+    
+    } else {
+      // --- CREATION LOGIC ---
+      if (!data.email || !data.password) {
+        toast({ title: "Error", description: "El email y la contraseña son requeridos para crear un nuevo usuario.", variant: "destructive"});
+        setIsSubmitting(false);
+        return;
+      }
+      const rolesAllowed: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
+      const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
+      if (finalRoles.length === 0) {
+        toast({ title: "Error de Rol", description: "Rol no válido. Solo puedes asignar 'Staff', 'Anfitrión' o 'Lector QR'.", variant: "destructive"});
+        setIsSubmitting(false);
+        return;
+      }
+      
+      try {
         const idToken = await currentUser.getIdToken();
         const creationPayload = {
           email: data.email,
@@ -263,19 +288,17 @@ export default function BusinessStaffPage() {
           throw new Error(result.error || 'Ocurrió un error desconocido al crear el usuario.');
         }
         toast({ title: "Personal Creado Exitosamente", description: `Se creó el usuario "${data.name}".` });
+        setShowDniEntryModal(false);
+        setShowUserFormModal(false);
+        setEditingUser(null);
+        setVerifiedDniResult(null);
+        await fetchStaffMembers();
+      } catch (error: any) {
+        console.error("Error creating staff user:", error);
+        toast({ title: "Error al Guardar", description: `Ocurrió un error. ${error.message}`, variant: "destructive" });
+      } finally {
+        setIsSubmitting(false);
       }
-      
-      setShowDniEntryModal(false);
-      setShowUserFormModal(false);
-      setEditingUser(null);
-      setVerifiedDniResult(null);
-      await fetchStaffMembers();
-
-    } catch (error: any) {
-      console.error("Error creating/editing staff user:", error);
-      toast({ title: "Error al Guardar", description: `Ocurrió un error. ${error.message}`, variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -508,8 +531,7 @@ export default function BusinessStaffPage() {
                     <br/><br/>
                     ¿Deseas reasignarlo a tu negocio con un nuevo rol?
                     <br/><br/>
-                    <span className="font-bold text-destructive">Advertencia:</span> Esta acción cambiará su rol actual y lo desvinculará de
-                    cualquier otro negocio al que pertenezca.
+                    <span className="font-bold text-destructive">Advertencia:</span> Esta acción puede cambiar su rol actual y su vinculación con otros negocios.
                 </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
             <ShadcnAlertDialogFooter>
@@ -523,6 +545,3 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
-
-
-
