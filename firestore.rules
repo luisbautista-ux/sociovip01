@@ -1,85 +1,115 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Funciones de Ayuda ---
+    // --- Funciones de Ayuda (Helpers) ---
     function isSignedIn() {
       return request.auth != null;
     }
 
     function getUserData() {
+      // Obtiene los datos del perfil del usuario que hace la petición.
       return get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
     }
 
     function isSuperAdmin() {
-      return isSignedIn() && 'superadmin' in getUserData().roles;
-    }
-    
-    function isBusinessAdmin(businessId) {
-      return isSignedIn() && 'business_admin' in getUserData().roles && getUserData().businessId == businessId;
+      return isSignedIn() && getUserData().roles.hasAny(['superadmin']);
     }
 
+    function isBusinessAdmin(businessId) {
+      return isSignedIn() && getUserData().roles.hasAny(['business_admin']) && getUserData().businessId == businessId;
+    }
+    
     function isStaff(businessId) {
-      return isSignedIn() && 'staff' in getUserData().roles && getUserData().businessId == businessId;
+      return isSignedIn() && getUserData().roles.hasAny(['staff']) && getUserData().businessId == businessId;
+    }
+    
+    // Un miembro del negocio es Admin o Staff
+    function isBusinessMember(businessId) {
+        return isBusinessAdmin(businessId) || isStaff(businessId);
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     // --- Reglas por Colección ---
 
-    // Perfiles de Usuario de la Plataforma
-    match /platformUsers/{userId} {
-      // El SuperAdmin puede hacer todo.
-      allow read, write: if isSuperAdmin();
-
-      // Los usuarios autenticados pueden leer su propio perfil.
-      allow get: if isSignedIn() && request.auth.uid == userId;
-
-      // Los usuarios pueden actualizar su propio nombre, teléfono y foto.
-      allow update: if isSignedIn() && request.auth.uid == userId &&
-                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'photoURL']);
-    }
-
-    // Negocios: Lectura pública, escritura solo para SuperAdmin.
+    // Colección de Negocios
     match /businesses/{businessId} {
-      allow read: if true;
-      allow write: if isSuperAdmin();
+      allow read: if true; // Lectura pública para todos
+      
+      // SuperAdmin o un miembro de ese negocio puede actualizar
+      allow write: if isSuperAdmin() || isBusinessMember(businessId);
     }
     
-    // Entidades del Negocio (Promociones/Eventos): Lectura pública, escritura para miembros del negocio
+    // Colección de Entidades (Promociones y Eventos)
     match /businessEntities/{entityId} {
-      allow read: if true;
-      allow create: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId) || isStaff(request.resource.data.businessId);
-      allow update: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || isStaff(resource.data.businessId);
-      allow delete: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId);
+      allow read: if true; // Lectura pública
+      // Para crear, se valida el businessId del nuevo recurso
+      allow create: if isSuperAdmin() || isBusinessMember(request.resource.data.businessId);
+      // Para actualizar/eliminar, se valida el businessId del recurso existente
+      allow update, delete: if isSuperAdmin() || isBusinessMember(resource.data.businessId);
     }
     
-    // Clientes QR: Creación pública, sin lectura/escritura directa no autorizada.
-    match /qrClients/{clientId} {
-      allow create: if true;
-      allow read, write: if false; // Por defecto denegado, la lectura se maneja por queries seguras
-    }
+    // Colección de Usuarios de la Plataforma
+    match /platformUsers/{userId} {
+      // Cualquiera autenticado puede leer perfiles.
+      allow read: if isSignedIn();
 
-    // Socios VIP: Gestión solo por SuperAdmin.
+      // CREAR: Un usuario puede ser creado de dos maneras:
+      // 1. Un usuario nuevo crea su propio perfil al registrarse.
+      // 2. Un SuperAdmin o BusinessAdmin crea un nuevo perfil para alguien más.
+      allow create: if request.auth.uid == userId ||
+                      isSuperAdmin() ||
+                      (isBusinessAdmin(request.resource.data.businessId));
+
+      // ACTUALIZAR: Un usuario puede ser actualizado por:
+      // 1. Él mismo (para editar su propio perfil).
+      // 2. Un SuperAdmin (puede editar a cualquiera).
+      // 3. Un Admin o Staff del negocio al que pertenece el usuario.
+      allow update: if isOwner(userId) ||
+                      isSuperAdmin() ||
+                      isBusinessMember(resource.data.businessId);
+
+      // BORRAR: Un usuario puede ser borrado por:
+      // 1. Un SuperAdmin.
+      // 2. Un Admin del negocio al que pertenece el usuario.
+      allow delete: if isSuperAdmin() ||
+                      isBusinessAdmin(resource.data.businessId);
+    }
+    
+    // Vínculos de Promotores con Negocios
+    match /businessPromoterLinks/{linkId} {
+        // SuperAdmin, el Admin del negocio, o cualquier promotor puede leer los vínculos
+        allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || getUserData().roles.hasAny(['promoter']);
+        // Solo SuperAdmin o Admin del negocio pueden crear/actualizar/eliminar
+        allow write: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+    }
+    
+    // Socios VIP
     match /socioVipMembers/{memberId} {
+       // Solo el SuperAdmin puede gestionar (leer y escribir) la lista de Socios VIP
        allow read, write: if isSuperAdmin();
     }
     
-    // Vínculos de Promotores
-    match /businessPromoterLinks/{linkId} {
-      allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || (isSignedIn() && getUserData().roles.hasAny(['promoter']));
-      allow create, update, delete: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
+    // Clientes QR
+    match /qrClients/{clientId} {
+      allow create: if true; // Cualquiera puede crear un cliente QR
+      allow read, update, delete: if false; // Nadie puede leer, actualizar o borrar directamente
     }
-    
-    // Pagos de Promotores
-    match /promoterPayments/{paymentId} {
-        allow read, write: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
-    }
-    
-    // Configuración de la plataforma
+
+    // Configuración de la Plataforma
     match /platformSettings/{configId} {
-      allow read: if isSignedIn(); // Permitir lectura a todos los usuarios logueados
-      allow write: if isSuperAdmin(); // Solo superadmin escribe
+      allow read: if isSignedIn(); // Cualquier usuario logueado puede leer la configuración
+      allow write: if isSuperAdmin(); // Solo SuperAdmin puede escribir
+    }
+    
+    // Pagos de Comisiones de Promotores
+    match /promoterPayments/{paymentId} {
+        // Solo SuperAdmin o Admin del negocio pueden leer o registrar pagos
+        allow read, write: if isSuperAdmin() || isBusinessMember(request.resource.data.businessId);
     }
   }
 }
