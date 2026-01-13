@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as ShadcnAlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -380,7 +381,7 @@ export default function BusinessStaffPage() {
                             </DropdownMenuItem>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><ShadcnAlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription></AlertDialogHeader>
                             <ShadcnAlertDialogFooter>
                               <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
@@ -427,7 +428,7 @@ export default function BusinessStaffPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><ShadcnAlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription></AlertDialogHeader>
                             <ShadcnAlertDialogFooter>
                               <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
@@ -501,24 +502,25 @@ export default function BusinessStaffPage() {
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</AlertDialogTitle>
-                <AlertDialogDescription>
-                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-semibold">{(existingPlatformUserToEdit?.roles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r]).join(', ')}</span>.
+                <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</UIAlertDialogTitle>
+                <ShadcnAlertDialogDescription>
+                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-semibold">{(existingPlatformUserToEdit?.roles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
                     <br/><br/>
                     ¿Deseas reasignarlo a tu negocio como <span className="font-semibold">Staff</span>?
                     <br/><br/>
                     <span className="font-bold text-destructive">Advertencia:</span> Esta acción cambiará su rol actual y lo desvinculará de cualquier otro negocio al que pertenezca.
-                </AlertDialogDescription>
+                </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <ShadcnAlertDialogFooter>
                 <AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={handleReassignRole} className="bg-primary hover:bg-primary/90">
                     <GitBranch className="mr-2 h-4 w-4"/> Confirmar y Reasignar
                 </AlertDialogAction>
-            </AlertDialogFooter>
+            </ShadcnAlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
+
 
