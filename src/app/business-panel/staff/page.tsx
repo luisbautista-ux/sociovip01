@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
-import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical } from "lucide-react";
+import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch, ArrowRight } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -185,7 +185,7 @@ export default function BusinessStaffPage() {
     setShowUserFormModal(true);
   };
   
-  const handleEditExistingUser = () => {
+  const handleReassignRole = () => {
       if (existingPlatformUserToEdit) {
           setEditingUser(existingPlatformUserToEdit);
           setShowUserFormModal(true); 
@@ -202,9 +202,10 @@ export default function BusinessStaffPage() {
 
     try {
       if (isEditing && data.uid) {
-        // --- EDITING LOGIC ---
+        // --- EDITING LOGIC (INCLUDING REASSIGNMENT) ---
         const userRef = doc(db, "platformUsers", data.uid);
-        const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
+        const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
+        const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'host', 'lector_qr'] : ['business_admin', 'staff', 'host', 'lector_qr'];
         const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
         
         if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
@@ -213,9 +214,19 @@ export default function BusinessStaffPage() {
           return;
         }
         
-        const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
+        const userPayload: Partial<PlatformUser> = {
+          name: data.name,
+          roles: finalRoles,
+          businessId: isReassigning ? currentBusinessId : data.businessId,
+        };
+
+        if(isReassigning) {
+            userPayload.businessIds = []; // Clear old businessIds if reassigning from another role
+        }
+
         await updateDoc(userRef, userPayload);
-        toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+        toast({ title: isReassigning ? "Usuario Reasignado" : "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+      
       } else {
         // --- CREATION LOGIC ---
         if (!data.email || !data.password) {
@@ -480,7 +491,7 @@ export default function BusinessStaffPage() {
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
             businesses={[]}
             allowedRoles={['staff', 'host', 'lector_qr']}
-            onSubmit={(data) => handleCreateOrEditUser(data, !!editingUser)}
+            onSubmit={(data, isEditing) => handleCreateOrEditUser(data, isEditing)}
             onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}
           />
@@ -489,10 +500,25 @@ export default function BusinessStaffPage() {
 
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
-          <AlertDialogHeader><UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Usuario ya Existente</UIAlertDialogTitle><AlertDialogDescription>El documento <span className="font-semibold">{existingPlatformUserToEdit?.dni}</span> ya está registrado para <span className="font-semibold">{existingPlatformUserToEdit?.name}</span>. Si no está en tu lista de personal, puede estar asignado a otro negocio. Contacta al Super Admin si necesitas reasignarlo. No puedes crear un duplicado.</AlertDialogDescription></AlertDialogHeader>
-          <ShadcnAlertDialogFooter><AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Entendido</AlertDialogCancel></ShadcnAlertDialogFooter>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</AlertDialogTitle>
+                <AlertDialogDescription>
+                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-semibold">{(existingPlatformUserToEdit?.roles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r]).join(', ')}</span>.
+                    <br/><br/>
+                    ¿Deseas reasignarlo a tu negocio como <span className="font-semibold">Staff</span>?
+                    <br/><br/>
+                    <span className="font-bold text-destructive">Advertencia:</span> Esta acción cambiará su rol actual y lo desvinculará de cualquier otro negocio al que pertenezca.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReassignRole} className="bg-primary hover:bg-primary/90">
+                    <GitBranch className="mr-2 h-4 w-4"/> Confirmar y Reasignar
+                </AlertDialogAction>
+            </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
+
