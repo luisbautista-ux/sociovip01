@@ -14,15 +14,18 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return isSignedIn() && getUserData().roles.hasAny(['superadmin']);
+      // CORRECTO: usar 'in' para verificar la existencia de un string en una lista
+      return isSignedIn() && 'superadmin' in getUserData().roles;
     }
 
     function isBusinessAdmin(businessId) {
-      return isSignedIn() && getUserData().roles.hasAny(['business_admin']) && getUserData().businessId == businessId;
+      // CORRECTO: usar 'in' para verificar la existencia de un string en una lista
+      return isSignedIn() && 'business_admin' in getUserData().roles && getUserData().businessId == businessId;
     }
     
     function isStaff(businessId) {
-      return isSignedIn() && getUserData().roles.hasAny(['staff']) && getUserData().businessId == businessId;
+      // CORRECTO: usar 'in' para verificar la existencia de un string en una lista
+      return isSignedIn() && 'staff' in getUserData().roles && getUserData().businessId == businessId;
     }
     
     // Un miembro del negocio es Admin o Staff
@@ -83,7 +86,7 @@ service cloud.firestore {
     // Vínculos de Promotores con Negocios
     match /businessPromoterLinks/{linkId} {
         // SuperAdmin, el Admin del negocio, o cualquier promotor puede leer los vínculos
-        allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || getUserData().roles.hasAny(['promoter']);
+        allow read: if isSuperAdmin() || isBusinessAdmin(resource.data.businessId) || ('promoter' in getUserData().roles);
         // Solo SuperAdmin o Admin del negocio pueden crear/actualizar/eliminar
         allow write: if isSuperAdmin() || isBusinessAdmin(request.resource.data.businessId);
     }
