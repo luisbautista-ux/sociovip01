@@ -199,7 +199,7 @@ export default function BusinessClientsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Listado de Clientes QR</CardTitle>
+          <CardTitle className="font-headline">Listado de Clientes QR</CardTitle>
           <CardDescription>
             Visualizando todos los clientes que han generado un QR en la plataforma.
           </CardDescription>
