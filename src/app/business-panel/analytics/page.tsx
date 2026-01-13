@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -138,7 +139,7 @@ export default function BusinessAnalyticsPage() {
   if (!businessId) {
       return (
         <div className="flex flex-col items-center justify-center h-64 p-4 border border-dashed rounded-md">
-            <CardTitle className="text-xl text-destructive">Configuración Incompleta</CardTitle>
+            <CardTitle className="text-xl text-destructive font-headline">Configuración Incompleta</CardTitle>
             <CardDescription className="mt-2 text-center text-muted-foreground">
                 Tu perfil de usuario no está asociado a un negocio válido. Contacta al superadministrador.
             </CardDescription>
@@ -154,7 +155,7 @@ export default function BusinessAnalyticsPage() {
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Rendimiento General (Últimos 6 Meses)</CardTitle>
+          <CardTitle className="font-headline">Rendimiento General (Últimos 6 Meses)</CardTitle>
           <CardDescription>Tendencias en creación de campañas, y generación/uso de códigos QR.</CardDescription>
         </CardHeader>
         <CardContent className="h-[400px] p-2">
@@ -188,7 +189,7 @@ export default function BusinessAnalyticsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Analíticas por Promoción/Evento</CardTitle>
+          <CardTitle className="font-headline">Analíticas por Promoción/Evento</CardTitle>
           <CardDescription>Selecciona una actividad para ver su detalle de rendimiento.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -156,7 +155,7 @@ export default function PromoterCommissionsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Detalle de comisiones</CardTitle>
+          <CardTitle className="font-headline">Detalle de comisiones</CardTitle>
           <CardDescription>
              Aquí se listan tus comisiones pendientes y pagadas por cada campaña en la que participaste.
           </CardDescription>
@@ -188,7 +187,7 @@ export default function PromoterCommissionsPage() {
                   filteredCommissions.map((comm) => (
                     <Card key={comm.id} className="overflow-hidden">
                       <CardHeader className="p-4">
-                        <CardTitle className="text-base flex items-center">
+                        <CardTitle className="text-base flex items-center font-headline">
                             {comm.entityType === 'event' ? <Calendar size={14} className="mr-2"/> : <Ticket size={14} className="mr-2"/>}
                             {comm.entityName}
                         </CardTitle>
@@ -238,7 +237,7 @@ export default function PromoterCommissionsPage() {
                           </TableCell>
                           <TableCell>{comm.businessName}</TableCell>
                           <TableCell className="text-center font-semibold">{comm.promoterCodesRedeemed}</TableCell>
-                          <TableCell className="text-center">{comm.commissionRateApplied}</TableCell>
+                          <TableCell className="text-center">{comm.commissionRateApplied || 'S/ 0.00'}</TableCell>
                           <TableCell className="text-right font-semibold text-destructive">
                               S/ {comm.commissionPending.toFixed(2)}
                           </TableCell>
@@ -273,7 +272,3 @@ export default function PromoterCommissionsPage() {
     </div>
   );
 }
-
-
-
-    

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -538,7 +537,7 @@ export default function BusinessPromotionsPage() {
       
       {!currentBusinessId && !isLoadingPageData && userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff')) && (
         <Card className="shadow-lg">
-          <CardHeader><UIAlertDialogTitle className="text-destructive">Error de Configuración del Negocio</UIAlertDialogTitle></CardHeader>
+          <CardHeader><UIAlertDialogTitle className="text-destructive font-headline">Error de Configuración del Negocio</UIAlertDialogTitle></CardHeader>
           <CardContent><p className="text-muted-foreground">Tu perfil de usuario no está asociado a un negocio o el ID del negocio no está disponible. No se pueden cargar ni crear promociones.</p></CardContent>
         </Card>
       )}
@@ -546,7 +545,7 @@ export default function BusinessPromotionsPage() {
       {currentBusinessId && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Mis Promociones</CardTitle>
+            <CardTitle className="font-headline">Mis Promociones</CardTitle>
             <ShadcnCardDescription>Administra las promociones ofrecidas por tu negocio.</ShadcnCardDescription>
             <div className="relative mt-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -578,7 +577,7 @@ export default function BusinessPromotionsPage() {
                     return(
                       <Card key={promo.id} className="overflow-hidden">
                         <CardHeader className="p-4">
-                          <CardTitle>{promo.name}</CardTitle>
+                          <CardTitle className="font-headline">{promo.name}</CardTitle>
                           <ShadcnCardDescription>Vigencia: {format(parseISO(promo.startDate), "dd/MM")} - {format(parseISO(promo.endDate), "dd/MM")}</ShadcnCardDescription>
                         </CardHeader>
                         <CardContent className="p-4 space-y-3">
@@ -697,7 +696,7 @@ export default function BusinessPromotionsPage() {
                         return (
                         <TableRow key={promo.id || `promo-fallback-${Math.random()}`}>
                            <TableCell className="font-medium align-top py-3">
-                              <div className="font-semibold text-base">{promo.name}</div>
+                              <div className="font-headline text-base">{promo.name}</div>
                               <div className="flex items-center space-x-2 mt-1.5 mb-2">
                                   <Switch
                                       checked={promo.isActive}
@@ -803,7 +802,7 @@ export default function BusinessPromotionsPage() {
         }}>
           <ShadcnDialogContent className="sm:max-w-2xl">
             <ShadcnDialogHeader>
-              <ShadcnDialogTitle>
+              <ShadcnDialogTitle className="font-headline">
                 {isDuplicating && editingPromotion
                   ? `Duplicar Promoción: ${(editingPromotion.name || 'Promoción').replace(' (Copia)', '')} (Copia)`
                   : editingPromotion
@@ -893,7 +892,7 @@ export default function BusinessPromotionsPage() {
       {showStatsModal && selectedPromotionForStats && (
         <ShadcnDialogContent className="sm:max-w-md">
             <ShadcnDialogHeader>
-                <ShadcnDialogTitle>Estadísticas para: {selectedPromotionForStats.name}</ShadcnDialogTitle>
+                <ShadcnDialogTitle className="font-headline">Estadísticas para: {selectedPromotionForStats.name}</ShadcnDialogTitle>
                 <ShadcnDialogDescription>Resumen del rendimiento de la promoción.</ShadcnDialogDescription>
             </ShadcnDialogHeader>
             <div className="space-y-3 py-4">

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -301,7 +300,7 @@ export default function BusinessStaffPage() {
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Miembros del Personal</CardTitle>
+          <CardTitle className="font-headline">Miembros del Personal</CardTitle>
           <CardDescription>Administra los usuarios staff, anfitriones y lectores QR de tu negocio.</CardDescription>
            <div className="relative mt-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -328,7 +327,7 @@ export default function BusinessStaffPage() {
               {filteredStaff.map((staff) => (
                 <Card key={staff.id} className="overflow-hidden">
                   <CardHeader className="p-4">
-                    <CardTitle>{staff.name}</CardTitle>
+                    <CardTitle className="font-headline">{staff.name}</CardTitle>
                     <CardDescription>{staff.email}</CardDescription>
                   </CardHeader>
                   <CardContent className="p-4 space-y-2 text-sm">
@@ -438,7 +437,7 @@ export default function BusinessStaffPage() {
       <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
         <UIDialogContent className="sm:max-w-md">
           <UIDialogHeader>
-            <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
+            <UIDialogTitle className="font-headline">Paso 1: Verificar Documento</UIDialogTitle>
             <UIDialogDescription>Ingresa el documento para verificar si la persona ya existe en la plataforma.</UIDialogDescription>
           </UIDialogHeader>
           <Form {...dniEntryForm}>
@@ -473,7 +472,7 @@ export default function BusinessStaffPage() {
       <UIDialog open={showUserFormModal} onOpenChange={setShowUserFormModal}>
         <UIDialogContent className="sm:max-w-lg">
           <UIDialogHeader>
-            <UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
+            <UIDialogTitle className="font-headline">{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
             <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los detalles para crear el usuario."}</UIDialogDescription>
           </UIDialogHeader>
           <PlatformUserForm 
@@ -497,4 +496,3 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
-

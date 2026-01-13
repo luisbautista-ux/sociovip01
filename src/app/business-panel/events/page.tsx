@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -390,7 +389,7 @@ const ManageEventDialog = ({
             <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) handleAttemptClose(); }}>
                 <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle>{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <DialogTitle className="font-headline">{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
                         <UIDialogDescriptionComponent>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</UIDialogDescriptionComponent>
                     </DialogHeader>
                     
@@ -412,7 +411,7 @@ const ManageEventDialog = ({
                             <TabsContent value="details" className="p-6 h-full">
                                 <Card>
                                   <CardHeader>
-                                    <CardTitle>Detalles Principales del Evento</CardTitle>
+                                    <CardTitle className="font-headline">Detalles Principales del Evento</CardTitle>
                                     <CardDescription>Configura la información básica y las fechas de tu evento.</CardDescription>
                                   </CardHeader>
                                   <CardContent>
@@ -429,7 +428,7 @@ const ManageEventDialog = ({
                             <TabsContent value="tickets" className="p-6 h-full">
                                 <Card>
                                  <CardHeader>
-                                     <CardTitle>Gestión de tipos de entrada</CardTitle>
+                                     <CardTitle className="font-headline">Gestión de tipos de entrada</CardTitle>
                                      <CardDescription>Añade y configura las entradas para tu evento. El aforo total se calcula sumando las cantidades de cada tipo.</CardDescription>
                                  </CardHeader>
                                  <CardContent>
@@ -470,7 +469,7 @@ const ManageEventDialog = ({
                             <TabsContent value="boxes" className="p-6 h-full">
                                     <Card>
                                         <CardHeader>
-                                            <CardTitle>Gestión de boxes</CardTitle>
+                                            <CardTitle className="font-headline">Gestión de boxes</CardTitle>
                                             <CardDescription>Añade y configura los boxes para tu evento, de forma individual o masiva.</CardDescription>
                                         </CardHeader>
                                         <CardContent>
@@ -593,7 +592,7 @@ const ManageEventDialog = ({
                                 <div className="space-y-6">
                                     <Card>
                                         <CardHeader>
-                                            <CardTitle>Promotores del Negocio</CardTitle>
+                                            <CardTitle className="font-headline">Promotores del Negocio</CardTitle>
                                             <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento.</CardDescription>
                                         </CardHeader>
                                         <CardContent>
@@ -627,7 +626,7 @@ const ManageEventDialog = ({
                                     
                                      <Card>
                                         <CardHeader>
-                                            <CardTitle>Configurar Comisiones ({assignedPromoters.length})</CardTitle>
+                                            <CardTitle className="font-headline">Configurar Comisiones ({assignedPromoters.length})</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
                                             <div className="space-y-3 p-4 border rounded-md bg-muted/50">
@@ -720,7 +719,7 @@ const ManageEventDialog = ({
             <Dialog open={isTicketFormOpen} onOpenChange={setIsTicketFormOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingTicket ? 'Editar Tipo de Entrada' : 'Nuevo Tipo de Entrada'}</DialogTitle>
+                  <DialogTitle className="font-headline">{editingTicket ? 'Editar Tipo de Entrada' : 'Nuevo Tipo de Entrada'}</DialogTitle>
                 </DialogHeader>
                 <TicketTypeForm 
                     ticketType={editingTicket || undefined} 
@@ -733,7 +732,7 @@ const ManageEventDialog = ({
             <Dialog open={isBoxFormOpen} onOpenChange={setIsBoxFormOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{editingBox ? 'Editar Box' : 'Nuevo Box'}</DialogTitle>
+                        <DialogTitle className="font-headline">{editingBox ? 'Editar Box' : 'Nuevo Box'}</DialogTitle>
                     </DialogHeader>
                     <EventBoxForm
                         eventBox={editingBox || undefined}
@@ -746,7 +745,7 @@ const ManageEventDialog = ({
             <Dialog open={isBatchBoxFormOpen} onOpenChange={setIsBatchBoxFormOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Crear Boxes en Lote</DialogTitle>
+                        <DialogTitle className="font-headline">Crear Boxes en Lote</DialogTitle>
                     </DialogHeader>
                     <BatchBoxForm
                         existingBoxes={currentEventData?.eventBoxes || []}
@@ -1124,15 +1123,15 @@ export default function BusinessEventsPage() {
       </div>
 
       {!currentBusinessId && !isLoading ? (
-          <Card><CardHeader><CardTitle className="text-destructive">Negocio no identificado</CardTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-destructive font-headline">Negocio no identificado</CardTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
       ) : isLoading ? (
           <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
       ) : events.length === 0 ? (
-          <Card><CardHeader><CardTitle>Sin Eventos</CardTitle></CardHeader><CardContent><p className="text-muted-foreground">Aún no has creado ningún evento. ¡Haz clic en "Crear Evento" para empezar!</p></CardContent></Card>
+          <Card><CardHeader><CardTitle className="font-headline">Sin Eventos</CardTitle></CardHeader><CardContent><p className="text-muted-foreground">Aún no has creado ningún evento. ¡Haz clic en "Crear Evento" para empezar!</p></CardContent></Card>
       ) : (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Mis Eventos</CardTitle>
+            <CardTitle className="font-headline">Mis Eventos</CardTitle>
             <CardDescription>Lista de todos los eventos creados para tu negocio.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -1147,7 +1146,7 @@ export default function BusinessEventsPage() {
                 return (
                   <Card key={event.id} className="overflow-hidden">
                     <CardHeader className="p-4">
-                       <CardTitle>{event.name}</CardTitle>
+                       <CardTitle className="font-headline">{event.name}</CardTitle>
                        <CardDescription>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</CardDescription>
                     </CardHeader>
                     <CardContent className="p-4 space-y-2">
