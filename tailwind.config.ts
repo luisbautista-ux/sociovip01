@@ -11,8 +11,7 @@ export default {
   theme: {
   	extend: {
       fontFamily: {
-        // No se define 'sans' para evitar sobreescribir el default que necesita lucide
-        headline: ['Bebas Neue', 'sans-serif'], // Fuente para títulos
+        headline: ['Oswald', 'sans-serif'], // Fuente para títulos
         body: ['Inter', 'sans-serif'], // Fuente para textos de cuerpo y UI
       },
   		colors: {
