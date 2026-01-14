@@ -20,7 +20,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
+import { cn, anyToDate } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
@@ -171,9 +171,13 @@ export default function BusinessStaffPage() {
                 if (result.userType === 'SocioVipMember' && result.socioVipData) {
                     initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
                     initialData.email = result.socioVipData.email;
+                    initialData.phone = result.socioVipData.phone;
+                    initialData.dob = anyToDate(result.socioVipData.dob) || undefined;
                     initialData.preExistingUserType = 'SocioVipMember';
                 } else if (result.userType === 'QrClient' && result.qrClientData) {
                     initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
+                    initialData.phone = result.qrClientData.phone;
+                    initialData.dob = anyToDate(result.qrClientData.dob) || undefined;
                     initialData.preExistingUserType = 'QrClient';
                 }
                 setVerifiedDniResult(initialData);
@@ -206,27 +210,25 @@ export default function BusinessStaffPage() {
       return;
     }
     
-    // Si no estamos editando (estamos creando), entonces simplemente cerramos y recargamos
+    // If we are creating (not editing), just close the modal and refetch.
     if (!isEditing) {
         setShowDniEntryModal(false);
         setShowUserFormModal(false);
         setEditingUser(null);
         setVerifiedDniResult(null);
-        fetchStaffMembers();
+        fetchStaffMembers(); // Refetch to show the new user
         return;
     }
 
-    // Lógica para actualizar un usuario existente
+    // Logic to update an existing user
     setIsSubmitting(true);
     const userRef = doc(db, "platformUsers", data.uid!);
     const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
     
-    // Roles permitidos: el business_admin puede asignar 'staff' o 'lector_qr'
-    // El superadmin puede asignar business_admin. Los usuarios no pueden quitarse su propio rol de admin/staff
     const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'lector_qr'] : ['business_admin', 'staff', 'lector_qr'];
     const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
     
-    // Prevenir que un admin se quite su propio rol de gestión
+    // Prevent admin from removing their own management role
     if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
       toast({ title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive" });
       setIsSubmitting(false);
@@ -236,12 +238,10 @@ export default function BusinessStaffPage() {
     const userPayload: Partial<PlatformUser> = {
       name: data.name,
       roles: finalRoles,
-      // Si estamos reasignando, forzamos el businessId del admin actual. Si no, usamos el del formulario (para superadmin).
       businessId: isReassigning ? currentBusinessId : data.businessId,
     };
 
     if(isReassigning) {
-        // Al reasignar un promotor a un staff de un negocio específico, limpiamos sus múltiples asignaciones.
         userPayload.businessIds = []; 
     }
 
@@ -275,8 +275,8 @@ export default function BusinessStaffPage() {
     }
     setIsSubmitting(true);
     try {
-      // NOTE: Esto solo elimina el perfil en Firestore, no la cuenta en Firebase Auth.
-      // Una implementación más robusta usaría una Cloud Function para la eliminación completa.
+      // NOTE: This only deletes the Firestore profile, not the Firebase Auth account.
+      // A more robust implementation would use a Cloud Function for complete deletion.
       await deleteDoc(doc(db, "platformUsers", user.uid));
       toast({ title: "Perfil de Usuario Eliminado", description: `El perfil de "${user.name}" ha sido eliminado.`, variant: "destructive" });
       fetchStaffMembers();
@@ -298,7 +298,7 @@ export default function BusinessStaffPage() {
 
     if (filteredStaff.length === 0) {
       return (
-        <div className="text-center h-24 flex items-center justify-center">
+        <div className="md:hidden text-center h-24 flex items-center justify-center">
           <p>No se encontraron miembros del personal.</p>
         </div>
       );
@@ -500,7 +500,7 @@ export default function BusinessStaffPage() {
           <PlatformUserForm 
             user={editingUser || undefined}
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
-            businesses={[]} // No se usa en este flujo, se asigna el businessId del admin actual
+            businesses={[]} // Not used in this flow, businessId is taken from current admin
             allowedRoles={['staff', 'lector_qr']}
             onSubmit={handleCreateOrEditUser}
             onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
