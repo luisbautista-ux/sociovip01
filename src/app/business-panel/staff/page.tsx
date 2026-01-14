@@ -42,10 +42,8 @@ const DniEntrySchema = z.object({
         if (!/^\d{8}$/.test(data.docNumber)) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El DNI debe contener exactamente 8 dígitos numéricos.", path: ['docNumber'] });
         }
-    } else if (data.docType === 'ce') {
-        if (!/^\d{10,20}$/.test(data.docNumber)) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.", path: ['docNumber'] });
-        }
+    } else if (data.docType === 'ce' && !/^\d{10,20}$/.test(data.docNumber)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.", path: ['docNumber'] });
     }
 });
 type DniEntryValues = z.infer<typeof DniEntrySchema>;
@@ -160,32 +158,39 @@ export default function BusinessStaffPage() {
     const docNumberCleaned = values.docNumber.trim();
     setIsSubmitting(true);
     
-    const result = await checkDniExists(docNumberCleaned);
-    
-    setIsSubmitting(false);
-    
-    let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-    
-    if (result.exists) {
-        if (result.userType === 'PlatformUser' && result.platformUserData) {
-            setExistingPlatformUserToEdit(result.platformUserData);
-            initialData.existingPlatformUser = result.platformUserData;
-            setShowDniEntryModal(false);
-            setShowDniIsPlatformUserAlert(true); 
-            return;
-        } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
-            initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
-            initialData.email = result.socioVipData.email;
-            initialData.preExistingUserType = 'SocioVipMember';
-        } else if (result.userType === 'QrClient' && result.qrClientData) {
-            initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
-            initialData.preExistingUserType = 'QrClient';
+    try {
+        const result = await checkDniExists(docNumberCleaned);
+        
+        let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
+        
+        if (result.exists) {
+            if (result.userType === 'PlatformUser' && result.platformUserData) {
+                setExistingPlatformUserToEdit(result.platformUserData);
+                initialData.existingPlatformUser = result.platformUserData;
+                setShowDniIsPlatformUserAlert(true); 
+            } else {
+                if (result.userType === 'SocioVipMember' && result.socioVipData) {
+                    initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
+                    initialData.email = result.socioVipData.email;
+                    initialData.preExistingUserType = 'SocioVipMember';
+                } else if (result.userType === 'QrClient' && result.qrClientData) {
+                    initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
+                    initialData.preExistingUserType = 'QrClient';
+                }
+                setVerifiedDniResult(initialData);
+                setShowUserFormModal(true);
+            }
+        } else {
+            // DNI is completely new
+            setVerifiedDniResult(initialData);
+            setShowUserFormModal(true);
         }
+    } catch (error: any) {
+        toast({ title: "Error de Verificación", description: "No se pudo completar la búsqueda. " + error.message, variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+        setShowDniEntryModal(false);
     }
-    
-    setVerifiedDniResult(initialData);
-    setShowDniEntryModal(false);
-    setShowUserFormModal(true);
   };
   
   const handleReassignRole = () => {
@@ -477,7 +482,7 @@ export default function BusinessStaffPage() {
               <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
                 <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel>
                     <FormControl>
-                        <RadioGroup onValueChange={(value) => { field.onChange(value); dniEntryForm.setValue('docNumber', ''); form.clearErrors('docNumber'); }} defaultValue={field.value} className="grid grid-cols-2 gap-2">
+                        <RadioGroup onValueChange={(value) => { field.onChange(value); dniEntryForm.setValue('docNumber', ''); dniEntryForm.clearErrors('docNumber'); }} defaultValue={field.value} className="grid grid-cols-2 gap-2">
                             <FormItem className="flex items-center space-x-3 space-y-0">
                                 <Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}>
                                     <FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI
