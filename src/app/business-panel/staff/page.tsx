@@ -2,7 +2,6 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
 import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch, ArrowRight } from "lucide-react";
@@ -183,7 +182,6 @@ export default function BusinessStaffPage() {
                 setShowUserFormModal(true);
             }
         } else {
-            // If DNI doesn't exist in our DB, consult the external API
             if (values.docType === 'dni') {
                 try {
                     const response = await fetch('/api/public/consult-document', {
@@ -276,7 +274,6 @@ export default function BusinessStaffPage() {
               setIsSubmitting(false);
           });
     } else {
-        // Handle creation via Google
         try {
             const result = await signupWithGoogle('staff', {
                 dni: data.dni,
