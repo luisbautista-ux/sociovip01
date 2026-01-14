@@ -27,9 +27,10 @@ import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "fi
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { DialogFooter } from "@/components/ui/dialog";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { errorEmitter } from "@/lib/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/lib/errors";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
 const DniEntrySchema = z.object({
@@ -556,3 +557,5 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
+    
