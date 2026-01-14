@@ -159,31 +159,31 @@ export default function BusinessStaffPage() {
 
     try {
         const result = await checkDniExists(docNumberCleaned);
-        
         let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-        
+
         if (result.exists) {
             if (result.userType === 'PlatformUser' && result.platformUserData) {
                 setExistingPlatformUserToEdit(result.platformUserData);
                 initialData.existingPlatformUser = result.platformUserData;
-                setShowDniIsPlatformUserAlert(true); 
+                setShowDniIsPlatformUserAlert(true);
             } else {
                 if (result.userType === 'SocioVipMember' && result.socioVipData) {
                     initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
                     initialData.email = result.socioVipData.email;
                     initialData.phone = result.socioVipData.phone;
-                    initialData.dob = anyToDate(result.socioVipData.dob) || undefined;
+                    initialData.dob = anyToDate(result.socioVipData.dob) ?? undefined;
                     initialData.preExistingUserType = 'SocioVipMember';
                 } else if (result.userType === 'QrClient' && result.qrClientData) {
                     initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
                     initialData.phone = result.qrClientData.phone;
-                    initialData.dob = anyToDate(result.qrClientData.dob) || undefined;
+                    initialData.dob = anyToDate(result.qrClientData.dob) ?? undefined;
                     initialData.preExistingUserType = 'QrClient';
                 }
                 setVerifiedDniResult(initialData);
                 setShowUserFormModal(true);
             }
         } else {
+            // If DNI doesn't exist in our DB, consult the external API
             if (values.docType === 'dni') {
                 try {
                     const response = await fetch('/api/public/consult-document', {
@@ -231,51 +231,80 @@ export default function BusinessStaffPage() {
       return;
     }
     
-    // Logic to update an existing user
     setIsSubmitting(true);
-    const userRef = doc(db, "platformUsers", data.uid!);
-    const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
     
-    const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'lector_qr'] : ['business_admin', 'staff', 'lector_qr'];
-    const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
-    
-    // Prevent admin from removing their own management role
-    if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
-      toast({ title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive" });
-      setIsSubmitting(false);
-      return;
-    }
-    
-    const userPayload: Partial<PlatformUser> = {
-      name: data.name,
-      roles: finalRoles,
-      businessId: isReassigning ? currentBusinessId : data.businessId,
-    };
-
-    if(isReassigning) {
-        userPayload.businessIds = []; 
-    }
-
-    updateDoc(userRef, userPayload)
-      .then(() => {
-          toast({ title: isReassigning ? "Usuario Reasignado" : "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
-          setShowDniEntryModal(false);
-          setShowUserFormModal(false);
-          setEditingUser(null);
-          setVerifiedDniResult(null);
-          fetchStaffMembers();
-      })
-      .catch(async (serverError) => {
-          const permissionError = new FirestorePermissionError({
-              path: userRef.path,
-              operation: 'update',
-              requestResourceData: userPayload,
-          } as SecurityRuleContext);
-          errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
+    if (isEditing) {
+        const userRef = doc(db, "platformUsers", data.uid!);
+        const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
+        
+        const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'lector_qr'] : ['business_admin', 'staff', 'lector_qr'];
+        const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
+        
+        if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
+          toast({ title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive" });
           setIsSubmitting(false);
-      });
+          return;
+        }
+        
+        const userPayload: Partial<PlatformUser> = {
+          name: data.name,
+          roles: finalRoles,
+          businessId: isReassigning ? currentBusinessId : data.businessId,
+        };
+
+        if(isReassigning) {
+            userPayload.businessIds = []; 
+        }
+
+        updateDoc(userRef, userPayload)
+          .then(() => {
+              toast({ title: isReassigning ? "Usuario Reasignado" : "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+              setShowUserFormModal(false);
+              setEditingUser(null);
+              setVerifiedDniResult(null);
+              fetchStaffMembers();
+          })
+          .catch(async (serverError) => {
+              const permissionError = new FirestorePermissionError({
+                  path: userRef.path,
+                  operation: 'update',
+                  requestResourceData: userPayload,
+              } as SecurityRuleContext);
+              errorEmitter.emit('permission-error', permissionError);
+          })
+          .finally(() => {
+              setIsSubmitting(false);
+          });
+    } else {
+        // Handle creation via Google
+        try {
+            const result = await signupWithGoogle('staff', {
+                dni: data.dni,
+                phone: data.phone,
+                dob: data.dob,
+                overrideName: data.name,
+            });
+
+            if ("user" in result) {
+                toast({ title: "¡Usuario Creado y Vinculado!", description: `${data.name} ahora es parte del equipo.` });
+                
+                const userRef = doc(db, "platformUsers", result.user.uid);
+                await updateDoc(userRef, {
+                    businessId: currentBusinessId,
+                    roles: data.roles.length > 0 ? data.roles : ['staff'],
+                });
+                
+                setShowUserFormModal(false);
+                fetchStaffMembers();
+            } else {
+                throw new Error(result.message || "No se pudo completar el registro con Google.");
+            }
+        } catch (error: any) {
+            toast({ title: "Error de Registro", description: error.message, variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
   };
 
   const handleDeleteUser = async (user: PlatformUser) => {
@@ -286,8 +315,6 @@ export default function BusinessStaffPage() {
     }
     setIsSubmitting(true);
     try {
-      // NOTE: This only deletes the Firestore profile, not the Firebase Auth account.
-      // A more robust implementation would use a Cloud Function for complete deletion.
       await deleteDoc(doc(db, "platformUsers", user.uid));
       toast({ title: "Perfil de Usuario Eliminado", description: `El perfil de "${user.name}" ha sido eliminado.`, variant: "destructive" });
       fetchStaffMembers();
@@ -297,8 +324,15 @@ export default function BusinessStaffPage() {
       setIsSubmitting(false);
     }
   };
-
+  const { signupWithGoogle } = useAuth();
   const PromoterMobileCards = ({ filteredStaff }: { filteredStaff: PlatformUser[] }) => {
+    if (filteredStaff.length === 0) {
+      return (
+        <div className="md:hidden text-center h-24 flex items-center justify-center">
+            <p>No se encontró personal.</p>
+        </div>
+      );
+    }
     return (
       <div className="md:hidden space-y-4">
         {filteredStaff.map((staff) => (
@@ -495,7 +529,7 @@ export default function BusinessStaffPage() {
           <PlatformUserForm 
             user={editingUser || undefined}
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
-            businesses={[]} // Not used in this flow, businessId is taken from current admin
+            businesses={[]}
             allowedRoles={['staff', 'lector_qr']}
             onSubmit={handleCreateOrEditUser}
             onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
@@ -524,135 +558,4 @@ export default function BusinessStaffPage() {
       </AlertDialog>
     </div>
   );
-}
-
-```
-</change>
-  <change>
-    <file>src/app/api/public/consult-document/route.ts</file>
-    <content><![CDATA[
-// src/app/api/public/consult-document/route.ts
-import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { adminDb } from '@/lib/firebase/firebaseAdmin';
-
-const ConsultSchema = z.object({
-  dni: z.string().min(8).max(15),
-  docType: z.enum(['dni', 'ce']),
-});
-
-async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; fechaNacimiento: string | null }> {
-    let result = {
-        nombreCompleto: "",
-        nombres: null as string | null,
-        apellidoPaterno: null as string | null,
-        apellidoMaterno: null as string | null,
-        fechaNacimiento: null as string | null,
-    };
-
-    try {
-        const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
-        const formNombres = new URLSearchParams();
-        formNombres.append('dni4', dni);
-        formNombres.append('action', 'buscar_nombres');
-        formNombres.append('security', '6b5762d689');
-
-        const responseNombres = await fetch(endpointNombres, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formNombres.toString(),
-        });
-        
-        if (responseNombres.ok) {
-            const dataNombres = await responseNombres.json();
-            if (dataNombres.success && dataNombres.data?.message) {
-                const lines = dataNombres.data.message.split('\n');
-                lines.forEach((line: string) => {
-                    if (line.startsWith("Nombres:")) result.nombres = line.replace("Nombres:", "").trim();
-                    else if (line.startsWith("Apellido Paterno:")) result.apellidoPaterno = line.replace("Apellido Paterno:", "").trim();
-                    else if (line.startsWith("Apellido Materno:")) result.apellidoMaterno = line.replace("Apellido Materno:", "").trim();
-                });
-            }
-        }
-
-        const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
-        const formFecha = new URLSearchParams();
-        formFecha.append('dni', dni);
-        formFecha.append('action', 'buscar_fecha');
-        formFecha.append('security', 'd65c3ae72d');
-
-        const responseFecha = await fetch(endpointFecha, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formFecha.toString(),
-        });
-
-        if (responseFecha.ok) {
-            const dataFecha = await responseFecha.json();
-            if (dataFecha.success && dataFecha.data?.message) {
-                const lines = dataFecha.data.message.split('\n');
-                lines.forEach((line: string) => {
-                    if (line.startsWith("Fecha de Nacimiento:")) {
-                        result.fechaNacimiento = line.replace("Fecha de Nacimiento:", "").trim();
-                    }
-                });
-            }
-        }
-
-        result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
-
-    } catch (e) {
-        console.error("Error fetching from external DNI API:", e);
-    }
-    
-    return result;
-}
-
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const validation = ConsultSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json({ error: 'Datos inválidos.', details: validation.error.flatten() }, { status: 400 });
-    }
-    const { dni, docType } = validation.data;
-
-    // 1. Check if user is already a platform user (the most important check)
-    const platformUserQuery = await adminDb.collection('platformUsers').where('dni', '==', dni).limit(1).get();
-    if (!platformUserQuery.empty) {
-        return NextResponse.json({ isPlatformUser: true, source: 'internal' });
-    }
-
-    // 2. Check internal DBs first (QrClient, SocioVip)
-    const collectionsToSearch = ['qrClients', 'socioVipMembers'];
-    for (const collectionName of collectionsToSearch) {
-      const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', dni).limit(1).get();
-      if (!querySnapshot.empty) {
-        const data = querySnapshot.docs[0].data();
-        const dobDate = data.dob?.toDate?.();
-        return NextResponse.json({ 
-            nombreCompleto: `${data.name} ${data.surname}`.trim(),
-            phone: data.phone || null,
-            fechaNacimiento: dobDate ? dobDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }) : null,
-            source: 'internal'
-        });
-      }
-    }
-
-    // 3. If it's a DNI and not found, consult external API
-    if (docType === 'dni') {
-      const externalData = await consultExternalDniApi(dni);
-      if (externalData.nombreCompleto) {
-        return NextResponse.json({ ...externalData, source: 'external' });
-      }
-    }
-
-    // 4. If not found anywhere
-    return NextResponse.json({ source: 'not_found' });
-
-  } catch (error: any) {
-    console.error("API Route (consult-document): Error:", error);
-    return NextResponse.json({ error: 'Error interno del servidor.' }, { status: 500 });
-  }
 }

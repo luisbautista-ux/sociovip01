@@ -1,3 +1,4 @@
+
 // src/app/api/public/consult-document/route.ts
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -67,57 +68,59 @@ async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: str
         }
 
         result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
-
+    
     } catch (e) {
         console.error("Error fetching from external DNI API:", e);
     }
     
-    return result;
+    return { nombreCompleto: result.nombreCompleto, fechaNacimiento: result.fechaNacimiento };
 }
-
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const validation = ConsultSchema.safeParse(body);
+
     if (!validation.success) {
       return NextResponse.json({ error: 'Datos inválidos.', details: validation.error.flatten() }, { status: 400 });
     }
+    
     const { dni, docType } = validation.data;
 
-    // 1. Check if user is already a platform user (the most important check)
-    const platformUserQuery = await adminDb.collection('platformUsers').where('dni', '==', dni).limit(1).get();
-    if (!platformUserQuery.empty) {
-        return NextResponse.json({ isPlatformUser: true, source: 'internal' });
-    }
-
-    // 2. Check internal DBs first (QrClient, SocioVip)
-    const collectionsToSearch = ['qrClients', 'socioVipMembers'];
+    const collectionsToSearch = ['platformUsers', 'socioVipMembers', 'qrClients'];
     for (const collectionName of collectionsToSearch) {
-      const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', dni).limit(1).get();
-      if (!querySnapshot.empty) {
-        const data = querySnapshot.docs[0].data();
-        const dobDate = data.dob?.toDate?.();
-        return NextResponse.json({ 
-            nombreCompleto: `${data.name} ${data.surname}`.trim(),
-            phone: data.phone || null,
-            fechaNacimiento: dobDate ? dobDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }) : null,
-            source: 'internal'
-        });
-      }
+        const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', dni).limit(1).get();
+        if (!querySnapshot.empty) {
+            const data = querySnapshot.docs[0].data();
+            const fullName = `${data.name || ''} ${data.surname || ''}`.trim();
+            
+            const dob = data.dob?.toDate ? data.dob.toDate() : (data.dob ? new Date(data.dob) : null);
+            const formattedDob = dob ? `${dob.getDate().toString().padStart(2,'0')}/${(dob.getMonth() + 1).toString().padStart(2, '0')}/${dob.getFullYear()}` : null;
+            
+            return NextResponse.json({ 
+                isPlatformUser: true, 
+                source: 'internal', 
+                nombreCompleto: fullName,
+                phone: data.phone || null,
+                fechaNacimiento: formattedDob
+            });
+        }
     }
 
-    // 3. If it's a DNI and not found, consult external API
     if (docType === 'dni') {
-      const externalData = await consultExternalDniApi(dni);
-      if (externalData.nombreCompleto) {
-        return NextResponse.json({ ...externalData, source: 'external' });
-      }
+        const externalData = await consultExternalDniApi(dni);
+        if (externalData.nombreCompleto) {
+            return NextResponse.json({ 
+                isPlatformUser: false, 
+                source: 'external', 
+                nombreCompleto: externalData.nombreCompleto,
+                fechaNacimiento: externalData.fechaNacimiento,
+                phone: null,
+            });
+        }
     }
 
-    // 4. If not found anywhere
-    return NextResponse.json({ source: 'not_found' });
-
+    return NextResponse.json({ isPlatformUser: false, source: 'not_found', nombreCompleto: null, fechaNacimiento: null, phone: null });
   } catch (error: any) {
     console.error("API Route (consult-document): Error:", error);
     return NextResponse.json({ error: 'Error interno del servidor.' }, { status: 500 });
