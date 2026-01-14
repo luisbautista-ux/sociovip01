@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
 import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch, ArrowRight } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as ShadcnAlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as ShadcnAlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -156,7 +156,7 @@ export default function BusinessStaffPage() {
     if (isSubmitting) return;
     const docNumberCleaned = values.docNumber.trim();
     setIsSubmitting(true);
-    
+
     try {
         const result = await checkDniExists(docNumberCleaned);
         
@@ -184,7 +184,28 @@ export default function BusinessStaffPage() {
                 setShowUserFormModal(true);
             }
         } else {
-            // DNI is completely new
+            if (values.docType === 'dni') {
+                try {
+                    const response = await fetch('/api/public/consult-document', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dni: docNumberCleaned, docType: 'dni' }),
+                    });
+                    const data = await response.json();
+                    if (response.ok && data.nombreCompleto) {
+                        initialData.name = data.nombreCompleto;
+                        if(data.fechaNacimiento) {
+                             const parsedDate = parse(data.fechaNacimiento, 'dd/MM/yyyy', new Date());
+                             if (!isNaN(parsedDate.getTime())) {
+                                initialData.dob = parsedDate;
+                             }
+                        }
+                        toast({ title: "Datos Encontrados", description: "Hemos autocompletado el nombre y fecha de nacimiento." });
+                    }
+                } catch (apiError) {
+                    console.warn("API de consulta de DNI no disponible, se procederá con el registro manual.");
+                }
+            }
             setVerifiedDniResult(initialData);
             setShowUserFormModal(true);
         }
@@ -194,7 +215,7 @@ export default function BusinessStaffPage() {
         setIsSubmitting(false);
         setShowDniEntryModal(false);
     }
-  };
+};
   
   const handleReassignRole = () => {
       if (existingPlatformUserToEdit) {
@@ -210,16 +231,6 @@ export default function BusinessStaffPage() {
       return;
     }
     
-    // If we are creating (not editing), just close the modal and refetch.
-    if (!isEditing) {
-        setShowDniEntryModal(false);
-        setShowUserFormModal(false);
-        setEditingUser(null);
-        setVerifiedDniResult(null);
-        fetchStaffMembers(); // Refetch to show the new user
-        return;
-    }
-
     // Logic to update an existing user
     setIsSubmitting(true);
     const userRef = doc(db, "platformUsers", data.uid!);
@@ -288,22 +299,6 @@ export default function BusinessStaffPage() {
   };
 
   const PromoterMobileCards = ({ filteredStaff }: { filteredStaff: PlatformUser[] }) => {
-    if (isLoading) {
-      return (
-        <div className="flex justify-center items-center h-60">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        </div>
-      );
-    }
-
-    if (filteredStaff.length === 0) {
-      return (
-        <div className="md:hidden text-center h-24 flex items-center justify-center">
-          <p>No se encontraron miembros del personal.</p>
-        </div>
-      );
-    }
-
     return (
       <div className="md:hidden space-y-4">
         {filteredStaff.map((staff) => (
@@ -352,10 +347,10 @@ export default function BusinessStaffPage() {
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><ShadcnAlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription></AlertDialogHeader>
-                      <ShadcnAlertDialogFooter>
+                      <AlertDialogFooter>
                         <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                         <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
-                      </ShadcnAlertDialogFooter>
+                      </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 </DropdownMenuContent>
@@ -439,10 +434,10 @@ export default function BusinessStaffPage() {
                           <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><ShadcnAlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription></AlertDialogHeader>
-                            <ShadcnAlertDialogFooter>
+                            <AlertDialogFooter>
                               <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
-                            </ShadcnAlertDialogFooter>
+                            </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                       </TableCell>
@@ -519,16 +514,145 @@ export default function BusinessStaffPage() {
                     ¿Deseas reasignarlo a tu negocio con un nuevo rol?
                 </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
-            <ShadcnAlertDialogFooter>
+            <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={handleReassignRole} className="bg-primary hover:bg-primary/90">
                     <GitBranch className="mr-2 h-4 w-4"/> Confirmar y Reasignar
                 </AlertDialogAction>
-            </ShadcnAlertDialogFooter>
+            </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
 
+```
+</change>
+  <change>
+    <file>src/app/api/public/consult-document/route.ts</file>
+    <content><![CDATA[
+// src/app/api/public/consult-document/route.ts
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { adminDb } from '@/lib/firebase/firebaseAdmin';
+
+const ConsultSchema = z.object({
+  dni: z.string().min(8).max(15),
+  docType: z.enum(['dni', 'ce']),
+});
+
+async function consultExternalDniApi(dni: string): Promise<{ nombreCompleto: string; fechaNacimiento: string | null }> {
+    let result = {
+        nombreCompleto: "",
+        nombres: null as string | null,
+        apellidoPaterno: null as string | null,
+        apellidoMaterno: null as string | null,
+        fechaNacimiento: null as string | null,
+    };
+
+    try {
+        const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
+        const formNombres = new URLSearchParams();
+        formNombres.append('dni4', dni);
+        formNombres.append('action', 'buscar_nombres');
+        formNombres.append('security', '6b5762d689');
+
+        const responseNombres = await fetch(endpointNombres, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formNombres.toString(),
+        });
+        
+        if (responseNombres.ok) {
+            const dataNombres = await responseNombres.json();
+            if (dataNombres.success && dataNombres.data?.message) {
+                const lines = dataNombres.data.message.split('\n');
+                lines.forEach((line: string) => {
+                    if (line.startsWith("Nombres:")) result.nombres = line.replace("Nombres:", "").trim();
+                    else if (line.startsWith("Apellido Paterno:")) result.apellidoPaterno = line.replace("Apellido Paterno:", "").trim();
+                    else if (line.startsWith("Apellido Materno:")) result.apellidoMaterno = line.replace("Apellido Materno:", "").trim();
+                });
+            }
+        }
+
+        const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
+        const formFecha = new URLSearchParams();
+        formFecha.append('dni', dni);
+        formFecha.append('action', 'buscar_fecha');
+        formFecha.append('security', 'd65c3ae72d');
+
+        const responseFecha = await fetch(endpointFecha, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formFecha.toString(),
+        });
+
+        if (responseFecha.ok) {
+            const dataFecha = await responseFecha.json();
+            if (dataFecha.success && dataFecha.data?.message) {
+                const lines = dataFecha.data.message.split('\n');
+                lines.forEach((line: string) => {
+                    if (line.startsWith("Fecha de Nacimiento:")) {
+                        result.fechaNacimiento = line.replace("Fecha de Nacimiento:", "").trim();
+                    }
+                });
+            }
+        }
+
+        result.nombreCompleto = `${result.nombres || ''} ${result.apellidoPaterno || ''} ${result.apellidoMaterno || ''}`.trim().replace(/\s+/g, ' ');
+
+    } catch (e) {
+        console.error("Error fetching from external DNI API:", e);
+    }
     
+    return result;
+}
+
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const validation = ConsultSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Datos inválidos.', details: validation.error.flatten() }, { status: 400 });
+    }
+    const { dni, docType } = validation.data;
+
+    // 1. Check if user is already a platform user (the most important check)
+    const platformUserQuery = await adminDb.collection('platformUsers').where('dni', '==', dni).limit(1).get();
+    if (!platformUserQuery.empty) {
+        return NextResponse.json({ isPlatformUser: true, source: 'internal' });
+    }
+
+    // 2. Check internal DBs first (QrClient, SocioVip)
+    const collectionsToSearch = ['qrClients', 'socioVipMembers'];
+    for (const collectionName of collectionsToSearch) {
+      const querySnapshot = await adminDb.collection(collectionName).where('dni', '==', dni).limit(1).get();
+      if (!querySnapshot.empty) {
+        const data = querySnapshot.docs[0].data();
+        const dobDate = data.dob?.toDate?.();
+        return NextResponse.json({ 
+            nombreCompleto: `${data.name} ${data.surname}`.trim(),
+            phone: data.phone || null,
+            fechaNacimiento: dobDate ? dobDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }) : null,
+            source: 'internal'
+        });
+      }
+    }
+
+    // 3. If it's a DNI and not found, consult external API
+    if (docType === 'dni') {
+      const externalData = await consultExternalDniApi(dni);
+      if (externalData.nombreCompleto) {
+        return NextResponse.json({ ...externalData, source: 'external' });
+      }
+    }
+
+    // 4. If not found anywhere
+    return NextResponse.json({ source: 'not_found' });
+
+  } catch (error: any) {
+    console.error("API Route (consult-document): Error:", error);
+    return NextResponse.json({ error: 'Error interno del servidor.' }, { status: 500 });
+  }
+}
