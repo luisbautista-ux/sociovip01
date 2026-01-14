@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info, Loader2, CalendarIcon, UserPlus } from "lucide-react";
+import { Info, Loader2, CalendarIcon } from "lucide-react";
 import { DialogFooter } from "@/components/ui/dialog";
 import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ALL_PLATFORM_USER_ROLES, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { GoogleIcon } from "@/components/icons";
+import { toast } from "@/hooks/use-toast";
 
 
 const platformUserFormSchema = z.object({
@@ -101,8 +102,8 @@ export function PlatformUserForm({
       name: user?.name || initialDataForCreation?.name || "",
       dni: user?.dni || initialDataForCreation?.dni || "",
       email: user?.email || initialDataForCreation?.email || "",
-      phone: user?.phone || initialDataForCreation?.phone || "",
-      dob: user?.dob ? anyToDate(user.dob) : initialDataForCreation?.dob ? anyToDate(initialDataForCreation.dob) : undefined,
+      phone: user?.phone || (initialDataForCreation as any)?.phone || "",
+      dob: user?.dob ? anyToDate(user.dob) : (initialDataForCreation as any)?.dob ? anyToDate((initialDataForCreation as any).dob) : undefined,
       password: "",
       roles: user?.roles || [],
       businessId: user?.businessId || null,
@@ -165,7 +166,7 @@ export function PlatformUserForm({
              <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
                 <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <AlertTitle className="text-blue-700 dark:text-blue-300">
-                  DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation.preExistingUserType]}
+                  DNI Encontrado como {PLATFORM_USER_ROLE_TRANSLATIONS[initialDataForCreation.preExistingUserType as keyof typeof PLATFORM_USER_ROLE_TRANSLATIONS]}
                 </AlertTitle>
                 <AlertDescription className="text-blue-600 dark:text-blue-400">
                   Este DNI pertenece a un {initialDataForCreation.preExistingUserType === 'QrClient' ? 'Cliente QR' : 'Usuario de Plataforma'} existente.
@@ -326,8 +327,5 @@ function anyToDate(value: any): Date | null {
   }
   return null;
 }
-function toast(arg0: { title: string; description: string; variant: "destructive"; }) {
-    throw new Error("Function not implemented.");
-}
 
-```
+    
