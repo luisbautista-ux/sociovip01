@@ -31,7 +31,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { errorEmitter } from "@/lib/error-emitter";
-import { FirestorePermissionError } from "@/lib/errors";
+import { FirestorePermissionError, type SecurityRuleContext } from "@/lib/errors";
 
 
 const DniEntrySchema = z.object({
@@ -96,7 +96,7 @@ export default function BusinessStaffPage() {
       const fetchedStaff: PlatformUser[] = [];
       querySnapshot.forEach(docSnap => {
         const data = docSnap.data() as Omit<PlatformUser, 'id'>;
-        if (data.roles.includes('staff') || data.roles.includes('host') || data.roles.includes('business_admin') || data.roles.includes('lector_qr')) {
+        if (data.roles.includes('staff') || data.roles.includes('lector_qr') || data.roles.includes('business_admin')) {
              fetchedStaff.push({ id: docSnap.id, uid: docSnap.id, ...data });
         }
       });
@@ -204,10 +204,9 @@ export default function BusinessStaffPage() {
     setIsSubmitting(true);
 
     if (isEditing && data.uid) {
-      // --- EDITING LOGIC (INCLUDING REASSIGNMENT) ---
       const userRef = doc(db, "platformUsers", data.uid);
       const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
-      const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'host', 'lector_qr'] : ['business_admin', 'staff', 'host', 'lector_qr'];
+      const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'lector_qr'] : ['business_admin', 'staff', 'lector_qr'];
       const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
       
       if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
@@ -235,13 +234,12 @@ export default function BusinessStaffPage() {
             setVerifiedDniResult(null);
             fetchStaffMembers();
         })
-        .catch(async (error) => {
-            console.error("Firebase update error:", error);
+        .catch(async (serverError) => {
             const permissionError = new FirestorePermissionError({
                 path: userRef.path,
                 operation: 'update',
                 requestResourceData: userPayload,
-            });
+            } as SecurityRuleContext);
             errorEmitter.emit('permission-error', permissionError);
         })
         .finally(() => {
@@ -249,16 +247,15 @@ export default function BusinessStaffPage() {
         });
     
     } else {
-      // --- CREATION LOGIC ---
       if (!data.email || !data.password) {
         toast({ title: "Error", description: "El email y la contraseña son requeridos para crear un nuevo usuario.", variant: "destructive"});
         setIsSubmitting(false);
         return;
       }
-      const rolesAllowed: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
+      const rolesAllowed: PlatformUserRole[] = ['staff', 'lector_qr'];
       const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
       if (finalRoles.length === 0) {
-        toast({ title: "Error de Rol", description: "Rol no válido. Solo puedes asignar 'Staff', 'Anfitrión' o 'Lector QR'.", variant: "destructive"});
+        toast({ title: "Error de Rol", description: "Rol no válido. Solo puedes asignar 'Staff' o 'Lector QR'.", variant: "destructive"});
         setIsSubmitting(false);
         return;
       }
@@ -508,13 +505,13 @@ export default function BusinessStaffPage() {
         <UIDialogContent className="sm:max-w-lg">
           <UIDialogHeader>
             <UIDialogTitle className="font-headline">{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
-            <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los detalles para crear el usuario."}</UIDialogDescription>
+            <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los datos para crear el usuario."}</UIDialogDescription>
           </UIDialogHeader>
           <PlatformUserForm 
             user={editingUser || undefined}
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
             businesses={[]}
-            allowedRoles={['staff', 'host', 'lector_qr']}
+            allowedRoles={['staff', 'lector_qr']}
             onSubmit={(data, isEditing) => handleCreateOrEditUser(data, isEditing)}
             onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}
@@ -530,8 +527,6 @@ export default function BusinessStaffPage() {
                     El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-semibold">{(existingPlatformUserToEdit?.roles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
                     <br/><br/>
                     ¿Deseas reasignarlo a tu negocio con un nuevo rol?
-                    <br/><br/>
-                    <span className="font-bold text-destructive">Advertencia:</span> Esta acción puede cambiar su rol actual y su vinculación con otros negocios.
                 </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
             <ShadcnAlertDialogFooter>

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -137,7 +138,7 @@ export default function LectorQrLayout({
     );
   }
 
-  const hasAccess = userProfile && (userProfile.roles?.includes('lector_qr') || userProfile.roles?.includes('host') || userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff'));
+  const hasAccess = userProfile && (userProfile.roles?.includes('lector_qr') || userProfile.roles?.includes('business_admin') || userProfile.roles?.includes('staff'));
 
   if (!hasAccess || !userProfile.businessId) {
     return (

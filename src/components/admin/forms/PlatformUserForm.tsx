@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -65,7 +66,7 @@ export function PlatformUserForm({
   const { userProfile: currentUserProfile } = useAuth();
   const isSuperAdminView = currentUserProfile?.roles.includes('superadmin') || false;
 
-  const rolesToDisplay = isSuperAdminView ? ALL_PLATFORM_USER_ROLES : allowedRoles;
+  const rolesToDisplay = (isSuperAdminView ? ALL_PLATFORM_USER_ROLES : allowedRoles).filter(role => role !== 'host');
   
   // En SuperAdminView, ahora se usa RadioGroup, que es single selection.
   const isSingleRoleSelection = true; 
@@ -181,7 +182,7 @@ export function PlatformUserForm({
             name="businessId"
             render={() => (
               <FormItem>
-                <FormLabel>Negocio Principal (Para Staff/Admin/Host) <span className="text-destructive">*</span></FormLabel>
+                <FormLabel>Negocio Principal (Para Staff/Admin/Lector) <span className="text-destructive">*</span></FormLabel>
                 <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded-md">
                   {businesses.map((biz) => (
                     <FormField
@@ -204,7 +205,7 @@ export function PlatformUserForm({
                     />
                   ))}
                 </div>
-                <FormDescription className="text-xs">Negocio al que el Staff/Host/Admin pertenece.</FormDescription>
+                <FormDescription className="text-xs">Negocio al que el Staff/Lector/Admin pertenece.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
