@@ -2,6 +2,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
 import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch, ArrowRight } from "lucide-react";
@@ -382,7 +383,7 @@ export default function BusinessStaffPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline">Miembros del Personal</CardTitle>
-          <CardDescription>Administra los usuarios staff, anfitriones y lectores QR de tu negocio.</CardDescription>
+          <CardDescription>Administra los usuarios staff y lectores QR de tu negocio.</CardDescription>
            <div className="relative mt-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -529,3 +530,5 @@ export default function BusinessStaffPage() {
     </div>
   );
 }
+
+    
