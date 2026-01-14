@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,9 +83,9 @@ export function PlatformUserForm({
     resolver: zodResolver(platformUserFormSchema),
     defaultValues: {
       uid: user?.uid || undefined,
-      name: user?.name || initialDataForCreation?.name || "",
+      name: user?.name || "",
       dni: user?.dni || initialDataForCreation?.dni || "",
-      email: user?.email || initialDataForCreation?.email || "",
+      email: user?.email || "",
       phone: user?.phone || "",
       dob: user?.dob ? anyToDate(user.dob) ?? undefined : undefined,
       password: "",
@@ -93,6 +94,22 @@ export function PlatformUserForm({
       businessIds: user?.businessIds || [],
     },
   });
+
+  useEffect(() => {
+    const initialValues = {
+      uid: user?.uid || undefined,
+      name: user?.name || initialDataForCreation?.name || "",
+      dni: user?.dni || initialDataForCreation?.dni || "",
+      email: user?.email || initialDataForCreation?.email || "",
+      phone: user?.phone || initialDataForCreation?.phone || "",
+      dob: user?.dob ? anyToDate(user.dob) : initialDataForCreation?.dob ? anyToDate(initialDataForCreation.dob) : undefined,
+      password: "",
+      roles: user?.roles || [],
+      businessId: user?.businessId || null,
+      businessIds: user?.businessIds || [],
+    };
+    form.reset(initialValues);
+  }, [user, initialDataForCreation, form]);
 
   const selectedRoles = form.watch("roles", user?.roles || []);
   const showBusinessIdSelector = isSuperAdminView && selectedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
@@ -309,6 +326,8 @@ function anyToDate(value: any): Date | null {
   }
   return null;
 }
-function toast(arg0: { title: string; description: string; }) {
+function toast(arg0: { title: string; description: string; variant: "destructive"; }) {
     throw new Error("Function not implemented.");
 }
+
+```
