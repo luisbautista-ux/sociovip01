@@ -1,5 +1,4 @@
 
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES, AVAILABLE_FONTS } from "./constants"; 
@@ -337,7 +336,9 @@ export interface PlatformUserFormData {
   uid?: string; 
   dni: string;
   name: string;
-  email: string;
+  email?: string;
+  phone: string;
+  dob: Date;
   roles: PlatformUserRole[]; 
   businessId?: string | null;
   businessIds?: string[];

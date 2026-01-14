@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,19 +17,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info, Loader2 } from "lucide-react";
+import { Info, Loader2, CalendarIcon, UserPlus } from "lucide-react";
 import { DialogFooter } from "@/components/ui/dialog";
 import type { PlatformUser, PlatformUserFormData, Business, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { PLATFORM_USER_ROLE_TRANSLATIONS, ALL_PLATFORM_USER_ROLES, ROLES_REQUIRING_BUSINESS_ID } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { GoogleIcon } from "@/components/icons";
 
 
 const platformUserFormSchema = z.object({
   uid: z.string().optional(),
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   dni: z.string().min(7, "El DNI/CE debe tener entre 7 y 15 caracteres.").max(15),
-  email: z.string().email("Debe ser un email válido."),
+  email: z.string().email("Debe ser un email válido.").optional().or(z.literal("")),
+  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9."),
+  dob: z.date({ required_error: "La fecha de nacimiento es requerida."}),
   password: z.string().optional(),
   roles: z.array(z.string()).refine((value) => value.length > 0, {
     message: "Debes seleccionar al menos un rol.",
@@ -46,7 +52,7 @@ interface PlatformUserFormProps {
   user?: PlatformUser;
   initialDataForCreation?: InitialDataForPlatformUserCreation;
   businesses: Business[];
-  allowedRoles?: PlatformUserRole[]; // Now optional
+  allowedRoles?: PlatformUserRole[];
   onSubmit: (data: PlatformUserFormData, isEditing: boolean) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -57,49 +63,30 @@ export function PlatformUserForm({
   user,
   initialDataForCreation,
   businesses,
-  allowedRoles = [], // Default to empty array
+  allowedRoles = [],
   onSubmit,
   onCancel,
   isSubmitting = false,
   disableSubmitOverride = false,
 }: PlatformUserFormProps) {
-  const { userProfile: currentUserProfile } = useAuth();
+  const { userProfile: currentUserProfile, signupWithGoogle } = useAuth();
   const isSuperAdminView = currentUserProfile?.roles.includes('superadmin') || false;
 
   const rolesToDisplay = (isSuperAdminView ? ALL_PLATFORM_USER_ROLES : allowedRoles).filter(role => role !== 'host');
   
-  // En SuperAdminView, ahora se usa RadioGroup, que es single selection.
   const isSingleRoleSelection = true; 
 
   const isEditing = !!user;
-  const needsPassword = !isEditing;
   
   const form = useForm<PlatformUserFormValues>({
-    resolver: zodResolver(
-      platformUserFormSchema.refine((data) => {
-        if (needsPassword && (!data.password || data.password.length < 6)) {
-          return false;
-        }
-        return true;
-      }, {
-        message: "La contraseña es requerida y debe tener al menos 6 caracteres.",
-        path: ["password"],
-      }).refine((data) => {
-        const hasRoleRequiringBusiness = data.roles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
-        if (hasRoleRequiringBusiness && !data.businessId && isSuperAdminView) {
-            return false;
-        }
-        return true;
-      }, {
-        message: "Se requiere un ID de negocio para los roles seleccionados.",
-        path: ["businessId"],
-      })
-    ),
+    resolver: zodResolver(platformUserFormSchema),
     defaultValues: {
       uid: user?.uid || undefined,
       name: user?.name || initialDataForCreation?.name || "",
       dni: user?.dni || initialDataForCreation?.dni || "",
       email: user?.email || initialDataForCreation?.email || "",
+      phone: user?.phone || "",
+      dob: user?.dob ? anyToDate(user.dob) ?? undefined : undefined,
       password: "",
       roles: user?.roles || [],
       businessId: user?.businessId || null,
@@ -115,6 +102,44 @@ export function PlatformUserForm({
     onSubmit(values, isEditing);
   };
   
+  const handleGoogleSignup = async () => {
+    const isValid = await form.trigger();
+    if (!isValid) {
+      toast({
+        title: "Campos incompletos",
+        description: "Por favor, revisa y completa todos los campos requeridos antes de continuar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const values = form.getValues();
+    
+    toast({
+        title: "Inicia sesión con Google",
+        description: "Se abrirá una ventana para que el nuevo usuario inicie sesión y vincule su cuenta de Google.",
+    });
+
+    const result = await signupWithGoogle(values.roles[0] as PlatformUserRole, {
+        dni: values.dni,
+        phone: values.phone,
+        dob: values.dob,
+        overrideName: values.name
+    });
+
+    if ("user" in result) {
+        toast({ title: "¡Usuario Creado y Vinculado!", description: `${values.name} ahora es parte del equipo.` });
+        onSubmit(values, false); // Notifica al padre que se completó
+    } else {
+        let errorMessage = "No se pudo completar el registro con Google.";
+        if (result.code === 'auth/popup-closed-by-user') {
+            errorMessage = "La ventana de Google fue cerrada. Inténtalo de nuevo.";
+        } else if (result.code === 'auth/credential-already-in-use') {
+            errorMessage = "Esta cuenta de Google ya está registrada en la plataforma.";
+        }
+        toast({ title: "Error de Vinculación", description: errorMessage, variant: "destructive"});
+    }
+  };
+
 
   return (
     <Form {...form}>
@@ -138,13 +163,31 @@ export function PlatformUserForm({
         <FormField control={form.control} name="name" render={({ field }) => (
             <FormItem><FormLabel>Nombre Completo <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Nombre del usuario" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )}/>
-        <FormField control={form.control} name="email" render={({ field }) => (
-            <FormItem><FormLabel>Email <span className="text-destructive">*</span></FormLabel><FormControl><Input type="email" placeholder="usuario@email.com" {...field} disabled={isSubmitting || isEditing} /></FormControl><FormMessage /></FormItem>
-        )}/>
-        {needsPassword && (
-          <FormField control={form.control} name="password" render={({ field }) => (
-            <FormItem><FormLabel>Contraseña <span className="text-destructive">*</span></FormLabel><FormControl><Input type="password" placeholder="Mínimo 6 caracteres" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-          )}/>
+
+        {!isEditing && (
+            <>
+                <FormField control={form.control} name="phone" render={({ field }) => (
+                    <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} maxLength={9} value={field.value || ""} disabled={isSubmitting}/></FormControl><FormMessage/></FormItem>
+                )}/>
+                <FormField control={form.control} name="dob" render={({ field }) => (
+                    <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <FormControl>
+                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
+                                {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona la fecha</span>}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={1940} toYear={new Date().getFullYear() - 18} disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18))} locale={es} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                        <FormMessage/>
+                    </FormItem>
+                )}/>
+            </>
         )}
         
         <FormField
@@ -236,12 +279,36 @@ export function PlatformUserForm({
         
         <DialogFooter className="pt-6">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableSubmitOverride}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? "Guardar Cambios" : "Crear Usuario"}
-          </Button>
+          
+          {isEditing ? (
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || disableSubmitOverride}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Guardar Cambios
+            </Button>
+          ) : (
+            <Button type="button" onClick={handleGoogleSignup} variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon className="mr-2 h-4 w-4" />}
+                Crear y Vincular con Google
+            </Button>
+          )}
+
         </DialogFooter>
       </form>
     </Form>
   );
+}
+
+// Helper robusto para convertir a fecha
+function anyToDate(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+function toast(arg0: { title: string; description: string; }) {
+    throw new Error("Function not implemented.");
 }
