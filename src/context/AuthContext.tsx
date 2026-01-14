@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { User as FirebaseUser } from "firebase/auth";
@@ -30,6 +31,7 @@ interface ExtraSignupData {
   phone: string;
   dob: Date;
   overrideName?: string;
+  businessId?: string | null; // AÑADIDO para staff/promotor/etc
 }
 
 interface AuthContextType {
@@ -226,7 +228,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               dni: extraData.dni || "",
               phone: extraData.phone || "",
               dob: extraData.dob ? extraData.dob.toISOString() : undefined,
-              businessId: null, // Los clientes no tienen un businessId principal
+              businessId: extraData.businessId || null, // CORREGIDO: Usar el businessId de extraData
               businessIds: [], // Inicia vacío, se llenará con la interacción
             };
             await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp() });
@@ -243,7 +245,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 dni: extraData.dni || "",
                 phone: extraData.phone || "",
                 dob: extraData.dob ? extraData.dob.toISOString() : undefined,
-                businessId: null,
+                businessId: extraData.businessId || null, // CORREGIDO: Usar el businessId de extraData
                 businessIds: [],
                };
                await setDoc(userDocRef, { ...newProfile, lastLogin: serverTimestamp() });
@@ -314,7 +316,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loginWithGoogle,
     linkGoogleAccount,
     linkFacebookAccount,
-  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, linkGoogleAccount, linkFacebookAccount]);
+  }), [currentUser, userProfile, loadingAuth, loadingProfile, login, signupWithGoogle, logout, sendPasswordReset, refreshUserProfile, loginWithGoogle, linkGoogleAccount, linkFacebookAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

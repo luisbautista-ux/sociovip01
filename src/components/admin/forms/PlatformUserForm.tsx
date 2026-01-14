@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -173,9 +174,10 @@ export function PlatformUserForm({
 
     const result = await signupWithGoogle(values.roles[0] as PlatformUserRole, {
         dni: values.dni,
-        phone: values.phone,
+        phone: values.phone || "",
         dob: values.dob,
-        overrideName: values.name
+        overrideName: values.name,
+        businessId: currentUserProfile?.businessId, // CORREGIDO: Pasar el businessId del admin actual
     });
 
     if ("user" in result) {
