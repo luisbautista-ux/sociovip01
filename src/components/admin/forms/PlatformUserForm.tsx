@@ -38,7 +38,7 @@ const platformUserFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
   dni: z.string().min(7, "El DNI/CE debe tener entre 7 y 15 caracteres.").max(15),
   email: z.string().email("Debe ser un email válido.").optional().or(z.literal("")),
-  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9."),
+  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9.").optional().or(z.literal("")),
   dob: z.date({ required_error: "La fecha de nacimiento es requerida."}),
   password: z.string().optional(),
   roles: z.array(z.string()).refine((value) => value.length > 0, {
@@ -60,6 +60,19 @@ interface PlatformUserFormProps {
   isSubmitting?: boolean;
   disableSubmitOverride?: boolean;
 }
+
+// Helper robusto para convertir a fecha
+function anyToDate(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  if (typeof value.toDate === 'function') return value.toDate(); // Firestore Timestamp
+  if (typeof value === 'string' || typeof value === 'number') {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
 
 export function PlatformUserForm({
   user,
@@ -97,19 +110,40 @@ export function PlatformUserForm({
   });
 
   useEffect(() => {
-    const initialValues = {
-      uid: user?.uid || undefined,
-      name: user?.name || initialDataForCreation?.name || "",
-      dni: user?.dni || initialDataForCreation?.dni || "",
-      email: user?.email || initialDataForCreation?.email || "",
-      phone: user?.phone || (initialDataForCreation as any)?.phone || "",
-      dob: user?.dob ? anyToDate(user.dob) : (initialDataForCreation as any)?.dob ? anyToDate((initialDataForCreation as any).dob) : undefined,
-      password: "",
-      roles: user?.roles || [],
-      businessId: user?.businessId || null,
-      businessIds: user?.businessIds || [],
+    const getInitialValues = () => {
+        if (user) { // Modo Edición
+            return {
+                uid: user.uid || undefined,
+                name: user.name || "",
+                dni: user.dni || "",
+                email: user.email || "",
+                phone: user.phone || "",
+                dob: anyToDate(user.dob) ?? undefined,
+                roles: user.roles || [],
+                businessId: user.businessId || null,
+                businessIds: user.businessIds || [],
+            };
+        }
+        if (initialDataForCreation) { // Modo Creación con datos iniciales
+            return {
+                uid: undefined,
+                name: initialDataForCreation.name || "",
+                dni: initialDataForCreation.dni || "",
+                email: initialDataForCreation.email || "",
+                phone: (initialDataForCreation as any).phone || "",
+                dob: anyToDate((initialDataForCreation as any).dob) ?? undefined,
+                roles: [],
+                businessId: null,
+                businessIds: [],
+            };
+        }
+        return { // Modo Creación en blanco
+            uid: undefined, name: "", dni: "", email: "", phone: "", dob: undefined, roles: [], businessId: null, businessIds: []
+        };
     };
-    form.reset(initialValues);
+
+    form.reset(getInitialValues());
+
   }, [user, initialDataForCreation, form]);
 
   const selectedRoles = form.watch("roles", user?.roles || []);
@@ -315,17 +349,3 @@ export function PlatformUserForm({
     </Form>
   );
 }
-
-// Helper robusto para convertir a fecha
-function anyToDate(value: any): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-  if (typeof value.toDate === 'function') return value.toDate();
-  if (typeof value === 'string' || typeof value === 'number') {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  return null;
-}
-
-    
