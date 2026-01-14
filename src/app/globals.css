@@ -90,6 +90,15 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline; /* Apply Bebas Neue to all headings */
   }
+  
+  /* Override browser autofill styles */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus, 
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--background)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+  }
 }
 
 /* Custom utility for gradient text */
