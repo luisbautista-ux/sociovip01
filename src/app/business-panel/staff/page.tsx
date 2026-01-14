@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -206,6 +205,7 @@ export default function BusinessStaffPage() {
       return;
     }
     
+    // Si no estamos editando (estamos creando), entonces simplemente cerramos y recargamos
     if (!isEditing) {
         setShowDniEntryModal(false);
         setShowUserFormModal(false);
@@ -215,12 +215,17 @@ export default function BusinessStaffPage() {
         return;
     }
 
+    // Lógica para actualizar un usuario existente
     setIsSubmitting(true);
     const userRef = doc(db, "platformUsers", data.uid!);
     const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
+    
+    // Roles permitidos: el business_admin puede asignar 'staff' o 'lector_qr'
+    // El superadmin puede asignar business_admin. Los usuarios no pueden quitarse su propio rol de admin/staff
     const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'lector_qr'] : ['business_admin', 'staff', 'lector_qr'];
     const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
     
+    // Prevenir que un admin se quite su propio rol de gestión
     if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
       toast({ title: "Acción no permitida", description: "No puedes quitarte a ti mismo el rol de administrador o staff.", variant: "destructive" });
       setIsSubmitting(false);
@@ -230,10 +235,12 @@ export default function BusinessStaffPage() {
     const userPayload: Partial<PlatformUser> = {
       name: data.name,
       roles: finalRoles,
+      // Si estamos reasignando, forzamos el businessId del admin actual. Si no, usamos el del formulario (para superadmin).
       businessId: isReassigning ? currentBusinessId : data.businessId,
     };
 
     if(isReassigning) {
+        // Al reasignar un promotor a un staff de un negocio específico, limpiamos sus múltiples asignaciones.
         userPayload.businessIds = []; 
     }
 
@@ -267,6 +274,8 @@ export default function BusinessStaffPage() {
     }
     setIsSubmitting(true);
     try {
+      // NOTE: Esto solo elimina el perfil en Firestore, no la cuenta en Firebase Auth.
+      // Una implementación más robusta usaría una Cloud Function para la eliminación completa.
       await deleteDoc(doc(db, "platformUsers", user.uid));
       toast({ title: "Perfil de Usuario Eliminado", description: `El perfil de "${user.name}" ha sido eliminado.`, variant: "destructive" });
       fetchStaffMembers();
@@ -490,9 +499,9 @@ export default function BusinessStaffPage() {
           <PlatformUserForm 
             user={editingUser || undefined}
             initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
-            businesses={[]}
+            businesses={[]} // No se usa en este flujo, se asigna el businessId del admin actual
             allowedRoles={['staff', 'lector_qr']}
-            onSubmit={(data, isEditing) => handleCreateOrEditUser(data, isEditing)}
+            onSubmit={handleCreateOrEditUser}
             onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
             isSubmitting={isSubmitting}
           />
@@ -502,7 +511,7 @@ export default function BusinessStaffPage() {
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</AlertDialogTitle>
+                <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</UIAlertDialogTitle>
                 <ShadcnAlertDialogDescription>
                     El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-semibold">{(existingPlatformUserToEdit?.roles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
                     <br/><br/>
