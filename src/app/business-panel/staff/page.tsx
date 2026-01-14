@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -27,7 +28,7 @@ import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "fi
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { DialogFooter } from "@/components/ui/dialog";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
-import { DropdownMenu, DropdownTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { errorEmitter } from "@/lib/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/lib/errors";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -152,7 +153,7 @@ export default function BusinessStaffPage() {
     setShowDniEntryModal(true); 
   };
   
-  const handleDniVerificationSubmit = async (values: DniEntryValues) => {
+const handleDniVerificationSubmit = async (values: DniEntryValues) => {
     if (isSubmitting) return;
     const docNumberCleaned = values.docNumber.trim();
     setIsSubmitting(true);
