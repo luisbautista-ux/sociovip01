@@ -38,6 +38,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 const ManageEventDialog = ({
@@ -786,6 +787,9 @@ export default function BusinessEventsPage() {
   
   const [showQrTemplateModal, setShowQrTemplateModal] = useState(false);
   const [selectedEventForTemplate, setSelectedEventForTemplate] = useState<BusinessManagedEntity | null>(null);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
 
   useEffect(() => {
@@ -855,6 +859,16 @@ export default function BusinessEventsPage() {
         setIsLoading(false);
     }
   }, [currentBusinessId, fetchEventsAndPromoters, loadingAuth, loadingProfile]);
+  
+  const totalPages = Math.ceil(events.length / rowsPerPage);
+  const paginatedEvents = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return events.slice(startIndex, startIndex + rowsPerPage);
+  }, [events, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [rowsPerPage]);
 
   const handleOpenManageEventDialog = (event: BusinessManagedEntity | null, duplicate = false) => {
     setIsSubmitting(false);
@@ -1137,7 +1151,7 @@ export default function BusinessEventsPage() {
           <CardContent>
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {events.map(event => {
+              {paginatedEvents.map(event => {
                 const isActivatable = isEntityCurrentlyActivatable(event);
                 const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
                 const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
@@ -1218,6 +1232,7 @@ export default function BusinessEventsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>#</TableHead>
                     <TableHead>Evento</TableHead>
                     <TableHead className="text-center">Fecha</TableHead>
                     <TableHead className="text-center">Aforo Total</TableHead>
@@ -1226,7 +1241,7 @@ export default function BusinessEventsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {events.map(event => {
+                  {paginatedEvents.map((event, index) => {
                     const isActivatable = isEntityCurrentlyActivatable(event);
                     const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
                     const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
@@ -1235,6 +1250,7 @@ export default function BusinessEventsPage() {
                     
                     return (
                       <TableRow key={event.id}>
+                        <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                         <TableCell className="font-medium">{event.name}</TableCell>
                         <TableCell className="text-center">{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
                         <TableCell className="text-center">{displayAttendance}</TableCell>
@@ -1290,6 +1306,47 @@ export default function BusinessEventsPage() {
               </Table>
             </div>
           </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+              <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page-events">Filas por página:</Label>
+                <Select
+                  value={`${rowsPerPage}`}
+                  onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                  <SelectTrigger id="rows-per-page-events" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 25].map((pageSize) => (
+                      <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+          </CardFooter>
         </Card>
       )}
       <ManageEventDialog 
@@ -1354,3 +1411,4 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
+
