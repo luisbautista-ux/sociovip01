@@ -2,7 +2,7 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Search, Loader2, UserPlus, ListChecks } from "lucide-react";
 import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry, BusinessPromoterLinkWithCommissions, GeneratedCode } from "@/lib/types";
@@ -22,6 +22,8 @@ import { PromoterMobileCards } from "@/components/business/promoters/PromoterMob
 import { CommissionDetailsDialog } from "@/components/business/promoters/CommissionDetailsDialog";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
 import { DEFAULT_COMMISSION_PER_CODE } from "@/lib/constants";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function BusinessPromotersPage() {
     const { userProfile, currentUser } = useAuth();
@@ -42,6 +44,9 @@ export default function BusinessPromotersPage() {
     const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     const [promoterForPayment, setPromoterForPayment] = useState<{ name: string; uid: string; pendingAmount: number } | null>(null);
     const [promoterForDetails, setPromoterForDetails] = useState<{ name: string; uid: string; commissions: PromoterCommissionEntry[] } | null>(null);
+    
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
 
     const fetchData = useCallback(async () => {
@@ -101,6 +106,17 @@ export default function BusinessPromotersPage() {
             promoter.promoterDni.includes(searchTerm)
         );
     }, [consolidatedPromotersData, searchTerm]);
+    
+    const totalPages = Math.ceil(filteredPromoters.length / rowsPerPage);
+    const paginatedPromoters = useMemo(() => {
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        return filteredPromoters.slice(startIndex, startIndex + rowsPerPage);
+    }, [filteredPromoters, currentPage, rowsPerPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, rowsPerPage]);
+
 
     const handleOpenAddPromoterFlow = () => {
         setModalStep('dni_entry');
@@ -269,6 +285,9 @@ export default function BusinessPromotersPage() {
                 disabled={isLoading}
               />
             </div>
+            <div className="text-sm text-muted-foreground pt-4">
+              Mostrando <span className="font-semibold text-foreground">{paginatedPromoters.length}</span> de <span className="font-semibold text-foreground">{filteredPromoters.length}</span> promotores totales.
+          </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -283,7 +302,7 @@ export default function BusinessPromotersPage() {
             ) : (
               <>
                 <PromoterMobileCards
-                  promoters={filteredPromoters}
+                  promoters={paginatedPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
@@ -292,7 +311,7 @@ export default function BusinessPromotersPage() {
                   isSubmitting={isSubmitting}
                 />
                 <PromotersTable
-                  promoters={filteredPromoters}
+                  promoters={paginatedPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onViewDetails={handleOpenDetailsDialog}
                   onEditLink={handleOpenEditLink}
@@ -303,6 +322,49 @@ export default function BusinessPromotersPage() {
               </>
             )}
           </CardContent>
+          {totalPages > 1 && (
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+              <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page-promoters">Filas por página:</Label>
+                <Select
+                  value={`${rowsPerPage}`}
+                  onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                  <SelectTrigger id="rows-per-page-promoters" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 25, 50].map((pageSize) => (
+                      <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </CardFooter>
+          )}
         </Card>
 
         {modalStep === 'dni_entry' && (
@@ -359,3 +421,5 @@ export default function BusinessPromotersPage() {
       </div>
     );
   }
+
+    

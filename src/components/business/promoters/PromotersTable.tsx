@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,6 +33,7 @@ export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEdi
       <Table>
           <TableHeader>
               <TableRow>
+                  <TableHead>#</TableHead>
                   <TableHead>Promotor</TableHead>
                   <TableHead className="text-right">Comisión Pendiente</TableHead>
                   <TableHead className="text-right">Comisión Pagada</TableHead>
@@ -40,9 +42,10 @@ export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEdi
               </TableRow>
           </TableHeader>
           <TableBody>
-              {promoters.map((promoter) => {
+              {promoters.map((promoter, index) => {
                   return (
                   <TableRow key={promoter.id}>
+                       <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="font-medium">
                         <div>{promoter.promoterName}</div>
                         <div className="text-xs text-muted-foreground">{promoter.promoterDni}</div>
@@ -96,3 +99,4 @@ export function PromotersTable({ promoters, onToggleStatus, onViewDetails, onEdi
   );
 }
 
+    
