@@ -23,6 +23,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn, renderDate, anyToDate } from "@/lib/utils";
 import * as ExcelJS from "exceljs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 /* ===================== Helpers de fecha (aceptan Timestamp/Date/string/number) ===================== */
 
@@ -57,7 +59,9 @@ export default function BusinessClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
 
-  const isSuperAdmin = !!userProfile?.roles?.includes?.("superadmin");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
 
   useEffect(() => {
     const load = async () => {
@@ -108,6 +112,18 @@ export default function BusinessClientsPage() {
       return searchFilter && isWithinInterval(regDate, interval);
     });
   }, [searchTerm, filterDate, qrClients]);
+
+  const totalPages = Math.ceil(filteredClients.length / rowsPerPage);
+  
+  const paginatedClients = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredClients.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredClients, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterDate, rowsPerPage]);
+
 
   const handleExport = async () => {
     if (filteredClients.length === 0) {
@@ -249,8 +265,8 @@ export default function BusinessClientsPage() {
         <CardContent>
           {/* Mobile View */}
           <div className="md:hidden space-y-4">
-            {filteredClients.length > 0 ? (
-                filteredClients.map((c) => (
+            {paginatedClients.length > 0 ? (
+                paginatedClients.map((c) => (
                   <Card key={c.id} className="overflow-hidden">
                      <CardHeader className="p-4">
                        <CardTitle className="text-lg">{c.name} {c.surname}</CardTitle>
@@ -283,6 +299,7 @@ export default function BusinessClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>#</TableHead>
                   <TableHead>Nombre Completo</TableHead>
                   <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
                   <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
@@ -292,9 +309,10 @@ export default function BusinessClientsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.length > 0 ? (
-                  filteredClients.map((c) => (
+                {paginatedClients.length > 0 ? (
+                  paginatedClients.map((c, index) => (
                     <TableRow key={c.id}>
+                      <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                       <TableCell className="font-medium">
                         {c.name} {c.surname}
                       </TableCell>
@@ -315,7 +333,7 @@ export default function BusinessClientsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">
+                    <TableCell colSpan={7} className="text-center h-24">
                       No se encontraron clientes con los filtros aplicados.
                     </TableCell>
                   </TableRow>
@@ -324,6 +342,47 @@ export default function BusinessClientsPage() {
             </Table>
           </div>
         </CardContent>
+        <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+          <div className="flex items-center space-x-2 text-sm">
+            <Label htmlFor="rows-per-page">Filas por página:</Label>
+            <Select
+              value={`${rowsPerPage}`}
+              onValueChange={(value) => setRowsPerPage(Number(value))}
+            >
+              <SelectTrigger id="rows-per-page" className="h-8 w-[70px]">
+                <SelectValue placeholder={rowsPerPage} />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 25, 50, 100].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Página {currentPage} de {totalPages}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   );
