@@ -54,33 +54,43 @@ export function DniEntryDialog({ open, onOpenChange, isSubmitting, onDniVerified
   const checkDniForPromoterAndLink = async (dni: string, businessIdToCheck: string): Promise<InitialDataForPromoterLink> => {
       let result: InitialDataForPromoterLink = { dni };
 
-      const linksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", businessIdToCheck), where("promoterDni", "==", dni));
+      // 1. Check if this DNI is already linked as a promoter to THIS business
+      const linksQuery = query(
+        collection(db, "businessPromoterLinks"), 
+        where("businessId", "==", businessIdToCheck), 
+        where("promoterDni", "==", dni)
+      );
       const linksSnapshot = await getDocs(linksQuery);
       if (!linksSnapshot.empty) {
+        // Stop here, they are already linked. The dialog will handle this.
         result.existingLink = { id: linksSnapshot.docs[0].id, ...linksSnapshot.docs[0].data() } as BusinessPromoterLink;
+        return result;
       }
 
-      const platformUserQuery = query(collection(db, "platformUsers"), where("dni", "==", dni), where("roles", "array-contains", "promoter"));
+      // 2. Check if a platformUser exists with this DNI, regardless of role
+      const platformUserQuery = query(collection(db, "platformUsers"), where("dni", "==", dni));
       const platformUserSnapshot = await getDocs(platformUserQuery);
+
       if (!platformUserSnapshot.empty) {
+          // A platform user exists! This is the person we want to link.
           result.existingPlatformUserPromoter = { id: platformUserSnapshot.docs[0].id, ...platformUserSnapshot.docs[0].data() } as PlatformUser;
+          return result;
       }
       
-      if (!result.existingPlatformUserPromoter) {
-          const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
-          const qrClientSnapshot = await getDocs(qrClientQuery);
-          if (!qrClientSnapshot.empty) {
-              result.qrClientData = { id: qrClientSnapshot.docs[0].id, ...qrClientSnapshot.docs[0].data() } as QrClient;
-          }
+      // 3. If no platform user, check legacy/other collections for data pre-population
+      const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dni));
+      const qrClientSnapshot = await getDocs(qrClientQuery);
+      if (!qrClientSnapshot.empty) {
+          result.qrClientData = { id: qrClientSnapshot.docs[0].id, ...qrClientSnapshot.docs[0].data() } as QrClient;
+          return result;
       }
 
-      if (!result.existingPlatformUserPromoter && !result.qrClientData) {
-          const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dni));
-          const socioVipSnapshot = await getDocs(socioVipQuery);
-          if (!socioVipSnapshot.empty) {
-              result.socioVipData = { id: socioVipSnapshot.docs[0].id, ...socioVipSnapshot.docs[0].data() } as SocioVipMember;
-          }
+      const socioVipQuery = query(collection(db, "socioVipMembers"), where("dni", "==", dni));
+      const socioVipSnapshot = await getDocs(socioVipQuery);
+      if (!socioVipSnapshot.empty) {
+          result.socioVipData = { id: socioVipSnapshot.docs[0].id, ...socioVipSnapshot.docs[0].data() } as SocioVipMember;
       }
+      
       return result;
   };
 
@@ -155,13 +165,12 @@ export function DniEntryDialog({ open, onOpenChange, isSubmitting, onDniVerified
             <AlertDialogDescription>
               El promotor con DNI/CE <span className="font-semibold">{alreadyLinkedData?.promoterDni}</span> ({alreadyLinkedData?.promoterName}) ya está vinculado a tu negocio.
               <br/><br/>
-              ¿Deseas editar la información de este vínculo?
+              No puedes volver a vincularlo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setAlreadyLinkedData(null)}>No, Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { onAlreadyLinked(alreadyLinkedData!); setAlreadyLinkedData(null); }} variant="gradient">
-              Sí, Editar Vínculo
+            <AlertDialogAction onClick={() => setAlreadyLinkedData(null)} variant="gradient">
+              Entendido
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
