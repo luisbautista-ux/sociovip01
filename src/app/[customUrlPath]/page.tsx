@@ -4,7 +4,7 @@ import type { Metadata, ResolvingMetadata } from "next";
 import { adminDb } from "@/lib/firebase/firebaseAdmin";
 import type { Business, BusinessManagedEntity } from "@/lib/types";
 
-export const revalidate = 60; // Revalidate every 60 seconds
+export const revalidate = 0; // FORZAR RENDERIZADO DINÁMICO
 
 type Props = {
   params: { customUrlPath: string };
@@ -16,9 +16,9 @@ export async function generateMetadata(
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const customUrlPath = params.customUrlPath;
-  const entityId = searchParams?.entity as string;
+  // Manejo robusto del parámetro 'entity'
+  const entityId = Array.isArray(searchParams?.entity) ? searchParams.entity[0] : searchParams?.entity;
 
-  // URL del logo por defecto en caso de que no haya una imagen.
   const defaultImage = "https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png";
 
   try {
@@ -86,7 +86,7 @@ export async function generateMetadata(
     };
 
   } catch (error) {
-    console.error(`Error generando metadatos para /${customUrlPath}:`, error);
+    console.error(`Error generando metadatos para /${customUrlPath} con entityId=${entityId}:`, error);
     // Retornar metadatos genéricos en caso de error
     return {
       title: "SocioVIP",
