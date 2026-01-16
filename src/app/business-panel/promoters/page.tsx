@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, writeBatch, runTransaction, arrayUnion } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, writeBatch, runTransaction, arrayUnion, limit } from "firebase/firestore";
 
 import { DniEntryDialog } from "@/components/business/promoters/DniEntryDialog";
 import { PaymentDialog } from "@/components/business/promoters/PaymentDialog";
