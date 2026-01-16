@@ -1,21 +1,19 @@
 
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Search, Loader2, UserPlus, ListChecks } from "lucide-react";
-import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry, BusinessPromoterLinkWithCommissions, GeneratedCode } from "@/lib/types";
+import { PlusCircle, Search, Loader2, UserPlus, ListChecks, GitBranch, AlertTriangle } from "lucide-react";
+import type { BusinessPromoterLink, BusinessPromoterFormData, InitialDataForPromoterLink, PromoterCommissionEntry, BusinessPromoterLinkWithCommissions, GeneratedCode, PlatformUser, PlatformUserRole } from "@/lib/types";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, writeBatch, runTransaction } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, writeBatch, runTransaction, arrayUnion } from "firebase/firestore";
 
 import { DniEntryDialog } from "@/components/business/promoters/DniEntryDialog";
-import { PromoterFormDialog } from "@/components/business/promoters/PromoterFormDialog";
 import { PaymentDialog } from "@/components/business/promoters/PaymentDialog";
 import { PromotersTable } from "@/components/business/promoters/PromotersTable";
 import { PromoterMobileCards } from "@/components/business/promoters/PromoterMobileCards";
@@ -24,6 +22,17 @@ import { sanitizeObjectForFirestore } from "@/lib/utils";
 import { DEFAULT_COMMISSION_PER_CODE } from "@/lib/constants";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
+import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
+import { Info } from "lucide-react";
+
+interface CheckDniResult {
+  exists: boolean;
+  userData?: PlatformUser;
+  isAlreadyLinkedToThisBusiness?: boolean;
+  linkData?: BusinessPromoterLink;
+}
 
 export default function BusinessPromotersPage() {
     const { userProfile, currentUser } = useAuth();
@@ -36,14 +45,18 @@ export default function BusinessPromotersPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
     
-    const [modalStep, setModalStep] = useState<'closed' | 'dni_entry' | 'promoter_form'>('closed');
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    // State for the new flow
+    const [showDniEntryModal, setShowDniEntryModal] = useState(false);
+    const [showUserFormModal, setShowUserFormModal] = useState(false);
+    const [showUserNotFoundAlert, setShowUserNotFoundAlert] = useState(false);
+    const [showDniAlreadyExistsAlert, setShowDniAlreadyExistsAlert] = useState(false);
+    const [userToLink, setUserToLink] = useState<PlatformUser | null>(null);
+    const [dniNotFound, setDniNotFound] = useState("");
     
-    const [editingPromoterLink, setEditingPromoterLink] = useState<BusinessPromoterLink | null>(null);
-    const [verifiedPromoterDniResult, setVerifiedPromoterDniResult] = useState<InitialDataForPromoterLink | null>(null);
     const [promoterForPayment, setPromoterForPayment] = useState<{ name: string; uid: string; pendingAmount: number } | null>(null);
     const [promoterForDetails, setPromoterForDetails] = useState<{ name: string; uid: string; commissions: PromoterCommissionEntry[] } | null>(null);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -58,13 +71,11 @@ export default function BusinessPromotersPage() {
         try {
             const idToken = await currentUser.getIdToken();
             
-            // 1. Fetch all promoter links for the business
             const promoterLinksQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId));
             const promoterLinksSnap = await getDocs(promoterLinksQuery);
             const links = promoterLinksSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessPromoterLink));
             setAllPromoterLinks(links);
 
-            // 2. Fetch all commission data for the business
             const response = await fetch('/api/business-panel/get-commissions-summary', {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${idToken}` },
@@ -117,17 +128,9 @@ export default function BusinessPromotersPage() {
         setCurrentPage(1);
     }, [searchTerm, rowsPerPage]);
 
-
     const handleOpenAddPromoterFlow = () => {
-        setModalStep('dni_entry');
-        setEditingPromoterLink(null);
-        setVerifiedPromoterDniResult(null);
-    };
-
-    const handleOpenEditLink = (link: BusinessPromoterLink) => {
-        setEditingPromoterLink(link);
-        setVerifiedPromoterDniResult(null);
-        setModalStep('promoter_form');
+        setShowDniEntryModal(true);
+        setUserToLink(null);
     };
 
     const handleOpenPaymentDialog = (promoter: { uid: string, name: string, pendingAmount: number }) => {
@@ -141,69 +144,88 @@ export default function BusinessPromotersPage() {
         setPromoterForDetails({ name: promoter.promoterName, uid: promoter.platformUserUid, commissions: promoterCommissions });
         setShowDetailsModal(true);
     };
-
-
-    const handleAddOrEditPromoterLink = async (data: BusinessPromoterFormData) => {
-      if (!currentBusinessId || !currentUser) {
-          toast({ title: "Error de Sesión", description: "No se puede completar la operación.", variant: "destructive" });
-          return;
-      }
-      setIsSubmitting(true);
-      try {
-        const idToken = await currentUser.getIdToken();
+    
+    const checkPromoterExists = async (dni: string): Promise<CheckDniResult> => {
+        const userQuery = query(collection(db, "platformUsers"), where("dni", "==", dni), limit(1));
+        const userSnap = await getDocs(userQuery);
         
-        if (editingPromoterLink) { 
-          const linkRef = doc(db, "businessPromoterLinks", editingPromoterLink.id);
-          const { password, ...updatePayload } = data;
-          await updateDoc(linkRef, sanitizeObjectForFirestore(updatePayload as any));
-          toast({ title: "Vínculo Actualizado", description: `Se actualizó la información para ${data.promoterName}.` });
-        
-        } else if (verifiedPromoterDniResult?.existingPlatformUserPromoter) {
-           const linkPayload = {
-              promoterUid: verifiedPromoterDniResult.existingPlatformUserPromoter.uid,
-              promoterData: {
-                  promoterDni: verifiedPromoterDniResult.dni,
-                  promoterName: data.promoterName,
-                  promoterEmail: data.promoterEmail,
-                  promoterPhone: data.promoterPhone || "",
-              }
-            };
-            const response = await fetch('/api/business-panel/link-promoter', {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, 
-                body: JSON.stringify(linkPayload)
-            });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Error al vincular promotor.');
-          toast({ title: "Promotor Vinculado", description: `${data.promoterName} ha sido vinculado a tu negocio.` });
-
-        } else if(verifiedPromoterDniResult) { 
-          if(!data.password) throw new Error("La contraseña es requerida para un nuevo promotor.");
-          const creationPayload = {
-            email: data.promoterEmail, password: data.password, displayName: data.promoterName,
-            firestoreData: {
-              dni: verifiedPromoterDniResult.dni, name: data.promoterName, email: data.promoterEmail,
-              phone: data.promoterPhone,
-              commissionRate: '' 
-            }
-          };
-          const response = await fetch('/api/business-panel/create-promoter', {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }, 
-            body: JSON.stringify(creationPayload)
-          });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || 'Error al crear promotor.');
-          toast({ title: "Promotor Creado y Vinculado", description: `Se creó el usuario para ${data.promoterName}.` });
+        if (userSnap.empty) {
+            return { exists: false };
         }
+
+        const userData = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() } as PlatformUser;
         
-        setModalStep('closed');
-        fetchData();
-      } catch (error: any) {
-        toast({ title: "Error al Guardar", description: `No se pudo procesar la solicitud. ${error.message}`, variant: "destructive"});
-      } finally {
-        setIsSubmitting(false);
-      }
+        const linkQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId), where("platformUserUid", "==", userData.uid), limit(1));
+        const linkSnap = await getDocs(linkQuery);
+        
+        return {
+            exists: true,
+            userData: userData,
+            isAlreadyLinkedToThisBusiness: !linkSnap.empty,
+            linkData: linkSnap.empty ? undefined : { id: linkSnap.docs[0].id, ...linkSnap.docs[0].data() } as BusinessPromoterLink,
+        };
+    };
+
+    const handleDniVerification = async (result: { docNumber: string; docType: 'dni' | 'ce' }) => {
+        setShowDniEntryModal(false);
+        setIsSubmitting(true);
+        
+        try {
+            const checkResult = await checkPromoterExists(result.docNumber);
+            if (checkResult.exists && checkResult.userData) {
+                if (checkResult.isAlreadyLinkedToThisBusiness) {
+                    toast({ title: "Promotor ya vinculado", description: `${checkResult.userData.name} ya está vinculado a este negocio.`, variant: "default" });
+                } else {
+                    setUserToLink(checkResult.userData);
+                    setShowDniAlreadyExistsAlert(true);
+                }
+            } else {
+                setDniNotFound(result.docNumber);
+                setShowUserNotFoundAlert(true);
+            }
+        } catch (error: any) {
+            toast({ title: "Error de Verificación", description: `No se pudo verificar el DNI. ${error.message}`, variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    const handleLinkExistingUser = async () => {
+        if (!userToLink || !currentBusinessId) return;
+        
+        setIsSubmitting(true);
+        setShowDniAlreadyExistsAlert(false);
+
+        try {
+            const batch = writeBatch(db);
+            const userRef = doc(db, "platformUsers", userToLink.uid);
+            batch.update(userRef, {
+                roles: arrayUnion('promoter'),
+                businessIds: arrayUnion(currentBusinessId)
+            });
+
+            const linkRef = doc(collection(db, "businessPromoterLinks"));
+            batch.set(linkRef, {
+                businessId: currentBusinessId,
+                promoterDni: userToLink.dni,
+                promoterName: userToLink.name,
+                promoterEmail: userToLink.email,
+                promoterPhone: userToLink.phone || '',
+                isActive: true,
+                isPlatformUser: true,
+                platformUserUid: userToLink.uid,
+                joinDate: serverTimestamp(),
+            });
+
+            await batch.commit();
+            toast({ title: "Promotor Vinculado", description: `${userToLink.name} ha sido vinculado a tu negocio como promotor.` });
+            fetchData();
+        } catch (error: any) {
+            toast({ title: "Error al Vincular", description: `No se pudo vincular al promotor. ${error.message}`, variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+            setUserToLink(null);
+        }
     };
 
     const handleConfirmPayment = async (promoterUid: string, entityId: string, amount: number, notes: string | undefined) => {
@@ -222,7 +244,7 @@ export default function BusinessPromotersPage() {
 
             toast({ title: "Pago Registrado", description: `Se registró un pago de S/ ${amount.toFixed(2)}.` });
             setShowPaymentModal(false);
-            fetchData(); // Vuelve a cargar todos los datos
+            fetchData(); 
         } catch (error: any) {
             toast({ title: "Error al Registrar Pago", description: error.message, variant: "destructive" });
         } finally {
@@ -233,7 +255,18 @@ export default function BusinessPromotersPage() {
     const handleDeletePromoterLink = async (link: BusinessPromoterLink) => {
         setIsSubmitting(true);
         try {
-            await deleteDoc(doc(db, "businessPromoterLinks", link.id));
+            const batch = writeBatch(db);
+            // Remove from businessPromoterLinks
+            batch.delete(doc(db, "businessPromoterLinks", link.id));
+            
+            // Remove businessId from promoter's profile if they have a UID
+            if(link.platformUserUid && currentBusinessId){
+                const userRef = doc(db, "platformUsers", link.platformUserUid);
+                // Atomically remove the businessId from the array
+                batch.update(userRef, { businessIds: (await getDoc(userRef)).data()?.businessIds.filter((id: string) => id !== currentBusinessId) });
+            }
+
+            await batch.commit();
             toast({ title: "Promotor Desvinculado", description: `${link.promoterName || 'El promotor'} ha sido desvinculado.`, variant: "destructive" });
             fetchData();
         } catch (error: any) {
@@ -305,7 +338,7 @@ export default function BusinessPromotersPage() {
                   promoters={paginatedPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onViewDetails={handleOpenDetailsDialog}
-                  onEditLink={handleOpenEditLink}
+                  onEditLink={() => { /* Edit link logic to be implemented if needed */ }}
                   onDeleteLink={handleDeletePromoterLink}
                   onOpenPaymentDialog={handleOpenPaymentDialog}
                   isSubmitting={isSubmitting}
@@ -314,7 +347,7 @@ export default function BusinessPromotersPage() {
                   promoters={paginatedPromoters}
                   onToggleStatus={handleTogglePromoterLinkStatus}
                   onViewDetails={handleOpenDetailsDialog}
-                  onEditLink={handleOpenEditLink}
+                  onEditLink={() => { /* Edit link logic to be implemented if needed */ }}
                   onDeleteLink={handleDeletePromoterLink}
                   onOpenPaymentDialog={handleOpenPaymentDialog}
                   isSubmitting={isSubmitting}
@@ -367,32 +400,57 @@ export default function BusinessPromotersPage() {
           )}
         </Card>
 
-        {modalStep === 'dni_entry' && (
-            <DniEntryDialog
-                open={modalStep === 'dni_entry'}
-                onOpenChange={(isOpen) => !isOpen && setModalStep('closed')}
-                isSubmitting={isSubmitting}
-                onDniVerified={(result) => {
-                    setVerifiedPromoterDniResult(result);
-                    setModalStep('promoter_form');
-                }}
-                onAlreadyLinked={(link) => {
-                    setModalStep('closed');
-                    handleOpenEditLink(link);
-                }}
-            />
-        )}
+        <DniEntryDialog
+            open={showDniEntryModal}
+            onOpenChange={setShowDniEntryModal}
+            isSubmitting={isSubmitting}
+            onDniVerified={(result) => handleDniVerification(result as any)}
+            onAlreadyLinked={(link) => {
+                setShowDniEntryModal(false);
+                toast({ title: "Promotor ya vinculado", description: `${link.promoterName} ya está vinculado a este negocio.`, variant: "default" });
+            }}
+        />
         
-        {modalStep === 'promoter_form' && (
-            <PromoterFormDialog
-                open={modalStep === 'promoter_form'}
-                onOpenChange={(isOpen) => !isOpen && setModalStep('closed')}
-                isSubmitting={isSubmitting}
-                promoterLinkToEdit={editingPromoterLink}
-                initialData={verifiedPromoterDniResult}
-                onSubmit={handleAddOrEditPromoterLink}
-            />
-        )}
+        <AlertDialog open={showDniAlreadyExistsAlert} onOpenChange={setShowDniAlreadyExistsAlert}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Promotor Existente Detectado</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        El usuario <span className="font-semibold">{userToLink?.name}</span> ya tiene una cuenta. ¿Deseas vincularlo como promotor a tu negocio?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setShowDniAlreadyExistsAlert(false)}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleLinkExistingUser} className="bg-primary hover:bg-primary/90">
+                        <GitBranch className="mr-2 h-4 w-4"/> Vincular Promotor
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+       <AlertDialog open={showUserNotFoundAlert} onOpenChange={setShowUserNotFoundAlert}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center">
+                    <Info className="h-6 w-6 mr-2 text-blue-500"/> Usuario no Registrado
+                </AlertDialogTitle>
+                <AlertDialogDescription className="pt-4 space-y-3">
+                    <p>El documento <strong>{dniNotFound}</strong> no corresponde a un usuario con una cuenta en la plataforma.</p>
+                    <p>Para añadirlo como promotor, la persona primero debe crear su propia cuenta personal en SocioVIP.</p>
+                    <div className="bg-muted p-3 rounded-md text-center">
+                        <p className="text-sm font-semibold">Indícale al usuario que se registre en:</p>
+                        <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.app/signup</a>
+                        <p className="text-xs text-muted-foreground mt-1">Una vez registrado, podrás buscarlo por su DNI para vincularlo.</p>
+                    </div>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setShowUserNotFoundAlert(false)} className="bg-primary hover:bg-primary/90">
+                    Entendido
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
         
         {showPaymentModal && promoterForPayment && (
             <PaymentDialog
