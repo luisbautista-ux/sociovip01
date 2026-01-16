@@ -15,11 +15,12 @@ import { Input } from "@/components/ui/input";
 import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; 
-import { db } from "@/lib/firebase"; 
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit } from "firebase/firestore";
+import { db, storage } from "@/lib/firebase"; 
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit, setDoc } from "firebase/firestore";
 import Link from "next/link";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 
 export default function AdminBusinessesPage() {
@@ -150,7 +151,7 @@ export default function AdminBusinessesPage() {
     
     const cleanedCustomUrlPath = data.customUrlPath && data.customUrlPath.trim() !== "" 
         ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') 
-        : null; // Ensure it's null if empty
+        : null; 
 
     if (cleanedCustomUrlPath) {
       const isUnique = await checkCustomUrlPathUniqueness(cleanedCustomUrlPath, currentBusinessId);
@@ -161,43 +162,48 @@ export default function AdminBusinessesPage() {
       }
     }
     
-    const businessPayloadRaw: Omit<Partial<Business>, 'id' | 'joinDate'> & { joinDate?: any } = {
-        name: data.name,
-        contactEmail: data.contactEmail,
-        ruc: data.ruc || null,
-        razonSocial: data.razonSocial || null,
-        department: data.department || null,
-        province: data.province || null,
-        district: data.district || null,
-        address: data.address || null,
-        managerName: data.managerName || null,
-        managerDni: data.managerDni || null,
-        businessType: data.businessType || null,
-        logoUrl: data.logoUrl || null,
-        publicCoverImageUrls: data.publicCoverImageUrls || [],
-        slogan: data.slogan || null,
-        publicContactEmail: data.publicContactEmail || null,
-        publicPhone: data.publicPhone || null,
-        publicAddress: data.publicAddress || null,
-        customUrlPath: cleanedCustomUrlPath, 
-    };
-    
-    const businessPayload = sanitizeObjectForFirestore(businessPayloadRaw);
-
     try {
-      if (currentBusinessId) { 
-        const businessRef = doc(db, "businesses", currentBusinessId);
-        await updateDoc(businessRef, businessPayload);
-        toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
-      } else { 
-        businessPayload.joinDate = serverTimestamp();
-        const docRef = await addDoc(collection(db, "businesses"), businessPayload);
-        toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${docRef.id}.` });
-      }
-      setShowCreateEditModal(false);
-      setEditingBusiness(null);
-      await fetchBusinesses(); // Await fetchBusinesses
-      return { success: true };
+        const businessId = currentBusinessId || doc(collection(db, "businesses")).id;
+        let finalLogoUrl = editingBusiness?.logoUrl || "";
+
+        if (data.logoFile) {
+            toast({ description: "Subiendo logo..." });
+            const oldLogoUrl = editingBusiness?.logoUrl;
+            if (oldLogoUrl && oldLogoUrl.includes('firebase')) {
+                try {
+                    await deleteObject(ref(storage, oldLogoUrl));
+                } catch (e: any) {
+                    if (e.code !== 'storage/object-not-found') console.warn("Old logo not deleted:", e);
+                }
+            }
+            const logoStorageRef = ref(storage, `business-logos/${businessId}/${data.logoFile.name}`);
+            const uploadResult = await uploadBytes(logoStorageRef, data.logoFile);
+            finalLogoUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        const { logoFile, ...restOfData } = data;
+
+        const businessPayloadRaw = {
+            ...restOfData,
+            logoUrl: finalLogoUrl,
+            customUrlPath: cleanedCustomUrlPath,
+        };
+        
+        const businessPayload = sanitizeObjectForFirestore(businessPayloadRaw);
+
+        if (currentBusinessId) { 
+            const businessRef = doc(db, "businesses", currentBusinessId);
+            await updateDoc(businessRef, businessPayload);
+            toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
+        } else { 
+            businessPayload.joinDate = serverTimestamp();
+            await setDoc(doc(db, "businesses", businessId), businessPayload);
+            toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${businessId}.` });
+        }
+        setShowCreateEditModal(false);
+        setEditingBusiness(null);
+        await fetchBusinesses();
+        return { success: true };
     } catch (error: any) {
       console.error("Failed to create/update business:", error);
       toast({ title: "Error al Guardar", description: `No se pudo guardar el negocio. ${error.message}`, variant: "destructive"});
@@ -226,7 +232,6 @@ export default function AdminBusinessesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
         <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
           <Building className="h-8 w-8 text-primary !block" />
           Negocios

@@ -1,4 +1,5 @@
 
+
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES, AVAILABLE_FONTS } from "./constants"; 
@@ -322,7 +323,7 @@ export interface BusinessFormData {
   managerName?: string;
   managerDni?: string;
   businessType?: BusinessType;
-  logoUrl?: string;
+  logoFile?: File | null;
   publicCoverImageUrls?: string[];
   publicVideoUrls?: string[];
   slogan?: string;
@@ -450,4 +451,33 @@ export interface InitialDataForPromoterLink {
 // Nueva interfaz para la configuración de la plataforma
 export interface PlatformSettings {
   defaultBusinessesForFreeUsers?: string[];
+}
+
+export interface TicketTypeFormData {
+  name: string;
+  cost: number;
+  description?: string;
+  quantity?: number;
+  color?: string;
+}
+
+export interface EventBoxFormData {
+  name: string;
+  cost: number;
+  description?: string;
+  status: 'available' | 'reserved' | 'sold';
+  capacity?: number;
+  promoterName?: string;
+  ownerName?: string;
+  ownerDni?: string;
+  ownerPhone?: string;
+}
+
+export interface BatchBoxFormData {
+  prefix: string;
+  fromNumber: number;
+  toNumber: number;
+  cost: number;
+  capacity?: number;
+  description?: string;
 }
