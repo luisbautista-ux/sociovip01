@@ -11,7 +11,7 @@ import type { SocioVipMember, SocioVipMemberFormData, QrClient, PlatformUser, In
 import { format, getMonth, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -97,6 +97,10 @@ export default function AdminSocioVipPage() {
   
   const [showDniIsAlreadySocioVipAlert, setShowDniIsAlreadySocioVipAlert] = useState(false);
   const [existingSocioVipToEdit, setExistingSocioVipToEdit] = useState<SocioVipMember | null>(null);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
 
   const dniEntryForm = useForm<DniEntryValues>({
     resolver: zodResolver(DniEntrySchema),
@@ -200,6 +204,17 @@ export default function AdminSocioVipPage() {
 
     return searchMatch && birthdayMatch && joinMatch;
   });
+
+  const totalPages = Math.ceil(filteredMembers.length / rowsPerPage);
+  const paginatedMembers = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredMembers.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredMembers, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, birthdayMonthFilter, joinMonthFilter, rowsPerPage]);
+
 
   const handleExport = () => {
     if (filteredMembers.length === 0) {
@@ -551,7 +566,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             <>
                {/* Mobile View */}
               <div className="md:hidden space-y-4">
-                {filteredMembers.map(member => (
+                {paginatedMembers.map(member => (
                    <Card key={member.id} className="overflow-hidden">
                       <CardHeader className="p-4">
                         <CardTitle>{member.name} {member.surname}</CardTitle>
@@ -611,6 +626,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>#</TableHead>
                       <TableHead>Nombre Completo</TableHead>
                       <TableHead className="hidden lg:table-cell"><Mail className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Email</TableHead>
                       <TableHead className="hidden md:table-cell"><Phone className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Teléfono</TableHead>
@@ -623,9 +639,10 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredMembers.length > 0 ? (
-                      filteredMembers.map((member) => (
+                    {paginatedMembers.length > 0 ? (
+                      paginatedMembers.map((member, index) => (
                         <TableRow key={member.id}>
+                          <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                           <TableCell className="font-medium">{member.name} {member.surname}</TableCell>
                           <TableCell className="hidden lg:table-cell">{member.email}</TableCell>
                           <TableCell className="hidden md:table-cell">{member.phone}</TableCell>
@@ -678,7 +695,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center h-24">No se encontraron socios VIP con los filtros aplicados.</TableCell>
+                        <TableCell colSpan={10} className="text-center h-24">No se encontraron socios VIP con los filtros aplicados.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -687,6 +704,49 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             </>
           )}
         </CardContent>
+        {totalPages > 1 && (
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+            <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page">Filas por página:</Label>
+                <Select
+                value={`${rowsPerPage}`}
+                onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                <SelectTrigger id="rows-per-page" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                </SelectTrigger>
+                <SelectContent>
+                    {[10, 25, 50, 100].map((pageSize) => (
+                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+            </div>
+            <div className="flex items-center space-x-2">
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                >
+                Anterior
+                </Button>
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                >
+                Siguiente
+                </Button>
+            </div>
+            </CardFooter>
+        )}
       </Card>
 
       <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
@@ -849,3 +909,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     
 
 
+
+
+    
