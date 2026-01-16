@@ -250,7 +250,8 @@ export function ManageCodesDialog({
         ? `https://sociovip.app/${businessDetails.customUrlPath}`
         : `https://sociovip.app/business/${entity?.businessId}`;
       
-      const shareUrl = `${baseUrl}?entity=${entity?.id}`;
+      const cacheBuster = `v=${new Date().getTime()}`;
+      const shareUrl = `${baseUrl}?entity=${entity?.id}&${cacheBuster}`;
 
       const codesText = codes.join('\n');
       const message = `Genera tu entrada QR con tu código en:\n${shareUrl}\n\n${codesText}`;
