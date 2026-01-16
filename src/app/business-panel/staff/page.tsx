@@ -4,48 +4,25 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
-import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch, ArrowRight } from "lucide-react";
+import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
-import { format, parse } from "date-fns";
-import { es } from "date-fns/locale";
-import { Badge } from "@/components/ui/badge";
 import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as ShadcnAlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn, anyToDate } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
-import { Alert, AlertTitle } from "@/components/ui/alert";
-import { DialogFooter } from "@/components/ui/dialog";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
+import { DniEntryDialog } from "@/components/business/promoters/DniEntryDialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { errorEmitter } from "@/lib/error-emitter";
 import { FirestorePermissionError, type SecurityRuleContext } from "@/lib/errors";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-
-const DniEntrySchema = z.object({
-  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
-  docNumber: z.string().min(1, "El número de documento es requerido."),
-}).superRefine((data, ctx) => {
-    if (data.docType === 'dni') {
-        if (!/^\d{8}$/.test(data.docNumber)) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El DNI debe contener exactamente 8 dígitos numéricos.", path: ['docNumber'] });
-        }
-    } else if (data.docType === 'ce' && !/^\d{10,20}$/.test(data.docNumber)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.", path: ['docNumber'] });
-    }
-});
-type DniEntryValues = z.infer<typeof DniEntrySchema>;
 
 interface CheckDniResult {
   exists: boolean;
@@ -69,16 +46,11 @@ export default function BusinessStaffPage() {
   const [showUserFormModal, setShowUserFormModal] = useState(false);
 
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
-  const [verifiedDniResult, setVerifiedDniResult] = useState<InitialDataForPlatformUserCreation | null>(null);
-
+  
   const [showDniIsPlatformUserAlert, setShowDniIsPlatformUserAlert] = useState(false);
+  const [showUserNotFoundAlert, setShowUserNotFoundAlert] = useState(false);
+  const [dniNotFound, setDniNotFound] = useState("");
   const [existingPlatformUserToEdit, setExistingPlatformUserToEdit] = useState<PlatformUser | null>(null);
-
-  const dniForm = useForm<DniEntryValues>({
-    resolver: zodResolver(DniEntrySchema),
-    defaultValues: { docType: 'dni', docNumber: "" },
-  });
-  const watchedDocType = dniForm.watch('docType');
 
   const fetchStaffMembers = useCallback(async () => {
     if (!currentBusinessId) {
@@ -118,103 +90,49 @@ export default function BusinessStaffPage() {
   
   const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     let result: CheckDniResult = { exists: false };
-    const collectionsToCheck: ('platformUsers' | 'socioVipMembers' | 'qrClients')[] = ['platformUsers', 'socioVipMembers', 'qrClients'];
+    const platformUserQuery = query(collection(db, "platformUsers"), where("dni", "==", dniToVerify), limit(1));
+    const platformUserSnap = await getDocs(platformUserQuery);
 
-    for (const coll of collectionsToCheck) {
-        const q = query(collection(db, coll), where("dni", "==", dniToVerify));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-            const docData = snapshot.docs[0].data();
-            const docId = snapshot.docs[0].id;
-            result.exists = true;
-            if (coll === 'platformUsers') {
-                result.userType = 'PlatformUser';
-                result.platformUserData = { id: docId, uid: docData.uid || docId, ...docData } as PlatformUser;
-            } else if (coll === 'socioVipMembers') {
-                result.userType = 'SocioVipMember';
-                result.socioVipData = { id: docId, ...docData } as SocioVipMember;
-            } else if (coll === 'qrClients') {
-                result.userType = 'QrClient';
-                result.qrClientData = { id: docId, ...docData } as QrClient;
-            }
-            return result;
-        }
+    if (!platformUserSnap.empty) {
+        const docData = platformUserSnap.docs[0].data();
+        result = {
+            exists: true,
+            userType: 'PlatformUser',
+            platformUserData: { id: platformUserSnap.docs[0].id, ...docData } as PlatformUser
+        };
     }
     return result; 
   };
   
   const handleOpenCreateUserFlow = () => {
     setEditingUser(null);
-    setVerifiedDniResult(null);
-    dniForm.reset({ docType: 'dni', docNumber: "" });
     setExistingPlatformUserToEdit(null);
     setShowDniIsPlatformUserAlert(false);
+    setShowUserNotFoundAlert(false);
+    setDniNotFound("");
     setShowDniEntryModal(true); 
   };
   
-const handleDniVerificationSubmit = async (values: DniEntryValues) => {
-    if (isSubmitting) return;
-    const docNumberCleaned = values.docNumber.trim();
+  const handleDniVerificationSubmit = async (docNumber: string) => {
     setIsSubmitting(true);
+    setShowDniEntryModal(false);
 
     try {
-        const result = await checkDniExists(docNumberCleaned);
-        let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-
-        if (result.exists) {
-            if (result.userType === 'PlatformUser' && result.platformUserData) {
-                setExistingPlatformUserToEdit(result.platformUserData);
-                initialData.existingPlatformUser = result.platformUserData;
-                setShowDniIsPlatformUserAlert(true);
-            } else {
-                if (result.userType === 'SocioVipMember' && result.socioVipData) {
-                    initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
-                    initialData.email = result.socioVipData.email;
-                    initialData.phone = result.socioVipData.phone;
-                    initialData.dob = anyToDate(result.socioVipData.dob) ?? undefined;
-                    initialData.preExistingUserType = 'SocioVipMember';
-                } else if (result.userType === 'QrClient' && result.qrClientData) {
-                    initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
-                    initialData.phone = result.qrClientData.phone;
-                    initialData.dob = anyToDate(result.qrClientData.dob) ?? undefined;
-                    initialData.preExistingUserType = 'QrClient';
-                }
-                setVerifiedDniResult(initialData);
-                setShowUserFormModal(true);
-            }
+        const result = await checkDniExists(docNumber);
+        
+        if (result.exists && result.userType === 'PlatformUser' && result.platformUserData) {
+            setExistingPlatformUserToEdit(result.platformUserData);
+            setShowDniIsPlatformUserAlert(true);
         } else {
-            if (values.docType === 'dni') {
-                try {
-                    const response = await fetch('/api/public/consult-document', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ dni: docNumberCleaned, docType: 'dni' }),
-                    });
-                    const data = await response.json();
-                    if (response.ok && data.nombreCompleto) {
-                        initialData.name = data.nombreCompleto;
-                        if(data.fechaNacimiento) {
-                             const parsedDate = parse(data.fechaNacimiento, 'dd/MM/yyyy', new Date());
-                             if (!isNaN(parsedDate.getTime())) {
-                                initialData.dob = parsedDate;
-                             }
-                        }
-                        toast({ title: "Datos Encontrados", description: "Hemos autocompletado el nombre y fecha de nacimiento." });
-                    }
-                } catch (apiError) {
-                    console.warn("API de consulta de DNI no disponible, se procederá con el registro manual.");
-                }
-            }
-            setVerifiedDniResult(initialData);
-            setShowUserFormModal(true);
+            setDniNotFound(docNumber);
+            setShowUserNotFoundAlert(true);
         }
     } catch (error: any) {
         toast({ title: "Error de Verificación", description: "No se pudo completar la búsqueda. " + error.message, variant: "destructive" });
     } finally {
         setIsSubmitting(false);
-        setShowDniEntryModal(false);
     }
-};
+  };
   
   const handleReassignRole = () => {
       if (existingPlatformUserToEdit) {
@@ -236,7 +154,7 @@ const handleDniVerificationSubmit = async (values: DniEntryValues) => {
         const userRef = doc(db, "platformUsers", data.uid!);
         const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
         
-        const rolesAllowed: PlatformUserRole[] = isReassigning ? ['staff', 'lector_qr'] : ['business_admin', 'staff', 'lector_qr'];
+        const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'lector_qr'];
         const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
         
         if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
@@ -247,6 +165,7 @@ const handleDniVerificationSubmit = async (values: DniEntryValues) => {
         
         const userPayload: Partial<PlatformUser> = {
           name: data.name,
+          dni: data.dni,
           roles: finalRoles,
           businessId: isReassigning ? currentBusinessId : data.businessId,
         };
@@ -260,7 +179,6 @@ const handleDniVerificationSubmit = async (values: DniEntryValues) => {
               toast({ title: isReassigning ? "Usuario Reasignado" : "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
               setShowUserFormModal(false);
               setEditingUser(null);
-              setVerifiedDniResult(null);
               fetchStaffMembers();
           })
           .catch(async (serverError) => {
@@ -275,33 +193,8 @@ const handleDniVerificationSubmit = async (values: DniEntryValues) => {
               setIsSubmitting(false);
           });
     } else {
-        try {
-            const result = await signupWithGoogle('staff', {
-                dni: data.dni,
-                phone: data.phone,
-                dob: data.dob,
-                overrideName: data.name,
-            });
-
-            if ("user" in result) {
-                toast({ title: "¡Usuario Creado y Vinculado!", description: `${data.name} ahora es parte del equipo.` });
-                
-                const userRef = doc(db, "platformUsers", result.user.uid);
-                await updateDoc(userRef, {
-                    businessId: currentBusinessId,
-                    roles: data.roles.length > 0 ? data.roles : ['staff'],
-                });
-                
-                setShowUserFormModal(false);
-                fetchStaffMembers();
-            } else {
-                throw new Error(result.message || "No se pudo completar el registro con Google.");
-            }
-        } catch (error: any) {
-            toast({ title: "Error de Registro", description: error.message, variant: "destructive" });
-        } finally {
-            setIsSubmitting(false);
-        }
+        toast({ title: "Acción no soportada", description: "La creación de usuarios se realiza desde el panel de Super Administrador.", variant: "destructive" });
+        setIsSubmitting(false);
     }
   };
 
@@ -322,7 +215,7 @@ const handleDniVerificationSubmit = async (values: DniEntryValues) => {
       setIsSubmitting(false);
     }
   };
-  const { signupWithGoogle } = useAuth();
+
   const PromoterMobileCards = ({ filteredStaff }: { filteredStaff: PlatformUser[] }) => {
     if (filteredStaff.length === 0) {
       return (
@@ -483,77 +376,88 @@ const handleDniVerificationSubmit = async (values: DniEntryValues) => {
         </CardContent>
       </Card>
       
-      <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
-        <UIDialogContent className="sm:max-w-md">
-          <UIDialogHeader>
-            <UIDialogTitle className="font-headline">Paso 1: Verificar Documento</UIDialogTitle>
-            <UIDialogDescription>Ingresa el documento para verificar si la persona ya existe en la plataforma.</UIDialogDescription>
-          </UIDialogHeader>
-          <Form {...dniForm}>
-            <form onSubmit={dniForm.handleSubmit(handleDniVerificationSubmit)} className="space-y-4 py-2">
-              <FormField control={dniForm.control} name="docType" render={({ field }) => (
-                <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel>
-                    <FormControl>
-                        <RadioGroup onValueChange={(value) => { field.onChange(value); dniForm.setValue('docNumber', ''); dniForm.clearErrors('docNumber'); }} defaultValue={field.value} className="grid grid-cols-2 gap-2">
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                                <Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}>
-                                    <FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI
-                                </Label>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                                 <Label htmlFor="docType-ce-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}>
-                                    <FormControl><RadioGroupItem value="ce" id="docType-ce-staff" className="sr-only" /></FormControl>Carnet de Extranjería
-                                </Label>
-                            </FormItem>
-                        </RadioGroup>
-                    </FormControl>
-                <FormMessage /></FormItem>
-              )} />
-              <FormField control={dniForm.control} name="docNumber" render={({ field }) => (
-                <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <DialogFooter><Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" variant="gradient" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button></DialogFooter>
-            </form>
-          </Form>
-        </UIDialogContent>
-      </UIDialog>
-      
-      <UIDialog open={showUserFormModal} onOpenChange={setShowUserFormModal}>
-        <UIDialogContent className="sm:max-w-lg">
-          <UIDialogHeader>
-            <UIDialogTitle className="font-headline">{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
-            <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los datos para crear el usuario."}</UIDialogDescription>
-          </UIDialogHeader>
-          <PlatformUserForm 
-            user={editingUser || undefined}
-            initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
-            businesses={[]}
-            allowedRoles={['staff', 'lector_qr']}
-            onSubmit={handleCreateOrEditUser}
-            onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
+      {showDniEntryModal && (
+        <DniEntryDialog
+            open={showDniEntryModal}
+            onOpenChange={(isOpen) => !isOpen && setShowDniEntryModal(false)}
             isSubmitting={isSubmitting}
-          />
-        </UIDialogContent>
-      </UIDialog>
+            onDniVerified={(result) => {
+              setShowDniEntryModal(false);
+              if (result.existingLink) {
+                  onAlreadyLinked(result.existingLink);
+              } else {
+                  handleDniVerificationSubmit(result.dni);
+              }
+            }}
+            onAlreadyLinked={(link) => {
+                setShowDniEntryModal(false);
+                setExistingPlatformUserToEdit(link as any);
+                setShowDniIsPlatformUserAlert(true);
+            }}
+        />
+      )}
+      
+      {showUserFormModal && (
+        <UIDialog open={showUserFormModal} onOpenChange={setShowUserFormModal}>
+            <UIDialogContent className="sm:max-w-lg">
+            <UIDialogHeader>
+                <UIDialogTitle className="font-headline">{editingUser ? `Editar Personal: ${editingUser.name}` : "Asignar Rol"}</UIDialogTitle>
+                <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Asigna un rol a este usuario."}</UIDialogDescription>
+            </UIDialogHeader>
+            <PlatformUserForm 
+                user={editingUser || undefined}
+                businesses={[]}
+                allowedRoles={['staff', 'lector_qr']}
+                onSubmit={handleCreateOrEditUser}
+                onCancel={() => {setShowUserFormModal(false); setEditingUser(null);}}
+                isSubmitting={isSubmitting}
+            />
+            </UIDialogContent>
+        </UIDialog>
+      )}
 
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</AlertDialogTitle>
                 <ShadcnAlertDialogDescription>
-                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-semibold">{(existingPlatformUserToEdit?.roles || []).map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
+                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma.
                     <br/><br/>
-                    ¿Deseas reasignarlo a tu negocio con un nuevo rol?
+                    ¿Deseas editar sus roles para este negocio?
                 </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={handleReassignRole} className="bg-primary hover:bg-primary/90">
-                    <GitBranch className="mr-2 h-4 w-4"/> Confirmar y Reasignar
+                    <GitBranch className="mr-2 h-4 w-4"/> Editar Roles
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+       <AlertDialog open={showUserNotFoundAlert} onOpenChange={setShowUserNotFoundAlert}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center">
+                    <Info className="h-6 w-6 mr-2 text-blue-500"/> Usuario no Registrado
+                </AlertDialogTitle>
+                <AlertDialogDescription className="pt-4 space-y-3">
+                    <p>El documento <strong>{dniNotFound}</strong> no corresponde a un usuario con una cuenta en la plataforma.</p>
+                    <p>Para añadirlo a tu equipo, el usuario primero debe crear su cuenta personal en SocioVIP.</p>
+                    <div className="bg-muted p-3 rounded-md text-center">
+                        <p className="text-sm font-semibold">Indícale al usuario que se registre en:</p>
+                        <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.app/signup</a>
+                        <p className="text-xs text-muted-foreground mt-1">Una vez registrado, podrás buscarlo por su DNI para asignarle un rol.</p>
+                    </div>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setShowUserNotFoundAlert(false)} className="bg-primary hover:bg-primary/90">
+                    Entendido
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }
