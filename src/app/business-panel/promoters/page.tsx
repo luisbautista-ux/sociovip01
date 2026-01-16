@@ -28,12 +28,6 @@ import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as U
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { Info } from "lucide-react";
 
-interface CheckDniResult {
-  exists: boolean;
-  userData?: PlatformUser;
-  isAlreadyLinkedToThisBusiness?: boolean;
-  linkData?: BusinessPromoterLink;
-}
 
 export default function BusinessPromotersPage() {
     const { userProfile, currentUser } = useAuth();
@@ -146,48 +140,20 @@ export default function BusinessPromotersPage() {
         setShowDetailsModal(true);
     };
     
-    const checkPromoterExists = async (dni: string): Promise<CheckDniResult> => {
-        const userQuery = query(collection(db, "platformUsers"), where("dni", "==", dni), limit(1));
-        const userSnap = await getDocs(userQuery);
-        
-        if (userSnap.empty) {
-            return { exists: false };
-        }
-
-        const userData = { id: userSnap.docs[0].id, ...userSnap.docs[0].data() } as PlatformUser;
-        
-        const linkQuery = query(collection(db, "businessPromoterLinks"), where("businessId", "==", currentBusinessId), where("platformUserUid", "==", userData.uid), limit(1));
-        const linkSnap = await getDocs(linkQuery);
-        
-        return {
-            exists: true,
-            userData: userData,
-            isAlreadyLinkedToThisBusiness: !linkSnap.empty,
-            linkData: linkSnap.empty ? undefined : { id: linkSnap.docs[0].id, ...linkSnap.docs[0].data() } as BusinessPromoterLink,
-        };
-    };
-
-    const handleDniVerification = async (result: { docNumber: string; docType: 'dni' | 'ce' }) => {
+    const handleDniVerification = (result: InitialDataForPromoterLink) => {
         setShowDniEntryModal(false);
-        setIsSubmitting(true);
+        // The dialog already performed the check.
+        // It calls `onDniVerified` only if no existing link was found for this business.
         
-        try {
-            const checkResult = await checkPromoterExists(result.docNumber);
-            if (checkResult.exists && checkResult.userData) {
-                if (checkResult.isAlreadyLinkedToThisBusiness) {
-                    toast({ title: "Promotor ya vinculado", description: `${checkResult.userData.name} ya está vinculado a este negocio.`, variant: "default" });
-                } else {
-                    setUserToLink(checkResult.userData);
-                    setShowDniAlreadyExistsAlert(true);
-                }
-            } else {
-                setDniNotFound(result.docNumber);
-                setShowUserNotFoundAlert(true);
-            }
-        } catch (error: any) {
-            toast({ title: "Error de Verificación", description: `No se pudo verificar el DNI. ${error.message}`, variant: "destructive" });
-        } finally {
-            setIsSubmitting(false);
+        if (result.existingPlatformUserPromoter) {
+            // A user with a promoter role exists, but isn't linked to THIS business.
+            // Ask to link them.
+            setUserToLink(result.existingPlatformUserPromoter);
+            setShowDniAlreadyExistsAlert(true);
+        } else {
+            // No user with promoter role found. Tell admin to ask the user to sign up.
+            setDniNotFound(result.dni);
+            setShowUserNotFoundAlert(true);
         }
     };
     
@@ -405,7 +371,7 @@ export default function BusinessPromotersPage() {
             open={showDniEntryModal}
             onOpenChange={setShowDniEntryModal}
             isSubmitting={isSubmitting}
-            onDniVerified={(result) => handleDniVerification(result as any)}
+            onDniVerified={handleDniVerification}
             onAlreadyLinked={(link) => {
                 setShowDniEntryModal(false);
                 toast({ title: "Promotor ya vinculado", description: `${link.promoterName} ya está vinculado a este negocio.`, variant: "default" });
