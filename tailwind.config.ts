@@ -109,6 +109,10 @@ export default {
           '25%': { transform: 'rotate(0.5deg)' },
           '75%': { transform: 'rotate(-0.5deg)' },
         },
+        scroll: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-100%)' },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
@@ -118,8 +122,11 @@ export default {
         'progress-bar-fill': 'progress-bar-fill linear forwards',
         'border-gradient': 'border-gradient-animation 3s linear infinite',
         'tilt': 'tilt 10s infinite linear',
+        'scroll': 'scroll 30s linear infinite',
   		}
   	}
   },
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;
+
+    

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -677,7 +676,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
        <main className="flex-grow overflow-y-auto">
             <div className="max-w-7xl mx-auto w-full px-0 sm:px-6 lg:px-8 pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 md:mt-8 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 md:mt-8 mb-4">
                     <div className="md:col-span-2">
                         <ImageCarousel
                           images={businessDetails.publicCoverImageUrls || []}
@@ -690,6 +689,36 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     <aside className="hidden md:block h-full">
                          <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor}/>
                     </aside>
+                </div>
+
+                <div className="relative overflow-x-hidden whitespace-nowrap py-2 text-sm font-bold text-white" style={{ backgroundColor: businessDetails.primaryColor }}>
+                    <div className="animate-scroll inline-block">
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                    </div>
+                    <div className="animate-scroll inline-block">
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                        <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                         <span className="mx-4">•</span>
+                        <span className="mx-4">Genera tus entradas QR gratis</span>
+                    </div>
                 </div>
             
                 <div className="sticky top-0 z-30 py-2 bg-background px-4">
@@ -1045,3 +1074,5 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
+
+    
