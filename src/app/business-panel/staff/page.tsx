@@ -441,7 +441,7 @@ export default function BusinessStaffPage() {
                 <AlertDialogTitle className="flex items-center">
                     <Info className="h-6 w-6 mr-2 text-blue-500"/> Usuario no Registrado
                 </AlertDialogTitle>
-                <AlertDialogDescription className="pt-4 space-y-3">
+                <ShadcnAlertDialogDescription className="pt-4 space-y-3">
                     <p>El documento <strong>{dniNotFound}</strong> no corresponde a un usuario con una cuenta en la plataforma.</p>
                     <p>Para añadirlo a tu equipo, el usuario primero debe crear su cuenta personal en SocioVIP.</p>
                     <div className="bg-muted p-3 rounded-md text-center">
@@ -449,7 +449,7 @@ export default function BusinessStaffPage() {
                         <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.app/signup</a>
                         <p className="text-xs text-muted-foreground mt-1">Una vez registrado, podrás buscarlo por su DNI para asignarle un rol.</p>
                     </div>
-                </AlertDialogDescription>
+                </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogAction onClick={() => setShowUserNotFoundAlert(false)} className="bg-primary hover:bg-primary/90">
