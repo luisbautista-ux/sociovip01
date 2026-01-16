@@ -10,7 +10,7 @@ import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMe
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +27,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 import { db } from "@/lib/firebase";
@@ -89,6 +90,9 @@ export default function AdminUsersPage() {
   const [showDniIsPlatformUserAlert, setShowDniIsPlatformUserAlert] = useState(false);
   const [existingPlatformUserToEdit, setExistingPlatformUserToEdit] = useState<PlatformUser | null>(null);
   const [existingPlatformUserRoles, setExistingPlatformUserRoles] = useState<PlatformUserRole[]>([]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
 
   const dniEntryForm = useForm<DniEntryValues>({
@@ -165,6 +169,16 @@ export default function AdminUsersPage() {
     (user.dni?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
   
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredUsers.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredUsers, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, rowsPerPage]);
+
   const handleExport = () => {
     if (filteredUsers.length === 0) {
       toast({ title: "Sin Datos", description: "No hay usuarios para exportar.", variant: "destructive" });
@@ -499,6 +513,9 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
               disabled={isLoading}
             />
           </div>
+           <div className="text-sm text-muted-foreground pt-4">
+            Mostrando <span className="font-semibold text-foreground">{filteredUsers.length}</span> de <span className="font-semibold text-foreground">{platformUsers.length}</span> usuarios totales.
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -514,7 +531,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             <>
               {/* Mobile View */}
               <div className="md:hidden space-y-4">
-                {filteredUsers.map(user => (
+                {paginatedUsers.map(user => (
                    <Card key={user.id} className="overflow-hidden">
                       <CardHeader className="p-4">
                         <CardTitle>{user.name}</CardTitle>
@@ -529,7 +546,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                             <span className="text-muted-foreground">Roles</span>
                             <div className="flex flex-wrap gap-1 justify-end">
                                 {user.roles && user.roles.map(role => (
-                                    <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="text-xs">
+                                    <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole) || role === 'promoter' ? 'secondary' : 'outline')} className="text-xs">
                                         {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
                                     </Badge>
                                 ))}
@@ -577,6 +594,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>#</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI/CE <span className="text-destructive">*</span></TableHead>
                       <TableHead className="hidden md:table-cell">Email <span className="text-destructive">*</span></TableHead>
@@ -587,8 +605,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsers.length > 0 ? (
-                      filteredUsers.map((user) => {
+                    {paginatedUsers.length > 0 ? (
+                      paginatedUsers.map((user, index) => {
                         const lastLoginDate = anyToDate(user.lastLogin);
                         const getBusinessDisplay = () => {
                           if (user.roles.includes('promoter')) {
@@ -605,12 +623,13 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
 
                         return (
                         <TableRow key={user.id}>
+                          <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell>{user.dni}</TableCell>
                           <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                           <TableCell>
                             {user.roles && user.roles.map(role => (
-                                <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
+                                <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole) || role === 'promoter' ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
                                     {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
                                 </Badge>
                             ))}
@@ -658,7 +677,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                       )})
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
+                        <TableCell colSpan={8} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -667,6 +686,49 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             </>
           )}
         </CardContent>
+        {totalPages > 1 && (
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+            <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page">Filas por página:</Label>
+                <Select
+                value={`${rowsPerPage}`}
+                onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                <SelectTrigger id="rows-per-page" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                </SelectTrigger>
+                <SelectContent>
+                    {[10, 25, 50, 100].map((pageSize) => (
+                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+            </div>
+            <div className="flex items-center space-x-2">
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                >
+                Anterior
+                </Button>
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                >
+                Siguiente
+                </Button>
+            </div>
+            </CardFooter>
+        )}
       </Card>
       
       <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
@@ -831,5 +893,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     </div>
   );
 }
+
+    
 
     
