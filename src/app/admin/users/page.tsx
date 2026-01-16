@@ -870,9 +870,9 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
       <AlertDialog open={showUserNotFoundAlert} onOpenChange={setShowUserNotFoundAlert}>
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center">
+                <UIAlertDialogTitle className="flex items-center">
                     <Info className="h-6 w-6 mr-2 text-blue-500"/> Usuario no Registrado
-                </AlertDialogTitle>
+                </UIAlertDialogTitle>
                 <ShadcnAlertDialogDescription className="pt-4 space-y-3">
                     <p>El documento <strong>{dniNotFound}</strong> no corresponde a un usuario con una cuenta en la plataforma.</p>
                     <p>Para asignarle un rol de plataforma (admin, staff, etc.), el usuario primero debe tener una cuenta personal en SocioVIP.</p>
@@ -894,6 +894,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     </div>
   );
 }
+
+    
 
     
 
