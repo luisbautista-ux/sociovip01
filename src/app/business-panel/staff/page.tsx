@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
 import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch } from "lucide-react";
-import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
+import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole } from "@/lib/types";
 import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -418,15 +418,15 @@ export default function BusinessStaffPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</AlertDialogTitle>
                 <ShadcnAlertDialogDescription>
-                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma.
+                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-bold text-primary">{existingPlatformUserToEdit?.roles?.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
                     <br/><br/>
-                    ¿Deseas editar sus roles para este negocio?
+                    ¿Deseas reasignar sus roles para este negocio?
                 </ShadcnAlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction onClick={handleReassignRole} className="bg-primary hover:bg-primary/90">
-                    <GitBranch className="mr-2 h-4 w-4"/> Editar Roles
+                    <GitBranch className="mr-2 h-4 w-4"/> Reasignar Roles
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
