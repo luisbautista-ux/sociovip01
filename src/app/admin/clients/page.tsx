@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { QrClient } from "@/lib/types"; 
 import { format, getMonth, parseISO, isValid } from "date-fns";
@@ -9,7 +9,7 @@ import { es } from "date-fns/locale";
 import { ListChecks, Download, Search, Gift, Loader2, Filter, Cake, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, Timestamp } from "firebase/firestore";
@@ -25,6 +25,9 @@ export default function AdminQrClientsPage() {
   const [qrClients, setQrClients] = useState<QrClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
 
   const fetchQrClients = useCallback(async () => {
     setIsLoading(true);
@@ -72,7 +75,7 @@ export default function AdminQrClientsPage() {
     fetchQrClients();
   }, [fetchQrClients]);
 
-  const filteredClients = qrClients.filter(client => {
+  const filteredClients = useMemo(() => qrClients.filter(client => {
     const searchMatch = (
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -86,7 +89,18 @@ export default function AdminQrClientsPage() {
       (client.registrationDate && typeof client.registrationDate === 'string' && getMonth(parseISO(client.registrationDate)) === parseInt(registrationMonthFilter));
       
     return searchMatch && birthdayMatch && registrationMatch;
-  });
+  }), [qrClients, searchTerm, birthdayMonthFilter, registrationMonthFilter]);
+
+  const totalPages = Math.ceil(filteredClients.length / rowsPerPage);
+  const paginatedClients = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredClients.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredClients, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, birthdayMonthFilter, registrationMonthFilter, rowsPerPage]);
+
 
   const handleExport = async () => {
     if (filteredClients.length === 0) {
@@ -231,7 +245,7 @@ export default function AdminQrClientsPage() {
             </div>
           </div>
           <div className="text-sm text-muted-foreground pt-4">
-            Mostrando <span className="font-semibold text-foreground">{filteredClients.length}</span> de <span className="font-semibold text-foreground">{qrClients.length}</span> clientes totales.
+            Mostrando <span className="font-semibold text-foreground">{paginatedClients.length}</span> de <span className="font-semibold text-foreground">{filteredClients.length}</span> clientes totales.
           </div>
         </CardHeader>
         <CardContent>
@@ -249,6 +263,7 @@ export default function AdminQrClientsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>#</TableHead>
                     <TableHead>Nombres y Apellidos</TableHead>
                     <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
                     <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
@@ -257,9 +272,10 @@ export default function AdminQrClientsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredClients.length > 0 ? (
-                    filteredClients.map((client) => (
+                  {paginatedClients.length > 0 ? (
+                    paginatedClients.map((client, index) => (
                       <TableRow key={client.id}>
+                        <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                         <TableCell>{client.name} {client.surname}</TableCell>
                         <TableCell className="hidden md:table-cell">{client.dni}</TableCell>
                         <TableCell className="hidden lg:table-cell">{client.phone}</TableCell>
@@ -269,7 +285,7 @@ export default function AdminQrClientsPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center h-24">No se encontraron clientes QR con los filtros aplicados.</TableCell>
+                      <TableCell colSpan={6} className="text-center h-24">No se encontraron clientes QR con los filtros aplicados.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -277,6 +293,49 @@ export default function AdminQrClientsPage() {
             </div>
           )}
         </CardContent>
+         {totalPages > 1 && (
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+            <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page-clients">Filas por página:</Label>
+                <Select
+                value={`${rowsPerPage}`}
+                onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                <SelectTrigger id="rows-per-page-clients" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                </SelectTrigger>
+                <SelectContent>
+                    {[10, 25, 50, 100].map((pageSize) => (
+                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+            </div>
+            <div className="flex items-center space-x-2">
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                >
+                Anterior
+                </Button>
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                >
+                Siguiente
+                </Button>
+            </div>
+            </CardFooter>
+        )}
       </Card>
     </div>
   );
