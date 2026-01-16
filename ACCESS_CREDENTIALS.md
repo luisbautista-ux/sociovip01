@@ -44,7 +44,7 @@ Esta sección detalla las rutas internas de la aplicación y qué roles de usuar
 -   `/`: Página principal de la aplicación.
 -   `/login`: Página de inicio de sesión de usuario.
 -   `/signup`: Página de registro de Super Administrador.
--   `/b/[customUrlPath]`: Página pública para un negocio con una URL personalizada (ej., `/b/pandora-lounge`).
+-   `/[customUrlPath]`: Página pública para un negocio con una URL personalizada (ej., `/pandora-lounge`).
 -   `/business/[businessId]`: Página pública para un negocio sin una URL personalizada.
 
 ### Rutas de Autenticación (Internas)
