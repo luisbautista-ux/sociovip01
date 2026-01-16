@@ -20,7 +20,7 @@ import { PromotersTable } from "@/components/business/promoters/PromotersTable";
 import { PromoterMobileCards } from "@/components/business/promoters/PromoterMobileCards";
 import { CommissionDetailsDialog } from "@/components/business/promoters/CommissionDetailsDialog";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
-import { DEFAULT_COMMISSION_PER_CODE } from "@/lib/constants";
+import { DEFAULT_COMMISSION_PER_CODE, PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -142,16 +142,11 @@ export default function BusinessPromotersPage() {
     
     const handleDniVerification = (result: InitialDataForPromoterLink) => {
         setShowDniEntryModal(false);
-        // The dialog already performed the check.
-        // It calls `onDniVerified` only if no existing link was found for this business.
         
         if (result.existingPlatformUserPromoter) {
-            // A user with a promoter role exists, but isn't linked to THIS business.
-            // Ask to link them.
             setUserToLink(result.existingPlatformUserPromoter);
             setShowDniAlreadyExistsAlert(true);
         } else {
-            // No user with promoter role found. Tell admin to ask the user to sign up.
             setDniNotFound(result.dni);
             setShowUserNotFoundAlert(true);
         }
@@ -381,15 +376,19 @@ export default function BusinessPromotersPage() {
         <AlertDialog open={showDniAlreadyExistsAlert} onOpenChange={setShowDniAlreadyExistsAlert}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Promotor Existente Detectado</AlertDialogTitle>
+                    <AlertDialogTitle className="flex items-center">
+                        <AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                        El usuario <span className="font-semibold">{userToLink?.name}</span> ya tiene una cuenta. ¿Deseas vincularlo como promotor a tu negocio?
+                        El usuario <span className="font-semibold">{userToLink?.name}</span> ya tiene una cuenta con el/los rol(es) de: <span className="font-bold text-primary">{userToLink?.roles?.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
+                        <br/><br/>
+                        ¿Deseas vincularlo también como promotor a tu negocio?
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={() => setShowDniAlreadyExistsAlert(false)}>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={handleLinkExistingUser} className="bg-primary hover:bg-primary/90">
-                        <GitBranch className="mr-2 h-4 w-4"/> Vincular Promotor
+                        <GitBranch className="mr-2 h-4 w-4"/> Vincular como Promotor
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -448,3 +447,4 @@ export default function BusinessPromotersPage() {
   }
 
     
+
