@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
-import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle, Check, ChevronsUpDown, MoreVertical } from "lucide-react";
+import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle, Check, ChevronsUpDown, MoreVertical, Info } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -88,6 +88,9 @@ export default function AdminUsersPage() {
   const [showCreateEditModal, setShowCreateEditModal] = useState(false); 
   
   const [showDniIsPlatformUserAlert, setShowDniIsPlatformUserAlert] = useState(false);
+  const [showUserNotFoundAlert, setShowUserNotFoundAlert] = useState(false);
+  const [dniNotFound, setDniNotFound] = useState("");
+
   const [existingPlatformUserToEdit, setExistingPlatformUserToEdit] = useState<PlatformUser | null>(null);
   const [existingPlatformUserRoles, setExistingPlatformUserRoles] = useState<PlatformUserRole[]>([]);
 
@@ -270,6 +273,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     setExistingPlatformUserRoles([]);
     setDniForVerification(""); 
     setShowDniEntryModal(true); 
+    setShowUserNotFoundAlert(false);
+    setDniNotFound("");
   };
 
   const handleDniVerificationSubmit = async (values: DniEntryValues) => {
@@ -284,56 +289,28 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     setIsSubmitting(true); 
     setDniForVerification(docNumberCleaned); 
     
-    const dbCheckResult = await checkDniExists(docNumberCleaned);
-    
-    let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-    
-    if (dbCheckResult.exists) {
-        if (dbCheckResult.userType === 'PlatformUser' && dbCheckResult.platformUserData) {
-            setIsSubmitting(false);
+    try {
+        const dbCheckResult = await checkDniExists(docNumberCleaned);
+        
+        if (dbCheckResult.exists && dbCheckResult.userType === 'PlatformUser' && dbCheckResult.platformUserData) {
             setExistingPlatformUserToEdit(dbCheckResult.platformUserData);
             setExistingPlatformUserRoles(dbCheckResult.platformUserRoles || []);
-            initialData.existingPlatformUser = dbCheckResult.platformUserData;
-            initialData.existingPlatformUserRoles = dbCheckResult.platformUserRoles || [];
             setShowDniIsPlatformUserAlert(true); 
-            setShowDniEntryModal(false); 
-            return; 
-        } else if (dbCheckResult.userType === 'SocioVipMember' && dbCheckResult.socioVipData) {
-            initialData.name = `${dbCheckResult.socioVipData.name} ${dbCheckResult.socioVipData.surname}`;
-            initialData.email = dbCheckResult.socioVipData.email;
-            initialData.preExistingUserType = 'SocioVipMember';
-        } else if (dbCheckResult.userType === 'QrClient' && dbCheckResult.qrClientData) {
-            initialData.name = `${dbCheckResult.qrClientData.name} ${dbCheckResult.qrClientData.surname}`;
-            initialData.preExistingUserType = 'QrClient';
+            setShowDniEntryModal(false);
+        } else {
+            setDniNotFound(docNumberCleaned);
+            setShowUserNotFoundAlert(true);
+            setShowDniEntryModal(false);
         }
-    } else {
-        // If DNI doesn't exist in our DB, consult the external API
-        if (values.docType === 'dni') {
-            try {
-                const response = await fetch('/api/admin/consult-dni', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dni: docNumberCleaned }),
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.nombreCompleto) {
-                        initialData.name = data.nombreCompleto;
-                    }
-                } else {
-                   console.warn("DNI consultation failed, proceeding with manual entry.");
-                }
-            } catch (error) {
-                console.error("Error calling DNI consultation API:", error);
-            }
-        }
+    } catch (error: any) {
+        toast({
+            title: "Error de Verificación",
+            description: `Hubo un problema al buscar el documento: ${error.message}`,
+            variant: "destructive"
+        });
+    } finally {
+        setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
-    setVerifiedDniResult(initialData);
-    setEditingUser(null); 
-    setShowDniEntryModal(false); 
-    setShowCreateEditModal(true); 
   };
   
   const handleEditExistingPlatformUser = () => {
@@ -514,7 +491,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             />
           </div>
            <div className="text-sm text-muted-foreground pt-4">
-            Mostrando <span className="font-semibold text-foreground">{filteredUsers.length}</span> de <span className="font-semibold text-foreground">{platformUsers.length}</span> usuarios totales.
+            Mostrando <span className="font-semibold text-foreground">{paginatedUsers.length}</span> de <span className="font-semibold text-foreground">{filteredUsers.length}</span> usuarios totales.
           </div>
         </CardHeader>
         <CardContent>
@@ -890,9 +867,35 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={showUserNotFoundAlert} onOpenChange={setShowUserNotFoundAlert}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center">
+                    <Info className="h-6 w-6 mr-2 text-blue-500"/> Usuario no Registrado
+                </AlertDialogTitle>
+                <ShadcnAlertDialogDescription className="pt-4 space-y-3">
+                    <p>El documento <strong>{dniNotFound}</strong> no corresponde a un usuario con una cuenta en la plataforma.</p>
+                    <p>Para asignarle un rol de plataforma (admin, staff, etc.), el usuario primero debe tener una cuenta personal en SocioVIP.</p>
+                    <div className="bg-muted p-3 rounded-md text-center">
+                        <p className="text-sm font-semibold">Indícale al usuario que se registre en:</p>
+                        <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.app/signup</a>
+                        <p className="text-xs text-muted-foreground mt-1">Una vez registrado, podrás buscar su DNI aquí para asignarle un rol.</p>
+                    </div>
+                </ShadcnAlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setShowUserNotFoundAlert(false)} className="bg-primary hover:bg-primary/90">
+                    Entendido
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
     </div>
   );
 }
+
+    
 
     
 
