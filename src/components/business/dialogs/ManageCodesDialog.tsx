@@ -246,13 +246,10 @@ export function ManageCodesDialog({
           return;
       }
 
-      const baseUrl = businessDetails?.customUrlPath
+      const shareUrl = businessDetails?.customUrlPath
         ? `https://sociovip.app/${businessDetails.customUrlPath}`
         : `https://sociovip.app/business/${entity?.businessId}`;
       
-      const cacheBuster = `v=${new Date().getTime()}`;
-      const shareUrl = `${baseUrl}?entity=${entity?.id}&${cacheBuster}`;
-
       const codesText = codes.join('\n');
       const message = `Genera tu entrada QR con tu código en:\n${shareUrl}\n\n${codesText}`;
       const whatsappUrl = `https://wa.me/${phoneToUse}?text=${encodeURIComponent(message)}`;
