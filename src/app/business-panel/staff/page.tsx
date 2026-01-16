@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -14,7 +15,7 @@ import { useForm } from "react-hook-form";
 import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, query, where, updateDoc, limit } from "firebase/firestore";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { DniEntryDialog } from "@/components/business/promoters/DniEntryDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -382,12 +383,8 @@ export default function BusinessStaffPage() {
             onOpenChange={(isOpen) => !isOpen && setShowDniEntryModal(false)}
             isSubmitting={isSubmitting}
             onDniVerified={(result) => {
-              setShowDniEntryModal(false);
-              if (result.existingLink) {
-                  onAlreadyLinked(result.existingLink);
-              } else {
-                  handleDniVerificationSubmit(result.dni);
-              }
+                setShowDniEntryModal(false);
+                handleDniVerificationSubmit(result.dni);
             }}
             onAlreadyLinked={(link) => {
                 setShowDniEntryModal(false);
