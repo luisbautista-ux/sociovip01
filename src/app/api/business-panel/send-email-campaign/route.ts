@@ -86,7 +86,7 @@ export async function POST(request: Request) {
         }
 
         const businessDoc = await adminDb.collection('businesses').doc(caller.businessId).get();
-        if (!businessDoc.exists()) {
+        if (!businessDoc.exists) {
             return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
         }
 
