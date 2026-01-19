@@ -1004,22 +1004,23 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               </div>
               <div className="flex items-center gap-3">
                  <Link href="/" passHref>
-                    <Button
-                        variant="ghost"
-                        className="font-semibold text-sm text-muted-foreground hover:text-primary transition"
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Volver al Inicio
-                    </Button>
-                 </Link>
-                  <Link href="/login" passHref>
-                     <Button
-                        variant="ghost"
-                        className="font-semibold text-sm text-white shadow-md hover:opacity-90 transition"
-                        style={{ backgroundColor: businessDetails.primaryColor }}
-                    >
-                      <UserCircle className="mr-2 h-4 w-4" />
-                      Iniciar Sesión
+                 <Button
+                    variant="ghost"
+                    className="font-semibold text-sm text-muted-foreground hover:text-gray-300 transition"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Volver al Inicio
+                  </Button>
+                </Link>
+
+                <Link href="/login" passHref>
+                  <Button
+                    variant="ghost"
+                    className="font-semibold text-sm text-white shadow-md hover:opacity-90 transition"
+                    style={{ backgroundColor: businessDetails.primaryColor }}
+                  >
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    Iniciar Sesión
                     </Button>
                   </Link>
               </div>

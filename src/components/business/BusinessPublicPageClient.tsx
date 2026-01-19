@@ -724,9 +724,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 <div className="sticky top-0 z-30 py-2 bg-background px-4">
                     <div className="max-w-7xl mx-auto">
                         <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
-                            <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Ver Todo</button>
-                            <button onClick={() => setView('promotions')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'promotions' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Promociones</button>
-                            <button onClick={() => setView('events')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'events' ? `border-b-2 text-primary border-primary` : 'text-muted-foreground')}>Eventos</button>
+                            <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Ver Todo</button>
+                            <button onClick={() => setView('promotions')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'promotions' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Promociones</button>
+                            <button onClick={() => setView('events')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'events' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Eventos</button>
                         </div>
                     </div>
                 </div>
@@ -1074,5 +1074,3 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     </div>
   );
 }
-
-    
