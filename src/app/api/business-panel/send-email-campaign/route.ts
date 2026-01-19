@@ -20,7 +20,7 @@ function encodeSubject(subject: string) {
     return `=?UTF-8?B?${utf8Subject}?=`;
 }
 
-// ✅ PLANTILLA HTML MEJORADA CON ESTILOS EN LÍNEA PARA MÁXIMA COMPATIBILIDAD
+// ✅ PLANTILLA HTML MEJORADA CON ESTILOS EN LÍNEA, GIF Y MEJOR DISEÑO
 function createHtmlBody(
     messageBody: string, 
     businessName: string, 
@@ -30,7 +30,7 @@ function createHtmlBody(
     businessUrl: string = 'https://sociovip.app'
 ): string {
     const finalBody = messageBody.replace(/\n/g, '<br>');
-    const lighterPrimary = primaryColor + '1A'; 
+    const gifUrl = "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjlnanA4cGhidjNocDBlOGRyZXJzN2NnbmRtNzUzaXZiM2Y3dWI2ciZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5piDYylE9mTtri4E2E/giphy.gif";
 
     return `
       <!DOCTYPE html>
@@ -43,14 +43,17 @@ function createHtmlBody(
             body { margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif; background-color: #f4f7f6; color: #333; }
         </style>
       </head>
-      <body>
-        <div style="max-width: 600px; margin: 20px auto; background: linear-gradient(180deg, ${lighterPrimary} 0%, #ffffff 25%); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
-          <div style="padding: 30px; text-align: center;">
-            ${businessLogoUrl ? `<img src="${businessLogoUrl}" alt="${businessName} Logo" style="max-width: 100px; height: auto; margin-bottom: 16px; border-radius: 8px; background-color: white; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.08);" />` : ''}
-            <h1 style="color: ${primaryColor}; font-size: 28px; margin:0; font-weight: 700;">${businessName}</h1>
+      <body style="background-color: #f4f7f6; margin: 0; padding: 0;">
+        <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
+          <div style="padding: 30px; text-align: center; background-image: linear-gradient(to right, ${primaryColor} 0%, ${secondaryColor} 100%); color: white;">
+            ${businessLogoUrl ? `<img src="${businessLogoUrl}" alt="${businessName} Logo" style="max-width: 80px; height: auto; margin: 0 auto 16px; border-radius: 8px; background-color: rgba(255,255,255,0.9); padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" />` : ''}
+            <h1 style="font-size: 28px; margin:0; font-weight: 700; text-shadow: 1px 1px 3px rgba(0,0,0,0.2);">${businessName}</h1>
           </div>
-          <div style="padding: 10px 30px 30px 30px;">
-            <p style="font-size: 16px; line-height: 1.7; color: #555;">${finalBody}</p>
+          <div style="padding: 30px;">
+            <div style="text-align: center; margin-bottom: 25px;">
+              <img src="${gifUrl}" alt="Animación festiva" style="max-width: 150px; height: auto; margin: 0 auto;" />
+            </div>
+            <p style="font-size: 16px; line-height: 1.7; color: #555; text-align: left;">${finalBody}</p>
             <p style="text-align:center; margin-top: 30px;">
               <a href="${businessUrl}" target="_blank" style="display: inline-block; padding: 14px 30px; text-align: center; text-transform: uppercase; transition: 0.5s; background-image: linear-gradient(to right, ${primaryColor} 0%, ${secondaryColor} 51%, ${primaryColor} 100%); background-size: 200% auto; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.5px; box-shadow: 0 4px 15px 0 rgba(142, 94, 162, 0.45);">Ver Promociones</a>
             </p>
@@ -83,7 +86,7 @@ export async function POST(request: Request) {
         }
 
         const businessDoc = await adminDb.collection('businesses').doc(caller.businessId).get();
-        if (!businessDoc.exists) {
+        if (!businessDoc.exists()) {
             return NextResponse.json({ error: 'Business not found.' }, { status: 404 });
         }
 
