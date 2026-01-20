@@ -53,7 +53,7 @@ export default function PilotPage() {
       const [promosSnap, clientsSnap, entitiesSnap] = await Promise.all([
         getDocs(promosQuery),
         getDocs(clientsQuery),
-        getDocs(entitiesSnap)
+        getDocs(entitiesQuery)
       ]);
 
       setAvailablePromotions(promosSnap.docs.map(d => ({ id: d.id, ...d.data() } as BusinessManagedEntity)));
