@@ -33,6 +33,12 @@ service cloud.firestore {
         return isBusinessAdmin(businessId) || isStaff(businessId);
     }
     
+    // Verifica si el usuario es miembro de CUALQUIER negocio (admin, staff o lector)
+    function isAnyBusinessMember() {
+      let userRoles = getUserData().roles;
+      return isSignedIn() && ('business_admin' in userRoles || 'staff' in userRoles || 'lector_qr' in userRoles);
+    }
+    
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -100,7 +106,9 @@ service cloud.firestore {
     // Clientes QR
     match /qrClients/{clientId} {
       allow create: if true; // Cualquiera puede crear un cliente QR
-      allow read, update, delete: if false; // Nadie puede leer, actualizar o borrar directamente
+      // Los miembros de negocio pueden leer la lista (el filtrado ocurre en la app)
+      allow read: if isSuperAdmin() || isAnyBusinessMember();
+      allow update, delete: if false;
     }
 
     // Configuración de la Plataforma
@@ -113,6 +121,13 @@ service cloud.firestore {
     match /promoterPayments/{paymentId} {
         // Solo SuperAdmin o Admin del negocio pueden leer o registrar pagos
         allow read, write: if isSuperAdmin() || isBusinessMember(request.resource.data.businessId);
+    }
+
+    // Reglas para el Piloto Automático de Marketing
+    match /automationRules/{ruleId} {
+      // El businessId está en el ID del documento (ej: "businessId123_loyalty")
+      // Solo los miembros de ese negocio o un SuperAdmin pueden leer/escribir.
+      allow read, write: if isSuperAdmin() || isBusinessMember(ruleId.split('_')[0]);
     }
   }
 }
