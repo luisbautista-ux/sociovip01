@@ -309,7 +309,6 @@ export interface BusinessClientView {
   membershipStatus?: SocioVipMember['membershipStatus'];
 }
 
-
 // Form data types
 export interface BusinessFormData {
   name: string;
@@ -480,4 +479,15 @@ export interface BatchBoxFormData {
   cost: number;
   capacity?: number;
   description?: string;
+}
+
+export interface AutomationRule {
+  id?: string; // e.g., businessId_loyalty
+  businessId: string;
+  type: 'loyalty' | 'retention' | 'birthday';
+  name: string;
+  isEnabled: boolean;
+  threshold: number; // For loyalty: # of visits. For retention: # of days. For birthday: month (1-12)
+  actionPromoId: string; // ID of the businessEntity (promotion) to send
+  lastRun?: Timestamp | string;
 }
