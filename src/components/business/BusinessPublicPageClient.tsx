@@ -848,8 +848,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               <div className="flex items-center gap-2">
                  <Link href="/" passHref>
                     <Button
-                        variant="outline"
-                        className="p-0 h-auto md:px-4 md:py-2 font-semibold text-foreground/80 border-foreground/20 hover:bg-muted focus-visible:ring-ring md:w-auto"
+                        variant="ghost"
+                        className="p-0 h-auto md:px-4 md:py-2 font-semibold text-foreground/80 border border-foreground/20 hover:bg-muted hover:text-foreground md:w-auto"
                     >
                       <ArrowLeft className="h-8 w-8 md:h-4 md:w-4 md:mr-2" />
                       <span className="hidden md:inline">Volver al Inicio</span>
@@ -857,8 +857,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                  </Link>
                   <Link href="/login" passHref>
                      <Button
-                        variant="outline"
-                        className="font-semibold text-sm text-foreground/80 border-foreground/20 hover:bg-muted focus-visible:ring-ring"
+                        variant="ghost"
+                        className="font-semibold text-sm border border-foreground/20 text-foreground/80 hover:bg-muted hover:text-foreground"
                       >
                       <UserCircle className="mr-2 h-4 w-4" />
                       Iniciar Sesión
