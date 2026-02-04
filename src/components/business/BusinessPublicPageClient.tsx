@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -110,6 +111,14 @@ const normalizeCode = (v: unknown) =>
 const extractCodeString = (codeObj: any) =>
   normalizeCode(codeObj?.value ?? codeObj?.code ?? codeObj?.codigo ?? codeObj?.val);
 
+const isCodeAvailableForUse = (codeObj: any) => {
+  const status = String(codeObj?.status ?? codeObj?.estado ?? "").toLowerCase();
+  const usedFlag = Boolean(codeObj?.used ?? codeObj?.redeemed ?? codeObj?.isUsed);
+  // disponible si NO tiene flags de usado y su status es vacío/available/nuevo/libre
+  return !usedFlag && (status === "" || status === "available" || status === "nuevo" || status === "libre");
+};
+
+
 // helper `cn` local
 const cn = (...c: (string | false | undefined | null)[]) => c.filter(Boolean).join(" ");
 
@@ -168,14 +177,21 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
 
-  // State for the modals and QR generation flow
+  const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
   const [showDniModal, setShowDniModal] = useState(false);
   const [currentStepInModal, setCurrentStepInModal] = useState<"enterDni" | "newUserForm">("enterDni");
   const [activeEntityForQr, setActiveEntityForQr] = useState<BusinessManagedEntity | null>(null);
   const [validatedCodeObject, setValidatedCodeObject] = useState<GeneratedCode | null>(null);
   const [enteredDni, setEnteredDni] = useState<string>("");
+  const [qrData, setQrData] = useState<QrCodeData | null>(null);
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
   const [isConsultingDni, setIsConsultingDni] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // For custom template rendering
 
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(DniEntrySchema),
@@ -187,18 +203,6 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
     resolver: zodResolver(newQrClientSchema),
     defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
   });
-  
-  const resetQrFlow = useCallback(() => {
-    setShowDniModal(false);
-    setActiveEntityForQr(null);
-    setValidatedCodeObject(null);
-    setEnteredDni("");
-    dniForm.reset();
-    newQrClientForm.reset();
-    setCurrentStepInModal("enterDni");
-    setIsLoadingQrFlow(false);
-  }, [dniForm, newQrClientForm]);
-
 
   const fetchBusinessDataByCustomUrl = useCallback(async () => {
     if (!customUrlPath || typeof customUrlPath !== "string") {
@@ -324,56 +328,87 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
     }
   }, [customUrlPath, fetchBusinessDataByCustomUrl]);
 
-  const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
-    const codeToValidate = normalizeCode(codeInputValue);
-  
-    if (codeToValidate.length !== 9) {
+
+const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
+  const codeToValidate = normalizeCode(codeInputValue);
+
+  if (codeToValidate.length !== 9) {
+    toast({
+      title: "Código inválido",
+      description: "El código debe tener 9 caracteres alfanuméricos.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setIsLoadingQrFlow(true);
+  try {
+    const entityRef = doc(db, "businessEntities", entity.id);
+    const snap = await getDoc(entityRef);
+
+    if (!snap.exists()) {
+      toast({ title: "Error", description: "La promoción o evento ya no existe.", variant: "destructive" });
+      return;
+    }
+    
+    const realTimeEntityData: BusinessManagedEntity = { 
+        id: snap.id, 
+        ...(snap.data() as any),
+        startDate: anyToDate(snap.data().startDate)?.toISOString() || "",
+        endDate: anyToDate(snap.data().endDate)?.toISOString() || "",
+    };
+
+    if (!isEntityCurrentlyActivatable(realTimeEntityData)) {
       toast({
-        title: "Código inválido",
-        description: "El código debe tener 9 caracteres alfanuméricos.",
+        title: "Promoción/Evento no disponible",
+        description: "Esta oferta no está vigente en este momento.",
         variant: "destructive",
       });
       return;
     }
-  
-    setIsLoadingQrFlow(true);
-    try {
-      const entityRef = doc(db, "businessEntities", entity.id);
-      const snap = await getDoc(entityRef);
-      if (!snap.exists()) throw new Error("La promoción o evento ya no existe.");
-  
-      const realTimeEntityData: BusinessManagedEntity = { id: snap.id, ...(snap.data() as any), startDate: anyToDate(snap.data().startDate)?.toISOString() || "", endDate: anyToDate(snap.data().endDate)?.toISOString() || "" };
-  
-      if (!isEntityCurrentlyActivatable(realTimeEntityData)) {
-        throw new Error("Esta oferta no está vigente en este momento.");
-      }
-  
-      const codes: GeneratedCode[] = Array.isArray(realTimeEntityData.generatedCodes) ? realTimeEntityData.generatedCodes : [];
-      const foundCodeObject = codes.find((c) => extractCodeString(c) === codeToValidate);
-  
-      if (!foundCodeObject) {
-        throw new Error(`El código "${codeToValidate}" no existe o no es válido para esta campaña.`);
-      }
-  
-      if (foundCodeObject.status === 'redeemed' || foundCodeObject.status === 'used') {
-        toast({ title: "¡QR recuperado!", description: "Este código ya fue usado. Te llevaremos a tu QR." });
-        router.push(`/qr/${foundCodeObject.id}`);
-      } else if (foundCodeObject.status === 'available') {
-        setActiveEntityForQr(realTimeEntityData);
-        setValidatedCodeObject(foundCodeObject);
-        setCurrentStepInModal("enterDni");
-        dniForm.reset({ docType: 'dni', docNumber: "" });
-        setShowDniModal(true);
-      } else {
-        throw new Error(`Este código ya está en un estado no válido (${foundCodeObject.status}).`);
-      }
-  
-    } catch (e: any) {
-      toast({ title: "Error de Validación", description: e.message || "No se pudo validar el código.", variant: "destructive" });
-    } finally {
-      setIsLoadingQrFlow(false);
+    
+    const codes: any[] = Array.isArray(realTimeEntityData.generatedCodes) ? realTimeEntityData.generatedCodes : [];
+    const foundCodeObject = codes.find((c) => extractCodeString(c) === codeToValidate);
+
+    if (foundCodeObject && isCodeAvailableForUse(foundCodeObject)) {
+      setActiveEntityForQr(realTimeEntityData);
+      setValidatedCodeObject(foundCodeObject);
+      setCurrentStepInModal("enterDni");
+      dniForm.reset({ docType: 'dni', docNumber: "" });
+      setShowDniModal(true);
+    } else {
+      toast({
+        title: "Código inválido o no disponible",
+        description: `El código "${codeToValidate}" no existe, ya fue utilizado o está vencido.`,
+        variant: "destructive",
+      });
     }
-  };
+  } catch (e) {
+    console.error("Error validating specific code:", e);
+    toast({ title: "Error de validación", description: "No se pudo validar el código.", variant: "destructive" });
+  } finally {
+    setIsLoadingQrFlow(false);
+  }
+};
+
+const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEntity> => {
+    const entityRef = doc(db, "businessEntities", entityId);
+    const docSnap = await getDoc(entityRef);
+    if (!docSnap.exists()) {
+      throw new Error("La entidad ya no existe.");
+    }
+    const data = docSnap.data();
+    // Ensure all nested date-like fields are properly converted.
+    return { 
+        id: docSnap.id, 
+        ...data,
+        startDate: anyToDate(data.startDate)?.toISOString() || "",
+        endDate: anyToDate(data.endDate)?.toISOString() || "",
+        createdAt: anyToDate(data.createdAt)?.toISOString(),
+        qrTemplateImageUrl: data.qrTemplateImageUrl,
+        qrTemplateLayout: data.qrTemplateLayout,
+    } as BusinessManagedEntity;
+};
 
 const consultExternalDniApi = async (dni: string, docType: 'dni' | 'ce') => {
     try {
@@ -416,7 +451,7 @@ const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
         const result = await response.json();
 
         if (!response.ok) {
-             throw new Error(result.error || 'Ocurrió un error en el servidor.');
+            throw new Error(result.error || 'Ocurrió un error en el servidor.');
         }
 
         if (result.action === 'newUser') {
@@ -510,6 +545,160 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
       setIsLoadingQrFlow(false);
     }
   };
+
+
+ useEffect(() => {
+    if (qrData?.promotion.qrValue && !qrData?.promotion.qrTemplateImageUrl) {
+      QRCode.toDataURL(qrData.promotion.qrValue, { width: 400, errorCorrectionLevel: 'H' }, (err, url) => {
+        if (err) {
+          console.error("Failed to generate QR code:", err);
+          setQrCodeImage(null);
+        } else {
+          setQrCodeImage(url);
+        }
+      });
+    } else {
+      setQrCodeImage(null);
+    }
+  }, [qrData]);
+
+  const handleSaveQrWithDetails = async () => {
+    const elementToCapture = qrData?.promotion.qrTemplateImageUrl ? canvasRef.current : cardRef.current;
+    if (!elementToCapture) {
+        toast({ title: "Error", description: "No se encontró el elemento para descargar.", variant: "destructive" });
+        return;
+    }
+    try {
+        const dataUrl = await htmlToImage.toPng(elementToCapture, {
+          quality: 1.0,
+          pixelRatio: 2,
+        });
+        const link = document.createElement('a');
+        link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
+        link.href = dataUrl;
+        link.click();
+        toast({ title: "QR Guardado", description: "La imagen de la tarjeta se ha descargado." });
+    } catch (error) {
+        console.error('oops, something went wrong!', error);
+        toast({ title: "Error al Guardar", description: "No se pudo generar la imagen de la tarjeta.", variant: "destructive" });
+    }
+  };
+  
+    const drawPreviewOnCanvas = useCallback(async () => {
+        const canvas = canvasRef.current;
+        if (!canvas || !qrData || !qrData.promotion.qrTemplateImageUrl) return;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        try {
+            const templateImg = new Image();
+            templateImg.crossOrigin = "anonymous";
+            templateImg.src = qrData.promotion.qrTemplateImageUrl;
+            await new Promise<void>((resolve, reject) => {
+                templateImg.onload = () => resolve();
+                templateImg.onerror = (err) => {
+                  console.error("Failed to load template image:", err);
+                  reject(new Error("Image load error"));
+                };
+            });
+
+            canvas.width = templateImg.width;
+            canvas.height = templateImg.height;
+            ctx.drawImage(templateImg, 0, 0);
+
+            const layout = qrData.promotion.qrTemplateLayout || {
+                qr: { x: 190, y: 350, size: 80, color: '#000000' },
+                name: { x: 190, y: 450, size: 16, color: '#FFFFFF' },
+                dni: { x: 190, y: 470, size: 12, color: '#FFFFFF' },
+                promoTitle: { x: 190, y: 500, size: 14, color: '#FFFFFF' },
+            };
+
+            const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { 
+                width: layout.qr.size, 
+                errorCorrectionLevel: 'H', 
+                margin: 1,
+                color: {
+                  dark: layout.qr.color || '#000000',
+                  light: '#0000' // transparent
+                }
+            });
+            const qrImage = new Image();
+            qrImage.src = qrDataUrl;
+            await new Promise(resolve => qrImage.onload = resolve);
+            ctx.drawImage(qrImage, layout.qr.x - layout.qr.size / 2, layout.qr.y - layout.qr.size / 2, layout.qr.size, layout.qr.size);
+
+            ctx.textAlign = 'center';
+            
+            const fullName = `${qrData.user.name} ${qrData.user.surname}`;
+            let nameFontSize = layout.name.size || 16;
+            ctx.font = `bold ${nameFontSize}px Arial`;
+            ctx.fillStyle = layout.name.color || '#FFFFFF';
+            const maxWidth = canvas.width * 0.9;
+            while(ctx.measureText(fullName).width > maxWidth && nameFontSize > 8) {
+                nameFontSize--;
+                ctx.font = `bold ${nameFontSize}px Arial`;
+            }
+            ctx.fillText(fullName, layout.name.x, layout.name.y);
+            
+            ctx.font = `bold ${layout.dni.size || 12}px Arial`;
+            ctx.fillStyle = layout.dni.color || '#FFFFFF';
+            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
+            
+            let promoFontSize = layout.promoTitle.size || 14;
+            ctx.font = `bold ${promoFontSize}px Arial`;
+            ctx.fillStyle = layout.promoTitle.color || '#FFFFFF';
+            while(ctx.measureText(qrData.promotion.title).width > maxWidth && promoFontSize > 8) {
+                promoFontSize--;
+                ctx.font = `bold ${promoFontSize}px Arial`;
+            }
+            ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
+            
+            // --- Dibuja la pulsera del tipo de entrada ---
+            if (qrData.promotion.ticketType && qrData.promotion.ticketType.name) {
+                const ticketType = qrData.promotion.ticketType;
+                const rectY = layout.promoTitle.y + 15;
+                const rectHeight = 35;
+                const textY = rectY + rectHeight / 2 + 5;
+                
+                ctx.fillStyle = ticketType.color || "#888888";
+                ctx.fillRect(0, rectY, canvas.width, rectHeight);
+
+                ctx.font = "bold 16px Arial";
+                ctx.fillStyle = "#FFFFFF";
+                ctx.textAlign = "center";
+                ctx.fillText(ticketType.name.toUpperCase(), canvas.width / 2, textY);
+            }
+
+
+        } catch (error) {
+            console.error("Error drawing on canvas:", error);
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'red';
+            ctx.font = '16px Arial';
+            ctx.fillText('Error al cargar plantilla.', canvas.width / 2, canvas.height / 2);
+        }
+    }, [qrData]);
+
+    useEffect(() => {
+        if (pageViewState === 'qrDisplay' && qrData?.promotion.qrTemplateImageUrl) {
+            drawPreviewOnCanvas();
+        }
+    }, [pageViewState, qrData, drawPreviewOnCanvas]);
+
+
+  const resetQrFlow = useCallback(() => {
+    setPageViewState("entityList");
+    setQrData(null);
+    setQrCodeImage(null);
+    setActiveEntityForQr(null);
+    setValidatedCodeObject(null);
+    setEnteredDni("");
+    dniForm.reset();
+    newQrClientForm.reset();
+    setShowDniModal(false);
+  }, [dniForm, newQrClientForm]);
 
   const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
     const form = useForm<SpecificCodeFormValues>({
@@ -654,19 +843,19 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                  <Link href="/" passHref>
                     <Button
                         variant="ghost"
-                        className="p-0 h-auto md:px-4 md:py-2 text-black hover:text-gray-600 focus-visible:ring-0 md:w-auto"
+                        className="p-0 h-auto md:px-4 md:py-2 text-muted-foreground hover:bg-muted focus-visible:ring-0 md:w-auto"
                     >
                       <ArrowLeft className="h-8 w-8 md:h-4 md:w-4 md:mr-2" />
-                      <span className="hidden md:inline">Volver</span>
+                      <span className="hidden md:inline">Volver al Inicio</span>
                     </Button>
                  </Link>
                   <Link href="/login" passHref>
                      <Button
-                        variant="ghost"
-                        className="p-0 h-auto md:px-4 md:py-2 text-black hover:text-gray-600 focus-visible:ring-0 md:w-auto"
-                    >
-                      <UserCircle className="h-8 w-8 md:h-5 md:w-5 md:mr-2" />
-                      <span className="hidden md:inline">Login</span>
+                        className="font-semibold text-sm text-white shadow-md hover:brightness-90 transition"
+                        style={{ backgroundColor: businessDetails.primaryColor }}
+                      >
+                      <UserCircle className="mr-2 h-4 w-4" />
+                      Iniciar Sesión
                     </Button>
                   </Link>
               </div>
@@ -1071,6 +1260,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           )}
         </DialogContent>
       </Dialog>
+      <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
     </div>
   );
 }
