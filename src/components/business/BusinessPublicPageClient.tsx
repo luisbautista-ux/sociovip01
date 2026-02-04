@@ -538,6 +538,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   
         toast({ title: "Registro Exitoso", description: "Cliente registrado. Redirigiendo a tu QR." });
         router.push(`/qr/${validatedCodeObject.id}`);
+
     } catch (e: any) {
       toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
       resetQrFlow();
@@ -826,6 +827,128 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     );
   }
   
+  if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
+    const QrPageFooter = () => (
+      <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
+          <Link href="/login" passHref>
+            <Button variant="outline" className="w-full font-bold">
+              <UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión
+            </Button>
+          </Link>
+          <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold">
+            <Download className="mr-2 h-4 w-4" /> Guardar QR
+          </Button>
+          <Button onClick={resetQrFlow} variant="outline" className="w-full font-bold">
+            Ver Otras del Negocio
+          </Button>
+          <Link href="/" passHref>
+            <Button variant="outline" className="w-full font-bold">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio
+            </Button>
+          </Link>
+        </div>
+      </footer>
+    );
+
+    if (qrData.promotion.qrTemplateImageUrl) {
+        return (
+            <div className="min-h-screen bg-background text-foreground flex flex-col">
+                 <header
+                    className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white"
+                    >
+                    <div className="max-w-7xl mx-auto flex items-center justify-start">
+                        {businessDetails.logoUrl && (
+                        <NextImage
+                            src={businessDetails.logoUrl}
+                            alt={`${businessDetails.name} logo`}
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
+                        />
+                        )}
+                        <h1 className="font-semibold text-xl" style={{ color: businessDetails.primaryColor }}>{businessDetails.name}</h1>
+                        {businessDetails.slogan && (
+                        <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>
+                        )}
+                    </div>
+                </header>
+                <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
+                   <div className="w-full max-w-sm shadow-xl rounded-xl">
+                      <canvas ref={canvasRef} className="w-full h-auto" />
+                   </div>
+                </main>
+                <QrPageFooter />
+            </div>
+        )
+    }
+
+    return (
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <header
+          className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white"
+        >
+          <div className="max-w-7xl mx-auto flex items-center justify-start">
+            {businessDetails.logoUrl && (
+              <NextImage
+                src={businessDetails.logoUrl}
+                alt={`${businessDetails.name} logo`}
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4"
+              />
+            )}
+            <h1 className="font-semibold text-xl" style={{ color: businessDetails.primaryColor }}>{businessDetails.name}</h1>
+            {businessDetails.slogan && (
+              <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>
+            )}
+          </div>
+        </header>
+         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
+            <Card ref={cardRef} className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden">
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-xl font-bold">
+                  {activeEntityForQr.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}
+                </CardTitle>
+                <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center justify-center space-y-4">
+                {qrCodeImage ? (
+                  <NextImage src={qrCodeImage} alt="Tu código QR" width={250} height={250} className="rounded-lg border p-1" />
+                ) : (
+                  <div className="h-[250px] w-[250px] flex items-center justify-center border rounded-lg bg-muted text-muted-foreground">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                )}
+                <div className="text-center">
+                  <p className="text-lg font-semibold">Hola, {qrData.user.name} {qrData.user.surname}</p>
+                  <p className="text-sm text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
+                </div>
+                <Separator />
+                <div className="text-center">
+                   <p className="font-semibold">{qrData.promotion.title}</p>
+                   {qrData.promotion.ticketType && (
+                    <div className="flex justify-center mt-2">
+                        <div
+                        className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md"
+                        style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}
+                        >
+                        {qrData.promotion.ticketType.name.toUpperCase()}
+                        </div>
+                    </div>
+                  )}
+                   <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(parseISO(qrData.promotion.validUntil), "dd MMMM, yyyy", { locale: es })}</p>
+                </div>
+              </CardContent>
+              <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
+              </CardFooter>
+            </Card>
+        </main>
+        <QrPageFooter />
+      </div>
+    )
+  }
+
   if (!businessDetails) return null;
 
   return (
@@ -851,8 +974,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                  </Link>
                   <Link href="/login" passHref>
                      <Button
-                        className="font-semibold text-sm text-white shadow-md hover:brightness-90 transition"
-                        style={{ backgroundColor: businessDetails.primaryColor }}
+                        variant="outline"
+                        className="font-semibold text-sm hover:bg-muted hover:text-accent-foreground"
                       >
                       <UserCircle className="mr-2 h-4 w-4" />
                       Iniciar Sesión
