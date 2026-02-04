@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -849,19 +848,21 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                  <Link href="/" passHref>
                     <Button
                         variant="ghost"
-                        className="p-0 h-auto md:px-4 md:py-2 font-semibold text-foreground/80 border border-foreground/20 hover:bg-muted hover:text-foreground md:w-auto"
+                        size="icon"
+                        className="font-semibold text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
                     >
-                      <ArrowLeft className="h-8 w-8 md:h-4 md:w-4 md:mr-2" />
+                      <ArrowLeft className="h-5 w-5 md:mr-2" />
                       <span className="hidden md:inline">Volver al Inicio</span>
                     </Button>
                  </Link>
                   <Link href="/login" passHref>
                      <Button
-                        variant="ghost"
-                        className="font-semibold text-sm border border-foreground/20 text-foreground/80 hover:bg-muted hover:text-foreground"
+                        variant="outline"
+                        size="icon"
+                        className="font-semibold text-sm border-foreground/20 text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
                       >
-                      <UserCircle className="mr-2 h-4 w-4" />
-                      Iniciar Sesión
+                      <UserCircle className="h-5 w-5 md:mr-2" />
+                      <span className="hidden md:inline">Iniciar Sesión</span>
                     </Button>
                   </Link>
               </div>
