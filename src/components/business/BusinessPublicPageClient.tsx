@@ -841,7 +841,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               <div className="flex items-center gap-3">
                  <Link href="/" className="flex items-center gap-2">
                     <SocioVipLogo size={32} />
-                    <span className="font-bold text-xl text-gradient hidden sm:inline">SocioVIP</span>
+                    <span className="font-bold text-xl text-black hidden sm:inline">SocioVIP</span>
                  </Link>
               </div>
               <div className="flex items-center gap-2">
@@ -849,7 +849,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="font-semibold text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
+                        className="font-semibold text-sm text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
                     >
                       <ArrowLeft className="h-5 w-5 md:mr-2" />
                       <span className="hidden md:inline">Volver al Inicio</span>
