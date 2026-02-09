@@ -98,10 +98,21 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
 
         {/* Contenido Central */}
         <div className="flex-grow flex flex-col items-center justify-center text-center px-4">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl animate-fade-in-up">
-            {title}
+          <h1
+            className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl"
+            style={{ animationDelay: '0.1s', animationName: 'fade-in-up' }}
+          >
+            {title.split(' ').map((word, index) => (
+              <span
+                key={index}
+                className="inline-block animate-fade-in-up"
+                style={{ animationDelay: `${0.1 + index * 0.1}s` }}
+              >
+                {word}&nbsp;
+              </span>
+            ))}
           </h1>
-          <div className="relative w-full max-w-xl mt-8 group animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          <div className="relative w-full max-w-xl mt-8 group animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
             <div
               className="relative animated-gradient-border-wrapper rounded-full transition-transform duration-300 group-focus-within:-translate-y-1 group-focus-within:scale-105"
             >
@@ -117,23 +128,44 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
           </div>
         </div>
 
-        {/* Botones de navegación fijos */}
+        {/* Botones de navegación */}
         {heroImages.length > 1 && (
           <>
-            <button
-              onClick={goToPrevious}
-              className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
-              aria-label="Imagen anterior"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-            <button
-              onClick={goToNext}
-              className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
-              aria-label="Siguiente imagen"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
+            {/* Desktop */}
+            <div className="hidden md:block">
+              <button
+                onClick={goToPrevious}
+                className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
+                aria-label="Imagen anterior"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <button
+                onClick={goToNext}
+                className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
+                aria-label="Siguiente imagen"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </button>
+            </div>
+            
+            {/* Mobile */}
+            <div className="absolute bottom-40 left-1/2 z-30 flex w-full -translate-x-1/2 justify-center gap-16 md:hidden">
+              <button
+                onClick={goToPrevious}
+                className="p-2 bg-white/80 text-gray-800 rounded-full shadow-md"
+                aria-label="Imagen anterior"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <button
+                onClick={goToNext}
+                className="p-2 bg-white/80 text-gray-800 rounded-full shadow-md"
+                aria-label="Siguiente imagen"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </button>
+            </div>
           </>
         )}
 
