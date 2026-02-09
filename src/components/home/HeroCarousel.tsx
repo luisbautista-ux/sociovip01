@@ -98,10 +98,10 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
 
         {/* Contenido Central */}
         <div className="flex-grow flex flex-col items-center justify-center text-center px-4">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl animate-fade-in-up">
             {title}
           </h1>
-          <div className="relative w-full max-w-xl mt-8 group">
+          <div className="relative w-full max-w-xl mt-8 group animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
             <div
               className="relative animated-gradient-border-wrapper rounded-full transition-transform duration-300 group-focus-within:-translate-y-1 group-focus-within:scale-105"
             >
