@@ -131,36 +131,34 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
         {/* Botones de navegación */}
         {heroImages.length > 1 && (
           <>
-            {/* Desktop */}
-            <div className="hidden md:block">
-              <button
-                onClick={goToPrevious}
-                className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
-                aria-label="Imagen anterior"
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </button>
-              <button
-                onClick={goToNext}
-                className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-white/80 text-gray-800 rounded-full shadow-md transition-colors duration-300 hover:bg-white"
-                aria-label="Siguiente imagen"
-              >
-                <ChevronRight className="h-6 w-6" />
-              </button>
-            </div>
+            {/* Desktop y Tablet */}
+            <button
+              onClick={goToPrevious}
+              className="hidden md:block absolute top-1/2 left-4 z-30 -translate-y-1/2 p-2 bg-black/30 text-white rounded-full shadow-md transition-colors duration-300 hover:bg-black/50"
+              aria-label="Imagen anterior"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <button
+              onClick={goToNext}
+              className="hidden md:block absolute top-1/2 right-4 z-30 -translate-y-1/2 p-2 bg-black/30 text-white rounded-full shadow-md transition-colors duration-300 hover:bg-black/50"
+              aria-label="Siguiente imagen"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
             
             {/* Mobile */}
-            <div className="absolute bottom-40 left-1/2 z-30 flex w-full -translate-x-1/2 justify-center gap-16 md:hidden">
-              <button
+            <div className="md:hidden absolute top-1/2 mt-12 left-0 right-0 z-30 flex w-full justify-between px-4">
+               <button
                 onClick={goToPrevious}
-                className="p-2 bg-white/80 text-gray-800 rounded-full shadow-md"
+                className="p-2 bg-black/30 text-white rounded-full shadow-md"
                 aria-label="Imagen anterior"
               >
                 <ChevronLeft className="h-6 w-6" />
               </button>
               <button
                 onClick={goToNext}
-                className="p-2 bg-white/80 text-gray-800 rounded-full shadow-md"
+                className="p-2 bg-black/30 text-white rounded-full shadow-md"
                 aria-label="Siguiente imagen"
               >
                 <ChevronRight className="h-6 w-6" />
@@ -168,6 +166,7 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
             </div>
           </>
         )}
+
 
         {/* Indicadores de Progreso */}
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center space-x-2">
