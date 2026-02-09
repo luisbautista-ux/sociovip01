@@ -94,10 +94,10 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
 
         {/* Contenido Central */}
         <div className="flex-grow flex flex-col items-center justify-center text-center px-4">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700">
             Descubre las promociones y eventos más exclusivos
           </h1>
-          <div className="relative w-full max-w-xl mt-8 group">
+          <div className="relative w-full max-w-xl mt-8 group animate-in fade-in slide-in-from-bottom-2 duration-700 delay-300">
             <div
               className="relative animated-gradient-border-wrapper rounded-full transition-transform duration-300 group-focus-within:-translate-y-1 group-focus-within:scale-105"
             >
