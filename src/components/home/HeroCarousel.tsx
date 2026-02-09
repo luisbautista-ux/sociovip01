@@ -82,7 +82,9 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-4">
             <div className="flex items-center justify-between">
                 <Link href="/" className="flex items-center gap-2">
-                    <SocioVipLogo size={40} className="drop-shadow-lg" />
+                    <div className="relative p-1 rounded-full animate-drop-in animate-float">
+                        <SocioVipLogo size={40} className="drop-shadow-lg" />
+                    </div>
                     <span className="font-bold text-2xl text-white drop-shadow-lg">SocioVIP</span>
                 </Link>
                 <Link href="/login" passHref>
@@ -97,17 +99,9 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
         {/* Contenido Central */}
         <div className="flex-grow flex flex-col items-center justify-center text-center px-4">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold drop-shadow-2xl max-w-4xl">
-            {title.split(" ").map((word, index) => (
-                <span
-                    key={index}
-                    className="inline-block animate-fade-in-up"
-                    style={{ animationDelay: `${150 * index}ms`, opacity: 0 }}
-                >
-                    {word}&nbsp;
-                </span>
-            ))}
+            {title}
           </h1>
-          <div className="relative w-full max-w-xl mt-8 group animate-fade-in-up" style={{ animationDelay: `${150 * title.split(" ").length}ms`, opacity: 0 }}>
+          <div className="relative w-full max-w-xl mt-8 group">
             <div
               className="relative animated-gradient-border-wrapper rounded-full transition-transform duration-300 group-focus-within:-translate-y-1 group-focus-within:scale-105"
             >
