@@ -148,7 +148,7 @@ export function HeroCarousel({ searchTerm, setSearchTerm }: HeroCarouselProps) {
             </button>
             
             {/* Mobile */}
-            <div className="md:hidden absolute top-1/2 mt-12 left-0 right-0 z-30 flex w-full justify-between px-4">
+            <div className="md:hidden absolute top-1/2 -translate-y-1/2 left-0 right-0 z-30 flex w-full justify-between px-4">
                <button
                 onClick={goToPrevious}
                 className="p-2 bg-black/30 text-white rounded-full shadow-md"
