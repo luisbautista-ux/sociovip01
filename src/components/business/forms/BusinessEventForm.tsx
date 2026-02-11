@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -137,8 +138,8 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { e.preventDefault(); isDragging.current = true; dragStart.current = { x: e.clientX, y: e.clientY }; };
-  const handleMouseLeave = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); setCurrentEventData(prev => prev ? {...prev, imageObjectPosition: objectPosition} : null); }};
-  const handleMouseUp = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); setCurrentEventData(prev => prev ? {...prev, imageObjectPosition: objectPosition} : null); }};
+  const handleMouseLeave = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); }};
+  const handleMouseUp = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); }};
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging.current || !imgContainerRef.current) return;
     const container = imgContainerRef.current;
@@ -153,7 +154,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   };
   
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => { if (e.touches.length === 1) { isDragging.current = true; dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } };
-  const handleTouchEnd = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); setCurrentEventData(prev => prev ? {...prev, imageObjectPosition: objectPosition} : null); }};
+  const handleTouchEnd = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); }};
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!isDragging.current || !imgContainerRef.current || e.touches.length !== 1) return;
     const container = imgContainerRef.current;
@@ -168,19 +169,6 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   };
   
   const isUnlimited = form.watch("unlimitedAttendance");
-
-  useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-        if(type === 'change') {
-            setCurrentEventData(prev => {
-                if(!prev) return null;
-                const updatedValue = { ...value, imageObjectPosition: objectPosition };
-                return {...prev, ...updatedValue};
-            });
-        }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, setCurrentEventData, objectPosition]);
 
   return (
     <Form {...form}>

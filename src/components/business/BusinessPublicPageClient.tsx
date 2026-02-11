@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -267,6 +268,7 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
             startDate: anyToDate(entityData.startDate)?.toISOString() || "",
             endDate: anyToDate(entityData.endDate)?.toISOString() || "",
             isActive: entityData.isActive === undefined ? true : entityData.isActive,
+            isPublicAccess: entityData.isPublicAccess || false,
             usageLimit: entityData.usageLimit || 0,
             maxAttendance: entityData.maxAttendance || 0,
             ticketTypes: Array.isArray(entityData.ticketTypes)
@@ -388,6 +390,25 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
   } finally {
     setIsLoadingQrFlow(false);
   }
+};
+
+const handlePublicAccessSubmit = (entity: BusinessManagedEntity) => {
+    if (!isEntityCurrentlyActivatable(entity)) {
+        toast({ title: "Evento no disponible", description: "Este evento no está vigente en este momento.", variant: "destructive" });
+        return;
+    }
+    setActiveEntityForQr(entity);
+    setValidatedCodeObject({
+        id: 'PUBLIC_ACCESS',
+        value: 'PUBLIC_ACCESS',
+        status: 'available',
+        entityId: entity.id,
+        generatedByName: 'Sistema',
+        generatedDate: new Date().toISOString(),
+    });
+    setCurrentStepInModal("enterDni");
+    dniForm.reset({ docType: 'dni', docNumber: "" });
+    setShowDniModal(true);
 };
 
 const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEntity> => {
@@ -962,7 +983,18 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                               </div>
                               <CardHeader className="pb-3"><CardTitle className="text-xl">{event.name}</CardTitle></CardHeader>
                               <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p><p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
-                              {isEntityCurrentlyActivatable(event) ? (<CardFooter className="flex-col items-start p-4 border-t"><SpecificCodeEntryForm entity={event} /></CardFooter>) : (<PastEventCardFooter entity={event} />)}
+                              {isEntityCurrentlyActivatable(event) ? (
+                                <CardFooter className="flex-col items-start p-4 border-t">
+                                    {event.isPublicAccess ? (
+                                        <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-9 text-white" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`}}>
+                                            <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
+                                        </Button>
+                                    ) : (
+                                        <SpecificCodeEntryForm entity={event} />
+                                    )}
+                                </CardFooter>
+                                ) : (<PastEventCardFooter entity={event} />)
+                              }
                             </Card>
                           ))}
                         </div>

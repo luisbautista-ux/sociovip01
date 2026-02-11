@@ -57,6 +57,7 @@ export async function POST(request: Request) {
         (c) => c.redeemedByInfo?.dni === dni && (c.status === 'redeemed' || c.status === 'used')
       );
       if (existingRedemptionForDni) {
+        // Devuelve el código existente para que el cliente pueda ver su QR
         const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
         const existingClientSnap = await transaction.get(clientQuery);
 
@@ -83,20 +84,11 @@ export async function POST(request: Request) {
       }
 
       const codes = (entityData.generatedCodes || []) as GeneratedCode[];
-      const codeIndex = codes.findIndex((c) => c.id === codeId);
-
-      if (codeIndex === -1) {
-        throw new Error('El código del promotor no es válido.');
-      }
-      if (codes[codeIndex].status !== 'available') {
-        throw new Error('Este código ya ha sido utilizado o no está disponible.');
-      }
-      
       let clientDoc;
       let clientData: Omit<QrClient, 'id'>;
       let finalClientId: string;
       let clientAction: 'userExists' | 'newUser' = 'userExists';
-
+      
       const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
       const clientSnapshot = await transaction.get(clientQuery);
 
@@ -127,27 +119,51 @@ export async function POST(request: Request) {
         transaction.set(newClientRef, clientData);
         finalClientId = newClientRef.id;
       } else {
-        return { action: 'newUser' }; // Devuelve un objeto para que el frontend pida más datos
+        return { action: 'newUser' }; 
       }
-      
-      codes[codeIndex] = {
-        ...codes[codeIndex],
-        status: 'redeemed',
-        redemptionDate: new Date().toISOString(),
-        redeemedByInfo: {
-          dni: dni,
-          name: `${clientData.name} ${clientData.surname}`,
-        },
-      };
 
-      transaction.update(entityRef, { generatedCodes: codes });
+      let finalCodeObject: GeneratedCode;
+
+      if (codeId === 'PUBLIC_ACCESS') {
+          if (!entityData.isPublicAccess) {
+              throw new Error("Este evento no es de acceso público.");
+          }
+          finalCodeObject = {
+              id: adminDb.collection('businessEntities').doc().id, // Unique ID for this entry
+              entityId: entityId,
+              value: 'PUBLIC_ACCESS',
+              status: 'redeemed',
+              generatedByName: 'Acceso Público',
+              generatedDate: new Date().toISOString(),
+              redemptionDate: new Date().toISOString(),
+              redeemedByInfo: { dni: dni, name: `${clientData.name} ${clientData.surname}` },
+          };
+          const updatedCodes = [...codes, finalCodeObject];
+          transaction.update(entityRef, { generatedCodes: updatedCodes });
+      } else {
+          const codeIndex = codes.findIndex((c) => c.id === codeId);
+          if (codeIndex === -1) {
+              throw new Error('El código del promotor no es válido.');
+          }
+          if (codes[codeIndex].status !== 'available') {
+              throw new Error('Este código ya ha sido utilizado o no está disponible.');
+          }
+          codes[codeIndex] = {
+              ...codes[codeIndex],
+              status: 'redeemed',
+              redemptionDate: new Date().toISOString(),
+              redeemedByInfo: { dni: dni, name: `${clientData.name} ${clientData.surname}`},
+          };
+          finalCodeObject = codes[codeIndex];
+          transaction.update(entityRef, { generatedCodes: codes });
+      }
 
       const dobDate = anyToDate(clientData.dob);
       const regDate = anyToDate(clientData.registrationDate);
           
       return {
         action: clientAction,
-        code: codes[codeIndex], // Devolver el código actualizado
+        code: finalCodeObject, // Return the code object
         clientData: {
           id: finalClientId,
           ...clientData,

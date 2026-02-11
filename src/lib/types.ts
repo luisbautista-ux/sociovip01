@@ -1,5 +1,3 @@
-
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
 import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES, AVAILABLE_FONTS } from "./constants"; 
@@ -394,6 +392,7 @@ export interface BusinessEventFormData {
   maxAttendance?: number;
   unlimitedAttendance?: boolean;
   isActive: boolean;
+  isPublicAccess: boolean; // Add this line
   imageUrl?: string;
   imageFile?: File | null;
   aiHint?: string;
