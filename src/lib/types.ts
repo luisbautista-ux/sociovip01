@@ -239,6 +239,7 @@ export interface BusinessManagedEntity {
   endDate: string; 
   usageLimit?: number; 
   isActive: boolean;
+  isPublicAccess?: boolean;
   imageUrl?: string;
   imageObjectPosition?: string;
   aiHint?: string;

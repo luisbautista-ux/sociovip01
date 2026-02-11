@@ -38,6 +38,7 @@ const eventDetailsFormSchema = z.object({
   unlimitedAttendance: z.boolean().default(true),
   maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
   isActive: z.boolean().default(true),
+  isPublicAccess: z.boolean().default(false),
   imageUrl: z.string().optional(),
   imageObjectPosition: z.string().optional(), // Added for image positioning
   aiHint: z.string().optional(),
@@ -82,6 +83,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         unlimitedAttendance: true,
         maxAttendance: undefined,
         isActive: true,
+        isPublicAccess: false,
         imageUrl: "",
         imageObjectPosition: '50% 50%',
         aiHint: "",
@@ -100,6 +102,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         unlimitedAttendance: event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0,
         maxAttendance: (event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0) ? undefined : event.maxAttendance,
         isActive: event.isActive === undefined ? true : event.isActive,
+        isPublicAccess: event.isPublicAccess || false,
         imageUrl: event.imageUrl || "",
         imageObjectPosition: event.imageObjectPosition || '50% 50%',
         aiHint: event.aiHint || "",
@@ -391,6 +394,27 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                 <FormMessage />
               </div>
               <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="isPublicAccess"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+              <div className="space-y-0.5">
+                <FormLabel><strong>Acceso Directo (sin código)</strong></FormLabel>
+                <FormDescription className="text-xs">
+                    Si se activa, los clientes podrán generar un QR sin un código de promotor.
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  disabled={isSubmitting}
+                />
+              </FormControl>
             </FormItem>
           )}
         />

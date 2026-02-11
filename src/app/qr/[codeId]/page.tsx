@@ -320,6 +320,9 @@ export default function QrDisplayPage() {
                      </div>
                    </div>
                  )}
+                {qrData.promotion.promoCode !== 'PUBLIC_ACCESS' && (
+                   <p className="text-xs text-muted-foreground mt-1">Código: {qrData.promotion.promoCode}</p>
+                )}
                  <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(anyToDate(qrData.promotion.validUntil)!, "dd MMMM, yyyy", { locale: es })}</p>
               </div>
             </CardContent>
