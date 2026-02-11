@@ -58,6 +58,7 @@ const ManageEventDialog = ({
     onSave: (event: BusinessManagedEntity, imageFile: File | null) => Promise<void>;
     isSubmitting: boolean;
 }) => {
+    const eventDetailsFormRef = useRef<EventDetailsFormRef>(null);
     const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(editingEvent);
     const [activeTab, setActiveTab] = useState("details");
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -103,19 +104,14 @@ const ManageEventDialog = ({
 
     const handleImageFileChange = (file: File | null) => {
       if (file) {
-        // Si ya había un blob anterior, liberarlo
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
-
         const previewUrl = URL.createObjectURL(file);
         setImageFile(file);
         setImagePreviewUrl(previewUrl);
-
-        // Actualiza también el estado del evento
         setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
       } else {
-        // Si no hay archivo nuevo, restaurar la imagen existente
         if (imagePreviewUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(imagePreviewUrl);
         }
@@ -134,9 +130,22 @@ const ManageEventDialog = ({
     }, [imagePreviewUrl]);
 
 
-     const handleSaveChanges = async () => {
-        if (currentEventData) {
-            await onSave(currentEventData, imageFile);
+    const handleSaveChanges = async () => {
+        const isFormValid = await eventDetailsFormRef.current?.trigger();
+        if (!isFormValid) {
+            toast({ title: "Formulario inválido", description: "Revisa los campos marcados en rojo en la pestaña 'Detalles'.", variant: "destructive" });
+            setActiveTab("details"); // Focus on the details tab
+            return;
+        }
+
+        const formValues = eventDetailsFormRef.current?.getValues();
+        
+        if (currentEventData && formValues) {
+             const dataToSave: BusinessManagedEntity = {
+                ...currentEventData,
+                ...formValues,
+            };
+            await onSave(dataToSave, imageFile);
         } else {
             toast({ title: "Error", description: "No hay datos del evento para guardar.", variant: "destructive" });
         }
@@ -417,6 +426,7 @@ const ManageEventDialog = ({
                                   </CardHeader>
                                   <CardContent>
                                     <BusinessEventForm 
+                                        ref={eventDetailsFormRef}
                                         event={currentEventData} 
                                         isSubmitting={isSubmitting}
                                         setCurrentEventData={setCurrentEventData}
@@ -897,6 +907,7 @@ export default function BusinessEventsPage() {
         startDate: now.toISOString(),
         endDate: oneWeekFromNow.toISOString(),
         isActive: true,
+        isPublicAccess: false,
         generatedCodes: [],
         ticketTypes: [],
         eventBoxes: [],
@@ -943,7 +954,6 @@ export default function BusinessEventsPage() {
       let fileToUpload: File | null = imageFile;
 
       try {
-        // Handle image duplication
         if (isDuplicating && !imageFile && eventDataToSave.imageUrl) {
             try {
                 const response = await fetch(eventDataToSave.imageUrl);
