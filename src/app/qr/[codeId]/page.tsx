@@ -12,7 +12,7 @@ import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/
 import type { BusinessManagedEntity, Business, QrClient, QrCodeData, GeneratedCode, TicketType } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle, Download, ArrowLeft, UserCircle, QrCode } from "lucide-react";
+import { Loader2, AlertTriangle, Download, ArrowLeft, UserCircle, QrCode, Building } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
@@ -241,11 +241,27 @@ export default function QrDisplayPage() {
 
   const QrPageFooter = () => (
     <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
-      <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
-        <Link href="/login" passHref><Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground"><UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión</Button></Link>
-        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground"><Download className="mr-2 h-4 w-4" /> Guardar QR</Button>
-        <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground">Ver Otras del Negocio</Button>
-        <Link href="/" passHref><Button variant="outline" className="w-full font-bold sm:col-span-1 hover:bg-muted hover:text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio</Button></Link>
+      <div className="max-w-4xl mx-auto grid grid-cols-4 items-center gap-2">
+        <Link href="/login" passHref legacyBehavior>
+          <Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Iniciar Sesión">
+            <UserCircle className="h-5 w-5 sm:mr-2" />
+            <span className="hidden sm:inline">Iniciar Sesión</span>
+          </Button>
+        </Link>
+        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Guardar QR">
+          <Download className="h-5 w-5 sm:mr-2" />
+          <span className="hidden sm:inline">Guardar QR</span>
+        </Button>
+        <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Ver Negocio">
+          <Building className="h-5 w-5 sm:mr-2" />
+          <span className="hidden sm:inline">Ver Negocio</span>
+        </Button>
+        <Link href="/" passHref legacyBehavior>
+          <Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Volver al Inicio">
+            <ArrowLeft className="h-5 w-5 sm:mr-2" />
+            <span className="hidden sm:inline">Volver</span>
+          </Button>
+        </Link>
       </div>
     </footer>
   );
@@ -302,6 +318,7 @@ export default function QrDisplayPage() {
           <Card 
             ref={cardRef} 
             className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden [transform-style:preserve-3d] animate-flip-in"
+            style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards', transform: 'rotateY(1080deg)', opacity: 0.5 }}
           >
             <CardHeader className="text-center pb-4">
               <CardTitle className="text-xl font-bold">{qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}</CardTitle>
