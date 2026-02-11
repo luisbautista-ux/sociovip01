@@ -242,10 +242,10 @@ export default function QrDisplayPage() {
   const QrPageFooter = () => (
     <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
       <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 items-center gap-2">
-        <Link href="/login" passHref><Button variant="outline" className="w-full font-bold"><UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión</Button></Link>
-        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold"><Download className="mr-2 h-4 w-4" /> Guardar QR</Button>
-        <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold">Ver Otras del Negocio</Button>
-        <Link href="/" passHref><Button variant="outline" className="w-full font-bold sm:col-span-1"><ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio</Button></Link>
+        <Link href="/login" passHref><Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground"><UserCircle className="mr-2 h-4 w-4" /> Iniciar Sesión</Button></Link>
+        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground"><Download className="mr-2 h-4 w-4" /> Guardar QR</Button>
+        <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground">Ver Otras del Negocio</Button>
+        <Link href="/" passHref><Button variant="outline" className="w-full font-bold sm:col-span-1 hover:bg-muted hover:text-muted-foreground"><ArrowLeft className="mr-2 h-4 w-4" /> Volver al Inicio</Button></Link>
       </div>
     </footer>
   );
