@@ -268,7 +268,7 @@ export default function QrDisplayPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-black">
         <div className="flex flex-col items-center justify-center text-center">
           <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
             <QrCode size={70} className="text-primary"/>
@@ -294,62 +294,81 @@ export default function QrDisplayPage() {
   if (!qrData || !businessDetails) return null;
   
   return (
-    <div className="min-h-screen bg-gradient-loader text-foreground flex flex-col">
-      <header className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white">
-        <div className="max-w-7xl mx-auto flex items-center justify-start">
-          {businessDetails.logoUrl && <NextImage src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4" />}
-          <h1 className="font-semibold text-xl" style={{ color: businessDetails.primaryColor }}>{businessDetails.name}</h1>
-          {businessDetails.slogan && <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>}
+    <div className="min-h-screen bg-black text-foreground flex flex-col">
+      {/* Background Image */}
+      {qrData.promotion.imageUrl && (
+        <div className="fixed inset-0 z-0">
+          <NextImage
+            src={qrData.promotion.imageUrl}
+            alt="Fondo de la promoción"
+            fill
+            className="object-cover blur-lg scale-110 brightness-50"
+            data-ai-hint={qrData.promotion.aiHint || "promotion background"}
+          />
         </div>
-      </header>
-      <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8 [perspective:1000px]">
-        {qrData.promotion.qrTemplateImageUrl ? (
-          <div className="relative w-full max-w-sm shadow-xl rounded-xl">
-            {isDrawingCanvas && (
-              <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-xl">
-                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <p className="text-lg font-semibold text-primary">Generando tu QR...</p>
-                <p className="text-sm text-muted-foreground">Espera un momento, por favor.</p>
-              </div>
-            )}
-            <canvas ref={canvasRef} className="w-full h-auto" />
+      )}
+      
+      {/* Main Content */}
+      <div className="relative z-10 flex flex-col h-screen">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white/5 backdrop-blur-sm">
+          <div className="max-w-7xl mx-auto flex items-center justify-start">
+            {businessDetails.logoUrl && <NextImage src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4" />}
+            <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
+            {businessDetails.slogan && <p className="text-xs text-white/80 ml-3">{businessDetails.slogan}</p>}
           </div>
-        ) : (
-          <Card 
-            ref={cardRef} 
-            className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden [transform-style:preserve-3d] animate-flip-in"
-            style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards', transform: 'rotateY(1080deg)', opacity: 0.5 }}
-          >
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-xl font-bold">{qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}</CardTitle>
-              <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center space-y-4">
-              {qrCodeImage ? <NextImage src={qrCodeImage} alt="Tu código QR" width={250} height={250} className="rounded-lg border p-1 animate-pulse-glow" /> : <div className="h-[250px] w-[250px] flex items-center justify-center border rounded-lg bg-muted text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin" /></div>}
-              <div className="text-center">
-                <p className="text-lg font-semibold">Hola, {qrData.user.name} {qrData.user.surname}</p>
-                <p className="text-sm text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
-              </div>
-              <Separator />
-              <div className="text-center">
-                 <p className="font-semibold">{qrData.promotion.title}</p>
-                 {qrData.promotion.ticketType?.name && (
-                   <div className="flex justify-center mt-2">
-                     <div className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md" style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}>
-                       {qrData.promotion.ticketType.name.toUpperCase()}
-                     </div>
-                   </div>
+        </header>
+
+        <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8 [perspective:1000px]">
+          {qrData.promotion.qrTemplateImageUrl ? (
+            <div className="relative w-full max-w-sm shadow-xl rounded-xl">
+              {isDrawingCanvas && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-xl">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                  <p className="text-lg font-semibold text-primary">Generando tu QR...</p>
+                  <p className="text-sm text-muted-foreground">Espera un momento, por favor.</p>
+                </div>
+              )}
+              <canvas ref={canvasRef} className="w-full h-auto" />
+            </div>
+          ) : (
+            <Card 
+              ref={cardRef} 
+              className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden [transform-style:preserve-3d] animate-flip-in bg-white/5 backdrop-blur-md border-white/20 text-white"
+              style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards', transform: 'rotateY(1080deg)', opacity: 0.5 }}
+            >
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-xl font-bold">{qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}</CardTitle>
+                <CardDescription className="text-white/80">Presenta este código en {businessDetails.name}.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center justify-center space-y-4">
+                {qrCodeImage ? <NextImage src={qrCodeImage} alt="Tu código QR" width={250} height={250} className="rounded-lg border p-1 bg-white animate-pulse-glow" /> : <div className="h-[250px] w-[250px] flex items-center justify-center border rounded-lg bg-muted/20 text-white/80"><Loader2 className="h-8 w-8 animate-spin" /></div>}
+                <div className="text-center">
+                  <p className="text-lg font-semibold">Hola, {qrData.user.name} {qrData.user.surname}</p>
+                  <p className="text-sm text-white/80">DNI/CE: {qrData.user.dni}</p>
+                </div>
+                <Separator className="bg-white/20" />
+                <div className="text-center">
+                  <p className="font-semibold">{qrData.promotion.title}</p>
+                  {qrData.promotion.ticketType?.name && (
+                    <div className="flex justify-center mt-2">
+                      <div className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md" style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}>
+                        {qrData.promotion.ticketType.name.toUpperCase()}
+                      </div>
+                    </div>
                   )}
-                {qrData.promotion.promoCode !== 'PUBLIC_ACCESS' && (
-                   <p className="text-xs text-muted-foreground mt-1">Código: {qrData.promotion.promoCode}</p>
-                )}
-                 <p className="text-xs text-muted-foreground mt-1">Válido hasta: {format(anyToDate(qrData.promotion.validUntil)!, "dd MMMM, yyyy", { locale: es })}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </main>
-      <QrPageFooter />
+                  {qrData.promotion.promoCode !== 'PUBLIC_ACCESS' && (
+                     <p className="text-xs text-white/80 mt-1">Código: {qrData.promotion.promoCode}</p>
+                  )}
+                  <p className="text-xs text-white/80 mt-1">Válido hasta: {format(anyToDate(qrData.promotion.validUntil)!, "dd MMMM, yyyy", { locale: es })}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </main>
+        <QrPageFooter />
+      </div>
     </div>
   );
 }
+
+    
