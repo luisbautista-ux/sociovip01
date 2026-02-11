@@ -278,7 +278,7 @@ export default function QrDisplayPage() {
   if (!qrData || !businessDetails) return null;
   
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="min-h-screen bg-gradient-loader text-foreground flex flex-col">
       <header className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white">
         <div className="max-w-7xl mx-auto flex items-center justify-start">
           {businessDetails.logoUrl && <NextImage src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4" />}
@@ -286,7 +286,7 @@ export default function QrDisplayPage() {
           {businessDetails.slogan && <p className="text-xs text-muted-foreground ml-3">{businessDetails.slogan}</p>}
         </div>
       </header>
-      <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8">
+      <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8 [perspective:1000px]">
         {qrData.promotion.qrTemplateImageUrl ? (
           <div className="relative w-full max-w-sm shadow-xl rounded-xl">
             {isDrawingCanvas && (
@@ -299,13 +299,16 @@ export default function QrDisplayPage() {
             <canvas ref={canvasRef} className="w-full h-auto" />
           </div>
         ) : (
-          <Card ref={cardRef} className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden">
+          <Card 
+            ref={cardRef} 
+            className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden [transform-style:preserve-3d] animate-flip-in"
+          >
             <CardHeader className="text-center pb-4">
               <CardTitle className="text-xl font-bold">{qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}</CardTitle>
               <CardDescription>Presenta este código en {businessDetails.name}.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-center justify-center space-y-4">
-              {qrCodeImage ? <NextImage src={qrCodeImage} alt="Tu código QR" width={250} height={250} className="rounded-lg border p-1" /> : <div className="h-[250px] w-[250px] flex items-center justify-center border rounded-lg bg-muted text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin" /></div>}
+              {qrCodeImage ? <NextImage src={qrCodeImage} alt="Tu código QR" width={250} height={250} className="rounded-lg border p-1 animate-pulse-glow" /> : <div className="h-[250px] w-[250px] flex items-center justify-center border rounded-lg bg-muted text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin" /></div>}
               <div className="text-center">
                 <p className="text-lg font-semibold">Hola, {qrData.user.name} {qrData.user.surname}</p>
                 <p className="text-sm text-muted-foreground">DNI/CE: {qrData.user.dni}</p>
@@ -319,7 +322,7 @@ export default function QrDisplayPage() {
                        {qrData.promotion.ticketType.name.toUpperCase()}
                      </div>
                    </div>
-                 )}
+                  )}
                 {qrData.promotion.promoCode !== 'PUBLIC_ACCESS' && (
                    <p className="text-xs text-muted-foreground mt-1">Código: {qrData.promotion.promoCode}</p>
                 )}

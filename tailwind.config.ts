@@ -123,6 +123,18 @@ export default {
                 transform: 'translateY(0)'
             },
         },
+        'flip-in': {
+          '0%': { transform: 'rotateY(90deg) scale(0.9)', opacity: '0' },
+          '100%': { transform: 'rotateY(0deg) scale(1)', opacity: '1' },
+        },
+        'pulse-glow': {
+          '0%, 100%': {
+            boxShadow: '0 0 0 0 hsla(var(--primary), 0.4)',
+          },
+          '50%': {
+            boxShadow: '0 0 0 10px hsla(var(--primary), 0)',
+          },
+        },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
@@ -134,10 +146,10 @@ export default {
         'tilt': 'tilt 10s infinite linear',
         'scroll': 'scroll 30s linear infinite',
         'fade-in-up': 'fade-in-up 0.5s ease-out both',
+        'flip-in': 'flip-in 0.7s cubic-bezier(0.25, 1, 0.5, 1) .2s forwards',
+        'pulse-glow': 'pulse-glow 2s infinite .9s',
   		}
   	}
   },
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;
-
-    
