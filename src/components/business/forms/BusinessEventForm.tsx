@@ -315,7 +315,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                         onSelect={field.onChange} 
                         locale={es} 
                         initialFocus 
-                        captionLayout="dropdown"
+                        captionLayout="dropdown-buttons"
                         fromYear={new Date().getFullYear() - 2}
                         toYear={new Date().getFullYear() + 5}
                     />
@@ -348,7 +348,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                         disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} 
                         locale={es} 
                         initialFocus 
-                        captionLayout="dropdown"
+                        captionLayout="dropdown-buttons"
                         fromYear={new Date().getFullYear() - 2}
                         toYear={new Date().getFullYear() + 5}
                     />
