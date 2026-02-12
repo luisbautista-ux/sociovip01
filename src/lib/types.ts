@@ -235,6 +235,7 @@ export interface BusinessManagedEntity {
   description: string;
   startDate: string; 
   endDate: string; 
+  locationAddress?: string;
   usageLimit?: number; 
   isActive: boolean;
   isPublicAccess?: boolean;
@@ -389,6 +390,7 @@ export interface BusinessEventFormData {
   description: string;
   startDate: Date;
   endDate: Date;
+  locationAddress?: string;
   maxAttendance?: number;
   unlimitedAttendance?: boolean;
   isActive: boolean;

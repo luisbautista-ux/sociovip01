@@ -58,6 +58,7 @@ import {
   ArrowLeft,
   History,
   Video,
+  MapPin,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -269,6 +270,7 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
             endDate: anyToDate(entityData.endDate)?.toISOString() || "",
             isActive: entityData.isActive === undefined ? true : entityData.isActive,
             isPublicAccess: entityData.isPublicAccess || false,
+            locationAddress: entityData.locationAddress || "",
             usageLimit: entityData.usageLimit || 0,
             maxAttendance: entityData.maxAttendance || 0,
             ticketTypes: Array.isArray(entityData.ticketTypes)
@@ -975,28 +977,45 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                           <Calendar className="h-7 w-7 mr-3" /> Eventos
                         </h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                          {allEvents.map((event) => (
-                            <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1">
-                              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                                <NextImage src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} data-ai-hint={event.aiHint || "party concert"}/>
-                                 {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30" />)}
-                              </div>
-                              <CardHeader className="pb-3"><CardTitle className="text-xl">{event.name}</CardTitle></CardHeader>
-                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p><p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
-                              {isEntityCurrentlyActivatable(event) ? (
-                                <CardFooter className="flex-col items-start p-4 border-t">
-                                    {event.isPublicAccess ? (
-                                        <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-9 text-white" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`}}>
-                                            <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
-                                        </Button>
-                                    ) : (
-                                        <SpecificCodeEntryForm entity={event} />
+                          {allEvents.map((event) => {
+                            const location = event.locationAddress || (businessDetails.publicAddress);
+                            return (
+                                <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1">
+                                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                                    <NextImage src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} data-ai-hint={event.aiHint || "party concert"}/>
+                                    {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30" />)}
+                                </div>
+                                <CardHeader className="pb-3"><CardTitle className="text-xl">{event.name}</CardTitle></CardHeader>
+                                <CardContent className="flex-grow space-y-2">
+                                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
+                                    <p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p>
+                                    {location && (
+                                        <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors pt-1 group"
+                                        >
+                                            <MapPin className="h-4 w-4 mr-1.5 shrink-0" />
+                                            <span className="group-hover:underline">{location}</span>
+                                        </a>
                                     )}
-                                </CardFooter>
-                                ) : (<PastEventCardFooter entity={event} />)
-                              }
-                            </Card>
-                          ))}
+                                </CardContent>
+                                {isEntityCurrentlyActivatable(event) ? (
+                                    <CardFooter className="flex-col items-start p-4 border-t">
+                                        {event.isPublicAccess ? (
+                                            <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-9 text-white" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`}}>
+                                                <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
+                                            </Button>
+                                        ) : (
+                                            <SpecificCodeEntryForm entity={event} />
+                                        )}
+                                    </CardFooter>
+                                    ) : (<PastEventCardFooter entity={event} />)
+                                }
+                                </Card>
+                            )
+                        })}
                         </div>
                       </section>
                     )}

@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
-import { CalendarIcon, ImageIcon, Upload, Move } from "lucide-react";
+import { CalendarIcon, ImageIcon, Upload, Move, MapPin } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, isBefore, startOfDay, isEqual } from "date-fns";
 import { es } from "date-fns/locale";
@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
   description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
+  locationAddress: z.string().optional(),
   termsAndConditions: z.string().optional(),
   startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
   endDate: z.date({ required_error: "Fecha de fin es requerida." }),
@@ -78,6 +79,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     defaultValues: {
         name: "",
         description: "",
+        locationAddress: "",
         termsAndConditions: "",
         startDate: new Date(),
         endDate: new Date(new Date().setDate(new Date().getDate() + 7)),
@@ -97,6 +99,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
       form.reset({
         name: event.name || "",
         description: event.description || "",
+        locationAddress: event.locationAddress || "",
         termsAndConditions: event.termsAndConditions || "",
         startDate: anyToDate(event.startDate) ?? new Date(),
         endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
@@ -249,6 +252,31 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             <FormItem>
               <FormLabel><strong>Descripción</strong> <span className="text-destructive">*</span></FormLabel>
               <FormControl><Textarea placeholder="Detalles del evento..." {...field} value={field.value || ''} rows={3} disabled={isSubmitting} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="locationAddress"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel><strong>Ubicación del Evento</strong></FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Dirección del evento" 
+                    {...field} 
+                    value={field.value || ''} 
+                    disabled={isSubmitting}
+                    className="pl-10"
+                  />
+                </div>
+              </FormControl>
+              <FormDescription className="text-xs">
+                Por defecto, se usa la dirección pública de tu negocio. Edítala si el evento es en otro lugar.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

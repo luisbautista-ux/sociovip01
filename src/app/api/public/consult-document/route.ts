@@ -16,7 +16,7 @@ async function consultExternalDniApi(
     const formNombres = new URLSearchParams();
     formNombres.append('dni4', dni);
     formNombres.append('action', 'buscar_nombres');
-    formNombres.append('security', '333547d7cc');
+    formNombres.append('security', '4a52c514a5');
 
     const responseNombres = await fetch(endpointNombres, {
       method: 'POST',
@@ -56,7 +56,7 @@ async function consultExternalDniApi(
     const formFecha = new URLSearchParams();
     formFecha.append('dni', dni);
     formFecha.append('action', 'buscar_fecha');
-    formFecha.append('security', 'b12649746e'); // Este nonce parece seguir funcionando
+    formFecha.append('security', '0747196999'); // Este nonce parece seguir funcionando
 
     const responseFecha = await fetch(endpointFecha, {
       method: 'POST',

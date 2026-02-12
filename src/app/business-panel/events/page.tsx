@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -904,6 +905,7 @@ export default function BusinessEventsPage() {
         type: 'event',
         name: '',
         description: '',
+        locationAddress: businessDetails?.publicAddress || '',
         startDate: now.toISOString(),
         endDate: oneWeekFromNow.toISOString(),
         isActive: true,
@@ -1421,4 +1423,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-
