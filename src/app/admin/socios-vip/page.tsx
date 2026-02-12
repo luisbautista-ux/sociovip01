@@ -816,7 +816,10 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                   <FormItem>
                     <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*" 
                         placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
                         {...field} 
                         maxLength={20}

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -775,7 +776,10 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                   <FormItem>
                     <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "9-12 dígitos numéricos"} 
                         {...field} 
                         maxLength={watchedDocType === 'dni' ? 8 : 12}

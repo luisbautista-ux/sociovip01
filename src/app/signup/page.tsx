@@ -263,7 +263,7 @@ export default function SignupPage() {
                 <FormField control={dniForm.control} name="docNumber" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Número de Documento</FormLabel>
-                    <FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "8-15 dígitos"} {...field} autoFocus maxLength={15} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} /></FormControl>
+                    <FormControl><Input type="tel" inputMode="numeric" pattern="[0-9]*" placeholder={watchedDocType === 'dni' ? "8 dígitos" : "8-15 dígitos"} {...field} autoFocus maxLength={15} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -295,7 +295,7 @@ export default function SignupPage() {
                   <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={signupForm.control} name="dob" render={({ field }) => (
-                  <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento</FormLabel>
+                  <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>

@@ -142,7 +142,7 @@ export function DniEntryDialog({ open, onOpenChange, isSubmitting, onDniVerified
               <FormField control={form.control} name="docNumber" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting || internalSubmitting} /></FormControl>
+                  <FormControl><Input type="tel" inputMode="numeric" pattern="[0-9]*" placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting || internalSubmitting} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

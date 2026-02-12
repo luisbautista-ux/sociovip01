@@ -557,9 +557,30 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         if (!response.ok) {
             throw new Error(result.error || 'Ocurrió un error al registrar el nuevo cliente.');
         }
+        
+        const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
+        const clientForQr: QrClient = result.clientData;
+        const ticketType = freshEntityData.ticketTypes?.find(t => t.id === validatedCodeObject.ticketTypeId);
+        const qrCodeDetails: QrCodeData["promotion"] = {
+            id: freshEntityData.id,
+            title: freshEntityData.name,
+            description: freshEntityData.description,
+            validUntil: freshEntityData.endDate,
+            imageUrl: freshEntityData.imageUrl || "",
+            promoCode: validatedCodeObject.value,
+            qrValue: validatedCodeObject.id,
+            aiHint: freshEntityData.aiHint || "",
+            type: freshEntityData.type,
+            termsAndConditions: freshEntityData.termsAndConditions,
+            qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
+            qrTemplateLayout: freshEntityData.qrTemplateLayout,
+            ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
+        };
   
-        toast({ title: "Registro Exitoso", description: "Cliente registrado. Redirigiendo a tu QR." });
-        router.push(`/qr/${validatedCodeObject.id}`);
+        setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
+        setShowDniModal(false);
+        setPageViewState("qrDisplay");
+        toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
 
     } catch (e: any) {
       toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
@@ -983,7 +1004,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                 <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1">
                                 <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
                                     <NextImage src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} data-ai-hint={event.aiHint || "party concert"}/>
-                                    {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30" />)}
+                                     {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30" />)}
                                 </div>
                                 <CardHeader className="pb-3"><CardTitle className="text-xl">{event.name}</CardTitle></CardHeader>
                                 <CardContent className="flex-grow space-y-2">
@@ -1121,6 +1142,9 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       </FormLabel>
                       <FormControl>
                         <Input 
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
                             {...field} 
                             maxLength={watchedDocType === 'dni' ? 8 : 20}
