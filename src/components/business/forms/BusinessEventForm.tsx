@@ -303,13 +303,22 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
+                        {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} locale={es} initialFocus />
+                    <CalendarShadcnUi 
+                        mode="single" 
+                        selected={field.value} 
+                        onSelect={field.onChange} 
+                        locale={es} 
+                        initialFocus 
+                        captionLayout="dropdown-buttons"
+                        fromYear={new Date().getFullYear() - 2}
+                        toYear={new Date().getFullYear() + 5}
+                    />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
@@ -326,13 +335,23 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
+                        {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona fecha</span>}
                         <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                       </Button>
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} locale={es} initialFocus />
+                    <CalendarShadcnUi 
+                        mode="single" 
+                        selected={field.value} 
+                        onSelect={field.onChange} 
+                        disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} 
+                        locale={es} 
+                        initialFocus 
+                        captionLayout="dropdown-buttons"
+                        fromYear={new Date().getFullYear() - 2}
+                        toYear={new Date().getFullYear() + 5}
+                    />
                   </PopoverContent>
                 </Popover>
                 <FormMessage />
