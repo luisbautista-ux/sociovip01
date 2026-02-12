@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar"; 
+import { DayPicker } from "react-day-picker";
 import { CalendarIcon, ImageIcon, Upload, Move, MapPin } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, isBefore, startOfDay, isEqual } from "date-fns";
@@ -29,6 +29,7 @@ import type { BusinessManagedEntity } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import NextImage from "next/image";
 import { useToast } from "@/hooks/use-toast";
+import { buttonVariants } from "@/components/ui/button";
 
 const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
@@ -309,15 +310,15 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar 
-                        mode="single" 
-                        selected={field.value} 
-                        onSelect={field.onChange} 
-                        locale={es} 
-                        initialFocus 
-                        captionLayout="dropdown-buttons"
-                        fromYear={new Date().getFullYear() - 2}
-                        toYear={new Date().getFullYear() + 5}
+                    <DayPicker
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      locale={es}
+                      initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={new Date().getFullYear() - 2}
+                      toYear={new Date().getFullYear() + 5}
                     />
                   </PopoverContent>
                 </Popover>
@@ -341,16 +342,16 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar 
-                        mode="single" 
-                        selected={field.value} 
-                        onSelect={field.onChange} 
-                        disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} 
-                        locale={es} 
-                        initialFocus 
-                        captionLayout="dropdown-buttons"
-                        fromYear={new Date().getFullYear() - 2}
-                        toYear={new Date().getFullYear() + 5}
+                    <DayPicker
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))}
+                      locale={es}
+                      initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={new Date().getFullYear() - 2}
+                      toYear={new Date().getFullYear() + 5}
                     />
                   </PopoverContent>
                 </Popover>
