@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DayPicker } from "react-day-picker";
+import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, ImageIcon, Upload, Move, MapPin } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, isBefore, startOfDay, isEqual } from "date-fns";
@@ -310,7 +310,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <DayPicker
+                    <Calendar
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
@@ -342,7 +342,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <DayPicker
+                    <Calendar
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
