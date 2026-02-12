@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarShadcnUi } from "@/components/ui/calendar"; 
+import { Calendar } from "@/components/ui/calendar"; 
 import { CalendarIcon, ImageIcon, Upload, Move, MapPin } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
 import { format, isBefore, startOfDay, isEqual } from "date-fns";
@@ -309,13 +309,13 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi 
+                    <Calendar 
                         mode="single" 
                         selected={field.value} 
                         onSelect={field.onChange} 
                         locale={es} 
                         initialFocus 
-                        captionLayout="dropdown-buttons"
+                        captionLayout="dropdown"
                         fromYear={new Date().getFullYear() - 2}
                         toYear={new Date().getFullYear() + 5}
                     />
@@ -341,14 +341,14 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarShadcnUi 
+                    <Calendar 
                         mode="single" 
                         selected={field.value} 
                         onSelect={field.onChange} 
                         disabled={(date) => form.getValues("startDate") && isBefore(date, startOfDay(form.getValues("startDate")))} 
                         locale={es} 
                         initialFocus 
-                        captionLayout="dropdown-buttons"
+                        captionLayout="dropdown"
                         fromYear={new Date().getFullYear() - 2}
                         toYear={new Date().getFullYear() + 5}
                     />
