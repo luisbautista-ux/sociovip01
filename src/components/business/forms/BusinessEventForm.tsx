@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
@@ -20,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DayPicker } from "react-day-picker";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import "react-day-picker/dist/style.css";
 import { CalendarIcon, ImageIcon, Upload, Move, MapPin } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
@@ -311,12 +310,12 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <DayPicker
+                    <CalendarComponent
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
                       locale={es}
-                      captionLayout="dropdown"
+                      captionLayout="dropdown-buttons"
                       fromYear={new Date().getFullYear() - 2}
                       toYear={new Date().getFullYear() + 5}
                       initialFocus
@@ -343,7 +342,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <DayPicker
+                    <CalendarComponent
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
@@ -352,7 +351,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                         return s ? isBefore(date, startOfDay(s)) : false;
                       }}
                       locale={es}
-                      captionLayout="dropdown"
+                      captionLayout="dropdown-buttons"
                       fromYear={new Date().getFullYear() - 2}
                       toYear={new Date().getFullYear() + 5}
                       initialFocus
@@ -465,3 +464,4 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
 
 BusinessEventForm.displayName = "BusinessEventForm";
 
+    
