@@ -33,6 +33,7 @@ export default function QrDisplayPage() {
   const [error, setError] = useState<string | null>(null);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [isDrawingCanvas, setIsDrawingCanvas] = useState(false);
+  const [isGeneratingDownload, setIsGeneratingDownload] = useState(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -199,6 +200,108 @@ export default function QrDisplayPage() {
     }
   }, [qrData]);
 
+  const generateDefaultCardAsCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx || !qrData || !businessDetails || !qrCodeImage) return null;
+
+    const scale = 2; // For higher resolution
+    const width = 384;
+    const height = 600; // Approximated height
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    ctx.scale(scale, scale);
+
+    // Background from the original card
+    ctx.fillStyle = 'rgb(255 255 255 / 0.05)';
+    ctx.fillRect(0, 0, width, height);
+
+    // Header Text
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción", width / 2, 50);
+
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillText(`Presenta este código en ${businessDetails.name}`, width / 2, 75);
+
+    // QR Code
+    const qrImg = new Image();
+    qrImg.src = qrCodeImage;
+    await new Promise(resolve => { qrImg.onload = resolve; });
+    
+    const qrSize = 250;
+    const qrX = (width - qrSize) / 2;
+    const qrY = 110;
+    
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.roundRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 8);
+    ctx.fill();
+    ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+    // User Info
+    const textYStart = qrY + qrSize + 40;
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(`${qrData.user.name} ${qrData.user.surname}`, width / 2, textYStart);
+    
+    ctx.font = '14px sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillText(`DNI/CE: ${qrData.user.dni}`, width / 2, textYStart + 25);
+
+    // Separator
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.fillRect(width * 0.1, textYStart + 45, width * 0.8, 1);
+
+    // Promotion Info
+    const promoYStart = textYStart + 65;
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText(qrData.promotion.title, width / 2, promoYStart);
+
+    let lastElementY = promoYStart;
+
+    if (qrData.promotion.ticketType?.name) {
+        const ticketType = qrData.promotion.ticketType;
+        const ticketY = promoYStart + 25;
+        
+        ctx.font = "bold 12px sans-serif";
+        const textWidth = ctx.measureText(ticketType.name.toUpperCase()).width;
+        const rectWidth = textWidth + 24;
+        const rectHeight = 22;
+        const rectX = (width - rectWidth) / 2;
+        
+        ctx.fillStyle = ticketType.color || "#888888";
+        ctx.beginPath();
+        ctx.roundRect(rectX, ticketY - rectHeight / 2, rectWidth, rectHeight, rectHeight / 2);
+        ctx.fill();
+        
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(ticketType.name.toUpperCase(), width / 2, ticketY);
+        ctx.textBaseline = "alphabetic";
+        lastElementY = ticketY + (rectHeight / 2) + 20;
+    } else {
+        lastElementY = promoYStart + 25;
+    }
+
+    if (qrData.promotion.promoCode !== 'PUBLIC_ACCESS') {
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillText(`Código: ${qrData.promotion.promoCode}`, width / 2, lastElementY);
+        lastElementY += 15;
+    }
+    
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillText(`Válido hasta: ${format(anyToDate(qrData.promotion.validUntil)!, "dd MMMM, yyyy", { locale: es })}`, width / 2, lastElementY);
+
+    return canvas;
+  }, [qrData, businessDetails, qrCodeImage]);
+
   useEffect(() => {
     if (qrData?.promotion.qrValue) {
       if (qrData.promotion.qrTemplateImageUrl) {
@@ -213,21 +316,33 @@ export default function QrDisplayPage() {
   }, [qrData, drawPreviewOnCanvas]);
 
   const handleSaveQrWithDetails = async () => {
-    const elementToCapture = qrData?.promotion.qrTemplateImageUrl ? canvasRef.current : cardRef.current;
-    if (!elementToCapture) {
-        toast({ title: "Error", description: "No se encontró el elemento para descargar.", variant: "destructive" });
-        return;
-    }
+    if (isGeneratingDownload) return;
+    setIsGeneratingDownload(true);
+    toast({ title: "Preparando descarga...", description: "Por favor, espera." });
+
     try {
+        let elementToCapture: HTMLElement | null = null;
+        if (qrData?.promotion.qrTemplateImageUrl) {
+            elementToCapture = canvasRef.current;
+        } else {
+            elementToCapture = await generateDefaultCardAsCanvas();
+        }
+
+        if (!elementToCapture) {
+            throw new Error("No se pudo generar la imagen para descargar.");
+        }
+        
         const dataUrl = await htmlToImage.toPng(elementToCapture, { quality: 1.0, pixelRatio: 2 });
         const link = document.createElement('a');
         link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
         link.href = dataUrl;
         link.click();
         toast({ title: "QR Guardado", description: "La imagen de la tarjeta se ha descargado." });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error saving QR image:', error);
-        toast({ title: "Error al Guardar", description: "No se pudo generar la imagen.", variant: "destructive" });
+        toast({ title: "Error al Guardar", description: `No se pudo generar la imagen: ${error.message}`, variant: "destructive" });
+    } finally {
+        setIsGeneratingDownload(false);
     }
   };
   
@@ -248,8 +363,8 @@ export default function QrDisplayPage() {
             <span className="hidden sm:inline">Iniciar Sesión</span>
           </Button>
         </Link>
-        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Guardar QR">
-          <Download className="h-5 w-5 sm:mr-2" />
+        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Guardar QR" disabled={isGeneratingDownload}>
+          {isGeneratingDownload ? <Loader2 className="h-5 w-5 sm:mr-2 animate-spin" /> : <Download className="h-5 w-5 sm:mr-2" />}
           <span className="hidden sm:inline">Guardar QR</span>
         </Button>
         <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Ver Negocio">
@@ -370,5 +485,7 @@ export default function QrDisplayPage() {
     </div>
   );
 }
+
+    
 
     
