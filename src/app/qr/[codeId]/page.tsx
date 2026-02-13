@@ -213,7 +213,7 @@ export default function QrDisplayPage() {
     ctx.scale(scale, scale);
 
     // Background from the original card
-    ctx.fillStyle = 'rgb(255 255 255 / 0.05)';
+    ctx.fillStyle = '#212121';
     ctx.fillRect(0, 0, width, height);
 
     // Header Text
@@ -321,23 +321,30 @@ export default function QrDisplayPage() {
     toast({ title: "Preparando descarga...", description: "Por favor, espera." });
 
     try {
-        let elementToCapture: HTMLElement | null = null;
-        if (qrData?.promotion.qrTemplateImageUrl) {
-            elementToCapture = canvasRef.current;
+        let dataUrl: string;
+
+        if (qrData?.promotion.qrTemplateImageUrl && canvasRef.current) {
+            dataUrl = await htmlToImage.toPng(canvasRef.current, { quality: 1.0, pixelRatio: 2 });
+        } else if (!qrData?.promotion.qrTemplateImageUrl) {
+            const canvas = await generateDefaultCardAsCanvas();
+            if (!canvas) {
+                throw new Error("No se pudo generar el lienzo para la descarga.");
+            }
+            dataUrl = canvas.toDataURL('image/png');
         } else {
-            elementToCapture = await generateDefaultCardAsCanvas();
+            throw new Error("No se encontró un elemento válido para descargar.");
         }
 
-        if (!elementToCapture) {
-            throw new Error("No se pudo generar la imagen para descargar.");
+        if (!dataUrl) {
+            throw new Error("La generación de la imagen falló y no produjo datos.");
         }
-        
-        const dataUrl = await htmlToImage.toPng(elementToCapture, { quality: 1.0, pixelRatio: 2 });
+
         const link = document.createElement('a');
-        link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
+        link.download = `SocioVIP_QR_${qrData?.promotion.promoCode || 'socio'}.png`;
         link.href = dataUrl;
         link.click();
         toast({ title: "QR Guardado", description: "La imagen de la tarjeta se ha descargado." });
+
     } catch (error: any) {
         console.error('Error saving QR image:', error);
         toast({ title: "Error al Guardar", description: `No se pudo generar la imagen: ${error.message}`, variant: "destructive" });
@@ -448,8 +455,8 @@ export default function QrDisplayPage() {
           ) : (
             <Card 
               ref={cardRef} 
-              className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden [transform-style:preserve-3d] animate-flip-in bg-white/5 backdrop-blur-md border-white/20 text-white"
-              style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards', transform: 'rotateY(1080deg)', opacity: 0.5 }}
+              className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden [transform-style:preserve-3d] animate-flip-in bg-black/50 backdrop-blur-md border-white/20 text-white"
+              style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards', opacity: 0.5 }}
             >
               <CardHeader className="text-center pb-4">
                 <CardTitle className="text-xl font-bold">{qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}</CardTitle>
@@ -466,9 +473,12 @@ export default function QrDisplayPage() {
                   <p className="font-semibold">{qrData.promotion.title}</p>
                   {qrData.promotion.ticketType?.name && (
                     <div className="flex justify-center mt-2">
-                      <div className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md" style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}>
+                        <div
+                        className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md"
+                        style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}
+                        >
                         {qrData.promotion.ticketType.name.toUpperCase()}
-                      </div>
+                        </div>
                     </div>
                   )}
                   {qrData.promotion.promoCode !== 'PUBLIC_ACCESS' && (
