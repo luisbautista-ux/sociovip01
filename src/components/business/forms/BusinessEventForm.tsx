@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { CalendarIcon, ImageIcon, Upload, Move, MapPin } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
@@ -300,7 +300,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel><strong>Fecha de Inicio</strong> <span className="text-destructive">*</span></FormLabel>
-                <Popover modal={false}>
+                <Popover modal={true}>
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
@@ -310,12 +310,12 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
+                    <DayPicker
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
                       locale={es}
-                      captionLayout="dropdown-buttons"
+                      captionLayout="dropdown"
                       fromYear={new Date().getFullYear() - 2}
                       toYear={new Date().getFullYear() + 5}
                       initialFocus
@@ -332,7 +332,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel><strong>Fecha de Fin</strong> <span className="text-destructive">*</span></FormLabel>
-                <Popover modal={false}>
+                <Popover modal={true}>
                   <PopoverTrigger asChild>
                     <FormControl>
                       <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
@@ -342,7 +342,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                     </FormControl>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
+                    <DayPicker
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
@@ -351,7 +351,7 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
                         return s ? isBefore(date, startOfDay(s)) : false;
                       }}
                       locale={es}
-                      captionLayout="dropdown-buttons"
+                      captionLayout="dropdown"
                       fromYear={new Date().getFullYear() - 2}
                       toYear={new Date().getFullYear() + 5}
                       initialFocus
