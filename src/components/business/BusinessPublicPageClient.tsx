@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -164,6 +163,39 @@ const newQrClientSchema = z.object({
 });
 
 type NewQrClientFormData = z.infer<typeof newQrClientSchema>;
+
+function hexToHsl(hex: string | undefined): string | null {
+  if (!hex || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex)) {
+    return null;
+  }
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  h = Math.round(h * 360);
+  s = Math.round(s * 100);
+  l = Math.round(l * 100);
+  return `${h} ${s}% ${l}%`;
+}
 
 
 export default function BusinessPublicPageClient({ customUrlPath }: { customUrlPath: string }) {
@@ -330,6 +362,28 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
       setIsLoading(false);
     }
   }, [customUrlPath, fetchBusinessDataByCustomUrl]);
+  
+  useEffect(() => {
+    if (businessDetails) {
+      const primaryHsl = hexToHsl(businessDetails.primaryColor);
+      const accentHsl = hexToHsl(businessDetails.secondaryColor);
+      
+      if (primaryHsl) {
+        document.documentElement.style.setProperty('--primary', primaryHsl);
+      }
+      if (accentHsl) {
+        document.documentElement.style.setProperty('--accent', accentHsl);
+        // Set the ring color to the secondary color as requested
+        document.documentElement.style.setProperty('--ring', accentHsl);
+      }
+    }
+    // Cleanup function to reset colors when component unmounts
+    return () => {
+      document.documentElement.style.removeProperty('--primary');
+      document.documentElement.style.removeProperty('--accent');
+      document.documentElement.style.removeProperty('--ring');
+    };
+  }, [businessDetails]);
 
 
 const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
@@ -664,7 +718,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                 margin: 1,
                 color: {
                   dark: layout.qr.color || '#000000',
-                  light: '#0000' // transparent
+                  light: '#0000' // Transparent background
                 }
             });
             const qrImage = new Image();
@@ -1098,34 +1152,35 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                             defaultValue={field.value}
                             className="grid grid-cols-2 gap-2"
                         >
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                                <Label
-                                    htmlFor="docType-dni-public"
-                                    className={cn(
-                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                                        field.value === 'dni' && "bg-primary text-primary-foreground border-primary"
-                                    )}
-                                >
-                                    <FormControl>
-                                        <RadioGroupItem value="dni" id="docType-dni-public" className="sr-only" />
-                                    </FormControl>
-                                    DNI
-                                </Label>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                                 <Label
-                                    htmlFor="docType-ce-public"
-                                    className={cn(
-                                        "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer",
-                                        field.value === 'ce' && "bg-primary text-primary-foreground border-primary"
-                                    )}
-                                >
-                                    <FormControl>
-                                        <RadioGroupItem value="ce" id="docType-ce-public" className="sr-only" />
-                                    </FormControl>
-                                    Carnet de Extranjería
-                                </Label>
-                            </FormItem>
+                           <FormItem className="flex items-center space-x-3 space-y-0">
+                            <Label
+                              htmlFor="docType-dni-public"
+                              className={cn(
+                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-[#ECB10E] hover:text-black cursor-pointer",
+                                field.value === 'dni' && "bg-black text-white border-black"
+                              )}
+                            >
+                              <FormControl>
+                                <RadioGroupItem value="dni" id="docType-dni-public" className="sr-only" />
+                              </FormControl>
+                              DNI
+                            </Label>
+                          </FormItem>
+
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <Label
+                              htmlFor="docType-ce-public"
+                              className={cn(
+                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-[#ECB10E] hover:text-black cursor-pointer",
+                                field.value === 'ce' && "bg-black text-white border-black"
+                              )}
+                            >
+                              <FormControl>
+                                <RadioGroupItem value="ce" id="docType-ce-public" className="sr-only" />
+                              </FormControl>
+                              Carnet de Extranjería
+                            </Label>
+                          </FormItem>
                         </RadioGroup>
                     </FormControl>
                     <FormMessage />
@@ -1147,6 +1202,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                             pattern="[0-9]*"
                             placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
                             {...field} 
+                            className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#ECB10E]"
                             maxLength={watchedDocType === 'dni' ? 8 : 20}
                             onChange={(e) => {
                                 const numericValue = e.target.value.replace(/[^0-9]/g, '');
@@ -1171,14 +1227,18 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     disabled={isLoadingQrFlow}
                   >
                     Cancelar
-                  </Button>
-                  <Button type="submit" className="text-white font-bold shadow-lg" 
-                    style={{
-                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
-                    }}
-                    disabled={isLoadingQrFlow}>
-                    {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
-                  </Button>
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="bg-[#ECB10E] text-black font-bold shadow-lg hover:bg-[#d9a10c]"
+                      disabled={isLoadingQrFlow}
+                    >
+                      {isLoadingQrFlow ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        "Verificar"
+                      )}
+                    </Button>
                 </ShadcnDialogFooter>
               </form>
             </Form>
