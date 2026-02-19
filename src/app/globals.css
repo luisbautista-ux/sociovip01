@@ -167,7 +167,8 @@
 }
 
 .bg-gradient-loader {
-  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)), #8e44ad, #c0392b, #2980b9);
+  /* Se usan colores HSL fijos de SocioVIP para que no cambien con el negocio */
+  background: linear-gradient(-45deg, hsl(258 69% 42%), hsl(0 79% 49%), #8e44ad, #c0392b, #2980b9);
   background-size: 400% 400%;
   animation: gradient-animation 15s ease infinite;
 }
