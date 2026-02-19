@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -99,6 +98,7 @@ import * as htmlToImage from 'html-to-image';
 import { ImageCarousel } from "@/components/business/ImageCarousel";
 import { VideoCarousel } from "@/components/business/VideoCarousel";
 import { parseISO } from "date-fns/parseISO";
+import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 
 // --- Helpers robustos para códigos ---
@@ -373,7 +373,7 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
       }
       if (accentHsl) {
         document.documentElement.style.setProperty('--accent', accentHsl);
-        // Set the ring color to the secondary color as requested
+        // Garantizar que el anillo de enfoque use el color de marca
         document.documentElement.style.setProperty('--ring', accentHsl);
       }
     }
@@ -444,7 +444,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     console.error("Error validating specific code:", e);
     toast({ title: "Error de validación", description: "No se pudo validar el código.", variant: "destructive" });
   } finally {
-    setIsLoadingQrFlow(false);
+    setIsLoadingFlow(false);
   }
 };
 
@@ -827,7 +827,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     {...field}
                     onChange={(e) => field.onChange(normalizeCode(e.target.value))}
                     maxLength={9}
-                    className="text-sm h-9 w-full"
+                    className="text-sm h-9 w-full focus-visible:ring-offset-0 transition-all border-2"
                     disabled={isLoadingQrFlow}
                   />
                 </FormControl>
@@ -838,7 +838,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
           <Button
             type="submit"
             size="sm"
-            className="w-full h-9 text-white"
+            className="w-full h-9 text-white font-bold transition-all hover:scale-105 active:scale-95"
             style={{
                 backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`
             }}
@@ -970,50 +970,54 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
 
        <main className="flex-grow overflow-y-auto">
             <div className="max-w-7xl mx-auto w-full px-0 sm:px-6 lg:px-8 pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 md:mt-8 mb-4">
-                    <div className="md:col-span-2">
-                        <ImageCarousel
-                          images={businessDetails.publicCoverImageUrls || []}
-                          primaryColor={businessDetails.primaryColor}
-                          title={businessDetails.name}
-                          slogan={businessDetails.slogan}
-                          logoUrl={businessDetails.logoUrl}
-                        />
+                <ScrollReveal direction="none">
+                    <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 md:mt-8 mb-4">
+                        <div className="md:col-span-2">
+                            <ImageCarousel
+                            images={businessDetails.publicCoverImageUrls || []}
+                            primaryColor={businessDetails.primaryColor}
+                            title={businessDetails.name}
+                            slogan={businessDetails.slogan}
+                            logoUrl={businessDetails.logoUrl}
+                            />
+                        </div>
+                        <aside className="hidden md:block h-full">
+                            <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor}/>
+                        </aside>
                     </div>
-                    <aside className="hidden md:block h-full">
-                         <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor}/>
-                    </aside>
-                </div>
+                </ScrollReveal>
 
-                <div className="relative overflow-x-hidden whitespace-nowrap py-2 text-sm font-bold text-white" style={{ backgroundColor: businessDetails.primaryColor }}>
-                    <div className="animate-scroll inline-block">
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
+                <ScrollReveal direction="none" delay={200}>
+                    <div className="relative overflow-x-hidden whitespace-nowrap py-2 text-sm font-bold text-white" style={{ backgroundColor: businessDetails.primaryColor }}>
+                        <div className="animate-scroll inline-block">
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                        </div>
+                        <div className="animate-scroll inline-block">
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                        </div>
                     </div>
-                    <div className="animate-scroll inline-block">
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                        <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                         <span className="mx-4">•</span>
-                        <span className="mx-4">Genera tus entradas QR gratis</span>
-                    </div>
-                </div>
+                </ScrollReveal>
             
                 <div className="sticky top-0 z-30 py-2 bg-background px-4">
                     <div className="max-w-7xl mx-auto">
@@ -1031,16 +1035,24 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
                           <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                          {promotions.map((promo) => (
-                            <Card key={promo.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1">
-                              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                                <NextImage src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} alt={promo.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} data-ai-hint={promo.aiHint || "discount offer"}/>
-                              </div>
-                              <CardHeader className="pb-3"><CardTitle className="text-xl">{promo.name}</CardTitle></CardHeader>
-                              <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p><p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
-                              <CardFooter className="flex-col items-start p-4 border-t"><SpecificCodeEntryForm entity={promo} /></CardFooter>
-                            </Card>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-8">
+                          {promotions.map((promo, index) => (
+                            <ScrollReveal key={promo.id} delay={index * 100}>
+                                <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
+                                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                                    <NextImage 
+                                        src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} 
+                                        alt={promo.name} fill 
+                                        className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
+                                        style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} 
+                                        data-ai-hint={promo.aiHint || "discount offer"}
+                                    />
+                                </div>
+                                <CardHeader className="pb-3"><CardTitle className="text-xl font-headline">{promo.name}</CardTitle></CardHeader>
+                                <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p><p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
+                                <CardFooter className="flex-col items-start p-4 border-t bg-muted/10"><SpecificCodeEntryForm entity={promo} /></CardFooter>
+                                </Card>
+                            </ScrollReveal>
                           ))}
                         </div>
                       </section>
@@ -1051,44 +1063,52 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
                           <Calendar className="h-7 w-7 mr-3" /> Eventos
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                          {allEvents.map((event) => {
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
+                          {allEvents.map((event, index) => {
                             const location = event.locationAddress || (businessDetails.publicAddress);
                             return (
-                                <Card key={event.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-1">
-                                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                                    <NextImage src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} alt={event.name} fill className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} data-ai-hint={event.aiHint || "party concert"}/>
-                                     {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30" />)}
-                                </div>
-                                <CardHeader className="pb-3"><CardTitle className="text-xl">{event.name}</CardTitle></CardHeader>
-                                <CardContent className="flex-grow space-y-2">
-                                    <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
-                                    <p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p>
-                                    {location && (
-                                        <a
-                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors pt-1 group"
-                                        >
-                                            <MapPin className="h-4 w-4 mr-1.5 shrink-0" />
-                                            <span className="group-hover:underline">{location}</span>
-                                        </a>
-                                    )}
-                                </CardContent>
-                                {isEntityCurrentlyActivatable(event) ? (
-                                    <CardFooter className="flex-col items-start p-4 border-t">
-                                        {event.isPublicAccess ? (
-                                            <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-9 text-white" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`}}>
-                                                <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
-                                            </Button>
-                                        ) : (
-                                            <SpecificCodeEntryForm entity={event} />
+                                <ScrollReveal key={event.id} delay={index * 100}>
+                                    <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
+                                    <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                                        <NextImage 
+                                            src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} 
+                                            alt={event.name} fill 
+                                            className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
+                                            style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} 
+                                            data-ai-hint={event.aiHint || "party concert"}
+                                        />
+                                        {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />)}
+                                    </div>
+                                    <CardHeader className="pb-3"><CardTitle className="text-xl font-headline">{event.name}</CardTitle></CardHeader>
+                                    <CardContent className="flex-grow space-y-2">
+                                        <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
+                                        <p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p>
+                                        {location && (
+                                            <a
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors pt-1 group"
+                                            >
+                                                <MapPin className="h-4 w-4 mr-1.5 shrink-0" />
+                                                <span className="group-hover:underline">{location}</span>
+                                            </a>
                                         )}
-                                    </CardFooter>
-                                    ) : (<PastEventCardFooter entity={event} />)
-                                }
-                                </Card>
+                                    </CardContent>
+                                    {isEntityCurrentlyActivatable(event) ? (
+                                        <CardFooter className="flex-col items-start p-4 border-t bg-muted/10">
+                                            {event.isPublicAccess ? (
+                                                <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-9 text-white font-bold shadow-lg transition-all hover:scale-105" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`}}>
+                                                    <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
+                                                </Button>
+                                            ) : (
+                                                <SpecificCodeEntryForm entity={event} />
+                                            )}
+                                        </CardFooter>
+                                        ) : (<PastEventCardFooter entity={event} />)
+                                    }
+                                    </Card>
+                                </ScrollReveal>
                             )
                         })}
                         </div>
@@ -1096,19 +1116,24 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     )}
 
                     {noContentToShow && (
-                      <div className="py-12"><Card className="col-span-full"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">{view === 'promotions' && 'No hay Promociones por Ahora'}{view === 'events' && 'No hay Eventos por Ahora'}{view === 'all' && 'No hay Promociones y Eventos por Ahora'}</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>{view === 'promotions' && 'Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!'}{view === 'events' && 'Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!'}{view === 'all' && 'Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!'}</CardDescription></CardContent></Card></div>
+                      <div className="py-12"><Card className="col-span-full border-dashed"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">{view === 'promotions' && 'No hay Promociones por Ahora'}{view === 'events' && 'No hay Eventos por Ahora'}{view === 'all' && 'No hay Promociones y Eventos por Ahora'}</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>{view === 'promotions' && 'Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!'}{view === 'events' && 'Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!'}{view === 'all' && 'Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!'}</CardDescription></CardContent></Card></div>
                     )}
                 </div>
             </div>
             
             {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
-                <footer className="w-full bg-background border-t mt-12 py-6">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-muted-foreground text-sm">
-                        <p className="font-semibold text-foreground mb-2">Información de Contacto</p>
-                        {businessDetails.publicAddress && (<p>{businessDetails.publicAddress}</p>)}
-                        {businessDetails.publicPhone && (<p>Teléfono: {businessDetails.publicPhone}</p>)}
-                        {businessDetails.publicContactEmail && (<p>Email: <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
-                    </div>
+                <footer className="w-full bg-background border-t mt-12 py-8">
+                    <ScrollReveal direction="down">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-muted-foreground text-sm">
+                            <div className="w-full flex justify-center mb-4 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
+                                <SocioVipLogo size={48} />
+                            </div>
+                            <p className="font-semibold text-foreground mb-2">Información de Contacto</p>
+                            {businessDetails.publicAddress && (<p>{businessDetails.publicAddress}</p>)}
+                            {businessDetails.publicPhone && (<p>Teléfono: {businessDetails.publicPhone}</p>)}
+                            {businessDetails.publicContactEmail && (<p>Email: <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
+                        </div>
+                    </ScrollReveal>
                 </footer>
             ) : null}
       </main>
@@ -1124,7 +1149,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <UIDialogTitleComponent>
+            <UIDialogTitleComponent className="font-headline text-2xl">
               {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
             </UIDialogTitleComponent>
             <UIDialogDescriptionComponent>
@@ -1156,7 +1181,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                             <Label
                               htmlFor="docType-dni-public"
                               className={cn(
-                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-[#ECB10E] hover:text-black cursor-pointer",
+                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium transition-all hover:bg-accent hover:text-accent-foreground cursor-pointer",
                                 field.value === 'dni' && "bg-black text-white border-black"
                               )}
                             >
@@ -1171,7 +1196,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                             <Label
                               htmlFor="docType-ce-public"
                               className={cn(
-                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-[#ECB10E] hover:text-black cursor-pointer",
+                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium transition-all hover:bg-accent hover:text-accent-foreground cursor-pointer",
                                 field.value === 'ce' && "bg-black text-white border-black"
                               )}
                             >
@@ -1202,7 +1227,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                             pattern="[0-9]*"
                             placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
                             {...field} 
-                            className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#ECB10E]"
+                            className="focus-visible:ring-offset-0 border-2"
                             maxLength={watchedDocType === 'dni' ? 8 : 20}
                             onChange={(e) => {
                                 const numericValue = e.target.value.replace(/[^0-9]/g, '');
@@ -1216,10 +1241,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     </FormItem>
                   )}
                 />
-                <ShadcnDialogFooter className="pt-2">
+                <ShadcnDialogFooter className="pt-2 gap-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="flex-1"
                     onClick={() => {
                       setShowDniModal(false);
                       resetQrFlow();
@@ -1230,7 +1256,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     </Button>
                     <Button
                       type="submit"
-                      className="bg-[#ECB10E] text-black font-bold shadow-lg hover:bg-[#d9a10c]"
+                      className="flex-1 bg-black text-white font-bold shadow-lg hover:bg-black/80 transition-all"
                       disabled={isLoadingQrFlow}
                     >
                       {isLoadingQrFlow ? (
@@ -1247,7 +1273,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               <form onSubmit={newQrClientForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-1 max-h-[60vh] overflow-y-auto pr-2">
                 {isConsultingDni && (
                     <div 
-                        className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-white"
+                        className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-white shadow-inner"
                         style={{
                             backgroundSize: '400% 400%',
                             animation: 'gradient-animation 15s ease infinite',
@@ -1272,7 +1298,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                           placeholder="Confirma tu número de documento"
                           {...field}
                           disabled={true}
-                          className="disabled:bg-muted/30"
+                          className="disabled:bg-muted/30 border-2"
                         />
                       </FormControl>
                       <FormMessage />
@@ -1289,7 +1315,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         Apellido(s) <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Tus apellidos" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} />
+                        <Input placeholder="Tus apellidos" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} className="border-2"/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1304,7 +1330,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         Nombre(s) <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Tus nombres" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} />
+                        <Input placeholder="Tus nombres" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} className="border-2"/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1329,6 +1355,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                 const numericValue = e.target.value.replace(/[^0-9]/g, '');
                                 field.onChange(numericValue);
                             }}
+                            className="border-2"
                             disabled={isLoadingQrFlow || isConsultingDni} />
                       </FormControl>
                       <FormMessage />
@@ -1348,7 +1375,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                           <FormControl>
                             <Button
                               variant={"outline"}
-                              className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                              className={cn("w-full pl-3 text-left font-normal border-2", !field.value && "text-muted-foreground")}
                               disabled={isLoadingQrFlow || isConsultingDni}
                             >
                               {field.value ? format(field.value, "d MMMM yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
@@ -1376,10 +1403,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     </FormItem>
                   )}
                 />
-                <ShadcnDialogFooter className="pt-3">
+                <ShadcnDialogFooter className="pt-3 gap-2">
                   <Button
                     type="button"
                     variant="outline"
+                    className="flex-1"
                     onClick={() => {
                       setCurrentStepInModal("enterDni");
                       newQrClientForm.reset({ dni: enteredDni });
@@ -1389,7 +1417,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   >
                     Volver
                   </Button>
-                  <Button type="submit" className="text-white font-bold shadow-lg" 
+                  <Button type="submit" className="flex-1 text-white font-bold shadow-lg transition-all hover:scale-105" 
                     style={{
                         backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
                     }}
