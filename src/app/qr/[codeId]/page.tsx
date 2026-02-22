@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -8,10 +7,10 @@ import Link from 'next/link';
 import QRCode from "qrcode";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, limit } from "firebase/firestore";
-import type { BusinessManagedEntity, Business, QrClient, QrCodeData, GeneratedCode, TicketType } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import type { BusinessManagedEntity, Business, QrClient, QrCodeData, GeneratedCode } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle, Download, ArrowLeft, UserCircle, QrCode, Building } from "lucide-react";
+import { Loader2, AlertTriangle, Download, ArrowLeft, UserCircle, Building } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
@@ -53,8 +52,8 @@ export default function QrDisplayPage() {
       let foundEntity: BusinessManagedEntity | null = null;
       let foundCode: GeneratedCode | null = null;
       
-      for (const doc of querySnapshot.docs) {
-          const entity = { id: doc.id, ...doc.data() } as BusinessManagedEntity;
+      for (const docSnap of querySnapshot.docs) {
+          const entity = { id: docSnap.id, ...docSnap.data() } as BusinessManagedEntity;
           const code = entity.generatedCodes?.find(c => c.id === codeId);
           if (code) {
               foundEntity = entity;
@@ -133,7 +132,7 @@ export default function QrDisplayPage() {
         templateImg.src = qrData.promotion.qrTemplateImageUrl;
         await new Promise<void>((resolve, reject) => {
             templateImg.onload = () => resolve();
-            templateImg.onerror = (err) => reject(new Error("Image load error"));
+            templateImg.onerror = () => reject(new Error("Image load error"));
         });
 
         canvas.width = templateImg.width;
@@ -143,7 +142,12 @@ export default function QrDisplayPage() {
         const layout = qrData.promotion.qrTemplateLayout;
         if (!layout) throw new Error("Layout data is missing");
 
-        const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { width: layout.qr.size, errorCorrectionLevel: 'H', margin: 1, color: { dark: layout.qr.color || '#000000', light: '#0000' } });
+        const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { 
+          width: layout.qr.size, 
+          errorCorrectionLevel: 'H', 
+          margin: 1, 
+          color: { dark: layout.qr.color || '#000000', light: '#0000' } 
+        });
         const qrImage = new Image();
         qrImage.src = qrDataUrl;
         await new Promise(resolve => qrImage.onload = resolve);
@@ -197,25 +201,23 @@ export default function QrDisplayPage() {
     } finally {
         setIsDrawingCanvas(false);
     }
-  }, [qrData, entity?.name]); // Error check: getElementRect removed, ensuring entity is defined if needed.
+  }, [qrData]);
 
   const generateDefaultCardAsCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx || !qrData || !businessDetails || !qrCodeImage) return null;
 
-    const scale = 2; // For higher resolution
+    const scale = 2;
     const width = 384;
-    const height = 600; // Approximated height
+    const height = 600;
     canvas.width = width * scale;
     canvas.height = height * scale;
     ctx.scale(scale, scale);
 
-    // Background from the original card
     ctx.fillStyle = '#212121';
     ctx.fillRect(0, 0, width, height);
 
-    // Header Text
     ctx.fillStyle = 'white';
     ctx.textAlign = 'center';
     ctx.font = 'bold 20px sans-serif';
@@ -225,7 +227,6 @@ export default function QrDisplayPage() {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.fillText(`Presenta este código en ${businessDetails.name}`, width / 2, 75);
 
-    // QR Code
     const qrImg = new Image();
     qrImg.src = qrCodeImage;
     await new Promise(resolve => { qrImg.onload = resolve; });
@@ -240,7 +241,6 @@ export default function QrDisplayPage() {
     ctx.fill();
     ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-    // User Info
     const textYStart = qrY + qrSize + 40;
     ctx.fillStyle = 'white';
     ctx.font = 'bold 18px sans-serif';
@@ -250,11 +250,9 @@ export default function QrDisplayPage() {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.fillText(`DNI/CE: ${qrData.user.dni}`, width / 2, textYStart + 25);
 
-    // Separator
     ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.fillRect(width * 0.1, textYStart + 45, width * 0.8, 1);
 
-    // Promotion Info
     const promoYStart = textYStart + 65;
     ctx.fillStyle = 'white';
     ctx.font = 'bold 16px sans-serif';
@@ -332,10 +330,6 @@ export default function QrDisplayPage() {
             dataUrl = canvas.toDataURL('image/png');
         } else {
             throw new Error("No se encontró un elemento válido para descargar.");
-        }
-
-        if (!dataUrl) {
-            throw new Error("La generación de la imagen falló y no produjo datos.");
         }
 
         const link = document.createElement('a');
@@ -416,14 +410,14 @@ export default function QrDisplayPage() {
   
   return (
     <div className="min-h-screen bg-black text-foreground flex flex-col">
-      {/* Background Image - Improved Visibility */}
+      {/* Background Image */}
       {qrData.promotion.imageUrl && (
         <div className="fixed inset-0 z-0">
           <NextImage
             src={qrData.promotion.imageUrl}
             alt="Fondo de la promoción"
             fill
-            className="object-cover blur-sm scale-105 brightness-[0.6]"
+            className="object-cover blur-sm scale-105 brightness-[0.7]"
             data-ai-hint={qrData.promotion.aiHint || "promotion background"}
           />
         </div>
@@ -454,7 +448,7 @@ export default function QrDisplayPage() {
           ) : (
             <Card 
               ref={cardRef} 
-              className="w-full max-w-sm shadow-2xl rounded-2xl overflow-hidden [transform-style:preserve-3d] animate-flip-in bg-white/10 backdrop-blur-lg border-white/20 text-white"
+              className="w-full max-w-sm shadow-2xl rounded-2xl overflow-hidden bg-white/10 backdrop-blur-lg border-white/20 text-white animate-flip-in"
               style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards' }}
             >
               <CardHeader className="text-center pb-4 border-b border-white/10">
