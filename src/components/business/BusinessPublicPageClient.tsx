@@ -38,7 +38,7 @@ import type {
   GeneratedCode,
   TicketType
 } from "@/lib/types";
-import { format, isPast, parse } from "date-fns";
+import { format, isPast, parse, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
 import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import {
@@ -67,7 +67,7 @@ import {
   DialogDescription as UIDialogDescriptionComponent,
   DialogFooter as ShadcnDialogFooter,
 } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
@@ -444,7 +444,7 @@ const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInput
     console.error("Error validating specific code:", e);
     toast({ title: "Error de validación", description: "No se pudo validar el código.", variant: "destructive" });
   } finally {
-    setIsLoadingFlow(false);
+    setIsLoadingQrFlow(false);
   }
 };
 
@@ -461,7 +461,7 @@ const handlePublicAccessSubmit = (entity: BusinessManagedEntity) => {
         entityId: entity.id,
         generatedByName: 'Sistema',
         generatedDate: new Date().toISOString(),
-    });
+    } as any);
     setCurrentStepInModal("enterDni");
     dniForm.reset({ docType: 'dni', docNumber: "" });
     setShowDniModal(true);
@@ -852,17 +852,24 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     );
   };
 
-  const PastEventCardFooter = ({ entity }: { entity: BusinessManagedEntity }) => (
-    <CardFooter className="flex-col items-center justify-center p-4 border-t bg-muted/50">
-        <div className="flex items-center text-sm font-semibold text-muted-foreground">
-            <History className="h-4 w-4 mr-2" />
-            <span>Evento Finalizado</span>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">
-            Finalizó el {format(new Date(entity.endDate), "dd MMMM, yyyy", { locale: es })}
-        </p>
-    </CardFooter>
-  );
+  const PastEventCardFooter = ({ entity }: { entity: BusinessManagedEntity }) => {
+    const isFinished = isPast(anyToDate(entity.endDate) || new Date());
+    
+    return (
+      <CardFooter className="flex-col items-center justify-center p-4 border-t bg-muted/50">
+          <div className="flex items-center text-sm font-semibold text-muted-foreground">
+              <History className="h-4 w-4 mr-2" />
+              <span>{isFinished ? "Evento Finalizado" : "Evento No Disponible"}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+              {isFinished 
+                ? `Finalizó el ${format(anyToDate(entity.endDate)!, "dd MMMM, yyyy", { locale: es })}`
+                : "La generación de QRs está desactivada temporalmente."
+              }
+          </p>
+      </CardFooter>
+    );
+  };
 
   const showPromotions = (view === 'all' || view === 'promotions') && promotions.length > 0;
   const showEvents = (view === 'all' || view === 'events') && allEvents.length > 0;

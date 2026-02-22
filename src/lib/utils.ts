@@ -1,5 +1,3 @@
-
-
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { BusinessManagedEntity, GeneratedCode, TicketType, Business } from "./types";
@@ -118,6 +116,13 @@ export function isEntityCurrentlyActivatable(
       999
     );
 
+    // Para eventos, permitimos la generación de entradas desde que el evento es creado y activado,
+    // hasta que el evento termina (sin importar si aún no ha empezado la fecha de inicio).
+    if (entity.type === 'event') {
+      return now <= end;
+    }
+
+    // Para promociones, mantenemos el rango de vigencia estricto.
     return now >= start && now <= end;
   } catch (error) {
     console.error(
@@ -292,4 +297,3 @@ export const generateCodesPDF = async (
 
   doc.save(`${businessDetails.name}_${entity.name}_codes.pdf`);
 };
-
