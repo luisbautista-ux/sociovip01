@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -198,7 +197,7 @@ export default function QrDisplayPage() {
     } finally {
         setIsDrawingCanvas(false);
     }
-  }, [qrData]);
+  }, [qrData, entity?.name]); // Error check: getElementRect removed, ensuring entity is defined if needed.
 
   const generateDefaultCardAsCanvas = useCallback(async (): Promise<HTMLCanvasElement | null> => {
     const canvas = document.createElement('canvas');
@@ -362,24 +361,24 @@ export default function QrDisplayPage() {
   };
 
   const QrPageFooter = () => (
-    <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t">
+    <footer className="sticky bottom-0 z-20 w-full bg-background/95 backdrop-blur-sm py-3 px-4 border-t border-white/10">
       <div className="max-w-4xl mx-auto grid grid-cols-4 items-center gap-2">
         <Link href="/login" passHref legacyBehavior>
-          <Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Iniciar Sesión">
+          <Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground border-white/20" title="Iniciar Sesión">
             <UserCircle className="h-5 w-5 sm:mr-2" />
             <span className="hidden sm:inline">Iniciar Sesión</span>
           </Button>
         </Link>
-        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Guardar QR" disabled={isGeneratingDownload}>
+        <Button onClick={handleSaveQrWithDetails} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground border-white/20" title="Guardar QR" disabled={isGeneratingDownload}>
           {isGeneratingDownload ? <Loader2 className="h-5 w-5 sm:mr-2 animate-spin" /> : <Download className="h-5 w-5 sm:mr-2" />}
           <span className="hidden sm:inline">Guardar QR</span>
         </Button>
-        <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Ver Negocio">
+        <Button onClick={handleBackToBusinessPage} variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground border-white/20" title="Ver Negocio">
           <Building className="h-5 w-5 sm:mr-2" />
           <span className="hidden sm:inline">Ver Negocio</span>
         </Button>
         <Link href="/" passHref legacyBehavior>
-          <Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground" title="Volver al Inicio">
+          <Button variant="outline" className="w-full font-bold hover:bg-muted hover:text-muted-foreground border-white/20" title="Volver al Inicio">
             <ArrowLeft className="h-5 w-5 sm:mr-2" />
             <span className="hidden sm:inline">Volver</span>
           </Button>
@@ -404,7 +403,7 @@ export default function QrDisplayPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-black">
         <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
         <h1 className="text-3xl font-bold text-destructive">Error al Cargar QR</h1>
         <p className="text-muted-foreground mt-2">{error}</p>
@@ -417,14 +416,14 @@ export default function QrDisplayPage() {
   
   return (
     <div className="min-h-screen bg-black text-foreground flex flex-col">
-      {/* Background Image */}
+      {/* Background Image - Improved Visibility */}
       {qrData.promotion.imageUrl && (
         <div className="fixed inset-0 z-0">
           <NextImage
             src={qrData.promotion.imageUrl}
             alt="Fondo de la promoción"
             fill
-            className="object-cover blur-lg scale-110 brightness-50"
+            className="object-cover blur-sm scale-105 brightness-[0.6]"
             data-ai-hint={qrData.promotion.aiHint || "promotion background"}
           />
         </div>
@@ -432,22 +431,22 @@ export default function QrDisplayPage() {
       
       {/* Main Content */}
       <div className="relative z-10 flex flex-col h-screen">
-        <header className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-white/5 backdrop-blur-sm">
+        <header className="py-4 px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-20 w-full bg-black/40 backdrop-blur-md border-b border-white/10">
           <div className="max-w-7xl mx-auto flex items-center justify-start">
             {businessDetails.logoUrl && <NextImage src={businessDetails.logoUrl} alt={`${businessDetails.name} logo`} width={40} height={40} className="h-10 w-10 object-contain rounded-md bg-white/20 p-1 mr-4" />}
             <h1 className="font-semibold text-xl text-white">{businessDetails.name}</h1>
-            {businessDetails.slogan && <p className="text-xs text-white/80 ml-3">{businessDetails.slogan}</p>}
+            {businessDetails.slogan && <p className="text-xs text-white/80 ml-3 hidden sm:block">{businessDetails.slogan}</p>}
           </div>
         </header>
 
         <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-8 [perspective:1000px]">
           {qrData.promotion.qrTemplateImageUrl ? (
-            <div className="relative w-full max-w-sm shadow-xl rounded-xl">
+            <div className="relative w-full max-w-sm shadow-2xl rounded-xl overflow-hidden ring-1 ring-white/20">
               {isDrawingCanvas && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-xl">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                  <p className="text-lg font-semibold text-primary">Generando tu QR...</p>
-                  <p className="text-sm text-muted-foreground">Espera un momento, por favor.</p>
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-xl">
+                  <Loader2 className="h-12 w-12 animate-spin text-white mb-4" />
+                  <p className="text-lg font-semibold text-white">Generando tu QR...</p>
+                  <p className="text-sm text-white/70">Espera un momento, por favor.</p>
                 </div>
               )}
               <canvas ref={canvasRef} className="w-full h-auto" />
@@ -455,36 +454,51 @@ export default function QrDisplayPage() {
           ) : (
             <Card 
               ref={cardRef} 
-              className="w-full max-w-sm shadow-xl rounded-xl overflow-hidden [transform-style:preserve-3d] animate-flip-in bg-black/50 backdrop-blur-md border-white/20 text-white"
-              style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards', opacity: 0.5 }}
+              className="w-full max-w-sm shadow-2xl rounded-2xl overflow-hidden [transform-style:preserve-3d] animate-flip-in bg-white/10 backdrop-blur-lg border-white/20 text-white"
+              style={{ animation: 'flip-in 1.5s cubic-bezier(0.25, 1, 0.5, 1) forwards' }}
             >
-              <CardHeader className="text-center pb-4">
-                <CardTitle className="text-xl font-bold">{qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}</CardTitle>
-                <CardDescription className="text-white/80">Presenta este código en {businessDetails.name}.</CardDescription>
+              <CardHeader className="text-center pb-4 border-b border-white/10">
+                <CardTitle className="text-xl font-bold tracking-tight">{qrData.promotion.type === "event" ? "Tu Entrada para el Evento" : "Tu Promoción"}</CardTitle>
+                <CardDescription className="text-white/70">Presenta este código en {businessDetails.name}.</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col items-center justify-center space-y-4">
-                {qrCodeImage ? <NextImage src={qrCodeImage} alt="Tu código QR" width={250} height={250} className="rounded-lg border p-1 bg-white animate-pulse-glow" /> : <div className="h-[250px] w-[250px] flex items-center justify-center border rounded-lg bg-muted/20 text-white/80"><Loader2 className="h-8 w-8 animate-spin" /></div>}
-                <div className="text-center">
-                  <p className="text-lg font-semibold">Hola, {qrData.user.name} {qrData.user.surname}</p>
-                  <p className="text-sm text-white/80">DNI/CE: {qrData.user.dni}</p>
+              <CardContent className="flex flex-col items-center justify-center space-y-6 pt-6">
+                {qrCodeImage ? (
+                  <div className="relative p-2 bg-white rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.3)] animate-pulse-glow">
+                    <NextImage src={qrCodeImage} alt="Tu código QR" width={240} height={240} className="rounded-xl" />
+                  </div>
+                ) : (
+                  <div className="h-[240px] w-[240px] flex items-center justify-center border border-white/10 rounded-2xl bg-white/5 text-white/80">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                )}
+                
+                <div className="text-center space-y-1">
+                  <p className="text-xl font-bold">Hola, {qrData.user.name}</p>
+                  <p className="text-sm text-white/60">DNI/CE: {qrData.user.dni}</p>
                 </div>
-                <Separator className="bg-white/20" />
-                <div className="text-center">
-                  <p className="font-semibold">{qrData.promotion.title}</p>
+                
+                <Separator className="bg-white/10" />
+                
+                <div className="text-center space-y-3 w-full pb-2">
+                  <p className="font-bold text-lg leading-tight">{qrData.promotion.title}</p>
+                  
                   {qrData.promotion.ticketType?.name && (
-                    <div className="flex justify-center mt-2">
+                    <div className="flex justify-center">
                         <div
-                        className="inline-block text-white rounded-full px-4 py-1 text-sm font-bold shadow-md"
-                        style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}
+                          className="inline-block text-white rounded-full px-6 py-1.5 text-xs font-black shadow-lg uppercase tracking-wider"
+                          style={{ backgroundColor: qrData.promotion.ticketType.color || '#888' }}
                         >
-                        {qrData.promotion.ticketType.name.toUpperCase()}
+                          {qrData.promotion.ticketType.name}
                         </div>
                     </div>
                   )}
-                  {qrData.promotion.promoCode !== 'PUBLIC_ACCESS' && (
-                     <p className="text-xs text-white/80 mt-1">Código: {qrData.promotion.promoCode}</p>
-                  )}
-                  <p className="text-xs text-white/80 mt-1">Válido hasta: {format(anyToDate(qrData.promotion.validUntil)!, "dd MMMM, yyyy", { locale: es })}</p>
+                  
+                  <div className="flex flex-col space-y-1 text-xs text-white/50 font-medium">
+                    {qrData.promotion.promoCode !== 'PUBLIC_ACCESS' && (
+                       <p>CÓDIGO: <span className="text-white font-mono">{qrData.promotion.promoCode}</span></p>
+                    )}
+                    <p>VÁLIDO HASTA: <span className="text-white">{format(anyToDate(qrData.promotion.validUntil)!, "dd MMMM, yyyy", { locale: es })}</span></p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -495,7 +509,3 @@ export default function QrDisplayPage() {
     </div>
   );
 }
-
-    
-
-    
