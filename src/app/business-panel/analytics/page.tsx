@@ -41,6 +41,7 @@ export default function BusinessAnalyticsPage() {
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false); // Para evitar errores de hidratación en gráficos
   const [allEntities, setAllEntities] = useState<BusinessManagedEntity[]>([]);
   const [generalStats, setGeneralStats] = useState<MonthlyStat[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
@@ -50,6 +51,11 @@ export default function BusinessAnalyticsPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const businessId = userProfile?.businessId;
+
+  // Asegurar que el componente está montado en el cliente antes de renderizar gráficos
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const fetchAnalyticsData = useCallback(async () => {
     if (!businessId) {
@@ -221,11 +227,11 @@ export default function BusinessAnalyticsPage() {
           <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide break-words">Rendimiento General (Últimos 6 Meses)</CardTitle>
           <CardDescription className="text-xs sm:text-sm">Tendencias en creación de campañas y códigos QR.</CardDescription>
         </CardHeader>
-        <CardContent className="p-2">
-           <div className="h-[280px] sm:h-[400px] w-full min-w-0 overflow-hidden">
-            {generalStats.length > 0 && generalStats.some(s => s.entitiesCreated > 0 || s.qrCodesGenerated > 0) ? (
+        <CardContent className="p-2 sm:p-4">
+           <div className="h-[280px] sm:h-[400px] w-full min-w-0">
+            {isMounted && generalStats.length > 0 && generalStats.some(s => s.entitiesCreated > 0 || s.qrCodesGenerated > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={generalStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <LineChart data={generalStats} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
@@ -244,6 +250,8 @@ export default function BusinessAnalyticsPage() {
                   <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canje." strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
+            ) : !isMounted ? (
+              <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-primary opacity-20" /></div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm space-y-2">
                   <Info className="h-8 w-8 opacity-20" /> 
@@ -282,26 +290,28 @@ export default function BusinessAnalyticsPage() {
                 <>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
                     <div className="lg:col-span-2 h-[280px] sm:h-[350px] w-full min-w-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={[selectedEntityStats]} layout="vertical" margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                            <XAxis type="number" fontSize={10} hide />
-                            <YAxis type="category" dataKey="name" hide />
-                            <Tooltip
-                               cursor={{ fill: 'transparent' }}
-                               contentStyle={{ 
-                                  backgroundColor: 'hsl(var(--background))', 
-                                  borderColor: 'hsl(var(--border))',
-                                  borderRadius: 'var(--radius)',
-                                  fontSize: '11px'
-                              }}
-                            />
-                            <Legend wrapperStyle={{ fontSize: '10px' }} iconType="rect" />
-                            <Bar dataKey="codesGenerated" fill="hsl(var(--secondary-foreground))" name="Creados" radius={[0, 4, 4, 0]} barSize={25} />
-                            <Bar dataKey="qrGenerated" fill="hsl(var(--primary))" name="Generados" radius={[0, 4, 4, 0]} barSize={25} />
-                            <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="Asistencias" radius={[0, 4, 4, 0]} barSize={25} />
-                         </BarChart>
-                      </ResponsiveContainer>
+                      {isMounted && (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={[selectedEntityStats]} layout="vertical" margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                              <XAxis type="number" fontSize={10} hide />
+                              <YAxis type="category" dataKey="name" hide />
+                              <Tooltip
+                                cursor={{ fill: 'transparent' }}
+                                contentStyle={{ 
+                                    backgroundColor: 'hsl(var(--background))', 
+                                    borderColor: 'hsl(var(--border))',
+                                    borderRadius: 'var(--radius)',
+                                    fontSize: '11px'
+                                }}
+                              />
+                              <Legend wrapperStyle={{ fontSize: '10px' }} iconType="rect" />
+                              <Bar dataKey="codesGenerated" fill="hsl(var(--secondary-foreground))" name="Creados" radius={[0, 4, 4, 0]} barSize={25} />
+                              <Bar dataKey="qrGenerated" fill="hsl(var(--primary))" name="Generados" radius={[0, 4, 4, 0]} barSize={25} />
+                              <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="Asistencias" radius={[0, 4, 4, 0]} barSize={25} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
                     <div className="lg:col-span-1 grid grid-cols-2 lg:grid-cols-1 gap-3">
                        <StatCard title="Creados" value={selectedEntityStats.codesGenerated} icon={Ticket} />
