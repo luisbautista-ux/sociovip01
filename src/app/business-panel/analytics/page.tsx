@@ -46,7 +46,6 @@ export default function BusinessAnalyticsPage() {
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
   const [attendanceSearchTerm, setAttendanceSearchTerm] = useState("");
   
-  // Estados de paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -71,7 +70,6 @@ export default function BusinessAnalyticsPage() {
       });
       setAllEntities(sortedEntities);
 
-      // --- Set default selected entity ---
       const mostRecentActiveEntity = sortedEntities.find(isEntityCurrentlyActivatable);
       if (mostRecentActiveEntity) {
         setSelectedEntityId(mostRecentActiveEntity.id);
@@ -79,8 +77,6 @@ export default function BusinessAnalyticsPage() {
         setSelectedEntityId(sortedEntities[0].id);
       }
 
-
-      // --- Process General Stats (last 6 months) ---
       const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
       const monthlyStats: { [key: string]: Omit<MonthlyStat, 'month'> } = {};
 
@@ -158,7 +154,6 @@ export default function BusinessAnalyticsPage() {
                 }
             });
         } else {
-            // Caso sin sesiones: usar usedDate o el primer check-in
             const firstCheckIn = code.checkIns?.[0]?.timestamp || code.usedDate;
             sessionsAttendance['general'] = firstCheckIn ? format(new Date(firstCheckIn), "HH:mm") : null;
             if (firstCheckIn) attendedCount = 1;
@@ -185,14 +180,12 @@ export default function BusinessAnalyticsPage() {
     );
   }, [selectedEntity, attendanceSearchTerm]);
 
-  // Lógica de paginación
   const totalPages = Math.ceil(allAttendanceData.length / rowsPerPage);
   const paginatedAttendanceData = useMemo(() => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     return allAttendanceData.slice(startIndex, startIndex + rowsPerPage);
   }, [allAttendanceData, currentPage, rowsPerPage]);
 
-  // Resetear página al cambiar filtros
   useEffect(() => {
     setCurrentPage(1);
   }, [attendanceSearchTerm, selectedEntityId, rowsPerPage]);
@@ -218,239 +211,233 @@ export default function BusinessAnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-10 px-2 sm:px-0">
-      <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center">
+    <div className="space-y-6 pb-10 max-w-full overflow-x-hidden px-1 sm:px-0">
+      <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center px-2">
         <BarChart3 className="h-7 w-7 sm:h-8 sm:w-8 mr-2" /> Analíticas
       </h1>
       
-      <Card className="shadow-lg overflow-hidden">
+      <Card className="shadow-lg overflow-hidden mx-2 sm:mx-0">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Rendimiento General (Últimos 6 Meses)</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Tendencias en creación de campañas, y generación/uso de códigos QR.</CardDescription>
+          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide break-words">Rendimiento General (Últimos 6 Meses)</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Tendencias en creación de campañas y códigos QR.</CardDescription>
         </CardHeader>
-        <CardContent className="h-[300px] sm:h-[400px] p-2">
-           {generalStats.length > 0 && generalStats.some(s => s.entitiesCreated > 0 || s.qrCodesGenerated > 0) ? (
-             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={generalStats}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                <Tooltip 
-                  contentStyle={{ 
-                      backgroundColor: 'hsl(var(--background))', 
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                      fontSize: '12px'
-                  }}
-                  labelStyle={{ color: 'hsl(var(--foreground))' }}
-                />
-                <Legend wrapperStyle={{ fontSize: '10px' }} />
-                <Line type="monotone" dataKey="entitiesCreated" stroke="hsl(var(--secondary-foreground))" name="Campañas Creadas" strokeWidth={2} />
-                <Line type="monotone" dataKey="qrCodesGenerated" stroke="hsl(var(--primary))" name="QR Generados" strokeWidth={2} />
-                <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canjeados" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-           ) : (
-             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                <Info className="h-5 w-5 mr-2" /> No hay suficientes datos recientes.
-            </div>
-           )}
+        <CardContent className="p-2">
+           <div className="h-[280px] sm:h-[400px] w-full min-w-0 overflow-hidden">
+            {generalStats.length > 0 && generalStats.some(s => s.entitiesCreated > 0 || s.qrCodesGenerated > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={generalStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))', 
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                        fontSize: '11px'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} iconType="circle" />
+                  <Line type="monotone" dataKey="entitiesCreated" stroke="hsl(var(--secondary-foreground))" name="Campañas" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="qrCodesGenerated" stroke="hsl(var(--primary))" name="QR Gen." strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canje." strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm space-y-2">
+                  <Info className="h-8 w-8 opacity-20" /> 
+                  <p>No hay datos suficientes para mostrar el gráfico.</p>
+              </div>
+            )}
+           </div>
         </CardContent>
       </Card>
 
-      <Card className="shadow-lg overflow-hidden">
+      <Card className="shadow-lg overflow-hidden mx-2 sm:mx-0">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Analíticas por Promoción/Evento</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Selecciona una actividad para ver su detalle de rendimiento.</CardDescription>
+          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Analíticas por Actividad</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Selecciona para ver el detalle de rendimiento.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
-            <Select onValueChange={setSelectedEntityId} value={selectedEntityId} disabled={allEntities.length === 0}>
-                <SelectTrigger className="h-12 border-2 text-sm">
-                    <SelectValue placeholder={allEntities.length === 0 ? "No hay actividades para analizar" : "Selecciona una actividad"} />
-                </SelectTrigger>
-                <SelectContent>
-                    {allEntities.map(entity => (
-                        <SelectItem key={entity.id} value={entity.id}>
-                          <span className="flex items-center text-sm">{entity.type === 'event' ? <Calendar className="h-4 w-4 mr-2"/> : <Ticket className="h-4 w-4 mr-2"/>}{entity.name}</span>
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            <div className="w-full">
+              <Select onValueChange={setSelectedEntityId} value={selectedEntityId} disabled={allEntities.length === 0}>
+                  <SelectTrigger className="h-12 border-2 text-sm w-full">
+                      <SelectValue placeholder={allEntities.length === 0 ? "Sin actividades" : "Selecciona una actividad"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {allEntities.map(entity => (
+                          <SelectItem key={entity.id} value={entity.id}>
+                            <span className="flex items-center text-sm truncate max-w-[200px]">
+                              {entity.type === 'event' ? <Calendar className="h-4 w-4 mr-2 flex-shrink-0"/> : <Ticket className="h-4 w-4 mr-2 flex-shrink-0"/>}
+                              {entity.name}
+                            </span>
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+            </div>
 
             {selectedEntityStats ? (
                 <>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
-                    <div className="lg:col-span-2 h-[250px] sm:h-[350px]">
+                    <div className="lg:col-span-2 h-[280px] sm:h-[350px] w-full min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={[selectedEntityStats]} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" fontSize={10} />
+                         <BarChart data={[selectedEntityStats]} layout="vertical" margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                            <XAxis type="number" fontSize={10} hide />
                             <YAxis type="category" dataKey="name" hide />
                             <Tooltip
+                               cursor={{ fill: 'transparent' }}
                                contentStyle={{ 
                                   backgroundColor: 'hsl(var(--background))', 
                                   borderColor: 'hsl(var(--border))',
                                   borderRadius: 'var(--radius)',
-                                  fontSize: '12px'
+                                  fontSize: '11px'
                               }}
                             />
-                            <Legend wrapperStyle={{ fontSize: '10px' }} />
-                            <Bar dataKey="codesGenerated" fill="hsl(var(--secondary-foreground))" name="Códigos Creados" radius={[0, 4, 4, 0]} barSize={35} />
-                            <Bar dataKey="qrGenerated" fill="hsl(var(--primary))" name="QRs Generados" radius={[0, 4, 4, 0]} barSize={35} />
-                            <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="QRs Usados (en puerta)" radius={[0, 4, 4, 0]} barSize={35} />
+                            <Legend wrapperStyle={{ fontSize: '10px' }} iconType="rect" />
+                            <Bar dataKey="codesGenerated" fill="hsl(var(--secondary-foreground))" name="Creados" radius={[0, 4, 4, 0]} barSize={25} />
+                            <Bar dataKey="qrGenerated" fill="hsl(var(--primary))" name="Generados" radius={[0, 4, 4, 0]} barSize={25} />
+                            <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="Asistencias" radius={[0, 4, 4, 0]} barSize={25} />
                          </BarChart>
                       </ResponsiveContainer>
                     </div>
-                    <div className="lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                       <StatCard 
-                          title="Códigos Creados" 
-                          value={selectedEntityStats.codesGenerated} 
-                          icon={Ticket} 
-                       />
-                       <StatCard 
-                          title="QRs Generados" 
-                          value={selectedEntityStats.qrGenerated} 
-                          icon={QrCode}
-                        />
-                       <StatCard 
-                          title="Asistencias" 
-                          value={selectedEntityStats.codesUsed} 
-                          icon={Users}
-                        />
-                       <StatCard 
-                          title="Tasa de Canje" 
-                          value={`${selectedEntityStats.qrGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.qrGenerated) * 100).toFixed(1) : 0}%`} 
-                          icon={BarChart3} 
-                        />
+                    <div className="lg:col-span-1 grid grid-cols-2 lg:grid-cols-1 gap-3">
+                       <StatCard title="Creados" value={selectedEntityStats.codesGenerated} icon={Ticket} />
+                       <StatCard title="Generados" value={selectedEntityStats.qrGenerated} icon={QrCode} />
+                       <StatCard title="Asistencias" value={selectedEntityStats.codesUsed} icon={Users} />
+                       <StatCard title="Tasa" value={`${selectedEntityStats.qrGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.qrGenerated) * 100).toFixed(1) : 0}%`} icon={BarChart3} />
                     </div>
                 </div>
 
                 <div className="pt-8 space-y-4">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-t pt-6">
-                        <div>
+                        <div className="w-full sm:w-auto">
                             <h3 className="text-lg sm:text-xl font-bold font-headline uppercase tracking-tight flex items-center gap-2 text-primary">
-                                <Users className="h-5 w-5"/> Reporte Detallado
+                                <Users className="h-5 w-5"/> Reporte de Asistencia
                             </h3>
-                            <p className="text-xs text-muted-foreground">Listado de clientes y horas de ingreso.</p>
+                            <p className="text-xs text-muted-foreground">Detalle de ingresos por cliente.</p>
                         </div>
                         <div className="relative w-full sm:w-72">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Buscar por DNI o Nombre..."
-                                className="pl-8 text-sm"
+                                placeholder="DNI o Nombre..."
+                                className="pl-8 text-sm h-10 w-full"
                                 value={attendanceSearchTerm}
                                 onChange={(e) => setAttendanceSearchTerm(e.target.value)}
                             />
                         </div>
                     </div>
 
-                    <div className="border rounded-lg overflow-x-auto shadow-sm">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="w-[40px] font-bold text-center px-2 text-[10px] sm:text-xs">#</TableHead>
-                                    <TableHead className="font-bold text-[10px] sm:text-xs whitespace-nowrap">Cliente</TableHead>
-                                    <TableHead className="font-bold text-center text-[10px] sm:text-xs">DNI/CE</TableHead>
-                                    <TableHead className="font-bold text-center text-[10px] sm:text-xs">Entrada</TableHead>
-                                    {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
-                                        selectedEntity.schedules.map(session => (
-                                            <TableHead key={session.id} className="font-bold text-center px-2">
-                                                <div className="flex flex-col items-center min-w-[60px]">
-                                                    <span className="text-[10px] sm:text-xs">{session.label}</span>
-                                                    <span className="text-[8px] font-normal opacity-70">
-                                                        {format(new Date(session.startDate), "dd/MM")}
-                                                    </span>
-                                                </div>
-                                            </TableHead>
-                                        ))
-                                    ) : (
-                                        <TableHead className="font-bold text-center text-[10px] sm:text-xs">Ingreso</TableHead>
-                                    )}
-                                    <TableHead className="font-bold text-right text-[10px] sm:text-xs pr-4">Asist.</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paginatedAttendanceData.length > 0 ? (
-                                    paginatedAttendanceData.map((item, idx) => (
-                                        <TableRow key={idx} className="hover:bg-muted/30">
-                                            <TableCell className="text-center text-[10px] text-muted-foreground px-2">
-                                                {((currentPage - 1) * rowsPerPage) + idx + 1}
-                                            </TableCell>
-                                            <TableCell className="font-medium px-2">
-                                                <div className="flex flex-col max-w-[120px] sm:max-w-none">
-                                                    <span className="text-[10px] sm:text-xs truncate">{item.name}</span>
-                                                    <span className="text-[8px] text-muted-foreground font-mono">{item.codeValue}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-center text-[10px] sm:text-xs px-2">{item.dni}</TableCell>
-                                            <TableCell className="text-center px-2">
-                                                {item.ticketType ? (
-                                                    <Badge variant="outline" className="text-[8px] sm:text-[10px] px-1 py-0 uppercase font-bold">{item.ticketType}</Badge>
-                                                ) : <span className="text-muted-foreground text-[10px]">---</span>}
-                                            </TableCell>
-                                            {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
-                                                selectedEntity.schedules.map(session => (
-                                                    <TableCell key={session.id} className="text-center px-2">
-                                                        {item.sessions[session.id] ? (
-                                                            <div className="flex items-center justify-center text-green-600 font-semibold gap-0.5">
-                                                                <CheckCircle2 size={12}/>
-                                                                <span className="text-[9px] sm:text-xs">{item.sessions[session.id]}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center justify-center text-destructive opacity-30">
-                                                                <XCircle size={12}/>
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                ))
-                                            ) : (
-                                                <TableCell className="text-center px-2">
-                                                    {item.sessions['general'] ? (
-                                                        <div className="flex items-center justify-center text-green-600 font-semibold gap-0.5">
-                                                            <CheckCircle2 size={12}/>
-                                                            <span className="text-[9px] sm:text-xs">{item.sessions['general']}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <XCircle className="mx-auto text-destructive opacity-20" size={12}/>
-                                                    )}
-                                                </TableCell>
-                                            )}
-                                            <TableCell className="text-right pr-4">
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] font-bold">
-                                                        {item.attendedCount}/{item.totalPossible}
-                                                    </span>
-                                                    <div className="w-10 sm:w-16 h-1 bg-muted rounded-full mt-1 overflow-hidden">
-                                                        <div 
-                                                            className="h-full bg-primary" 
-                                                            style={{ width: `${(item.attendedCount / item.totalPossible) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={10} className="h-24 text-center text-muted-foreground italic text-xs">
-                                            No se encontraron registros.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                    <div className="border rounded-lg overflow-hidden shadow-sm bg-background max-w-full">
+                        <div className="overflow-x-auto w-full">
+                          <Table>
+                              <TableHeader className="bg-muted/50">
+                                  <TableRow>
+                                      <TableHead className="w-[40px] font-bold text-center px-2 text-[10px] sm:text-xs">#</TableHead>
+                                      <TableHead className="font-bold text-[10px] sm:text-xs min-w-[140px]">Cliente</TableHead>
+                                      <TableHead className="font-bold text-center text-[10px] sm:text-xs">DNI/CE</TableHead>
+                                      <TableHead className="font-bold text-center text-[10px] sm:text-xs">Entrada</TableHead>
+                                      {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
+                                          selectedEntity.schedules.map(session => (
+                                              <TableHead key={session.id} className="font-bold text-center px-2 min-w-[80px]">
+                                                  <div className="flex flex-col items-center">
+                                                      <span className="text-[10px] sm:text-xs truncate max-w-[70px]">{session.label}</span>
+                                                      <span className="text-[8px] font-normal opacity-70">
+                                                          {format(new Date(session.startDate), "dd/MM")}
+                                                      </span>
+                                                  </div>
+                                              </TableHead>
+                                          ))
+                                      ) : (
+                                          <TableHead className="font-bold text-center text-[10px] sm:text-xs min-w-[80px]">Ingreso</TableHead>
+                                      )}
+                                      <TableHead className="font-bold text-right text-[10px] sm:text-xs pr-4">Asist.</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {paginatedAttendanceData.length > 0 ? (
+                                      paginatedAttendanceData.map((item, idx) => (
+                                          <TableRow key={idx} className="hover:bg-muted/30">
+                                              <TableCell className="text-center text-[10px] text-muted-foreground px-2">
+                                                  {((currentPage - 1) * rowsPerPage) + idx + 1}
+                                              </TableCell>
+                                              <TableCell className="font-medium px-2 py-3">
+                                                  <div className="flex flex-col">
+                                                      <span className="text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">{item.name}</span>
+                                                      <span className="text-[8px] text-muted-foreground font-mono">{item.codeValue}</span>
+                                                  </div>
+                                              </TableCell>
+                                              <TableCell className="text-center text-[10px] sm:text-xs px-2">{item.dni}</TableCell>
+                                              <TableCell className="text-center px-2">
+                                                  {item.ticketType ? (
+                                                      <Badge variant="outline" className="text-[8px] sm:text-[9px] px-1 py-0 uppercase font-bold leading-none">{item.ticketType}</Badge>
+                                                  ) : <span className="text-muted-foreground text-[10px]">---</span>}
+                                              </TableCell>
+                                              {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
+                                                  selectedEntity.schedules.map(session => (
+                                                      <TableCell key={session.id} className="text-center px-2">
+                                                          {item.sessions[session.id] ? (
+                                                              <div className="flex items-center justify-center text-green-600 font-bold gap-0.5">
+                                                                  <CheckCircle2 size={10}/>
+                                                                  <span className="text-[9px] sm:text-xs">{item.sessions[session.id]}</span>
+                                                              </div>
+                                                          ) : (
+                                                              <div className="flex items-center justify-center text-destructive opacity-20">
+                                                                  <XCircle size={10}/>
+                                                              </div>
+                                                          )}
+                                                      </TableCell>
+                                                  ))
+                                              ) : (
+                                                  <TableCell className="text-center px-2">
+                                                      {item.sessions['general'] ? (
+                                                          <div className="flex items-center justify-center text-green-600 font-bold gap-0.5">
+                                                              <CheckCircle2 size={10}/>
+                                                              <span className="text-[9px] sm:text-xs">{item.sessions['general']}</span>
+                                                          </div>
+                                                      ) : (
+                                                          <XCircle className="mx-auto text-destructive opacity-20" size={10}/>
+                                                      )}
+                                                  </TableCell>
+                                              )}
+                                              <TableCell className="text-right pr-4">
+                                                  <div className="flex flex-col items-end">
+                                                      <span className="text-[10px] font-black">
+                                                          {item.attendedCount}/{item.totalPossible}
+                                                      </span>
+                                                      <div className="w-8 sm:w-12 h-1 bg-muted rounded-full mt-0.5 overflow-hidden">
+                                                          <div 
+                                                              className="h-full bg-primary" 
+                                                              style={{ width: `${(item.attendedCount / item.totalPossible) * 100}%` }}
+                                                          />
+                                                      </div>
+                                                  </div>
+                                              </TableCell>
+                                          </TableRow>
+                                      ))
+                                  ) : (
+                                      <TableRow>
+                                          <TableCell colSpan={10} className="h-24 text-center text-muted-foreground italic text-[10px] sm:text-xs">
+                                              No se encontraron registros coincidentes.
+                                          </TableCell>
+                                      </TableRow>
+                                  )}
+                              </TableBody>
+                          </Table>
+                        </div>
                     </div>
                     
-                    {/* Controles de Paginación Mejorados para Móvil */}
                     {totalPages > 1 && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 bg-muted/20 rounded-lg">
-                            <div className="flex items-center space-x-2 text-xs sm:text-sm">
-                                <Label htmlFor="rows-per-page-attendance">Filas:</Label>
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-3 bg-muted/20 rounded-lg">
+                            <div className="flex items-center space-x-2 text-xs">
+                                <Label htmlFor="rows-per-page-attendance" className="font-bold">Filas:</Label>
                                 <Select
                                     value={`${rowsPerPage}`}
                                     onValueChange={(value) => setRowsPerPage(Number(value))}
                                 >
-                                    <SelectTrigger id="rows-per-page-attendance" className="h-8 w-[65px]">
+                                    <SelectTrigger id="rows-per-page-attendance" className="h-8 w-[65px] bg-background">
                                         <SelectValue placeholder={rowsPerPage} />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -462,14 +449,14 @@ export default function BusinessAnalyticsPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="text-[10px] sm:text-sm text-muted-foreground font-medium">
+                            <div className="text-[10px] sm:text-xs text-muted-foreground font-black uppercase">
                                 Pág. {currentPage} de {totalPages}
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 text-xs px-2 sm:px-3"
+                                    className="h-8 text-[10px] px-2 bg-background font-bold"
                                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                                     disabled={currentPage === 1}
                                 >
@@ -478,7 +465,7 @@ export default function BusinessAnalyticsPage() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 text-xs px-2 sm:px-3"
+                                    className="h-8 text-[10px] px-2 bg-background font-bold"
                                     onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                                     disabled={currentPage === totalPages}
                                 >
@@ -490,9 +477,9 @@ export default function BusinessAnalyticsPage() {
                 </div>
                 </>
             ) : (
-                 <div className="flex flex-col items-center justify-center h-60 text-muted-foreground border-2 border-dashed rounded-lg text-center p-4">
-                    <BarChart3 size={40} className="opacity-20 mb-2"/>
-                    <p className="text-sm">Selecciona una campaña para ver estadísticas y asistencia.</p>
+                 <div className="flex flex-col items-center justify-center h-60 text-muted-foreground border-2 border-dashed rounded-lg text-center p-6 bg-muted/10 mx-2">
+                    <BarChart3 size={48} className="opacity-10 mb-3"/>
+                    <p className="text-sm font-medium">Selecciona una campaña para visualizar estadísticas detalladas y reporte de asistencia.</p>
                 </div>
             )}
         </CardContent>
