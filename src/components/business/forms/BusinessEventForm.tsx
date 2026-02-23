@@ -1,51 +1,50 @@
-
+// src/components/business/forms/BusinessEventForm.tsx
 "use client";
 
-import React, { useImperativeHandle, useEffect, useRef, useState, useCallback } from "react";
+import React, { useImperativeHandle, useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, type UseFormReturn } from "react-hook-form";
+import { useForm, type UseFormReturn, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
-import { CalendarIcon, ImageIcon, Upload, Move, MapPin } from "lucide-react";
+import { CalendarIcon, ImageIcon, Upload, Move, MapPin, Plus, Trash2, Clock } from "lucide-react";
 import { cn, anyToDate } from "@/lib/utils";
-import { format, isBefore, startOfDay, isEqual } from "date-fns";
+import { format, isBefore, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import type { BusinessManagedEntity } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
-import NextImage from "next/image";
 import { useToast } from "@/hooks/use-toast";
-import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+const scheduleSchema = z.object({
+  id: z.string(),
+  label: z.string().min(2, "Nombre de la sesión requerido"),
+  startDate: z.string().min(1, "Fecha de inicio requerida"),
+  endDate: z.string().min(1, "Fecha de fin requerida"),
+});
 
 const eventDetailsFormSchema = z.object({
-  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres."),
-  description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
+  name: z.string().min(3, "Mínimo 3 caracteres"),
+  description: z.string().min(10, "Mínimo 10 caracteres"),
   locationAddress: z.string().optional(),
   termsAndConditions: z.string().optional(),
-  startDate: z.date({ required_error: "Fecha de inicio es requerida." }),
-  endDate: z.date({ required_error: "Fecha de fin es requerida." }),
+  startDate: z.date(),
+  endDate: z.date(),
   unlimitedAttendance: z.boolean().default(true),
-  maxAttendance: z.coerce.number().int().min(0, "El aforo no puede ser negativo.").optional().or(z.literal(undefined)).or(z.literal(null)),
+  maxAttendance: z.coerce.number().optional().nullable(),
   isActive: z.boolean().default(true),
   isPublicAccess: z.boolean().default(false),
   imageUrl: z.string().optional(),
-  imageObjectPosition: z.string().optional(), // Added for image positioning
+  imageObjectPosition: z.string().optional(),
   aiHint: z.string().optional(),
   imageFile: z.custom<File | null>(() => true).optional(),
+  schedules: z.array(scheduleSchema).optional(),
 });
 
 export type EventDetailsFormValues = z.infer<typeof eventDetailsFormSchema>;
@@ -57,7 +56,7 @@ export interface EventDetailsFormRef {
 }
 
 interface BusinessEventFormProps {
-  event: BusinessManagedEntity | null; 
+  event: BusinessManagedEntity | null;
   isSubmitting?: boolean;
   setCurrentEventData: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
   imagePreviewUrl: string | null;
@@ -67,61 +66,39 @@ interface BusinessEventFormProps {
 export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessEventFormProps>(({ event, isSubmitting = false, setCurrentEventData, imagePreviewUrl, onImageFileChange }, ref) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const [objectPosition, setObjectPosition] = useState('50% 50%');
-
   const imgContainerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   
   const form = useForm<EventDetailsFormValues>({
     resolver: zodResolver(eventDetailsFormSchema),
-    mode: "onBlur",
     defaultValues: {
-        name: "",
-        description: "",
-        locationAddress: "",
-        termsAndConditions: "",
-        startDate: new Date(),
-        endDate: new Date(new Date().setDate(new Date().getDate() + 7)),
-        unlimitedAttendance: true,
-        maxAttendance: undefined,
-        isActive: true,
-        isPublicAccess: false,
-        imageUrl: "",
-        imageObjectPosition: '50% 50%',
-        aiHint: "",
+        name: "", description: "", locationAddress: "", termsAndConditions: "",
+        startDate: new Date(), endDate: new Date(new Date().setDate(new Date().getDate() + 7)),
+        unlimitedAttendance: true, maxAttendance: null, isActive: true, isPublicAccess: false,
+        imageUrl: "", imageObjectPosition: '50% 50%', aiHint: "", schedules: []
     }
   });
 
-   useEffect(() => {
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "schedules" });
+
+  useEffect(() => {
     if (event) {
       setObjectPosition(event.imageObjectPosition || '50% 50%');
       form.reset({
-        name: event.name || "",
-        description: event.description || "",
-        locationAddress: event.locationAddress || "",
-        termsAndConditions: event.termsAndConditions || "",
+        ...event,
         startDate: anyToDate(event.startDate) ?? new Date(),
-        endDate: anyToDate(event.endDate) ?? new Date(new Date().setDate(new Date().getDate() + 7)),
-        unlimitedAttendance: event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0,
-        maxAttendance: (event.maxAttendance === undefined || event.maxAttendance === null || event.maxAttendance === 0) ? undefined : event.maxAttendance,
-        isActive: event.isActive === undefined ? true : event.isActive,
-        isPublicAccess: event.isPublicAccess || false,
-        imageUrl: event.imageUrl || "",
-        imageObjectPosition: event.imageObjectPosition || '50% 50%',
-        aiHint: event.aiHint || "",
-        imageFile: null,
+        endDate: anyToDate(event.endDate) ?? new Date(),
+        unlimitedAttendance: !event.maxAttendance || event.maxAttendance === 0,
+        maxAttendance: event.maxAttendance || null,
+        schedules: event.schedules || [],
       });
     }
   }, [event, form]);
   
   useImperativeHandle(ref, () => ({
-    getValues: () => ({
-      ...form.getValues(),
-      imageObjectPosition: objectPosition, 
-      imageFile: form.getValues('imageFile'),
-    }),
+    getValues: () => ({ ...form.getValues(), imageObjectPosition: objectPosition }),
     trigger: () => form.trigger(),
     formState: form.formState,
   }));
@@ -129,337 +106,94 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({ title: "Archivo muy grande", description: "La imagen no debe superar los 5MB.", variant: "destructive" });
-        return;
-      }
+      if (file.size > 5 * 1024 * 1024) { toast({ title: "Archivo muy grande", variant: "destructive" }); return; }
       onImageFileChange(file);
       form.setValue("imageFile", file);
-      const newPosition = '50% 50%';
-      setObjectPosition(newPosition);
+      setObjectPosition('50% 50%');
     }
   };
 
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { e.preventDefault(); isDragging.current = true; dragStart.current = { x: e.clientX, y: e.clientY }; };
-  const handleMouseLeave = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); }};
-  const handleMouseUp = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); }};
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDragging.current || !imgContainerRef.current) return;
-    const container = imgContainerRef.current;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
-    const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
-    const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
-    const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
-    setObjectPosition(newPosition);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-  };
-  
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => { if (e.touches.length === 1) { isDragging.current = true; dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } };
-  const handleTouchEnd = () => { if (isDragging.current) { isDragging.current = false; form.setValue("imageObjectPosition", objectPosition); }};
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isDragging.current || !imgContainerRef.current || e.touches.length !== 1) return;
-    const container = imgContainerRef.current;
-    const dx = e.touches[0].clientX - dragStart.current.x;
-    const dy = e.touches[0].clientY - dragStart.current.y;
-    const [currentX, currentY] = objectPosition.split(' ').map(p => parseFloat(p));
-    const newX = Math.max(0, Math.min(100, currentX - (dx / container.clientWidth) * 100));
-    const newY = Math.max(0, Math.min(100, currentY - (dy / container.clientHeight) * 100));
-    const newPosition = `${newX.toFixed(2)}% ${newY.toFixed(2)}%`;
-    setObjectPosition(newPosition);
-    dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  };
-  
   const isUnlimited = form.watch("unlimitedAttendance");
 
   return (
     <Form {...form}>
-      <form className="space-y-4 overflow-y-auto pr-3 pl-1 py-1">
-        
-        <div className="flex flex-col items-center justify-center mb-4 space-y-3">
-          <FormLabel className="self-start">Imagen Principal <span className="text-destructive">*</span></FormLabel>
-            <div
-                ref={imgContainerRef}
-                className="group w-full aspect-video relative rounded-md border bg-muted flex items-center justify-center overflow-hidden cursor-move"
-                style={{ touchAction: 'none' }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-            >
-              {imagePreviewUrl ? (
-                <>
-                  <img
-                    src={imagePreviewUrl}
-                    alt="Vista previa de la imagen"
-                    className="object-cover w-full h-full"
-                    style={{ objectPosition }}
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white pointer-events-none">
-                    <Move className="h-8 w-8" />
-                    <span className="text-sm font-semibold mt-1">
-                      Arrastra para ajustar la imagen
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="text-muted-foreground flex flex-col items-center">
-                  <ImageIcon className="h-10 w-10" />
-                  <span className="text-sm mt-1">Vista Previa</span>
-                </div>
-              )}
-            </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            className="hidden"
-            accept="image/png, image/jpeg, image/webp"
-          />
-          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting}>
-             Cambiar Imagen
-          </Button>
-          <FormField
-            control={form.control}
-            name="imageFile"
-            render={({ field }) => (
-                <FormItem>
-                    <FormMessage />
-                </FormItem>
+      <form className="space-y-6 overflow-y-auto px-1 py-1">
+        <div className="space-y-4">
+          <div ref={imgContainerRef} className="relative aspect-video rounded-md border bg-muted overflow-hidden cursor-move">
+            {imagePreviewUrl ? (
+              <img src={imagePreviewUrl} className="object-cover w-full h-full" style={{ objectPosition }} />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><ImageIcon size={40} /><span className="text-xs">Sin imagen</span></div>
             )}
-            />
-        </div>
-        
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel><span className="font-bold">Nombre del Evento</span> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input placeholder="Ej: Noche de Salsa" {...field} value={field.value || ''} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>Descripción</strong> <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Textarea placeholder="Detalles del evento..." {...field} value={field.value || ''} rows={3} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="locationAddress"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>Ubicación del Evento</strong></FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Dirección del evento" 
-                    {...field} 
-                    value={field.value || ''} 
-                    disabled={isSubmitting}
-                    className="pl-10"
-                  />
-                </div>
-              </FormControl>
-              <FormDescription className="text-xs">
-                Por defecto, se usa la dirección pública de tu negocio. Edítala si el evento es en otro lugar.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="termsAndConditions"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>Términos y Condiciones (Opcional)</strong></FormLabel>
-              <FormControl><Textarea placeholder="Condiciones del evento, ej: Dresscode elegante." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="startDate"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel><strong>Fecha de Inicio</strong> <span className="text-destructive">*</span></FormLabel>
-                <Popover modal={true}>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona fecha</span>}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <DayPicker
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      locale={es}
-                      captionLayout="dropdown"
-                      fromYear={new Date().getFullYear() - 2}
-                      toYear={new Date().getFullYear() + 5}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="endDate"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel><strong>Fecha de Fin</strong> <span className="text-destructive">*</span></FormLabel>
-                <Popover modal={true}>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                        {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona fecha</span>}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <DayPicker
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) => {
-                        const s = form.getValues("startDate");
-                        return s ? isBefore(date, startOfDay(s)) : false;
-                      }}
-                      locale={es}
-                      captionLayout="dropdown"
-                      fromYear={new Date().getFullYear() - 2}
-                      toYear={new Date().getFullYear() + 5}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        
-        <div className="space-y-2">
-            <FormField
-              control={form.control}
-              name="unlimitedAttendance"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={(isChecked) => {
-                          field.onChange(isChecked);
-                      }}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormLabel className="font-normal"><strong>Aforo Ilimitado</strong></FormLabel>
-                </FormItem>
-              )}
-            />
-             <FormField
-                control={form.control}
-                name="maxAttendance"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel className={cn(isUnlimited && "text-muted-foreground/50")}>Aforo Máximo</FormLabel>
-                    <FormControl>
-                        <Input
-                        type="number"
-                        placeholder="100"
-                        className="no-spinner"
-                        {...field}
-                        value={field.value ?? ''} 
-                        onChange={e => {
-                            const val = e.target.value;
-                            field.onChange(val === "" ? undefined : Number(val));
-                        }}
-                        disabled={isSubmitting || isUnlimited}
-                        />
-                    </FormControl>
-                    <FormDescription className="text-xs">
-                        {isUnlimited ? "El aforo es ilimitado. Desmarca la casilla para definir un límite." : "Define el número máximo de asistentes."}
-                    </FormDescription>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
+          </div>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full">Cambiar Imagen</Button>
         </div>
 
-        <FormField
-          control={form.control}
-          name="aiHint"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel><strong>Palabras Clave para Imagen (Opcional)</strong></FormLabel>
-              <FormControl><Input placeholder="Ej: concierto musica (máx 2 palabras)" {...field} value={field.value || ""} disabled={isSubmitting} /></FormControl>
-               <FormMessage />
-            </FormItem>
+        <div className="grid grid-cols-1 gap-4">
+          <FormField control={form.control} name="name" render={({ field }) => (
+            <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          )}/>
+          <FormField control={form.control} name="locationAddress" render={({ field }) => (
+            <FormItem><FormLabel>Ubicación</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          )}/>
+        </div>
+
+        <div className="space-y-4 border-t pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold flex items-center gap-2"><Clock size={16}/>Horarios del Evento (Sesiones)</h3>
+            <Button type="button" size="sm" variant="outline" onClick={() => append({ id: Math.random().toString(36).slice(2), label: "", startDate: "", endDate: "" })}>
+              <Plus size={14} className="mr-1"/> Agregar Horario
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {fields.map((field, index) => (
+              <Card key={field.id} className="relative">
+                <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <FormField control={form.control} name={`schedules.${index}.label`} render={({ field }) => (
+                    <FormItem><FormLabel className="text-xs">Nombre (Ej: Día 1)</FormLabel><FormControl><Input {...field} size={1} /></FormControl></FormItem>
+                  )}/>
+                  <FormField control={form.control} name={`schedules.${index}.startDate`} render={({ field }) => (
+                    <FormItem><FormLabel className="text-xs">Inicio</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl></FormItem>
+                  )}/>
+                  <FormField control={form.control} name={`schedules.${index}.endDate`} render={({ field }) => (
+                    <FormItem><FormLabel className="text-xs">Fin</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl></FormItem>
+                  )}/>
+                  <Button type="button" variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 bg-background border rounded-full text-destructive shadow-sm" onClick={() => remove(index)}>
+                    <Trash2 size={12}/>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+            {fields.length === 0 && <p className="text-xs text-muted-foreground text-center py-2 italic">Sin horarios específicos. Se usará el rango general del evento.</p>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 border-t pt-4">
+          <FormField control={form.control} name="startDate" render={({ field }) => (
+            <FormItem className="flex flex-col"><FormLabel>Fecha Inicio General</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={e => field.onChange(new Date(e.target.value))} /></FormControl></FormItem>
+          )}/>
+          <FormField control={form.control} name="endDate" render={({ field }) => (
+            <FormItem className="flex flex-col"><FormLabel>Fecha Fin General</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={e => field.onChange(new Date(e.target.value))} /></FormControl></FormItem>
+          )}/>
+        </div>
+
+        <div className="space-y-4 border-t pt-4">
+          <FormField control={form.control} name="unlimitedAttendance" render={({ field }) => (
+            <FormItem className="flex items-center space-x-2"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Aforo Ilimitado</FormLabel></FormItem>
+          )}/>
+          {!isUnlimited && (
+            <FormField control={form.control} name="maxAttendance" render={({ field }) => (
+              <FormItem><FormLabel>Aforo Máximo</FormLabel><FormControl><Input type="number" {...field} value={field.value || ""} /></FormControl></FormItem>
+            )}/>
           )}
-        />
-        <FormField
-          control={form.control}
-          name="isActive"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-              <div className="space-y-0.5">
-                <FormLabel><strong>Activar Evento</strong> <span className="text-destructive">*</span></FormLabel>
-                <FormMessage />
-              </div>
-              <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSubmitting} /></FormControl>
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="isPublicAccess"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-              <div className="space-y-0.5">
-                <FormLabel><strong>Acceso Directo (sin código)</strong></FormLabel>
-                <FormDescription className="text-xs">
-                    Si se activa, los clientes podrán generar un QR sin un código de promotor.
-                </FormDescription>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
+        </div>
+
+        <FormField control={form.control} name="isPublicAccess" render={({ field }) => (
+          <FormItem className="flex items-center justify-between rounded-lg border p-3"><FormLabel>Acceso Público (DNI obligatorio)</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl></FormItem>
+        )}/>
       </form>
     </Form>
   );
 });
-
 BusinessEventForm.displayName = "BusinessEventForm";

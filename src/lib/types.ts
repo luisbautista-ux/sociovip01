@@ -10,7 +10,24 @@ export interface TicketType {
   cost: number;
   description?: string;
   quantity?: number; 
-  color?: string; // Color para identificar el tipo de entrada
+  color?: string;
+}
+
+export interface EventSchedule {
+  id: string;
+  label: string; // Ej: "Día 1 - La Yunza"
+  startDate: string;
+  endDate: string;
+}
+
+export interface CheckIn {
+  scheduleId: string;
+  scheduleLabel: string;
+  timestamp: string;
+  validatedBy: {
+    uid: string;
+    name: string;
+  };
 }
 
 export interface PromotionDetails { 
@@ -19,14 +36,15 @@ export interface PromotionDetails {
   description: string;
   validUntil: string; 
   imageUrl: string;
-  promoCode: string; // The original 9-digit code
-  qrValue: string; // The value embedded in the QR (e.g., the code's unique ID)
+  promoCode: string;
+  qrValue: string;
   aiHint: string;
   type: 'promotion' | 'event';
   termsAndConditions?: string;
   qrTemplateImageUrl?: string;
   qrTemplateLayout?: QrTemplateLayout;
-  ticketType?: Pick<TicketType, 'name' | 'cost' | 'color'>; // ✅ AÑADIDO: Información del tipo de entrada
+  ticketType?: Pick<TicketType, 'name' | 'cost' | 'color'>;
+  schedules?: EventSchedule[]; // Añadido para mostrar en QR
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'used' | 'expired';
@@ -39,20 +57,19 @@ export interface QrClient {
   phone: string;
   dob: Timestamp | string; 
   registrationDate: Timestamp | string;
-  email?: string; // Added for email campaigns
-  generatedForBusinessId?: string; // Legacy field
-  associatedBusinessIds?: string[]; // New field for multiple associations
+  email?: string;
+  generatedForBusinessId?: string;
+  associatedBusinessIds?: string[];
 }
 
 export interface QrCodeData { 
   user: QrClient;
   promotion: PromotionDetails; 
-  code: string; // This will now be the code's unique ID, not the 9-digit value
+  code: string;
   status: QrCodeStatusGenerated;
 }
 
 export type BusinessType = typeof BUSINESS_TYPES[number];
-
 
 export interface Business {
   id: string; 
@@ -69,17 +86,17 @@ export interface Business {
   managerDni?: string;
   businessType?: BusinessType;
   logoUrl?: string;
-  publicCoverImageUrls?: string[]; // Campo actualizado para soportar múltiples imágenes
-  publicVideoUrls?: string[]; // Campo para URLs de videos
+  publicCoverImageUrls?: string[];
+  publicVideoUrls?: string[];
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
-  personalPhone?: string; // Teléfono para uso interno/admin (ej: WhatsApp)
+  personalPhone?: string;
   publicAddress?: string;
   customUrlPath?: string | null; 
   primaryColor?: string;
   secondaryColor?: string;
-  gmailRefreshToken?: string; // For Gmail API
+  gmailRefreshToken?: string;
 }
 
 export type PlatformUserRole = typeof ALL_PLATFORM_USER_ROLES[number];
@@ -92,12 +109,11 @@ export interface PlatformUser {
   email: string;
   roles: PlatformUserRole[];
   businessId?: string | null; 
-  businessIds?: string[]; // Para promotores con multiples negocios
+  businessIds?: string[];
   lastLogin: Timestamp | string; 
   phone?: string;
   photoURL?: string;
-  dob?: Timestamp | string; // Date of Birth
-  // New field for free clients
+  dob?: Timestamp | string;
   assignedBusinessId?: string | null;
 }
 
@@ -119,7 +135,6 @@ export interface SocioVipMember {
   authUid?: string; 
 }
 
-
 export interface AdminDashboardStats {
   totalBusinesses: number;
   totalPlatformUsers: number;
@@ -133,12 +148,11 @@ export interface BusinessDashboardStats {
   totalQrUsed: number; 
 }
 
-
 export interface PromotionAnalyticsData { 
   month: string;
   promotionsCreated: number; 
-  qrCodesGenerated: number; // Reverted for consistency with chart
-  qrCodesUtilized: number; // Reverted for consistency with chart
+  qrCodesGenerated: number;
+  qrCodesUtilized: number;
 }
 
 export interface RegisteredClient { 
@@ -153,31 +167,31 @@ export type CommissionStatus = 'unpaid' | 'paid';
 export interface GeneratedCode { 
   id: string; 
   entityId: string; 
-  value: string; // The 9-digit alphanumeric code
-  status: QrCodeStatusGenerated; // available -> redeemed (by client) -> used (at door)
+  value: string;
+  status: QrCodeStatusGenerated;
   generatedByName: string; 
   generatedByUid?: string;
   generatedDate: string; 
-  redemptionDate?: string | null; // When client generated their QR
+  redemptionDate?: string | null;
   redeemedByInfo?: {
     dni: string;
     name: string;
     phone?: string;
   } | null;
-  usedDate?: string | null; // When host scanned the QR at the door
-  usedByInfo?: { // Info of the host/staff who scanned
+  usedDate?: string | null; // Legacy single use
+  usedByInfo?: {
     uid: string;
     name: string;
   } | null;
+  checkIns?: CheckIn[]; // Soporte para múltiples entradas
   observation?: string | null;
   isVipCandidate?: boolean;
   ownerName?: string;
   ownerDni?: string;
-  ownerPhone?: string; // New field for box owner phone
-  // New fields for commissions
+  ownerPhone?: string;
   commissionGenerated?: number;
   commissionStatus?: CommissionStatus;
-  paymentId?: string | null; // Links to a document in promoterPayments
+  paymentId?: string | null;
   ticketTypeId?: string;
   ticketTypeName?: string;
 }
@@ -211,8 +225,8 @@ export interface EventBox {
   description?: string;
   status: 'available' | 'reserved' | 'sold';
   capacity?: number;
-  promoterId?: string; // UID del promotor que lo reservó/vendió
-  promoterName?: string; // Nombre del promotor
+  promoterId?: string;
+  promoterName?: string;
   ownerName?: string;
   ownerDni?: string;
   ownerPhone?: string;
@@ -225,7 +239,6 @@ export interface QrTemplateLayout {
   promoTitle: { x: number; y: number; size?: number; color?: string; fontFamily?: string; };
   ticketType?: { x: number; y: number; width: number; height: number; textColor?: string; size?: number; fontFamily?: string; };
 }
-
 
 export interface BusinessManagedEntity { 
   id: string; 
@@ -244,12 +257,11 @@ export interface BusinessManagedEntity {
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
-  // Event-specific fields
+  schedules?: EventSchedule[]; // Múltiples horarios/fechas
   maxAttendance?: number;
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
   assignedPromoters?: EventPromoterAssignment[];
-  // Common fields
   businessName?: string; 
   businessLogoUrl?: string;
   businessCustomUrlPath?: string | null;
@@ -286,12 +298,10 @@ export interface BusinessPromoterLink {
   joinDate: Timestamp | string; 
 }
 
-// New type for view model in promoters page
 export interface BusinessPromoterLinkWithCommissions extends BusinessPromoterLink {
   pendingAmount: number;
   paidAmount: number;
 }
-
 
 export type BusinessClientType = 'qr' | 'vip';
 
@@ -309,7 +319,6 @@ export interface BusinessClientView {
   membershipStatus?: SocioVipMember['membershipStatus'];
 }
 
-// Form data types
 export interface BusinessFormData {
   name: string;
   contactEmail: string;
@@ -373,7 +382,7 @@ export interface BusinessPromotionFormData {
   description: string;
   startDate: Date;
   endDate: Date;
-  usageLimit?: number | string; // Allow string for empty input
+  usageLimit?: number | string;
   isActive: boolean;
   imageUrl?: string;
   imageFile?: File | null;
@@ -394,11 +403,12 @@ export interface BusinessEventFormData {
   maxAttendance?: number;
   unlimitedAttendance?: boolean;
   isActive: boolean;
-  isPublicAccess: boolean; // Add this line
+  isPublicAccess: boolean;
   imageUrl?: string;
   imageFile?: File | null;
   aiHint?: string;
   termsAndConditions?: string;
+  schedules?: EventSchedule[];
 }
 
 export interface BusinessPromoterFormData { 
@@ -410,11 +420,11 @@ export interface BusinessPromoterFormData {
   password?: string;
 }
  
-export interface SpecificCodeFormValues { // Para el input de código de 9 dígitos en la página pública del negocio
+export interface SpecificCodeFormValues {
   specificCode: string;
 }
 
-export interface DniEntryValues { // Para el input de DNI en varios flujos
+export interface DniEntryValues {
   dni: string;
 }
 
@@ -449,7 +459,6 @@ export interface InitialDataForPromoterLink {
   socioVipData?: SocioVipMember;
 }
 
-// Nueva interfaz para la configuración de la plataforma
 export interface PlatformSettings {
   defaultBusinessesForFreeUsers?: string[];
 }
@@ -484,12 +493,12 @@ export interface BatchBoxFormData {
 }
 
 export interface AutomationRule {
-  id?: string; // e.g., businessId_loyalty
+  id?: string;
   businessId: string;
   type: 'loyalty' | 'retention' | 'birthday';
   name: string;
   isEnabled: boolean;
-  threshold: number; // For loyalty: # of visits. For retention: # of days. For birthday: month (1-12)
-  actionPromoId: string; // ID of the businessEntity (promotion) to send
+  threshold: number;
+  actionPromoId: string;
   lastRun?: Timestamp | string;
 }

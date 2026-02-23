@@ -1,5 +1,4 @@
-
-
+// src/app/api/redeem-code/route.ts
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
@@ -7,10 +6,9 @@ import { anyToDate, isEntityCurrentlyActivatable } from '@/lib/utils';
 import type { BusinessManagedEntity, GeneratedCode, QrClient } from '@/lib/types';
 import { Timestamp } from 'firebase-admin/firestore';
 
-
 const RedeemCodeSchema = z.object({
   entityId: z.string().min(1),
-  codeId: z.string().min(1),
+  codeId: z.string().min(1), // Can be 'PUBLIC_ACCESS' or a real ID
   dni: z.string().min(7),
   businessId: z.string().min(1),
   newClientData: z
@@ -36,154 +34,95 @@ export async function POST(request: Request) {
     }
 
     const { entityId, codeId, dni, businessId, newClientData } = validation.data;
-
     const qrClientsRef = adminDb.collection('qrClients');
     
     const finalResult = await adminDb.runTransaction(async (transaction) => {
       const entityRef = adminDb.collection('businessEntities').doc(entityId);
       const entityDoc = await transaction.get(entityRef);
       
-      if (!entityDoc.exists) {
-        throw new Error(`La entidad (promoción/evento) no fue encontrada.`);
-      }
+      if (!entityDoc.exists) throw new Error(`La entidad no fue encontrada.`);
       const entityData = entityDoc.data() as BusinessManagedEntity;
 
-      if (!isEntityCurrentlyActivatable(entityData)) {
-        throw new Error('Esta promoción o evento no está vigente.');
-      }
+      if (!isEntityCurrentlyActivatable(entityData)) throw new Error('No está vigente.');
 
-      // Check if DNI has already redeemed a code for this entity
-      const existingRedemptionForDni = (entityData.generatedCodes || []).find(
+      // Check if DNI already has a QR for this entity
+      const existing = (entityData.generatedCodes || []).find(
         (c) => c.redeemedByInfo?.dni === dni && (c.status === 'redeemed' || c.status === 'used')
       );
-      if (existingRedemptionForDni) {
-        // Devuelve el código existente para que el cliente pueda ver su QR
-        const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
-        const existingClientSnap = await transaction.get(clientQuery);
 
-        if (!existingClientSnap.empty) {
-            const clientDoc = existingClientSnap.docs[0];
-            const clientData = clientDoc.data() as Omit<QrClient, 'id'>;
-            
-            const dobDate = anyToDate(clientData.dob);
-            const regDate = anyToDate(clientData.registrationDate);
-
-            return {
-                action: 'alreadyRedeemed',
-                code: existingRedemptionForDni,
-                clientData: {
-                    id: clientDoc.id,
-                    ...clientData,
-                    dob: dobDate ? dobDate.toISOString() : null,
-                    registrationDate: regDate ? regDate.toISOString() : null,
-                },
-            };
-        } else {
-             throw new Error(`El DNI ingresado ya generó un QR para este evento, pero no se encontró el perfil del cliente.`);
-        }
-      }
-
-      const codes = (entityData.generatedCodes || []) as GeneratedCode[];
-      let clientDoc;
-      let clientData: Omit<QrClient, 'id'>;
-      let finalClientId: string;
-      let clientAction: 'userExists' | 'newUser' = 'userExists';
-      
       const clientQuery = qrClientsRef.where('dni', '==', dni).limit(1);
-      const clientSnapshot = await transaction.get(clientQuery);
+      const clientSnap = await transaction.get(clientQuery);
+      
+      let clientDocId: string;
+      let clientDataObj: any;
 
-      if (!clientSnapshot.empty) {
-        clientDoc = clientSnapshot.docs[0];
-        clientData = clientDoc.data() as Omit<QrClient, 'id'>;
-        finalClientId = clientDoc.id;
-
-        const currentAssociatedIds = clientData.associatedBusinessIds || [];
-        if (!currentAssociatedIds.includes(businessId)) {
-            transaction.update(clientDoc.ref, {
-                associatedBusinessIds: [...currentAssociatedIds, businessId]
-            });
+      if (!clientSnap.empty) {
+        clientDocId = clientSnap.docs[0].id;
+        clientDataObj = clientSnap.docs[0].data();
+        // Update associations if needed
+        const assoc = clientDataObj.associatedBusinessIds || [];
+        if (!assoc.includes(businessId)) {
+            transaction.update(clientSnap.docs[0].ref, { associatedBusinessIds: [...assoc, businessId] });
         }
       } else if (newClientData) {
-        clientAction = 'newUser';
-        clientData = {
-          dni: dni,
-          name: newClientData.name,
-          surname: newClientData.surname,
-          phone: newClientData.phone,
-          dob: Timestamp.fromDate(new Date(newClientData.dob)),
-          registrationDate: Timestamp.now(),
-          generatedForBusinessId: businessId,
-          associatedBusinessIds: [businessId],
-        } as Omit<QrClient, 'id'>;
         const newClientRef = qrClientsRef.doc();
-        transaction.set(newClientRef, clientData);
-        finalClientId = newClientRef.id;
+        clientDocId = newClientRef.id;
+        clientDataObj = {
+            dni,
+            name: newClientData.name,
+            surname: newClientData.surname,
+            phone: newClientData.phone,
+            dob: Timestamp.fromDate(new Date(newClientData.dob)),
+            registrationDate: Timestamp.now(),
+            associatedBusinessIds: [businessId],
+        };
+        transaction.set(newClientRef, clientDataObj);
       } else {
-        return { action: 'newUser' }; 
+        return { action: 'newUser' };
       }
 
-      let finalCodeObject: GeneratedCode;
+      if (existing) {
+          return { action: 'alreadyRedeemed', code: existing, clientData: { id: clientDocId, ...clientDataObj } };
+      }
+
+      let finalCode: GeneratedCode;
+      const codes = [...(entityData.generatedCodes || [])];
 
       if (codeId === 'PUBLIC_ACCESS') {
-          if (!entityData.isPublicAccess) {
-              throw new Error("Este evento no es de acceso público.");
-          }
-          finalCodeObject = {
-              id: adminDb.collection('businessEntities').doc().id, // Unique ID for this entry
-              entityId: entityId,
-              value: 'PUBLIC_ACCESS',
+          if (!entityData.isPublicAccess) throw new Error("No es de acceso público.");
+          
+          finalCode = {
+              id: adminDb.collection('businessEntities').doc().id,
+              entityId,
+              value: `PUB-${dni.substring(0,5)}`,
               status: 'redeemed',
               generatedByName: 'Acceso Público',
               generatedDate: new Date().toISOString(),
               redemptionDate: new Date().toISOString(),
-              redeemedByInfo: { dni: dni, name: `${clientData.name} ${clientData.surname}` },
+              redeemedByInfo: { dni, name: `${clientDataObj.name} ${clientDataObj.surname}`.trim() },
+              checkIns: [],
           };
-          const updatedCodes = [...codes, finalCodeObject];
-          transaction.update(entityRef, { generatedCodes: updatedCodes });
+          codes.push(finalCode);
       } else {
-          const codeIndex = codes.findIndex((c) => c.id === codeId);
-          if (codeIndex === -1) {
-              throw new Error('El código del promotor no es válido.');
-          }
-          if (codes[codeIndex].status !== 'available') {
-              throw new Error('Este código ya ha sido utilizado o no está disponible.');
-          }
-          codes[codeIndex] = {
-              ...codes[codeIndex],
+          const idx = codes.findIndex(c => c.id === codeId);
+          if (idx === -1 || codes[idx].status !== 'available') throw new Error('Código no válido.');
+          
+          codes[idx] = {
+              ...codes[idx],
               status: 'redeemed',
               redemptionDate: new Date().toISOString(),
-              redeemedByInfo: { dni: dni, name: `${clientData.name} ${clientData.surname}`},
+              redeemedByInfo: { dni, name: `${clientDataObj.name} ${clientDataObj.surname}`.trim() },
+              checkIns: [],
           };
-          finalCodeObject = codes[codeIndex];
-          transaction.update(entityRef, { generatedCodes: codes });
+          finalCode = codes[idx];
       }
 
-      const dobDate = anyToDate(clientData.dob);
-      const regDate = anyToDate(clientData.registrationDate);
-          
-      return {
-        action: clientAction,
-        code: finalCodeObject, // Return the code object
-        clientData: {
-          id: finalClientId,
-          ...clientData,
-          dob: dobDate ? dobDate.toISOString() : null,
-          registrationDate: regDate ? regDate.toISOString() : null,
-        }
-      };
+      transaction.update(entityRef, { generatedCodes: codes });
+      return { action: 'success', code: finalCode, clientData: { id: clientDocId, ...clientDataObj } };
     });
-
-    if(finalResult.action === 'newUser' && !finalResult.clientData) {
-        return NextResponse.json({ action: 'newUser' });
-    }
 
     return NextResponse.json(finalResult);
   } catch (error: any) {
-    console.error('API Route (redeem-code): Error detallado:', error);
-    return NextResponse.json(
-      { error: error.message || 'Ocurrió un error interno del servidor.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-
