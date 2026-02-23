@@ -1,7 +1,6 @@
-
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar } from 'recharts';
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
@@ -18,7 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatCard } from "@/components/admin/StatCard";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface MonthlyStat {
   month: string;
@@ -44,6 +45,10 @@ export default function BusinessAnalyticsPage() {
   const [generalStats, setGeneralStats] = useState<MonthlyStat[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
   const [attendanceSearchTerm, setAttendanceSearchTerm] = useState("");
+  
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const businessId = userProfile?.businessId;
 
@@ -133,7 +138,7 @@ export default function BusinessAnalyticsPage() {
     return { id: selectedEntity.id, name: selectedEntity.name, codesGenerated, qrGenerated, codesUsed };
   }, [selectedEntity]);
 
-  const attendanceData = useMemo(() => {
+  const allAttendanceData = useMemo(() => {
     if (!selectedEntity || !selectedEntity.generatedCodes) return [];
 
     const redeemedCodes = selectedEntity.generatedCodes.filter(c => c.redeemedByInfo?.dni);
@@ -179,6 +184,18 @@ export default function BusinessAnalyticsPage() {
         (item.codeValue && item.codeValue.toLowerCase().includes(search))
     );
   }, [selectedEntity, attendanceSearchTerm]);
+
+  // Lógica de paginación
+  const totalPages = Math.ceil(allAttendanceData.length / rowsPerPage);
+  const paginatedAttendanceData = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return allAttendanceData.slice(startIndex, startIndex + rowsPerPage);
+  }, [allAttendanceData, currentPage, rowsPerPage]);
+
+  // Resetear página al cambiar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [attendanceSearchTerm, selectedEntityId, rowsPerPage]);
 
   if (isLoading) {
     return (
@@ -333,6 +350,7 @@ export default function BusinessAnalyticsPage() {
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
+                                    <TableHead className="w-[50px] font-bold text-center">#</TableHead>
                                     <TableHead className="font-bold">Cliente</TableHead>
                                     <TableHead className="font-bold text-center">DNI/CE</TableHead>
                                     <TableHead className="font-bold text-center">Entrada</TableHead>
@@ -354,9 +372,12 @@ export default function BusinessAnalyticsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {attendanceData.length > 0 ? (
-                                    attendanceData.map((item, idx) => (
+                                {paginatedAttendanceData.length > 0 ? (
+                                    paginatedAttendanceData.map((item, idx) => (
                                         <TableRow key={idx} className="hover:bg-muted/30">
+                                            <TableCell className="text-center text-xs text-muted-foreground">
+                                                {((currentPage - 1) * rowsPerPage) + idx + 1}
+                                            </TableCell>
                                             <TableCell className="font-medium">
                                                 <div className="flex flex-col">
                                                     <span>{item.name}</span>
@@ -421,6 +442,51 @@ export default function BusinessAnalyticsPage() {
                             </TableBody>
                         </Table>
                     </div>
+                    
+                    {/* Controles de Paginación */}
+                    {totalPages > 1 && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 bg-muted/20 rounded-lg">
+                            <div className="flex items-center space-x-2 text-sm">
+                                <Label htmlFor="rows-per-page-attendance">Filas por página:</Label>
+                                <Select
+                                    value={`${rowsPerPage}`}
+                                    onValueChange={(value) => setRowsPerPage(Number(value))}
+                                >
+                                    <SelectTrigger id="rows-per-page-attendance" className="h-8 w-[70px]">
+                                        <SelectValue placeholder={rowsPerPage} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[10, 25, 50, 100].map((pageSize) => (
+                                            <SelectItem key={pageSize} value={`${pageSize}`}>
+                                                {pageSize}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Página {currentPage} de {totalPages}
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Anterior
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Siguiente
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 </>
             ) : (
