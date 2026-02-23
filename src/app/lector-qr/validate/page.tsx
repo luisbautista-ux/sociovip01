@@ -34,7 +34,7 @@ interface QrScannerProps {
 }
 
 const QrScanner = React.memo(({ onScanSuccess, onScanFailure }: QrScannerProps) => {
-  const scannerRef = React.useRef<Html5Qrcode | null>(null);
+  const scannerRef = React.useRef<HTML5Qrcode | null>(null);
 
   React.useEffect(() => {
     if (!scannerRef.current) {
@@ -203,8 +203,25 @@ export default function LectorValidateQrPage() {
     }
   };
 
-  const currentSchedule = validationResult?.entity ? getCurrentSchedule(validationResult.entity) : null;
-  const alreadyUsedToday = validationResult?.code?.checkIns?.some(ci => ci.scheduleId === (currentSchedule?.id || 'general'));
+  // --- Lógica de estados de validación ---
+  const now = new Date();
+  const entity = validationResult?.entity;
+  const code = validationResult?.code;
+  
+  const hasSchedules = !!(entity?.schedules && entity.schedules.length > 0);
+  const currentSchedule = entity ? getCurrentSchedule(entity) : null;
+  const alreadyUsedToday = code?.checkIns?.some(ci => ci.scheduleId === (currentSchedule?.id || 'general'));
+
+  const start = entity ? anyToDate(entity.startDate) : null;
+  const end = entity ? anyToDate(entity.endDate) : null;
+  
+  // Verificación estricta de tiempo para eventos sin sesiones
+  const isOutsideTime = !hasSchedules && start && end && (now < start || now > end);
+  
+  // Verificación de sesiones activas
+  const isNoSession = hasSchedules && !currentSchedule;
+
+  const canValidate = validationResult?.type === 'promo_code' && !alreadyUsedToday && !isNoSession && !isOutsideTime;
 
   return (
     <div className="space-y-6">
@@ -241,19 +258,21 @@ export default function LectorValidateQrPage() {
                 <AlertTitle>Código No Encontrado</AlertTitle>
                 <AlertDescription>Este código no pertenece a ninguna promoción o usuario de este negocio.</AlertDescription>
               </Alert>
-            ) : validationResult.type === 'promo_code' && validationResult.entity && validationResult.code ? (
+            ) : validationResult.type === 'promo_code' && entity && code ? (
               <div className="space-y-4">
-                <Alert className={cn("border-2", alreadyUsedToday ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200")}>
-                  {alreadyUsedToday ? <XCircle className="text-red-600 h-5 w-5"/> : <CheckCircle2 className="text-green-600 h-5 w-5"/>}
+                <Alert className={cn("border-2", (alreadyUsedToday || isNoSession || isOutsideTime) ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200")}>
+                  {(alreadyUsedToday || isNoSession || isOutsideTime) ? <XCircle className="text-red-600 h-5 w-5"/> : <CheckCircle2 className="text-green-600 h-5 w-5"/>}
                   <div className="ml-2">
-                    <AlertTitle className={cn("font-bold text-lg", alreadyUsedToday ? "text-red-800" : "text-green-800")}>
-                        {alreadyUsedToday ? "ACCESO YA UTILIZADO" : "ACCESO PERMITIDO"}
+                    <AlertTitle className={cn("font-bold text-lg", (alreadyUsedToday || isNoSession || isOutsideTime) ? "text-red-800" : "text-green-800")}>
+                        {alreadyUsedToday ? "ACCESO YA UTILIZADO" : 
+                         isNoSession ? "SIN SESIÓN ACTIVA" : 
+                         isOutsideTime ? "FUERA DE HORARIO" : "ACCESO PERMITIDO"}
                     </AlertTitle>
-                    <AlertDescription className={alreadyUsedToday ? "text-red-700" : "text-green-700"}>
-                        {alreadyUsedToday 
-                            ? `El cliente ya ingresó a la sesión: ${currentSchedule?.label || 'General'}.` 
-                            : `Sesión actual detectada: ${currentSchedule?.label || 'General'}`
-                        }
+                    <AlertDescription className={(alreadyUsedToday || isNoSession || isOutsideTime) ? "text-red-700" : "text-green-700"}>
+                        {alreadyUsedToday ? `El cliente ya ingresó a la sesión: ${currentSchedule?.label || 'General'}.` : 
+                         isNoSession ? "No hay una sesión activa de este evento ahora. Verifique los horarios." :
+                         isOutsideTime ? `El evento no está en curso. Válido desde ${start ? format(start, 'dd/MM HH:mm') : '--'} hasta ${end ? format(end, 'dd/MM HH:mm') : '--'}` :
+                         `Sesión actual detectada: ${currentSchedule?.label || 'General'}`}
                     </AlertDescription>
                   </div>
                 </Alert>
@@ -263,23 +282,23 @@ export default function LectorValidateQrPage() {
                     <User className="h-5 w-5 text-primary"/>
                     <div>
                         <p className="text-xs text-muted-foreground uppercase font-bold">Cliente</p>
-                        <p className="font-semibold">{validationResult.code.redeemedByInfo?.name}</p>
+                        <p className="font-semibold">{code.redeemedByInfo?.name}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 bg-muted/50 p-3 rounded-lg">
                     <Info className="h-5 w-5 text-primary"/>
                     <div>
                         <p className="text-xs text-muted-foreground uppercase font-bold">Actividad</p>
-                        <p className="font-semibold">{validationResult.entity.name}</p>
+                        <p className="font-semibold">{entity.name}</p>
                     </div>
                   </div>
                 </div>
 
-                {validationResult.code.checkIns && validationResult.code.checkIns.length > 0 && (
+                {code.checkIns && code.checkIns.length > 0 && (
                     <div className="mt-4">
                         <h4 className="text-xs font-bold text-muted-foreground flex items-center gap-1 mb-2 uppercase tracking-wider"><History size={14}/> Historial de Entradas</h4>
                         <div className="space-y-1">
-                            {validationResult.code.checkIns.map((ci, i) => (
+                            {code.checkIns.map((ci, i) => (
                                 <div key={i} className="text-sm flex justify-between bg-muted p-2 rounded-md border border-border/50">
                                     <span className="font-medium text-primary">{ci.scheduleLabel}</span>
                                     <span className="text-muted-foreground">{format(new Date(ci.timestamp), 'dd/MM HH:mm', {locale: es})}</span>
@@ -291,13 +310,13 @@ export default function LectorValidateQrPage() {
               </div>
             ) : null}
           </CardContent>
-          <CardFooter>
-            {validationResult.type === 'promo_code' && !alreadyUsedToday && (
+          <CardFooter className="flex flex-col gap-2">
+            {canValidate && (
                 <Button onClick={handleValidateAndRedeem} className="w-full h-12 text-lg font-bold bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-200">
                     <CheckCircle2 className="mr-2 h-6 w-6" /> Validar Entrada
                 </Button>
             )}
-            <Button variant="outline" onClick={() => setValidationResult(null)} className="w-full mt-2">Cerrar</Button>
+            <Button variant="outline" onClick={() => setValidationResult(null)} className="w-full">Cerrar</Button>
           </CardFooter>
         </Card>
       )}
@@ -320,9 +339,13 @@ export default function LectorValidateQrPage() {
                             <span className="font-bold">{entity.name}</span>
                             <Badge variant="outline" className="text-[10px] uppercase">{entity.type === 'event' ? 'Evento' : 'Promo'}</Badge>
                           </div>
-                          {schedule && (
+                          {schedule ? (
                             <div className="flex items-center text-xs text-green-600 font-semibold gap-1">
                                 <Clock size={12}/> Sesión Activa: {schedule.label}
+                            </div>
+                          ) : (
+                            <div className="flex items-center text-xs text-muted-foreground gap-1">
+                                <Clock size={12}/> Sin sesión activa ahora
                             </div>
                           )}
                       </div>
