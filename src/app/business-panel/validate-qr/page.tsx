@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, User, Info, CheckCircle2, XCircle, AlertTriangle, Clock, Camera, History, Calendar, Ticket } from "lucide-react";
+import { QrCode as QrCodeIcon, User, Info, CheckCircle2, XCircle, AlertTriangle, Clock, Camera, History, Calendar, Ticket, Users, Loader2 } from "lucide-react";
 import type { BusinessManagedEntity, GeneratedCode, PlatformUser, CheckIn } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";

@@ -7,14 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, Ticket, CalendarDays, User, Info, Search, CheckCircle2, XCircle, AlertTriangle, Clock, Users, Camera, UserCheck, Star, History } from "lucide-react";
-import type { BusinessManagedEntity, GeneratedCode, Business, PlatformUser, CheckIn } from "@/lib/types";
+import { QrCode as QrCodeIcon, Ticket, User, Info, CheckCircle2, XCircle, AlertTriangle, Clock, Users, Camera, History, Loader2 } from "lucide-react";
+import type { BusinessManagedEntity, GeneratedCode, PlatformUser, CheckIn } from "@/lib/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { Html5Qrcode, type Html5QrcodeError, type Html5QrcodeResult } from "html5-qrcode";
 import { isEntityCurrentlyActivatable, anyToDate, getCurrentSchedule } from "@/lib/utils";
-import { GENERATED_CODE_STATUS_TRANSLATIONS, PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
 import { useAuth } from "@/context/AuthContext";
 import { collection, doc, getDoc, getDocs, query, runTransaction, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -268,7 +267,7 @@ export default function LectorValidateQrPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 bg-muted/50 p-3 rounded-lg">
-                    <Calendar className="h-5 w-5 text-primary"/>
+                    <Info className="h-5 w-5 text-primary"/>
                     <div>
                         <p className="text-xs text-muted-foreground uppercase font-bold">Actividad</p>
                         <p className="font-semibold">{validationResult.entity.name}</p>
