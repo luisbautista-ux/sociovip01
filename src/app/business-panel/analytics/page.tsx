@@ -41,7 +41,7 @@ export default function BusinessAnalyticsPage() {
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(false); // Para evitar errores de hidratación en gráficos
+  const [isMounted, setIsMounted] = useState(false);
   const [allEntities, setAllEntities] = useState<BusinessManagedEntity[]>([]);
   const [generalStats, setGeneralStats] = useState<MonthlyStat[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string>('');
@@ -52,7 +52,6 @@ export default function BusinessAnalyticsPage() {
 
   const businessId = userProfile?.businessId;
 
-  // Asegurar que el componente está montado en el cliente antes de renderizar gráficos
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -208,30 +207,31 @@ export default function BusinessAnalyticsPage() {
   if (!businessId) {
       return (
         <div className="flex flex-col items-center justify-center h-64 p-4 border border-dashed rounded-md">
-            <CardTitle className="text-xl text-destructive font-headline">Configuración Incompleta</CardTitle>
+            <CardTitle className="text-xl text-destructive font-headline text-center">Configuración Incompleta</CardTitle>
             <CardDescription className="mt-2 text-center text-muted-foreground">
-                Tu perfil de usuario no está asociado a un negocio válido. Contacta al superadministrador.
+                Tu perfil de usuario no está asociado a un negocio válido.
             </CardDescription>
         </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-10 max-w-full overflow-x-hidden px-1 sm:px-0">
-      <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center px-2">
+    <div className="w-full max-w-full overflow-x-hidden pb-10 px-2 sm:px-0 space-y-6">
+      <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center mb-2">
         <BarChart3 className="h-7 w-7 sm:h-8 sm:w-8 mr-2" /> Analíticas
       </h1>
       
-      <Card className="shadow-lg overflow-hidden mx-2 sm:mx-0">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide break-words">Rendimiento General (Últimos 6 Meses)</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Tendencias en creación de campañas y códigos QR.</CardDescription>
+      {/* Gráfico de Rendimiento General */}
+      <Card className="shadow-md w-full overflow-hidden">
+        <CardHeader className="p-4">
+          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide break-words">Rendimiento General</CardTitle>
+          <CardDescription className="text-xs">Últimos 6 meses.</CardDescription>
         </CardHeader>
-        <CardContent className="p-2 sm:p-4">
-           <div className="h-[280px] sm:h-[400px] w-full min-w-0">
-            {isMounted && generalStats.length > 0 && generalStats.some(s => s.entitiesCreated > 0 || s.qrCodesGenerated > 0) ? (
+        <CardContent className="p-0 sm:p-4">
+           <div className="h-[280px] sm:h-[400px] w-full relative">
+            {isMounted && generalStats.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={generalStats} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                <LineChart data={generalStats} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
@@ -242,36 +242,31 @@ export default function BusinessAnalyticsPage() {
                         borderRadius: 'var(--radius)',
                         fontSize: '11px'
                     }}
-                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
                   />
                   <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} iconType="circle" />
-                  <Line type="monotone" dataKey="entitiesCreated" stroke="hsl(var(--secondary-foreground))" name="Campañas" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="qrCodesGenerated" stroke="hsl(var(--primary))" name="QR Gen." strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canje." strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="entitiesCreated" stroke="hsl(var(--secondary-foreground))" name="Campañas" strokeWidth={2} />
+                  <Line type="monotone" dataKey="qrCodesGenerated" stroke="hsl(var(--primary))" name="QR Gen." strokeWidth={2} />
+                  <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canje." strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
-            ) : !isMounted ? (
-              <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-primary opacity-20" /></div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm space-y-2">
-                  <Info className="h-8 w-8 opacity-20" /> 
-                  <p>No hay datos suficientes para mostrar el gráfico.</p>
-              </div>
+              <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-primary opacity-20" /></div>
             )}
            </div>
         </CardContent>
       </Card>
 
-      <Card className="shadow-lg overflow-hidden mx-2 sm:mx-0">
-        <CardHeader className="p-4 sm:p-6">
+      {/* Sección Analíticas por Actividad */}
+      <Card className="shadow-md w-full overflow-hidden">
+        <CardHeader className="p-4">
           <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Analíticas por Actividad</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Selecciona para ver el detalle de rendimiento.</CardDescription>
+          <CardDescription className="text-xs">Detalle de rendimiento por campaña.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 p-4 sm:p-6">
+        <CardContent className="space-y-4 p-4">
             <div className="w-full">
               <Select onValueChange={setSelectedEntityId} value={selectedEntityId} disabled={allEntities.length === 0}>
                   <SelectTrigger className="h-12 border-2 text-sm w-full">
-                      <SelectValue placeholder={allEntities.length === 0 ? "Sin actividades" : "Selecciona una actividad"} />
+                      <SelectValue placeholder="Selecciona una actividad" />
                   </SelectTrigger>
                   <SelectContent>
                       {allEntities.map(entity => (
@@ -287,83 +282,51 @@ export default function BusinessAnalyticsPage() {
             </div>
 
             {selectedEntityStats ? (
-                <>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
-                    <div className="lg:col-span-2 h-[280px] sm:h-[350px] w-full min-w-0">
-                      {isMounted && (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={[selectedEntityStats]} layout="vertical" margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                              <XAxis type="number" fontSize={10} hide />
-                              <YAxis type="category" dataKey="name" hide />
-                              <Tooltip
-                                cursor={{ fill: 'transparent' }}
-                                contentStyle={{ 
-                                    backgroundColor: 'hsl(var(--background))', 
-                                    borderColor: 'hsl(var(--border))',
-                                    borderRadius: 'var(--radius)',
-                                    fontSize: '11px'
-                                }}
-                              />
-                              <Legend wrapperStyle={{ fontSize: '10px' }} iconType="rect" />
-                              <Bar dataKey="codesGenerated" fill="hsl(var(--secondary-foreground))" name="Creados" radius={[0, 4, 4, 0]} barSize={25} />
-                              <Bar dataKey="qrGenerated" fill="hsl(var(--primary))" name="Generados" radius={[0, 4, 4, 0]} barSize={25} />
-                              <Bar dataKey="codesUsed" fill="hsl(var(--accent))" name="Asistencias" radius={[0, 4, 4, 0]} barSize={25} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
-                    <div className="lg:col-span-1 grid grid-cols-2 lg:grid-cols-1 gap-3">
+                <div className="space-y-6">
+                    {/* Stat Cards en móvil ocupan 1 columna, en desktop 4 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
                        <StatCard title="Creados" value={selectedEntityStats.codesGenerated} icon={Ticket} />
                        <StatCard title="Generados" value={selectedEntityStats.qrGenerated} icon={QrCode} />
                        <StatCard title="Asistencias" value={selectedEntityStats.codesUsed} icon={Users} />
                        <StatCard title="Tasa" value={`${selectedEntityStats.qrGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.qrGenerated) * 100).toFixed(1) : 0}%`} icon={BarChart3} />
                     </div>
-                </div>
 
-                <div className="pt-8 space-y-4">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-t pt-6">
-                        <div className="w-full sm:w-auto">
-                            <h3 className="text-lg sm:text-xl font-bold font-headline uppercase tracking-tight flex items-center gap-2 text-primary">
-                                <Users className="h-5 w-5"/> Reporte de Asistencia
-                            </h3>
-                            <p className="text-xs text-muted-foreground">Detalle de ingresos por cliente.</p>
+                    {/* Reporte de Asistencia con Contención Estricta */}
+                    <div className="pt-6 space-y-4 border-t">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h3 className="text-lg font-bold font-headline uppercase text-primary">Reporte de Asistencia</h3>
+                                <p className="text-[10px] text-muted-foreground">Listado de ingresos confirmados.</p>
+                            </div>
+                            <div className="relative w-full sm:w-72">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="DNI o Nombre..."
+                                    className="pl-8 text-sm h-10 w-full"
+                                    value={attendanceSearchTerm}
+                                    onChange={(e) => setAttendanceSearchTerm(e.target.value)}
+                                />
+                            </div>
                         </div>
-                        <div className="relative w-full sm:w-72">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="DNI o Nombre..."
-                                className="pl-8 text-sm h-10 w-full"
-                                value={attendanceSearchTerm}
-                                onChange={(e) => setAttendanceSearchTerm(e.target.value)}
-                            />
-                        </div>
-                    </div>
 
-                    <div className="border rounded-lg overflow-hidden shadow-sm bg-background max-w-full">
-                        <div className="overflow-x-auto w-full">
-                          <Table>
+                        {/* Contenedor de Tabla con Ancho Controlado */}
+                        <div className="w-full max-w-[calc(100vw-2.5rem)] sm:max-w-full border rounded-lg overflow-x-auto shadow-sm bg-background">
+                          <Table className="min-w-full">
                               <TableHeader className="bg-muted/50">
                                   <TableRow>
-                                      <TableHead className="w-[40px] font-bold text-center px-2 text-[10px] sm:text-xs">#</TableHead>
-                                      <TableHead className="font-bold text-[10px] sm:text-xs min-w-[140px]">Cliente</TableHead>
-                                      <TableHead className="font-bold text-center text-[10px] sm:text-xs">DNI/CE</TableHead>
-                                      <TableHead className="font-bold text-center text-[10px] sm:text-xs">Entrada</TableHead>
+                                      <TableHead className="w-[40px] text-center px-2 text-[10px]">#</TableHead>
+                                      <TableHead className="min-w-[120px] text-[10px]">Cliente</TableHead>
+                                      <TableHead className="text-center text-[10px]">DNI</TableHead>
                                       {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
                                           selectedEntity.schedules.map(session => (
-                                              <TableHead key={session.id} className="font-bold text-center px-2 min-w-[80px]">
-                                                  <div className="flex flex-col items-center">
-                                                      <span className="text-[10px] sm:text-xs truncate max-w-[70px]">{session.label}</span>
-                                                      <span className="text-[8px] font-normal opacity-70">
-                                                          {format(new Date(session.startDate), "dd/MM")}
-                                                      </span>
-                                                  </div>
+                                              <TableHead key={session.id} className="text-center px-2 min-w-[70px] text-[10px]">
+                                                  {session.label}
                                               </TableHead>
                                           ))
                                       ) : (
-                                          <TableHead className="font-bold text-center text-[10px] sm:text-xs min-w-[80px]">Ingreso</TableHead>
+                                          <TableHead className="text-center text-[10px] min-w-[70px]">Ingreso</TableHead>
                                       )}
-                                      <TableHead className="font-bold text-right text-[10px] sm:text-xs pr-4">Asist.</TableHead>
+                                      <TableHead className="text-right text-[10px] pr-4">Total</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -373,123 +336,71 @@ export default function BusinessAnalyticsPage() {
                                               <TableCell className="text-center text-[10px] text-muted-foreground px-2">
                                                   {((currentPage - 1) * rowsPerPage) + idx + 1}
                                               </TableCell>
-                                              <TableCell className="font-medium px-2 py-3">
+                                              <TableCell className="px-2 py-2">
                                                   <div className="flex flex-col">
-                                                      <span className="text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">{item.name}</span>
-                                                      <span className="text-[8px] text-muted-foreground font-mono">{item.codeValue}</span>
+                                                      <span className="text-[10px] font-bold line-clamp-1">{item.name}</span>
+                                                      <span className="text-[8px] text-muted-foreground">{item.codeValue}</span>
                                                   </div>
                                               </TableCell>
-                                              <TableCell className="text-center text-[10px] sm:text-xs px-2">{item.dni}</TableCell>
-                                              <TableCell className="text-center px-2">
-                                                  {item.ticketType ? (
-                                                      <Badge variant="outline" className="text-[8px] sm:text-[9px] px-1 py-0 uppercase font-bold leading-none">{item.ticketType}</Badge>
-                                                  ) : <span className="text-muted-foreground text-[10px]">---</span>}
-                                              </TableCell>
+                                              <TableCell className="text-center text-[10px] px-2">{item.dni}</TableCell>
                                               {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
                                                   selectedEntity.schedules.map(session => (
                                                       <TableCell key={session.id} className="text-center px-2">
                                                           {item.sessions[session.id] ? (
-                                                              <div className="flex items-center justify-center text-green-600 font-bold gap-0.5">
-                                                                  <CheckCircle2 size={10}/>
-                                                                  <span className="text-[9px] sm:text-xs">{item.sessions[session.id]}</span>
-                                                              </div>
+                                                              <span className="text-[9px] font-bold text-green-600">{item.sessions[session.id]}</span>
                                                           ) : (
-                                                              <div className="flex items-center justify-center text-destructive opacity-20">
-                                                                  <XCircle size={10}/>
-                                                              </div>
+                                                              <XCircle size={10} className="mx-auto text-destructive opacity-20" />
                                                           )}
                                                       </TableCell>
                                                   ))
                                               ) : (
                                                   <TableCell className="text-center px-2">
                                                       {item.sessions['general'] ? (
-                                                          <div className="flex items-center justify-center text-green-600 font-bold gap-0.5">
-                                                              <CheckCircle2 size={10}/>
-                                                              <span className="text-[9px] sm:text-xs">{item.sessions['general']}</span>
-                                                          </div>
+                                                          <span className="text-[9px] font-bold text-green-600">{item.sessions['general']}</span>
                                                       ) : (
-                                                          <XCircle className="mx-auto text-destructive opacity-20" size={10}/>
+                                                          <XCircle size={10} className="mx-auto text-destructive opacity-20" />
                                                       )}
                                                   </TableCell>
                                               )}
-                                              <TableCell className="text-right pr-4">
-                                                  <div className="flex flex-col items-end">
-                                                      <span className="text-[10px] font-black">
-                                                          {item.attendedCount}/{item.totalPossible}
-                                                      </span>
-                                                      <div className="w-8 sm:w-12 h-1 bg-muted rounded-full mt-0.5 overflow-hidden">
-                                                          <div 
-                                                              className="h-full bg-primary" 
-                                                              style={{ width: `${(item.attendedCount / item.totalPossible) * 100}%` }}
-                                                          />
-                                                      </div>
-                                                  </div>
+                                              <TableCell className="text-right pr-4 text-[10px] font-black">
+                                                  {item.attendedCount}/{item.totalPossible}
                                               </TableCell>
                                           </TableRow>
                                       ))
                                   ) : (
                                       <TableRow>
-                                          <TableCell colSpan={10} className="h-24 text-center text-muted-foreground italic text-[10px] sm:text-xs">
-                                              No se encontraron registros coincidentes.
+                                          <TableCell colSpan={10} className="h-20 text-center text-muted-foreground italic text-[10px]">
+                                              Sin registros.
                                           </TableCell>
                                       </TableRow>
                                   )}
                               </TableBody>
                           </Table>
                         </div>
+                        
+                        {/* Paginación */}
+                        {totalPages > 1 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2">
+                                <div className="flex items-center space-x-2 text-[10px]">
+                                    <Label className="font-bold">Filas:</Label>
+                                    <Select value={`${rowsPerPage}`} onValueChange={(v) => setRowsPerPage(Number(v))}>
+                                        <SelectTrigger className="h-7 w-[60px] text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="25">25</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Ant.</Button>
+                                    <span className="text-[10px] font-bold mx-2">{currentPage} / {totalPages}</span>
+                                    <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Sig.</Button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    
-                    {totalPages > 1 && (
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-3 bg-muted/20 rounded-lg">
-                            <div className="flex items-center space-x-2 text-xs">
-                                <Label htmlFor="rows-per-page-attendance" className="font-bold">Filas:</Label>
-                                <Select
-                                    value={`${rowsPerPage}`}
-                                    onValueChange={(value) => setRowsPerPage(Number(value))}
-                                >
-                                    <SelectTrigger id="rows-per-page-attendance" className="h-8 w-[65px] bg-background">
-                                        <SelectValue placeholder={rowsPerPage} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {[10, 25, 50].map((pageSize) => (
-                                            <SelectItem key={pageSize} value={`${pageSize}`}>
-                                                {pageSize}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="text-[10px] sm:text-xs text-muted-foreground font-black uppercase">
-                                Pág. {currentPage} de {totalPages}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 text-[10px] px-2 bg-background font-bold"
-                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                                    disabled={currentPage === 1}
-                                >
-                                    Ant.
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 text-[10px] px-2 bg-background font-bold"
-                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                                    disabled={currentPage === totalPages}
-                                >
-                                    Sig.
-                                </Button>
-                            </div>
-                        </div>
-                    )}
                 </div>
-                </>
             ) : (
-                 <div className="flex flex-col items-center justify-center h-60 text-muted-foreground border-2 border-dashed rounded-lg text-center p-6 bg-muted/10 mx-2">
-                    <BarChart3 size={48} className="opacity-10 mb-3"/>
-                    <p className="text-sm font-medium">Selecciona una campaña para visualizar estadísticas detalladas y reporte de asistencia.</p>
+                 <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg text-center p-6 bg-muted/10">
+                    <BarChart3 size={32} className="opacity-10 mb-2"/>
+                    <p className="text-xs">Selecciona una campaña para ver los reportes.</p>
                 </div>
             )}
         </CardContent>
