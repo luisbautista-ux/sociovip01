@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
+import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar } from 'recharts';
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { BarChart3, Users, Loader2, Info, Ticket, Calendar, QrCode, Search, XCircle, Clock } from "lucide-react";
 import { format, subMonths, startOfMonth, es } from "date-fns";
@@ -50,7 +50,6 @@ export default function BusinessAnalyticsPage() {
 
   const businessId = userProfile?.businessId;
 
-  // Garantizar que solo renderizamos gráficos en el cliente
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -74,7 +73,6 @@ export default function BusinessAnalyticsPage() {
       });
       setAllEntities(sortedEntities);
 
-      // Seleccionar por defecto la entidad activa más reciente
       const mostRecentActiveEntity = sortedEntities.find(isEntityCurrentlyActivatable);
       if (mostRecentActiveEntity) {
         setSelectedEntityId(mostRecentActiveEntity.id);
@@ -82,7 +80,6 @@ export default function BusinessAnalyticsPage() {
         setSelectedEntityId(sortedEntities[0].id);
       }
 
-      // Preparar datos para el gráfico general (últimos 6 meses)
       const monthlyStats: { [key: string]: Omit<MonthlyStat, 'month'> } = {};
       const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
 
@@ -142,6 +139,15 @@ export default function BusinessAnalyticsPage() {
         codesUsed 
     };
   }, [selectedEntity]);
+
+  const barChartData = useMemo(() => {
+    if (!selectedEntityStats) return [];
+    return [
+      { name: 'Creados', value: selectedEntityStats.codesGenerated, fill: 'hsl(var(--primary))' },
+      { name: 'Generados', value: selectedEntityStats.qrGenerated, fill: '#000000' },
+      { name: 'Asistencias', value: selectedEntityStats.codesUsed, fill: 'hsl(var(--accent))' },
+    ];
+  }, [selectedEntityStats]);
 
   const allAttendanceData = useMemo(() => {
     if (!selectedEntity || !selectedEntity.generatedCodes) return [];
@@ -204,7 +210,6 @@ export default function BusinessAnalyticsPage() {
         <BarChart3 className="h-7 w-7 sm:h-8 sm:w-8 mr-2" /> Analíticas
       </h1>
       
-      {/* Gráfico de Rendimiento General */}
       <Card className="shadow-md w-full overflow-hidden">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Rendimiento General</CardTitle>
@@ -232,7 +237,6 @@ export default function BusinessAnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Sección Analíticas por Actividad */}
       <Card className="shadow-md w-full overflow-hidden">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Analíticas por Actividad</CardTitle>
@@ -259,6 +263,39 @@ export default function BusinessAnalyticsPage() {
 
             {selectedEntityStats ? (
                 <div className="space-y-8">
+                    {/* Gráfico de Barras Horizontal Restaurado */}
+                    <div className="h-[250px] w-full min-w-0 overflow-hidden">
+                        {isMounted ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart
+                                    layout="vertical"
+                                    data={barChartData}
+                                    margin={{ top: 5, right: 40, left: 40, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                                    <XAxis type="number" hide />
+                                    <YAxis 
+                                        type="category" 
+                                        dataKey="name" 
+                                        stroke="hsl(var(--muted-foreground))" 
+                                        fontSize={12}
+                                        width={80}
+                                        tickLine={false}
+                                        axisLine={false}
+                                    />
+                                    <Tooltip 
+                                        cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                                        contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: '12px' }}
+                                    />
+                                    <Legend verticalAlign="top" align="center" wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }} />
+                                    <Bar dataKey="value" name="Cantidad" radius={[0, 4, 4, 0]} barSize={35} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-primary opacity-20" /></div>
+                        )}
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                        <StatCard title="Códigos Creados" value={selectedEntityStats.codesGenerated} icon={Ticket} />
                        <StatCard title="QRs Generados" value={selectedEntityStats.qrGenerated} icon={QrCode} />
