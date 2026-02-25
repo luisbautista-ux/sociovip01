@@ -50,6 +50,7 @@ export default function BusinessAnalyticsPage() {
 
   const businessId = userProfile?.businessId;
 
+  // Evitar errores de hidratación y asegurar que el gráfico calcule el ancho real del celular
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -73,6 +74,7 @@ export default function BusinessAnalyticsPage() {
       });
       setAllEntities(sortedEntities);
 
+      // Pre-seleccionar la más reciente
       const mostRecentActiveEntity = sortedEntities.find(isEntityCurrentlyActivatable);
       if (mostRecentActiveEntity) {
         setSelectedEntityId(mostRecentActiveEntity.id);
@@ -80,6 +82,7 @@ export default function BusinessAnalyticsPage() {
         setSelectedEntityId(sortedEntities[0].id);
       }
 
+      // Lógica para el gráfico de líneas general (últimos 6 meses)
       const monthlyStats: { [key: string]: Omit<MonthlyStat, 'month'> } = {};
       const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
 
@@ -143,9 +146,9 @@ export default function BusinessAnalyticsPage() {
   const barChartData = useMemo(() => {
     if (!selectedEntityStats) return [];
     return [
-      { name: 'Creados', value: selectedEntityStats.codesGenerated, fill: 'hsl(var(--primary))' },
-      { name: 'Generados', value: selectedEntityStats.qrGenerated, fill: '#000000' },
-      { name: 'Asistencias', value: selectedEntityStats.codesUsed, fill: 'hsl(var(--accent))' },
+      { name: 'Creados', value: selectedEntityStats.codesGenerated, fill: 'hsl(var(--primary))' }, // Púrpura SocioVIP
+      { name: 'Generados', value: selectedEntityStats.qrGenerated, fill: '#1f2937' }, // Gris Oscuro (Contrastado)
+      { name: 'Asistencias', value: selectedEntityStats.codesUsed, fill: '#f59e0b' }, // Amarillo Ámbar
     ];
   }, [selectedEntityStats]);
 
@@ -263,7 +266,7 @@ export default function BusinessAnalyticsPage() {
 
             {selectedEntityStats ? (
                 <div className="space-y-8">
-                    {/* Gráfico de Barras Horizontal Restaurado */}
+                    {/* Gráfico de Barras Horizontal con Colores Únicos */}
                     <div className="h-[250px] w-full min-w-0 overflow-hidden">
                         {isMounted ? (
                             <ResponsiveContainer width="100%" height="100%">
