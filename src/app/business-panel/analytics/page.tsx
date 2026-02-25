@@ -50,7 +50,14 @@ export default function BusinessAnalyticsPage() {
 
   const businessId = userProfile?.businessId;
 
-  // Evitar errores de hidratación y asegurar que el gráfico calcule el ancho real del celular
+  // Colores definidos para consistencia
+  const COLORS = {
+    creados: "#3b82f6", // Blue 500
+    generados: "#8b5cf6", // Purple 500
+    asistencias: "#f59e0b", // Amber 500
+    campanas: "#94a3b8" // Slate 400
+  };
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -146,11 +153,11 @@ export default function BusinessAnalyticsPage() {
   const barChartData = useMemo(() => {
     if (!selectedEntityStats) return [];
     return [
-      { name: 'Creados', value: selectedEntityStats.codesGenerated, fill: 'hsl(var(--primary))' }, // Púrpura SocioVIP
-      { name: 'Generados', value: selectedEntityStats.qrGenerated, fill: '#1f2937' }, // Gris Oscuro (Contrastado)
-      { name: 'Asistencias', value: selectedEntityStats.codesUsed, fill: '#f59e0b' }, // Amarillo Ámbar
+      { name: 'Creados', value: selectedEntityStats.codesGenerated, fill: COLORS.creados },
+      { name: 'Generados', value: selectedEntityStats.qrGenerated, fill: COLORS.generados },
+      { name: 'Asistencias', value: selectedEntityStats.codesUsed, fill: COLORS.asistencias },
     ];
-  }, [selectedEntityStats]);
+  }, [selectedEntityStats, COLORS]);
 
   const allAttendanceData = useMemo(() => {
     if (!selectedEntity || !selectedEntity.generatedCodes) return [];
@@ -228,9 +235,9 @@ export default function BusinessAnalyticsPage() {
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: '11px' }} />
                   <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} iconType="circle" />
-                  <Line type="monotone" dataKey="entitiesCreated" stroke="hsl(var(--secondary-foreground))" name="Campañas" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="qrCodesGenerated" stroke="hsl(var(--primary))" name="QR Gen." strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canje." strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="entitiesCreated" stroke={COLORS.campanas} name="Campañas" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="qrCodesGenerated" stroke={COLORS.generados} name="QR Gen." strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="qrCodesUtilized" stroke={COLORS.asistencias} name="QR Canje." strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
