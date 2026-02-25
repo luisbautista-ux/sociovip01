@@ -2,21 +2,19 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar } from 'recharts';
+import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
-import { BarChart3, Users, Loader2, Info, Ticket, Calendar, QrCode, Search, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { format, subMonths, startOfMonth, endOfMonth, isValid, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { BarChart3, Users, Loader2, Info, Ticket, Calendar, QrCode, Search, XCircle, Clock } from "lucide-react";
+import { format, subMonths, startOfMonth, es } from "date-fns";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { anyToDate, isEntityCurrentlyActivatable, getCurrentSchedule } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatCard } from "@/components/admin/StatCard";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,6 +50,7 @@ export default function BusinessAnalyticsPage() {
 
   const businessId = userProfile?.businessId;
 
+  // Garantizar que solo renderizamos gráficos en el cliente
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -75,6 +74,7 @@ export default function BusinessAnalyticsPage() {
       });
       setAllEntities(sortedEntities);
 
+      // Seleccionar por defecto la entidad activa más reciente
       const mostRecentActiveEntity = sortedEntities.find(isEntityCurrentlyActivatable);
       if (mostRecentActiveEntity) {
         setSelectedEntityId(mostRecentActiveEntity.id);
@@ -82,8 +82,9 @@ export default function BusinessAnalyticsPage() {
         setSelectedEntityId(sortedEntities[0].id);
       }
 
-      const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
+      // Preparar datos para el gráfico general (últimos 6 meses)
       const monthlyStats: { [key: string]: Omit<MonthlyStat, 'month'> } = {};
+      const sixMonthsAgo = startOfMonth(subMonths(new Date(), 5));
 
       for (let i = 0; i < 6; i++) {
         const monthDate = startOfMonth(subMonths(new Date(), 5 - i));
@@ -131,23 +132,23 @@ export default function BusinessAnalyticsPage() {
 
   const selectedEntityStats = useMemo((): SelectedEntityStats | null => {
     if (!selectedEntity) return null;
-
-    const codesGenerated = selectedEntity.generatedCodes?.length || 0;
     const qrGenerated = selectedEntity.generatedCodes?.filter(c => c.status === 'redeemed' || c.status === 'used').length || 0;
     const codesUsed = selectedEntity.generatedCodes?.filter(c => c.status === 'used').length || 0;
-    
-    return { id: selectedEntity.id, name: selectedEntity.name, codesGenerated, qrGenerated, codesUsed };
+    return { 
+        id: selectedEntity.id, 
+        name: selectedEntity.name, 
+        codesGenerated: selectedEntity.generatedCodes?.length || 0, 
+        qrGenerated, 
+        codesUsed 
+    };
   }, [selectedEntity]);
 
   const allAttendanceData = useMemo(() => {
     if (!selectedEntity || !selectedEntity.generatedCodes) return [];
-
     const redeemedCodes = selectedEntity.generatedCodes.filter(c => c.redeemedByInfo?.dni);
-    
     const data = redeemedCodes.map(code => {
         const sessionsAttendance: Record<string, string | null> = {};
         let attendedCount = 0;
-
         if (selectedEntity.schedules && selectedEntity.schedules.length > 0) {
             selectedEntity.schedules.forEach(session => {
                 const checkIn = code.checkIns?.find(ci => ci.scheduleId === session.id);
@@ -163,7 +164,6 @@ export default function BusinessAnalyticsPage() {
             sessionsAttendance['general'] = firstCheckIn ? format(new Date(firstCheckIn), "HH:mm") : null;
             if (firstCheckIn) attendedCount = 1;
         }
-
         return {
             dni: code.redeemedByInfo!.dni,
             name: code.redeemedByInfo!.name,
@@ -174,15 +174,9 @@ export default function BusinessAnalyticsPage() {
             ticketType: code.ticketTypeName
         };
     });
-
     if (!attendanceSearchTerm) return data;
-    
     const search = attendanceSearchTerm.toLowerCase();
-    return data.filter(item => 
-        item.name.toLowerCase().includes(search) || 
-        item.dni.includes(search) ||
-        (item.codeValue && item.codeValue.toLowerCase().includes(search))
-    );
+    return data.filter(item => item.name.toLowerCase().includes(search) || item.dni.includes(search));
   }, [selectedEntity, attendanceSearchTerm]);
 
   const totalPages = Math.ceil(allAttendanceData.length / rowsPerPage);
@@ -203,50 +197,32 @@ export default function BusinessAnalyticsPage() {
       </div>
     );
   }
-  
-  if (!businessId) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 p-4 border border-dashed rounded-md">
-            <CardTitle className="text-xl text-destructive font-headline text-center">Configuración Incompleta</CardTitle>
-            <CardDescription className="mt-2 text-center text-muted-foreground">
-                Tu perfil de usuario no está asociado a un negocio válido.
-            </CardDescription>
-        </div>
-    );
-  }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden pb-10 px-2 sm:px-0 space-y-6">
+    <div className="w-full max-w-full overflow-hidden pb-10 px-2 sm:px-0 space-y-6">
       <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center mb-2">
         <BarChart3 className="h-7 w-7 sm:h-8 sm:w-8 mr-2" /> Analíticas
       </h1>
       
       {/* Gráfico de Rendimiento General */}
       <Card className="shadow-md w-full overflow-hidden">
-        <CardHeader className="p-4">
-          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide break-words">Rendimiento General</CardTitle>
-          <CardDescription className="text-xs">Últimos 6 meses.</CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Rendimiento General</CardTitle>
+          <CardDescription className="text-xs">Últimos 6 meses de actividad comercial.</CardDescription>
         </CardHeader>
-        <CardContent className="p-0 sm:p-4">
-           <div className="h-[280px] sm:h-[400px] w-full relative">
-            {isMounted && generalStats.length > 0 ? (
+        <CardContent className="p-0 sm:p-6">
+           <div className="h-[300px] w-full min-w-0 overflow-hidden relative">
+            {isMounted ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={generalStats} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <LineChart data={generalStats} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))', 
-                        borderColor: 'hsl(var(--border))',
-                        borderRadius: 'var(--radius)',
-                        fontSize: '11px'
-                    }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: '11px' }} />
                   <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} iconType="circle" />
-                  <Line type="monotone" dataKey="entitiesCreated" stroke="hsl(var(--secondary-foreground))" name="Campañas" strokeWidth={2} />
-                  <Line type="monotone" dataKey="qrCodesGenerated" stroke="hsl(var(--primary))" name="QR Gen." strokeWidth={2} />
-                  <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canje." strokeWidth={2} />
+                  <Line type="monotone" dataKey="entitiesCreated" stroke="hsl(var(--secondary-foreground))" name="Campañas" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="qrCodesGenerated" stroke="hsl(var(--primary))" name="QR Gen." strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="qrCodesUtilized" stroke="hsl(var(--accent))" name="QR Canje." strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -258,11 +234,11 @@ export default function BusinessAnalyticsPage() {
 
       {/* Sección Analíticas por Actividad */}
       <Card className="shadow-md w-full overflow-hidden">
-        <CardHeader className="p-4">
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Analíticas por Actividad</CardTitle>
-          <CardDescription className="text-xs">Detalle de rendimiento por campaña.</CardDescription>
+          <CardDescription className="text-xs">Selecciona un evento para ver su rendimiento detallado.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 p-4">
+        <CardContent className="space-y-6 p-4 sm:p-6">
             <div className="w-full">
               <Select onValueChange={setSelectedEntityId} value={selectedEntityId} disabled={allEntities.length === 0}>
                   <SelectTrigger className="h-12 border-2 text-sm w-full">
@@ -282,26 +258,24 @@ export default function BusinessAnalyticsPage() {
             </div>
 
             {selectedEntityStats ? (
-                <div className="space-y-6">
-                    {/* Stat Cards en móvil ocupan 1 columna, en desktop 4 */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-                       <StatCard title="Creados" value={selectedEntityStats.codesGenerated} icon={Ticket} />
-                       <StatCard title="Generados" value={selectedEntityStats.qrGenerated} icon={QrCode} />
+                <div className="space-y-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                       <StatCard title="Códigos Creados" value={selectedEntityStats.codesGenerated} icon={Ticket} />
+                       <StatCard title="QRs Generados" value={selectedEntityStats.qrGenerated} icon={QrCode} />
                        <StatCard title="Asistencias" value={selectedEntityStats.codesUsed} icon={Users} />
-                       <StatCard title="Tasa" value={`${selectedEntityStats.qrGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.qrGenerated) * 100).toFixed(1) : 0}%`} icon={BarChart3} />
+                       <StatCard title="Tasa de Asistencia" value={`${selectedEntityStats.qrGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.qrGenerated) * 100).toFixed(1) : 0}%`} icon={BarChart3} />
                     </div>
 
-                    {/* Reporte de Asistencia con Contención Estricta */}
                     <div className="pt-6 space-y-4 border-t">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
-                                <h3 className="text-lg font-bold font-headline uppercase text-primary">Reporte de Asistencia</h3>
-                                <p className="text-[10px] text-muted-foreground">Listado de ingresos confirmados.</p>
+                                <h3 className="text-xl font-bold font-headline uppercase text-primary">Reporte de Asistencia</h3>
+                                <p className="text-xs text-muted-foreground">Listado detallado de ingresos por cliente.</p>
                             </div>
                             <div className="relative w-full sm:w-72">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="DNI o Nombre..."
+                                    placeholder="Buscar por DNI o Nombre..."
                                     className="pl-8 text-sm h-10 w-full"
                                     value={attendanceSearchTerm}
                                     onChange={(e) => setAttendanceSearchTerm(e.target.value)}
@@ -309,68 +283,67 @@ export default function BusinessAnalyticsPage() {
                             </div>
                         </div>
 
-                        {/* Contenedor de Tabla con Ancho Controlado */}
                         <div className="w-full max-w-[calc(100vw-2.5rem)] sm:max-w-full border rounded-lg overflow-x-auto shadow-sm bg-background">
                           <Table className="min-w-full">
                               <TableHeader className="bg-muted/50">
                                   <TableRow>
-                                      <TableHead className="w-[40px] text-center px-2 text-[10px]">#</TableHead>
-                                      <TableHead className="min-w-[120px] text-[10px]">Cliente</TableHead>
-                                      <TableHead className="text-center text-[10px]">DNI</TableHead>
+                                      <TableHead className="w-[50px] text-center px-2 text-xs">#</TableHead>
+                                      <TableHead className="min-w-[150px] text-xs">Cliente</TableHead>
+                                      <TableHead className="text-center text-xs">DNI</TableHead>
                                       {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
                                           selectedEntity.schedules.map(session => (
-                                              <TableHead key={session.id} className="text-center px-2 min-w-[70px] text-[10px]">
+                                              <TableHead key={session.id} className="text-center px-2 min-w-[80px] text-xs">
                                                   {session.label}
                                               </TableHead>
                                           ))
                                       ) : (
-                                          <TableHead className="text-center text-[10px] min-w-[70px]">Ingreso</TableHead>
+                                          <TableHead className="text-center text-xs min-w-[80px]">Ingreso</TableHead>
                                       )}
-                                      <TableHead className="text-right text-[10px] pr-4">Total</TableHead>
+                                      <TableHead className="text-right text-xs pr-4">Resumen</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
                                   {paginatedAttendanceData.length > 0 ? (
                                       paginatedAttendanceData.map((item, idx) => (
                                           <TableRow key={idx} className="hover:bg-muted/30">
-                                              <TableCell className="text-center text-[10px] text-muted-foreground px-2">
+                                              <TableCell className="text-center text-xs text-muted-foreground px-2">
                                                   {((currentPage - 1) * rowsPerPage) + idx + 1}
                                               </TableCell>
-                                              <TableCell className="px-2 py-2">
+                                              <TableCell className="px-2 py-3">
                                                   <div className="flex flex-col">
-                                                      <span className="text-[10px] font-bold line-clamp-1">{item.name}</span>
-                                                      <span className="text-[8px] text-muted-foreground">{item.codeValue}</span>
+                                                      <span className="text-sm font-bold line-clamp-1">{item.name}</span>
+                                                      <span className="text-[10px] text-muted-foreground">{item.codeValue}</span>
                                                   </div>
                                               </TableCell>
-                                              <TableCell className="text-center text-[10px] px-2">{item.dni}</TableCell>
+                                              <TableCell className="text-center text-xs px-2">{item.dni}</TableCell>
                                               {selectedEntity.schedules && selectedEntity.schedules.length > 0 ? (
                                                   selectedEntity.schedules.map(session => (
                                                       <TableCell key={session.id} className="text-center px-2">
                                                           {item.sessions[session.id] ? (
-                                                              <span className="text-[9px] font-bold text-green-600">{item.sessions[session.id]}</span>
+                                                              <span className="text-xs font-bold text-green-600">{item.sessions[session.id]}</span>
                                                           ) : (
-                                                              <XCircle size={10} className="mx-auto text-destructive opacity-20" />
+                                                              <XCircle size={14} className="mx-auto text-destructive opacity-30" />
                                                           )}
                                                       </TableCell>
                                                   ))
                                               ) : (
                                                   <TableCell className="text-center px-2">
                                                       {item.sessions['general'] ? (
-                                                          <span className="text-[9px] font-bold text-green-600">{item.sessions['general']}</span>
+                                                          <span className="text-xs font-bold text-green-600">{item.sessions['general']}</span>
                                                       ) : (
-                                                          <XCircle size={10} className="mx-auto text-destructive opacity-20" />
+                                                          <XCircle size={14} className="mx-auto text-destructive opacity-30" />
                                                       )}
                                                   </TableCell>
                                               )}
-                                              <TableCell className="text-right pr-4 text-[10px] font-black">
+                                              <TableCell className="text-right pr-4 text-xs font-black">
                                                   {item.attendedCount}/{item.totalPossible}
                                               </TableCell>
                                           </TableRow>
                                       ))
                                   ) : (
                                       <TableRow>
-                                          <TableCell colSpan={10} className="h-20 text-center text-muted-foreground italic text-[10px]">
-                                              Sin registros.
+                                          <TableCell colSpan={10} className="h-24 text-center text-muted-foreground italic text-sm">
+                                              No hay registros que coincidan con la búsqueda.
                                           </TableCell>
                                       </TableRow>
                                   )}
@@ -378,29 +351,28 @@ export default function BusinessAnalyticsPage() {
                           </Table>
                         </div>
                         
-                        {/* Paginación */}
                         {totalPages > 1 && (
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2">
-                                <div className="flex items-center space-x-2 text-[10px]">
-                                    <Label className="font-bold">Filas:</Label>
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
+                                <div className="flex items-center space-x-2 text-sm">
+                                    <Label className="font-semibold">Filas:</Label>
                                     <Select value={`${rowsPerPage}`} onValueChange={(v) => setRowsPerPage(Number(v))}>
-                                        <SelectTrigger className="h-7 w-[60px] text-[10px]"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="25">25</SelectItem></SelectContent>
+                                        <SelectTrigger className="h-8 w-[70px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem></SelectContent>
                                     </Select>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                    <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Ant.</Button>
-                                    <span className="text-[10px] font-bold mx-2">{currentPage} / {totalPages}</span>
-                                    <Button variant="outline" size="sm" className="h-8 text-[10px]" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Sig.</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Anterior</Button>
+                                    <span className="text-xs font-medium mx-2">Pág. {currentPage} de {totalPages}</span>
+                                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente</Button>
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
             ) : (
-                 <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border-2 border-dashed rounded-lg text-center p-6 bg-muted/10">
-                    <BarChart3 size={32} className="opacity-10 mb-2"/>
-                    <p className="text-xs">Selecciona una campaña para ver los reportes.</p>
+                 <div className="flex flex-col items-center justify-center h-48 text-muted-foreground border-2 border-dashed rounded-lg text-center p-6 bg-muted/10">
+                    <BarChart3 size={40} className="opacity-20 mb-3"/>
+                    <p className="text-sm">Selecciona una campaña para visualizar los reportes detallados.</p>
                 </div>
             )}
         </CardContent>
