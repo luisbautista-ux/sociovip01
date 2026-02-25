@@ -1,8 +1,9 @@
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar } from 'recharts';
+import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar, Cell } from 'recharts';
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { BarChart3, Users, Loader2, Info, Ticket, Calendar, QrCode, Search, XCircle, Clock } from "lucide-react";
 import { format, subMonths, startOfMonth, es } from "date-fns";
@@ -52,10 +53,10 @@ export default function BusinessAnalyticsPage() {
 
   // Colores definidos para consistencia
   const COLORS = {
-    creados: "#3b82f6", // Blue 500
-    generados: "#8b5cf6", // Purple 500
-    asistencias: "#f59e0b", // Amber 500
-    campanas: "#94a3b8" // Slate 400
+    creados: "hsl(var(--accent))",      // Business Secondary
+    generados: "hsl(var(--primary))",   // Business Primary
+    asistencias: "#f59e0b",             // SocioVIP Gold/Success
+    campanas: "#94a3b8"                 // Slate 400
   };
 
   useEffect(() => {
@@ -153,9 +154,9 @@ export default function BusinessAnalyticsPage() {
   const barChartData = useMemo(() => {
     if (!selectedEntityStats) return [];
     return [
-      { name: 'Creados', value: selectedEntityStats.codesGenerated, fill: COLORS.creados },
-      { name: 'Generados', value: selectedEntityStats.qrGenerated, fill: COLORS.generados },
-      { name: 'Asistencias', value: selectedEntityStats.codesUsed, fill: COLORS.asistencias },
+      { name: 'Creados', value: selectedEntityStats.codesGenerated, color: COLORS.creados },
+      { name: 'Generados', value: selectedEntityStats.qrGenerated, color: COLORS.generados },
+      { name: 'Asistencias', value: selectedEntityStats.codesUsed, color: COLORS.asistencias },
     ];
   }, [selectedEntityStats, COLORS]);
 
@@ -215,14 +216,15 @@ export default function BusinessAnalyticsPage() {
   }
 
   return (
-    <div className="w-full max-w-full overflow-hidden pb-10 px-2 sm:px-0 space-y-6">
-      <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center mb-2">
+    <div className="w-full max-w-full overflow-hidden pb-10 space-y-6">
+      <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center mb-2 px-2 sm:px-0">
         <BarChart3 className="h-7 w-7 sm:h-8 sm:w-8 mr-2" /> Analíticas
       </h1>
       
-      <Card className="shadow-md w-full overflow-hidden">
+      {/* Gráfico de Líneas General */}
+      <Card className="shadow-md w-full overflow-hidden mx-2 sm:mx-0">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Rendimiento General</CardTitle>
+          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide text-primary">Rendimiento General</CardTitle>
           <CardDescription className="text-xs">Últimos 6 meses de actividad comercial.</CardDescription>
         </CardHeader>
         <CardContent className="p-0 sm:p-6">
@@ -247,9 +249,10 @@ export default function BusinessAnalyticsPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-md w-full overflow-hidden">
+      {/* Sección por Actividad Seleccionada */}
+      <Card className="shadow-md w-full overflow-hidden mx-2 sm:mx-0">
         <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide">Analíticas por Actividad</CardTitle>
+          <CardTitle className="font-headline text-lg sm:text-2xl uppercase tracking-wide text-primary">Analíticas por Actividad</CardTitle>
           <CardDescription className="text-xs">Selecciona un evento para ver su rendimiento detallado.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-4 sm:p-6">
@@ -273,7 +276,7 @@ export default function BusinessAnalyticsPage() {
 
             {selectedEntityStats ? (
                 <div className="space-y-8">
-                    {/* Gráfico de Barras Horizontal con Colores Únicos */}
+                    {/* Gráfico de Barras Horizontal con Colores Solicitados */}
                     <div className="h-[250px] w-full min-w-0 overflow-hidden">
                         {isMounted ? (
                             <ResponsiveContainer width="100%" height="100%">
@@ -297,8 +300,11 @@ export default function BusinessAnalyticsPage() {
                                         cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                                         contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', fontSize: '12px' }}
                                     />
-                                    <Legend verticalAlign="top" align="center" wrapperStyle={{ paddingBottom: '20px', fontSize: '12px' }} />
-                                    <Bar dataKey="value" name="Cantidad" radius={[0, 4, 4, 0]} barSize={35} />
+                                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={35}>
+                                        {barChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -313,6 +319,7 @@ export default function BusinessAnalyticsPage() {
                        <StatCard title="Tasa de Asistencia" value={`${selectedEntityStats.qrGenerated > 0 ? ((selectedEntityStats.codesUsed / selectedEntityStats.qrGenerated) * 100).toFixed(1) : 0}%`} icon={BarChart3} />
                     </div>
 
+                    {/* Reporte de Asistencia con Paginación y Numeración */}
                     <div className="pt-6 space-y-4 border-t">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
@@ -330,7 +337,8 @@ export default function BusinessAnalyticsPage() {
                             </div>
                         </div>
 
-                        <div className="w-full max-w-[calc(100vw-2.5rem)] sm:max-w-full border rounded-lg overflow-x-auto shadow-sm bg-background">
+                        {/* Contenedor de Tabla con Scroll Responsivo */}
+                        <div className="w-full overflow-x-auto border rounded-lg shadow-sm bg-background max-w-[calc(100vw-2.5rem)] sm:max-w-full">
                           <Table className="min-w-full">
                               <TableHeader className="bg-muted/50">
                                   <TableRow>
@@ -398,13 +406,18 @@ export default function BusinessAnalyticsPage() {
                           </Table>
                         </div>
                         
+                        {/* Controles de Paginación */}
                         {totalPages > 1 && (
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2">
                                 <div className="flex items-center space-x-2 text-sm">
                                     <Label className="font-semibold">Filas:</Label>
                                     <Select value={`${rowsPerPage}`} onValueChange={(v) => setRowsPerPage(Number(v))}>
                                         <SelectTrigger className="h-8 w-[70px]"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="10">10</SelectItem><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem></SelectContent>
+                                        <SelectContent>
+                                            <SelectItem value="10">10</SelectItem>
+                                            <SelectItem value="25">25</SelectItem>
+                                            <SelectItem value="50">50</SelectItem>
+                                        </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="flex items-center space-x-2">
@@ -417,7 +430,7 @@ export default function BusinessAnalyticsPage() {
                     </div>
                 </div>
             ) : (
-                 <div className="flex flex-col items-center justify-center h-48 text-muted-foreground border-2 border-dashed rounded-lg text-center p-6 bg-muted/10">
+                 <div className="flex flex-col items-center justify-center h-48 text-muted-foreground border-2 border-dashed rounded-lg text-center p-6 bg-muted/10 mx-2 sm:mx-0">
                     <BarChart3 size={40} className="opacity-20 mb-3"/>
                     <p className="text-sm">Selecciona una campaña para visualizar los reportes detallados.</p>
                 </div>
