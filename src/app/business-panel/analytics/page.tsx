@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -258,7 +257,7 @@ export default function BusinessAnalyticsPage() {
         <CardContent className="space-y-6 p-4 sm:p-6">
             <div className="w-full">
               <Select onValueChange={setSelectedEntityId} value={selectedEntityId} disabled={allEntities.length === 0}>
-                  <SelectTrigger className="h-12 border-2 text-sm w-full">
+                  <SelectTrigger className="h-12 border-2 border-primary text-sm w-full">
                       <SelectValue placeholder="Selecciona una actividad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -276,7 +275,7 @@ export default function BusinessAnalyticsPage() {
 
             {selectedEntityStats ? (
                 <div className="space-y-8">
-                    {/* Gráfico de Barras Horizontal con Colores Solicitados */}
+                    {/* Gráfico de Barras Horizontal con Colores Dinámicos */}
                     <div className="h-[250px] w-full min-w-0 overflow-hidden">
                         {isMounted ? (
                             <ResponsiveContainer width="100%" height="100%">
