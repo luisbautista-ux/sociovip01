@@ -1,3 +1,4 @@
+
 // src/components/business/forms/BusinessEventForm.tsx
 "use client";
 
@@ -31,7 +32,7 @@ const scheduleSchema = z.object({
 
 const eventDetailsFormSchema = z.object({
   name: z.string().min(3, "Mínimo 3 caracteres"),
-  description: z.string().min(10, "Mínimo 10 caracteres"),
+  description: z.string().optional().or(z.literal("")), // Permite vacío o nulo
   locationAddress: z.string().optional(),
   termsAndConditions: z.string().optional(),
   startDate: z.date(),
@@ -133,6 +134,9 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
         <div className="grid grid-cols-1 gap-4">
           <FormField control={form.control} name="name" render={({ field }) => (
             <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          )}/>
+          <FormField control={form.control} name="description" render={({ field }) => (
+            <FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl><FormMessage /></FormItem>
           )}/>
           <FormField control={form.control} name="locationAddress" render={({ field }) => (
             <FormItem><FormLabel>Ubicación</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
