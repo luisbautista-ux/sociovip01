@@ -15,6 +15,7 @@ import type { Business } from "@/lib/types";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import NextImage from "next/image";
 import { DialogTitle } from "@/components/ui/dialog";
+import { SocioVipLogo } from "@/components/icons";
 
 // Helper function to convert hex to HSL string
 function hexToHsl(hex: string): string | null {
@@ -56,9 +57,10 @@ export default function BusinessPanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { currentUser, userProfile, loadingAuth, loadingProfile, logout } = useAuth();
+  const { currentUser, userProfile, loadingAuth, logout } = useAuth();
   const router = useRouter();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
   
   useEffect(() => {
     const applyBusinessColorsAndName = async () => {
@@ -68,6 +70,7 @@ export default function BusinessPanelLayout({
           const businessSnap = await getDoc(businessDocRef);
           if (businessSnap.exists()) {
             const businessData = businessSnap.data() as Business;
+            setBusinessDetails(businessData); // Store business details
             
             // Set colors for theme
             const primaryHsl = hexToHsl(businessData.primaryColor || '#B080D0');
@@ -86,7 +89,7 @@ export default function BusinessPanelLayout({
       }
     };
 
-    if (!loadingProfile && userProfile) {
+    if (!loadingAuth && userProfile) {
       applyBusinessColorsAndName();
     }
     
@@ -94,7 +97,7 @@ export default function BusinessPanelLayout({
         document.documentElement.style.removeProperty('--primary');
         document.documentElement.style.removeProperty('--accent');
     };
-  }, [userProfile, loadingProfile]);
+  }, [userProfile, loadingAuth]);
 
 
   useEffect(() => {
@@ -103,24 +106,24 @@ export default function BusinessPanelLayout({
     }
   }, [currentUser, loadingAuth, router]);
 
-  if (loadingAuth || loadingProfile) {
+  if (loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-        <Loader2 className="h-12 w-12 animate-spin text-white" />
-        <p className="ml-4 text-lg text-white/90">Verificando y cargando...</p>
+        <div className="flex flex-col items-center justify-center text-center">
+            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
+                <SocioVipLogo size={80} className="animate-pulse" />
+            </div>
+            <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
+        </div>
       </div>
     );
   }
 
   if (!currentUser) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
-         <p className="text-lg text-white/90">Redirigiendo a inicio de sesión...</p>
-      </div>
-    );
+    return null;
   }
   
-  if (!userProfile) {
+  if (!userProfile && !loadingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -141,7 +144,7 @@ export default function BusinessPanelLayout({
     );
   }
   
-  if (!userProfile.roles || !Array.isArray(userProfile.roles) || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff'))) {
+  if (userProfile && (!userProfile.roles || !Array.isArray(userProfile.roles) || (!userProfile.roles.includes('business_admin') && !userProfile.roles.includes('staff')))) {
      return (
       <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <Card className="w-full max-w-md text-center">
@@ -162,7 +165,7 @@ export default function BusinessPanelLayout({
     );
   }
   
-  const requiresBusinessId = userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff');
+  const requiresBusinessId = userProfile && (userProfile.roles.includes('business_admin') || userProfile.roles.includes('staff'));
   if (requiresBusinessId && !userProfile.businessId) {
     return (
        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -190,7 +193,15 @@ export default function BusinessPanelLayout({
       </div>
       <div className="flex flex-col flex-1">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-2">
-          <div className="md:hidden">
+          {/* Mobile Header */}
+          <div className="md:hidden flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              {businessDetails?.logoUrl && (
+                <NextImage src={businessDetails.logoUrl} alt={businessDetails.name} width={40} height={40} className="h-10 w-10 object-contain rounded-md" />
+              )}
+              <h1 className="font-semibold text-xl text-primary">{businessDetails?.name}</h1>
+            </div>
+            
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button size="icon" variant="outline">
@@ -200,12 +211,12 @@ export default function BusinessPanelLayout({
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-64 bg-card flex flex-col">
                  <DialogTitle className="sr-only">Menú de Navegación del Panel de Negocio</DialogTitle>
-                 {/* Utiliza el componente de la barra lateral directamente aquí */}
                  <BusinessSidebar closeSheet={() => setIsSheetOpen(false)} />
               </SheetContent>
             </Sheet>
           </div>
-          <div className="flex-grow">
+          {/* Desktop Header remains empty */}
+          <div className="flex-grow hidden md:block">
           </div>
         </header>
         <main className="flex-1 p-4 sm:p-6 overflow-auto">

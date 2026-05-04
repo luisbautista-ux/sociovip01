@@ -1,11 +1,8 @@
-
-'use server';
-
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
 import {z} from 'zod';
 
-import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser} from '@/lib/types';
 import {FieldValue} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
@@ -29,7 +26,6 @@ async function getCallerProfile(
   const idToken = authorizationHeader.split('Bearer ')[1];
   const decodedToken = await getAuth().verifyIdToken(idToken);
   const uid = decodedToken.uid;
-  const adminDb = admin.firestore();
   const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
   if (!userDoc.exists) {
     throw new Error('Caller profile not found.');
@@ -38,22 +34,6 @@ async function getCallerProfile(
 }
 
 export async function POST(request: Request) {
-  let adminDb;
-
-  try {
-    await initializeAdminApp();
-    adminDb = admin.firestore();
-  } catch (error: any) {
-    console.error(
-      'API Route (link-promoter): Firebase Admin initialization failed.',
-      error
-    );
-    return NextResponse.json(
-      {error: `Error de inicialización del servidor: ${error.message}`},
-      {status: 500}
-    );
-  }
-
   try {
     const authorization = headers().get('Authorization');
     if (!authorization) {
@@ -93,13 +73,11 @@ export async function POST(request: Request) {
 
     const batch = adminDb.batch();
 
-    // 1. Update platformUsers document
     const userDocRef = adminDb.collection('platformUsers').doc(promoterUid);
     batch.update(userDocRef, {
       businessIds: FieldValue.arrayUnion(businessId),
     });
 
-    // 2. Create businessPromoterLinks document
     const linkPayload = {
       businessId: businessId,
       promoterDni: promoterData.promoterDni,
@@ -114,7 +92,6 @@ export async function POST(request: Request) {
     const linkDocRef = adminDb.collection('businessPromoterLinks').doc();
     batch.set(linkDocRef, linkPayload);
 
-    // Commit the batch
     await batch.commit();
 
     return NextResponse.json({

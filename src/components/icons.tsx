@@ -1,9 +1,9 @@
+
 "use client";
 
 import Image, { type ImageProps } from "next/image";
 
-export const LOGO_URL =
-  "https://i.ibb.co/ycG8QLZj/Brown-Mascot-Lion-Free-Logo.jpg";
+// Se mueve LOGO_IMAGE_URL a `src/lib/constants.ts` para evitar conflictos de importación en `layout.tsx`.
 
 type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
   size?: number;
@@ -11,8 +11,8 @@ type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
 };
 
 /**
- * Logo de SocioVIP como imagen (reemplaza el SVG).
- * Mantiene API simple: puedes pasar `className` y opcionalmente `size`.
+ * Logo de SocioVIP como componente de imagen.
+ * La URL ahora se gestiona centralmente en constants.ts.
  */
 export function SocioVipLogo({
   size = 28,
@@ -21,7 +21,7 @@ export function SocioVipLogo({
 }: SocioVipLogoProps) {
   return (
     <Image
-      src={LOGO_URL}
+      src="https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png"
       alt="SocioVIP"
       width={size}
       height={size}
@@ -66,6 +66,7 @@ export function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
 
 // WhatsApp Icon ahora como una Imagen desde URL externa
 export function WhatsAppIcon({ className, ...props }: { className?: string } & Omit<ImageProps, 'src' | 'alt'>) {

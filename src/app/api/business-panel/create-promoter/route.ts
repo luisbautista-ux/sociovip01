@@ -1,10 +1,8 @@
-'use server';
-
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
 import {z} from 'zod';
 
-import {admin, initializeAdminApp} from '@/lib/firebase/firebaseAdmin';
+import {admin, adminDb} from '@/lib/firebase/firebaseAdmin';
 import type {PlatformUser} from '@/lib/types';
 import {FieldValue} from 'firebase-admin/firestore';
 import {getAuth} from 'firebase-admin/auth';
@@ -31,7 +29,6 @@ async function getCallerProfile(
   const idToken = authorizationHeader.split('Bearer ')[1];
   const decodedToken = await getAuth().verifyIdToken(idToken);
   const uid = decodedToken.uid;
-  const adminDb = admin.firestore();
   const userDoc = await adminDb.collection('platformUsers').doc(uid).get();
   if (!userDoc.exists) {
     throw new Error('Caller profile not found.');
@@ -41,15 +38,14 @@ async function getCallerProfile(
 
 export async function POST(request: Request) {
   let adminAuth;
-  let adminDb;
 
   try {
-    await initializeAdminApp();
+    // La inicialización ahora se maneja de forma centralizada.
+    // Solo necesitamos las instancias de los servicios.
     adminAuth = admin.auth();
-    adminDb = admin.firestore();
   } catch (error: any) {
     console.error(
-      'API Route (create-promoter): Firebase Admin initialization failed.',
+      'API Route (create-promoter): Firebase Admin services not available.',
       error
     );
     return NextResponse.json(

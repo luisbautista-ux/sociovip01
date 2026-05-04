@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -6,11 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
 import { Star, PlusCircle, Download, Search, Edit, Trash2, Mail, Phone, Award, ShieldCheck, CalendarDays, Cake, Filter, Loader2, AlertTriangle, Info, MoreVertical } from "lucide-react";
-import type { SocioVipMember, SocioVipMemberFormData, QrClient, PlatformUser, InitialDataForSocioVipCreation } from "@/lib/types";
+import type { SocioVipMember, SocioVipMemberFormData, QrClient, PlatformUser, InitialDataForSocioVipCreation, PlatformUserRole } from "@/lib/types";
 import { format, getMonth, parseISO, isValid } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -25,8 +26,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
+import { cn, anyToDate } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/context/AuthContext";
 
 
 const DniEntrySchema = z.object({
@@ -63,14 +66,25 @@ interface CheckSocioDniResult {
   platformUserData?: PlatformUser;
 }
 
+type CombinedMember = Partial<SocioVipMember> & {
+  id: string;
+  dni: string;
+  name: string;
+  surname: string;
+  email: string;
+  role?: PlatformUserRole;
+  authUid?: string; // UID from Firebase Auth, crucial for linking
+};
+
 
 export default function AdminSocioVipPage() {
+  const { currentUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [birthdayMonthFilter, setBirthdayMonthFilter] = useState<string>("all");
   const [joinMonthFilter, setJoinMonthFilter] = useState<string>("all");
   
-  const [editingMember, setEditingMember] = useState<SocioVipMember | null>(null);
-  const [members, setMembers] = useState<SocioVipMember[]>([]);
+  const [editingMember, setEditingMember] = useState<CombinedMember | null>(null);
+  const [members, setMembers] = useState<CombinedMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -83,6 +97,10 @@ export default function AdminSocioVipPage() {
   
   const [showDniIsAlreadySocioVipAlert, setShowDniIsAlreadySocioVipAlert] = useState(false);
   const [existingSocioVipToEdit, setExistingSocioVipToEdit] = useState<SocioVipMember | null>(null);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
 
   const dniEntryForm = useForm<DniEntryValues>({
     resolver: zodResolver(DniEntrySchema),
@@ -93,21 +111,9 @@ export default function AdminSocioVipPage() {
   const fetchSocioVipMembers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, "socioVipMembers"));
-      const fetchedMembers: SocioVipMember[] = querySnapshot.docs.map(docSnap => {
+      const socioVipQuery = await getDocs(collection(db, "socioVipMembers"));
+      const fetchedMembers: CombinedMember[] = socioVipQuery.docs.map(docSnap => {
         const data = docSnap.data();
-        
-        const toSafeISOString = (dateValue: any): string | undefined => {
-            if (!dateValue) return undefined;
-            if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
-            if (dateValue instanceof Date) return dateValue.toISOString();
-            if (typeof dateValue === 'string') {
-              const parsedDate = new Date(dateValue);
-              return isValid(parsedDate) ? parsedDate.toISOString() : undefined;
-            }
-            return undefined;
-        };
-
         return {
           id: docSnap.id,
           name: data.name,
@@ -122,11 +128,49 @@ export default function AdminSocioVipPage() {
           membershipStatus: data.membershipStatus || 'inactive',
           staticQrCodeUrl: data.staticQrCodeUrl,
           authUid: data.authUid,
-          joinDate: toSafeISOString(data.joinDate) || new Date().toISOString(),
-          dob: toSafeISOString(data.dob)
-        } as SocioVipMember;
+          joinDate: anyToDate(data.joinDate)?.toISOString() || new Date().toISOString(),
+          dob: anyToDate(data.dob)?.toISOString()
+        } as CombinedMember;
       });
-      setMembers(fetchedMembers);
+
+      const clientRoles: PlatformUserRole[] = ['client_gratis', 'vip_premium'];
+      const platformUsersQuery = query(collection(db, "platformUsers"), where("roles", "array-contains-any", clientRoles));
+      const platformUsersSnap = await getDocs(platformUsersQuery);
+
+      const platformUserMembers: CombinedMember[] = platformUsersSnap.docs.map(docSnap => {
+          const data = docSnap.data() as PlatformUser;
+          const nameParts = data.name.split(' ');
+          const surname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+          const name = nameParts.length > 1 ? nameParts[0] : data.name;
+
+          return {
+            id: docSnap.id,
+            authUid: data.uid,
+            dni: data.dni,
+            name: name,
+            surname: surname,
+            email: data.email,
+            phone: data.phone || '',
+            dob: anyToDate(data.dob)?.toISOString(),
+            joinDate: anyToDate(data.lastLogin)?.toISOString() || new Date().toISOString(),
+            membershipStatus: 'active',
+            loyaltyPoints: 0,
+            role: data.roles.find(r => clientRoles.includes(r)),
+          } as CombinedMember;
+      });
+      
+      const allMembersMap = new Map<string, CombinedMember>();
+      // Los usuarios de plataforma tienen prioridad porque son el nuevo sistema
+      platformUserMembers.forEach(m => allMembersMap.set(m.dni, m));
+      fetchedMembers.forEach(m => {
+          if (!allMembersMap.has(m.dni)) {
+              allMembersMap.set(m.dni, m);
+          }
+      });
+      
+      const combinedMembers = Array.from(allMembersMap.values());
+      
+      setMembers(combinedMembers);
     } catch (error: any) {
       console.error("Failed to fetch Socio VIP members:", error);
       toast({
@@ -161,6 +205,17 @@ export default function AdminSocioVipPage() {
     return searchMatch && birthdayMatch && joinMatch;
   });
 
+  const totalPages = Math.ceil(filteredMembers.length / rowsPerPage);
+  const paginatedMembers = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredMembers.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredMembers, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, birthdayMonthFilter, joinMonthFilter, rowsPerPage]);
+
+
   const handleExport = () => {
     if (filteredMembers.length === 0) {
       toast({ title: "Sin Datos", description: "No hay socios para exportar.", variant: "destructive" });
@@ -170,7 +225,8 @@ export default function AdminSocioVipPage() {
     const rows = filteredMembers.map(mem => [
       mem.id, mem.name, mem.surname, mem.email, `'${mem.phone || "N/A"}`, `'${mem.dni}`,
       mem.dob && typeof mem.dob === 'string' ? format(parseISO(mem.dob), "dd/MM/yyyy", { locale: es }) : "N/A",
-      mem.loyaltyPoints, MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS],
+      mem.loyaltyPoints, 
+      mem.role ? PLATFORM_USER_ROLE_TRANSLATIONS[mem.role] : (MEMBERSHIP_STATUS_TRANSLATIONS[mem.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS] || 'Legado'),
       mem.joinDate ? format(parseISO(mem.joinDate as string), "dd/MM/yyyy", { locale: es }) : "N/A",
       mem.address || "N/A", mem.profession || "N/A", mem.preferences?.join(', ') || "N/A"
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
@@ -184,7 +240,7 @@ export default function AdminSocioVipPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "sociosvip_socios_vip.csv");
+    link.setAttribute("download", "sociovip_socios_vip.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -208,7 +264,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     if (!socioVipSnapshot.empty) {
       result.existsAsSocioVip = true;
       result.socioVipData = { id: socioVipSnapshot.docs[0].id, ...socioVipSnapshot.docs[0].data() } as SocioVipMember;
-      return result; // Si ya es Socio VIP, no necesitamos verificar más para este flujo
     }
 
     const qrClientQuery = query(collection(db, "qrClients"), where("dni", "==", dniToVerify));
@@ -250,9 +305,9 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
 
     const dbCheckResult = await checkDniAcrossCollections(docNumberCleaned);
 
-    if (dbCheckResult.existsAsSocioVip && dbCheckResult.socioVipData) {
+    if (dbCheckResult.existsAsSocioVip || dbCheckResult.existsAsPlatformUser) {
         setIsSubmitting(false);
-        setExistingSocioVipToEdit(dbCheckResult.socioVipData);
+        setExistingSocioVipToEdit(dbCheckResult.socioVipData || (dbCheckResult.platformUserData as any));
         setShowDniIsAlreadySocioVipAlert(true);
         setShowDniEntryModal(false);
         return;
@@ -269,12 +324,6 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             const dobDate = dbCheckResult.qrClientData.dob instanceof Timestamp ? dbCheckResult.qrClientData.dob.toDate() : new Date(dbCheckResult.qrClientData.dob);
             initialData.dob = dobDate.toISOString();
         }
-    } else if (dbCheckResult.existsAsPlatformUser && dbCheckResult.platformUserData) {
-        initialData.existingUserType = 'PlatformUser';
-        const nameParts = dbCheckResult.platformUserData.name.split(' ');
-        initialData.surname = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0] || '';
-        initialData.name = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-        initialData.email = dbCheckResult.platformUserData.email;
     }
 
     setIsSubmitting(false);
@@ -304,23 +353,19 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         setIsSubmitting(false);
         return;
       }
-
-      if (editingMember) { 
-        if (data.dni !== editingMember.dni) { 
-            const dniCheckResult = await checkDniAcrossCollections(data.dni);
-            if (dniCheckResult.existsAsSocioVip && dniCheckResult.socioVipData?.id !== editingMember.id) { 
-                toast({ title: "Error de DNI", description: `El DNI/CE ${data.dni} ya está registrado para otro Socio VIP.`, variant: "destructive" });
-                setIsSubmitting(false);
-                return;
-            }
-        }
-        const memberRef = doc(db, "socioVipMembers", editingMember.id);
-        await updateDoc(memberRef, {
+      
+      const payload = {
           ...data,
           dni: data.dni,
           dob: Timestamp.fromDate(data.dob),
           preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
-        });
+      };
+
+      if (editingMember) {
+        const docId = editingMember.authUid || editingMember.id;
+        const collectionName = editingMember.authUid ? "platformUsers" : "socioVipMembers";
+        const memberRef = doc(db, collectionName, docId);
+        await updateDoc(memberRef, payload);
         toast({ title: "Socio VIP Actualizado", description: `El socio "${data.name} ${data.surname}" ha sido actualizado.` });
       } else { 
         if (!verifiedSocioDniResult?.dni) { 
@@ -330,11 +375,8 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
         }
         
         const newMemberPayload = {
-          ...data,
-          dni: verifiedSocioDniResult.dni, 
+          ...payload,
           joinDate: Timestamp.fromDate(new Date()),
-          dob: Timestamp.fromDate(data.dob),
-          preferences: data.preferences?.split(',').map(p => p.trim()).filter(p => p) || [],
           staticQrCodeUrl: `https://placehold.co/100x100.png?text=${(data.name || '').substring(0,3).toUpperCase()}QR`,
           authUid: null, 
         };
@@ -359,25 +401,89 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     }
   };
 
-  const handleDeleteMember = async (member: SocioVipMember) => {
-    if (isSubmitting) return;
+  const handleDeleteMember = async (member: CombinedMember) => {
+    if (isSubmitting || !member.id) return;
     setIsSubmitting(true);
+    
     try {
-      await deleteDoc(doc(db, "socioVipMembers", member.id));
-      toast({ title: "Socio VIP Eliminado", description: `El socio "${member.name} ${member.surname}" ha sido eliminado.`, variant: "destructive" });
+      // If member has authUid, it's a platform user and needs Auth deletion
+      if (member.authUid) {
+        const idToken = await currentUser?.getIdToken();
+        if (!idToken) throw new Error("Token de administrador no disponible.");
+
+        const response = await fetch('/api/admin/delete-user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ uidToDelete: member.authUid })
+        });
+        
+        const result = await response.json();
+        if (!response.ok) {
+           // Handle cases where user is in Firestore but not in Auth
+           if (result.error && result.error.includes("no existe en Firebase Authentication")) {
+              console.warn(`User ${member.authUid} not found in Auth, deleting from Firestore only.`);
+              await deleteDoc(doc(db, "platformUsers", member.authUid));
+           } else {
+              throw new Error(result.error || 'Error al eliminar el usuario desde el servidor.');
+           }
+        }
+      } else { // It's a legacy socioVipMember, just delete from Firestore
+          await deleteDoc(doc(db, "socioVipMembers", member.id));
+      }
+      
+      toast({ title: "Socio Eliminado Exitosamente", description: `El socio "${member.name} ${member.surname}" ha sido eliminado.`, variant: "destructive" });
       fetchSocioVipMembers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete Socio VIP member:", error);
-      toast({ title: "Error al Eliminar", description: "No se pudo eliminar el Socio VIP.", variant: "destructive"});
+      toast({ title: "Error al Eliminar", description: `No se pudo eliminar al socio. ${error.message}`, variant: "destructive"});
     } finally {
       setIsSubmitting(false);
     }
   };
+  
+    const MemberStatusBadge = ({ member }: { member: CombinedMember }) => {
+    let statusText: string = 'Legado';
+    let variant: "default" | "secondary" | "destructive" | "outline" = 'outline';
+    let tooltipText: string = 'Miembro SocioVIP Legado';
+
+    if (member.role === 'vip_premium') {
+      statusText = "Premium";
+      variant = 'default';
+      tooltipText = 'Miembro SocioVIP Premium';
+    } else if (member.role === 'client_gratis') {
+      statusText = "Gratis";
+      variant = 'secondary';
+      tooltipText = 'Miembro SocioVIP Gratis';
+    } else if (member.membershipStatus) {
+      statusText = MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus] || 'Legado';
+      variant = MEMBERSHIP_STATUS_COLORS[member.membershipStatus] || 'outline';
+      tooltipText = `Miembro Legado - ${statusText}`;
+    }
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Badge variant={variant} className={cn(member.role === 'vip_premium' && 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black')}>
+              {member.role === 'vip_premium' && <Star className="h-3 w-3 mr-1" />}
+              {statusText}
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{tooltipText}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
         <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
           <Star className="h-8 w-8 text-primary !block" />
           Socios VIP
@@ -395,7 +501,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Socios VIP</CardTitle>
-          <CardDescription>Miembros exclusivos de la plataforma SocioVIP.</CardDescription>
+          <CardDescription>Miembros exclusivos de la plataforma SocioVIP, incluyendo membresías gratuitas y de pago.</CardDescription>
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 items-end">
             <div className="relative">
               <Label htmlFor="search-members">Buscar Socio</Label>
@@ -460,7 +566,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             <>
                {/* Mobile View */}
               <div className="md:hidden space-y-4">
-                {filteredMembers.map(member => (
+                {paginatedMembers.map(member => (
                    <Card key={member.id} className="overflow-hidden">
                       <CardHeader className="p-4">
                         <CardTitle>{member.name} {member.surname}</CardTitle>
@@ -477,9 +583,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-muted-foreground">Estado</span>
-                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS]}>
-                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS]}
-                            </Badge>
+                            <MemberStatusBadge member={member} />
                         </div>
                       </CardContent>
                       <CardFooter className="p-2 bg-muted/50">
@@ -490,13 +594,13 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                                   </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuItem onClick={() => { setEditingMember(member); setVerifiedSocioDniResult(null); setShowCreateEditModal(true);}} disabled={isSubmitting}>
+                                <DropdownMenuItem onClick={() => { setEditingMember(member); setVerifiedSocioDniResult(null); setShowCreateEditModal(true);}} disabled={isSubmitting || !member.authUid}>
                                   <Edit className="h-4 w-4 mr-2" /> Editar
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground">
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10 focus:text-destructive-foreground" disabled={isSubmitting}>
                                             <Trash2 className="h-4 w-4 mr-2" /> Eliminar
                                         </DropdownMenuItem>
                                     </AlertDialogTrigger>
@@ -522,6 +626,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>#</TableHead>
                       <TableHead>Nombre Completo</TableHead>
                       <TableHead className="hidden lg:table-cell"><Mail className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Email</TableHead>
                       <TableHead className="hidden md:table-cell"><Phone className="inline-block h-4 w-4 mr-1 text-muted-foreground"/>Teléfono</TableHead>
@@ -534,19 +639,18 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredMembers.length > 0 ? (
-                      filteredMembers.map((member) => (
+                    {paginatedMembers.length > 0 ? (
+                      paginatedMembers.map((member, index) => (
                         <TableRow key={member.id}>
+                          <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                           <TableCell className="font-medium">{member.name} {member.surname}</TableCell>
                           <TableCell className="hidden lg:table-cell">{member.email}</TableCell>
                           <TableCell className="hidden md:table-cell">{member.phone}</TableCell>
                           <TableCell className="hidden xl:table-cell">{member.dni}</TableCell>
                           <TableCell>{member.dob && typeof member.dob === 'string' ? format(parseISO(member.dob), "P", { locale: es }) : "N/A"}</TableCell>
-                          <TableCell className="text-center">{member.loyaltyPoints}</TableCell>
+                          <TableCell className="text-center">{member.loyaltyPoints || 0}</TableCell>
                           <TableCell>
-                            <Badge variant={MEMBERSHIP_STATUS_COLORS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_COLORS]}>
-                              {MEMBERSHIP_STATUS_TRANSLATIONS[member.membershipStatus as keyof typeof MEMBERSHIP_STATUS_TRANSLATIONS]}
-                            </Badge>
+                            <MemberStatusBadge member={member} />
                           </TableCell>
                           <TableCell className="hidden lg:table-cell">{member.joinDate && typeof member.joinDate === 'string' ? format(parseISO(member.joinDate), "P", { locale: es }) : "N/A"}</TableCell>
                           <TableCell className="text-right space-x-1">
@@ -569,8 +673,8 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                                 <AlertDialogHeader>
                                   <UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle>
                                   <UIDialogDescription2>
-                                    Esta acción no se puede deshacer. Esto eliminará permanentemente al socio
-                                    <span className="font-semibold"> {member.name} {member.surname}</span>.
+                                    Esta acción eliminará permanentemente al socio
+                                    <span className="font-semibold"> {member.name} {member.surname}</span>. Si tiene una cuenta de acceso, esta también será eliminada.
                                   </UIDialogDescription2>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -591,7 +695,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center h-24">No se encontraron socios VIP con los filtros aplicados.</TableCell>
+                        <TableCell colSpan={10} className="text-center h-24">No se encontraron socios VIP con los filtros aplicados.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -600,6 +704,49 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             </>
           )}
         </CardContent>
+        {totalPages > 1 && (
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+            <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page">Filas por página:</Label>
+                <Select
+                value={`${rowsPerPage}`}
+                onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                <SelectTrigger id="rows-per-page" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                </SelectTrigger>
+                <SelectContent>
+                    {[10, 25, 50, 100].map((pageSize) => (
+                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+            </div>
+            <div className="flex items-center space-x-2">
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                >
+                Anterior
+                </Button>
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                >
+                Siguiente
+                </Button>
+            </div>
+            </CardFooter>
+        )}
       </Card>
 
       <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
@@ -669,7 +816,10 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                   <FormItem>
                     <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*" 
                         placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
                         {...field} 
                         maxLength={20}
@@ -721,7 +871,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
             </UIDialogDescription>
           </UIDialogHeader>
           <SocioVipMemberForm
-            member={editingMember || undefined}
+            member={editingMember as SocioVipMember | undefined}
             initialData={!editingMember && verifiedSocioDniResult ? verifiedSocioDniResult : undefined}
             onSubmit={handleCreateOrEditMember}
             onCancel={() => { setShowCreateEditModal(false); setEditingMember(null); setVerifiedSocioDniResult(null);}}
@@ -756,5 +906,12 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
     </div>
   );
 }
+
+    
+
+    
+
+
+
 
     

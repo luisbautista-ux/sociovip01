@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Building, Users, BarChart3, ListChecks, Star, LogOut } from "lucide-react";
+import { LayoutDashboard, Building, Users, BarChart3, ListChecks, Star, LogOut, Settings, Cog } from "lucide-react";
 import { SocioVipLogo } from "@/components/icons";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ const navItems = [
   { href: "/admin/socios-vip", label: "Socios VIP", icon: Star },
   { href: "/admin/clients", label: "Clientes QR", icon: ListChecks },
   { href: "/admin/analytics", label: "Analíticas", icon: BarChart3 },
+  { href: "/admin/platform-config", label: "Config. Plataforma", icon: Cog },
+  { href: "/admin/settings", label: "Mi Perfil", icon: Settings },
 ];
 
 interface AdminSidebarProps {

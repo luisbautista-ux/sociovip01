@@ -3,50 +3,27 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription } from "@/components/ui/dialog"; 
-import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical } from "lucide-react";
-import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { Badge } from "@/components/ui/badge";
+import { Users, PlusCircle, Search, Edit, Trash2, Loader2, AlertTriangle, Info, MoreVertical, GitBranch } from "lucide-react";
+import type { PlatformUser, PlatformUserFormData, QrClient, SocioVipMember, PlatformUserRole } from "@/lib/types";
 import React, { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as ShadcnAlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { PLATFORM_USER_ROLE_TRANSLATIONS } from "@/lib/constants";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, deleteDoc, query, where, updateDoc } from "firebase/firestore";
-import { Alert, AlertTitle } from "@/components/ui/alert";
-import { DialogFooter } from "@/components/ui/dialog";
+import { collection, getDocs, doc, deleteDoc, query, where, updateDoc, limit } from "firebase/firestore";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
+import { DniEntryDialog } from "@/components/business/promoters/DniEntryDialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { errorEmitter } from "@/lib/error-emitter";
+import { FirestorePermissionError, type SecurityRuleContext } from "@/lib/errors";
 
-
-const DniEntrySchema = z.object({
-  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
-  docNumber: z.string().min(1, "El número de documento es requerido."),
-}).superRefine((data, ctx) => {
-    if (data.docType === 'dni') {
-        if (!/^\d{8}$/.test(data.docNumber)) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El DNI debe contener exactamente 8 dígitos numéricos.", path: ['docNumber'] });
-        }
-    } else if (data.docType === 'ce') {
-        if (!/^\d{10,20}$/.test(data.docNumber)) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.", path: ['docNumber'] });
-        }
-    }
-});
-type DniEntryValues = z.infer<typeof DniEntrySchema>;
 
 interface CheckDniResult {
   exists: boolean;
@@ -70,16 +47,11 @@ export default function BusinessStaffPage() {
   const [showUserFormModal, setShowUserFormModal] = useState(false);
 
   const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
-  const [verifiedDniResult, setVerifiedDniResult] = useState<InitialDataForPlatformUserCreation | null>(null);
-
+  
   const [showDniIsPlatformUserAlert, setShowDniIsPlatformUserAlert] = useState(false);
+  const [showUserNotFoundAlert, setShowUserNotFoundAlert] = useState(false);
+  const [dniNotFound, setDniNotFound] = useState("");
   const [existingPlatformUserToEdit, setExistingPlatformUserToEdit] = useState<PlatformUser | null>(null);
-
-  const dniEntryForm = useForm<DniEntryValues>({
-    resolver: zodResolver(DniEntrySchema),
-    defaultValues: { docType: 'dni', docNumber: "" },
-  });
-  const watchedDocType = dniEntryForm.watch('docType');
 
   const fetchStaffMembers = useCallback(async () => {
     if (!currentBusinessId) {
@@ -94,7 +66,7 @@ export default function BusinessStaffPage() {
       const fetchedStaff: PlatformUser[] = [];
       querySnapshot.forEach(docSnap => {
         const data = docSnap.data() as Omit<PlatformUser, 'id'>;
-        if (data.roles.includes('staff') || data.roles.includes('host') || data.roles.includes('business_admin') || data.roles.includes('lector_qr')) {
+        if (data.roles.includes('staff') || data.roles.includes('lector_qr') || data.roles.includes('business_admin')) {
              fetchedStaff.push({ id: docSnap.id, uid: docSnap.id, ...data });
         }
       });
@@ -119,74 +91,51 @@ export default function BusinessStaffPage() {
   
   const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     let result: CheckDniResult = { exists: false };
-    const collectionsToCheck: ('platformUsers' | 'socioVipMembers' | 'qrClients')[] = ['platformUsers', 'socioVipMembers', 'qrClients'];
+    const platformUserQuery = query(collection(db, "platformUsers"), where("dni", "==", dniToVerify), limit(1));
+    const platformUserSnap = await getDocs(platformUserQuery);
 
-    for (const coll of collectionsToCheck) {
-        const q = query(collection(db, coll), where("dni", "==", dniToVerify));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-            const docData = snapshot.docs[0].data();
-            const docId = snapshot.docs[0].id;
-            result.exists = true;
-            if (coll === 'platformUsers') {
-                result.userType = 'PlatformUser';
-                result.platformUserData = { id: docId, uid: docData.uid || docId, ...docData } as PlatformUser;
-            } else if (coll === 'socioVipMembers') {
-                result.userType = 'SocioVipMember';
-                result.socioVipData = { id: docId, ...docData } as SocioVipMember;
-            } else if (coll === 'qrClients') {
-                result.userType = 'QrClient';
-                result.qrClientData = { id: docId, ...docData } as QrClient;
-            }
-            return result;
-        }
+    if (!platformUserSnap.empty) {
+        const docData = platformUserSnap.docs[0].data();
+        result = {
+            exists: true,
+            userType: 'PlatformUser',
+            platformUserData: { id: platformUserSnap.docs[0].id, ...docData } as PlatformUser
+        };
     }
     return result; 
   };
   
   const handleOpenCreateUserFlow = () => {
     setEditingUser(null);
-    setVerifiedDniResult(null);
-    dniEntryForm.reset({ docType: 'dni', docNumber: "" });
     setExistingPlatformUserToEdit(null);
     setShowDniIsPlatformUserAlert(false);
+    setShowUserNotFoundAlert(false);
+    setDniNotFound("");
     setShowDniEntryModal(true); 
   };
   
-  const handleDniVerificationSubmit = async (values: DniEntryValues) => {
-    if (isSubmitting) return;
-    const docNumberCleaned = values.docNumber.trim();
+  const handleDniVerificationSubmit = async (docNumber: string) => {
     setIsSubmitting(true);
-    
-    const result = await checkDniExists(docNumberCleaned);
-    
-    setIsSubmitting(false);
-    
-    let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-    
-    if (result.exists) {
-        if (result.userType === 'PlatformUser' && result.platformUserData) {
-            setExistingPlatformUserToEdit(result.platformUserData);
-            initialData.existingPlatformUser = result.platformUserData;
-            setShowDniEntryModal(false);
-            setShowDniIsPlatformUserAlert(true); 
-            return;
-        } else if (result.userType === 'SocioVipMember' && result.socioVipData) {
-            initialData.name = `${result.socioVipData.name} ${result.socioVipData.surname}`;
-            initialData.email = result.socioVipData.email;
-            initialData.preExistingUserType = 'SocioVipMember';
-        } else if (result.userType === 'QrClient' && result.qrClientData) {
-            initialData.name = `${result.qrClientData.name} ${result.qrClientData.surname}`;
-            initialData.preExistingUserType = 'QrClient';
-        }
-    }
-    
-    setVerifiedDniResult(initialData);
     setShowDniEntryModal(false);
-    setShowUserFormModal(true);
+
+    try {
+        const result = await checkDniExists(docNumber);
+        
+        if (result.exists && result.userType === 'PlatformUser' && result.platformUserData) {
+            setExistingPlatformUserToEdit(result.platformUserData);
+            setShowDniIsPlatformUserAlert(true);
+        } else {
+            setDniNotFound(docNumber);
+            setShowUserNotFoundAlert(true);
+        }
+    } catch (error: any) {
+        toast({ title: "Error de Verificación", description: "No se pudo completar la búsqueda. " + error.message, variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
   
-  const handleEditExistingUser = () => {
+  const handleReassignRole = () => {
       if (existingPlatformUserToEdit) {
           setEditingUser(existingPlatformUserToEdit);
           setShowUserFormModal(true); 
@@ -199,13 +148,14 @@ export default function BusinessStaffPage() {
       toast({ title: "Error", description: "Operación no permitida o negocio no identificado.", variant: "destructive" });
       return;
     }
+    
     setIsSubmitting(true);
-
-    try {
-      if (isEditing && data.uid) {
-        // --- EDITING LOGIC ---
-        const userRef = doc(db, "platformUsers", data.uid);
-        const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
+    
+    if (isEditing) {
+        const userRef = doc(db, "platformUsers", data.uid!);
+        const isReassigning = existingPlatformUserToEdit && existingPlatformUserToEdit.uid === data.uid;
+        
+        const rolesAllowed: PlatformUserRole[] = ['business_admin', 'staff', 'lector_qr'];
         const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
         
         if (userProfile?.uid === data.uid && !finalRoles.some(r => r === 'business_admin' || r === 'staff')) {
@@ -214,57 +164,38 @@ export default function BusinessStaffPage() {
           return;
         }
         
-        const userPayload: Partial<PlatformUser> = { name: data.name, roles: finalRoles };
-        await updateDoc(userRef, userPayload);
-        toast({ title: "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
-      } else {
-        // --- CREATION LOGIC ---
-        if (!data.email || !data.password) {
-          throw new Error("El email y la contraseña son requeridos para crear un nuevo usuario.");
-        }
-        const rolesAllowed: PlatformUserRole[] = ['staff', 'host', 'lector_qr'];
-        const finalRoles = data.roles.filter(role => rolesAllowed.includes(role as PlatformUserRole));
-        if (finalRoles.length === 0) {
-          throw new Error("Rol no válido. Solo puedes asignar 'Staff', 'Anfitrión' o 'Lector QR'.")
-        }
-        
-        const idToken = await currentUser.getIdToken();
-        const creationPayload = {
-          email: data.email,
-          password: data.password,
-          displayName: data.name,
-          firestoreData: {
-            dni: data.dni,
-            name: data.name,
-            email: data.email,
-            roles: finalRoles
-          }
+        const userPayload: Partial<PlatformUser> = {
+          name: data.name,
+          dni: data.dni,
+          roles: finalRoles,
+          businessId: isReassigning ? currentBusinessId : data.businessId,
         };
 
-        const response = await fetch('/api/business-panel/create-staff', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-          body: JSON.stringify(creationPayload)
-        });
-
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error || 'Ocurrió un error desconocido al crear el usuario.');
+        if(isReassigning) {
+            userPayload.businessIds = []; 
         }
-        toast({ title: "Personal Creado Exitosamente", description: `Se creó el usuario "${data.name}".` });
-      }
-      
-      setShowDniEntryModal(false);
-      setShowUserFormModal(false);
-      setEditingUser(null);
-      setVerifiedDniResult(null);
-      await fetchStaffMembers();
 
-    } catch (error: any) {
-      console.error("Error creating/editing staff user:", error);
-      toast({ title: "Error al Guardar", description: `Ocurrió un error. ${error.message}`, variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
+        updateDoc(userRef, userPayload)
+          .then(() => {
+              toast({ title: isReassigning ? "Usuario Reasignado" : "Usuario Actualizado", description: `El perfil de "${data.name}" ha sido actualizado.` });
+              setShowUserFormModal(false);
+              setEditingUser(null);
+              fetchStaffMembers();
+          })
+          .catch(async (serverError) => {
+              const permissionError = new FirestorePermissionError({
+                  path: userRef.path,
+                  operation: 'update',
+                  requestResourceData: userPayload,
+              } as SecurityRuleContext);
+              errorEmitter.emit('permission-error', permissionError);
+          })
+          .finally(() => {
+              setIsSubmitting(false);
+          });
+    } else {
+        toast({ title: "Acción no soportada", description: "La creación de usuarios se realiza desde el panel de Super Administrador.", variant: "destructive" });
+        setIsSubmitting(false);
     }
   };
 
@@ -286,6 +217,77 @@ export default function BusinessStaffPage() {
     }
   };
 
+  const PromoterMobileCards = ({ filteredStaff }: { filteredStaff: PlatformUser[] }) => {
+    if (filteredStaff.length === 0) {
+      return (
+        <div className="md:hidden text-center h-24 flex items-center justify-center">
+            <p>No se encontró personal.</p>
+        </div>
+      );
+    }
+    return (
+      <div className="md:hidden space-y-4">
+        {filteredStaff.map((staff) => (
+          <Card key={staff.id} className="overflow-hidden">
+            <CardHeader className="p-4">
+              <CardTitle className="font-headline">{staff.name}</CardTitle>
+              <CardDescription>{staff.email}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">DNI/CE</span>
+                <span className="font-semibold">{staff.dni}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Roles</span>
+                <div className="flex flex-wrap gap-1 justify-end">
+                  {staff.roles?.map(role => (
+                    <Badge key={role} variant="secondary" className="text-xs">
+                        {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="p-2 bg-muted/50 justify-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8">
+                    Acciones
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => { setEditingUser(staff); setShowUserFormModal(true); }} disabled={isSubmitting}>
+                    <Edit className="h-4 w-4 mr-2" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator/>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem 
+                        onSelect={(e) => e.preventDefault()} 
+                        className="text-destructive focus:bg-destructive/10"
+                        disabled={isSubmitting || staff.uid === userProfile?.uid}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><ShadcnAlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription></AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -301,8 +303,8 @@ export default function BusinessStaffPage() {
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Miembros del Personal</CardTitle>
-          <CardDescription>Administra los usuarios staff, anfitriones y lectores QR de tu negocio.</CardDescription>
+          <CardTitle className="font-headline">Miembros del Personal</CardTitle>
+          <CardDescription>Administra los usuarios staff y lectores QR de tu negocio.</CardDescription>
            <div className="relative mt-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -323,65 +325,7 @@ export default function BusinessStaffPage() {
             <p className="text-center text-muted-foreground h-24 flex items-center justify-center">No hay personal registrado.</p>
         ) : (
           <>
-            {/* Mobile View */}
-            <div className="md:hidden space-y-4">
-              {filteredStaff.map((staff) => (
-                <Card key={staff.id} className="overflow-hidden">
-                  <CardHeader className="p-4">
-                    <CardTitle>{staff.name}</CardTitle>
-                    <CardDescription>{staff.email}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">DNI/CE</span>
-                      <span className="font-semibold">{staff.dni}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Roles</span>
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        {staff.roles?.map(role => (
-                          <Badge key={role} variant="secondary" className="text-xs">
-                              {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="p-2 bg-muted/50">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="w-full justify-center">Acciones <MoreVertical className="ml-2 h-4 w-4"/></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => { setEditingUser(staff); setShowUserFormModal(true); }} disabled={isSubmitting}>
-                          <Edit className="h-4 w-4 mr-2" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator/>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem 
-                              onSelect={(e) => e.preventDefault()} 
-                              className="text-destructive focus:bg-destructive/10"
-                              disabled={isSubmitting || staff.uid === userProfile?.uid}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
-                            <ShadcnAlertDialogFooter>
-                              <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
-                            </ShadcnAlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-            {/* Desktop View */}
+            <PromoterMobileCards filteredStaff={filteredStaff} />
             <div className="hidden md:block">
               <Table>
                 <TableHeader>
@@ -415,11 +359,11 @@ export default function BusinessStaffPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" disabled={isSubmitting || staff.uid === userProfile?.uid}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           <AlertDialogContent>
-                            <AlertDialogHeader><UIAlertDialogTitle>¿Estás seguro?</UIAlertDialogTitle><AlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader>
-                            <ShadcnAlertDialogFooter>
+                            <AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><ShadcnAlertDialogDescription>Eliminarás el perfil de <span className="font-semibold">{staff.name}</span>. Esta acción no elimina su cuenta de acceso.</ShadcnAlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter>
                               <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteUser(staff)} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Eliminar Perfil"}</AlertDialogAction>
-                            </ShadcnAlertDialogFooter>
+                            </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
                       </TableCell>
@@ -433,73 +377,84 @@ export default function BusinessStaffPage() {
         </CardContent>
       </Card>
       
-      <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
-        <UIDialogContent className="sm:max-w-md">
-          <UIDialogHeader>
-            <UIDialogTitle>Paso 1: Verificar Documento</UIDialogTitle>
-            <UIDialogDescription>Ingresa el documento para verificar si la persona ya existe en la plataforma.</UIDialogDescription>
-          </UIDialogHeader>
-          <Form {...dniEntryForm}>
-            <form onSubmit={dniEntryForm.handleSubmit(handleDniVerificationSubmit)} className="space-y-4 py-2">
-              <FormField control={dniEntryForm.control} name="docType" render={({ field }) => (
-                <FormItem className="space-y-2"><FormLabel>Tipo de Documento</FormLabel>
-                    <FormControl>
-                        <RadioGroup onValueChange={(value) => { field.onChange(value); dniEntryForm.setValue('docNumber', ''); dniEntryForm.clearErrors('docNumber'); }} defaultValue={field.value} className="grid grid-cols-2 gap-2">
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                                <Label htmlFor="docType-dni-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'dni' && "bg-primary text-primary-foreground border-primary")}>
-                                    <FormControl><RadioGroupItem value="dni" id="docType-dni-staff" className="sr-only" /></FormControl>DNI
-                                </Label>
-                            </FormItem>
-                            <FormItem className="flex items-center space-x-3 space-y-0">
-                                 <Label htmlFor="docType-ce-staff" className={cn("w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer", field.value === 'ce' && "bg-primary text-primary-foreground border-primary")}>
-                                    <FormControl><RadioGroupItem value="ce" id="docType-ce-staff" className="sr-only" /></FormControl>Carnet de Extranjería
-                                </Label>
-                            </FormItem>
-                        </RadioGroup>
-                    </FormControl>
-                <FormMessage /></FormItem>
-              )} />
-              <FormField control={dniEntryForm.control} name="docNumber" render={({ field }) => (
-                <FormItem><FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder={watchedDocType === 'dni' ? "8 dígitos" : "10-20 dígitos"} {...field} maxLength={20} onChange={(e) => field.onChange(e.target.value.replace(/[^0-9]/g, ''))} autoFocus disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <DialogFooter><Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" variant="gradient" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}</Button></DialogFooter>
-            </form>
-          </Form>
-        </UIDialogContent>
-      </UIDialog>
-      
-      <UIDialog open={showUserFormModal} onOpenChange={setShowUserFormModal}>
-        <UIDialogContent className="sm:max-w-lg">
-          <UIDialogHeader>
-            <UIDialogTitle>{editingUser ? `Editar Usuario: ${editingUser.name}` : "Paso 2: Completar Perfil"}</UIDialogTitle>
-            <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Completa los detalles para crear el usuario."}</UIDialogDescription>
-          </UIDialogHeader>
-          <PlatformUserForm 
-            user={editingUser || undefined}
-            initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
-            businesses={[]}
-            allowedRoles={['staff', 'host', 'lector_qr']}
-            onSubmit={(data) => handleCreateOrEditUser(data, !!editingUser)}
-            onCancel={() => {setShowUserFormModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
+      {showDniEntryModal && (
+        <DniEntryDialog
+            open={showDniEntryModal}
+            onOpenChange={(isOpen) => !isOpen && setShowDniEntryModal(false)}
             isSubmitting={isSubmitting}
-          />
-        </UIDialogContent>
-      </UIDialog>
+            onDniVerified={(result) => {
+                setShowDniEntryModal(false);
+                handleDniVerificationSubmit(result.dni);
+            }}
+            onAlreadyLinked={(link) => {
+                setShowDniEntryModal(false);
+                setExistingPlatformUserToEdit(link as any);
+                setShowDniIsPlatformUserAlert(true);
+            }}
+        />
+      )}
+      
+      {showUserFormModal && (
+        <UIDialog open={showUserFormModal} onOpenChange={setShowUserFormModal}>
+            <UIDialogContent className="sm:max-w-lg">
+            <UIDialogHeader>
+                <UIDialogTitle className="font-headline">{editingUser ? `Editar Personal: ${editingUser.name}` : "Asignar Rol"}</UIDialogTitle>
+                <UIDialogDescription>{editingUser ? "Actualiza los detalles del perfil." : "Asigna un rol a este usuario."}</UIDialogDescription>
+            </UIDialogHeader>
+            <PlatformUserForm 
+                user={editingUser || undefined}
+                businesses={[]}
+                allowedRoles={['staff', 'lector_qr']}
+                onSubmit={handleCreateOrEditUser}
+                onCancel={() => {setShowUserFormModal(false); setEditingUser(null);}}
+                isSubmitting={isSubmitting}
+            />
+            </UIDialogContent>
+        </UIDialog>
+      )}
 
       <AlertDialog open={showDniIsPlatformUserAlert} onOpenChange={setShowDniIsPlatformUserAlert}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <UIAlertDialogTitle className="flex items-center"><AlertTriangle className="text-yellow-500 mr-2 h-6 w-6"/> Usuario ya Existente</UIAlertDialogTitle>
-            <AlertDialogDescription>El documento <span className="font-semibold">{existingPlatformUserToEdit?.dni}</span> ya está registrado para <span className="font-semibold">{existingPlatformUserToEdit?.name}</span>. Si no está en tu lista de personal, puede estar asignado a otro negocio. Contacta al Super Admin si necesitas reasignarlo. No puedes crear un duplicado.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <ShadcnAlertDialogFooter><AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Entendido</AlertDialogCancel></ShadcnAlertDialogFooter>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center"><AlertTriangle className="h-6 w-6 text-yellow-500 mr-2"/> Usuario Existente Detectado</AlertDialogTitle>
+                <ShadcnAlertDialogDescription>
+                    El usuario <span className="font-semibold">{existingPlatformUserToEdit?.name}</span> ya existe en la plataforma con el rol de <span className="font-bold text-primary">{existingPlatformUserToEdit?.roles?.map(r => PLATFORM_USER_ROLE_TRANSLATIONS[r as PlatformUserRole] || r).join(', ')}</span>.
+                    <br/><br/>
+                    ¿Deseas reasignar sus roles para este negocio?
+                </ShadcnAlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowDniIsPlatformUserAlert(false)}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReassignRole} className="bg-primary hover:bg-primary/90">
+                    <GitBranch className="mr-2 h-4 w-4"/> Reasignar Roles
+                </AlertDialogAction>
+            </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+       <AlertDialog open={showUserNotFoundAlert} onOpenChange={setShowUserNotFoundAlert}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center">
+                    <Info className="h-6 w-6 mr-2 text-blue-500"/> Usuario no Registrado
+                </AlertDialogTitle>
+                <ShadcnAlertDialogDescription className="pt-4 space-y-3">
+                    <p>El documento <strong>{dniNotFound}</strong> no corresponde a un usuario con una cuenta en la plataforma.</p>
+                    <p>Para añadirlo a tu equipo, el usuario primero debe crear su cuenta personal en SocioVIP.</p>
+                    <div className="bg-muted p-3 rounded-md text-center">
+                        <p className="text-sm font-semibold">Indícale al usuario que se registre en:</p>
+                        <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.app/signup</a>
+                        <p className="text-xs text-muted-foreground mt-1">Una vez registrado, podrás buscarlo por su DNI para asignarle un rol.</p>
+                    </div>
+                </ShadcnAlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setShowUserNotFoundAlert(false)} className="bg-primary hover:bg-primary/90">
+                    Entendido
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }
-
-
-
-
-

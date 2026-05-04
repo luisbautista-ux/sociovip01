@@ -1,14 +1,8 @@
 
 import type { Metadata } from "next";
-// Removed Geist imports as per new font instructions
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
-
-export const metadata: Metadata = {
-  title: "SocioVip",
-  description: "Descubre las mejores promociones y proximos eventos cerca de tí.",
-};
 
 export default function RootLayout({
   children,
@@ -16,10 +10,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <head>
-        {/* The Inter font is typically handled by Tailwind's default font stack or can be loaded via Next/Font if needed. 
-            For simplicity and alignment with modern Tailwind setups, we'll rely on the tailwind.config.ts definition. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Inter:wght@400;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
         <AuthProvider>

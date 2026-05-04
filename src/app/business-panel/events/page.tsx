@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,153 +12,282 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle,
-  DialogDescription,
+  DialogDescription as UIDialogDescriptionComponent,
   DialogFooter
 } from "@/components/ui/dialog";
-import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Calendar, Loader2, Copy, BarChart3, ListChecks, QrCode as QrCodeIcon, DollarSign, ChevronsUpDown, MoreVertical, Box, User, Phone, Image as ImageIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc } from "firebase/firestore";
-import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, BusinessPromoterLink, CommissionRule, Business } from "@/lib/types";
+import { db, storage } from "@/lib/firebase";
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, Timestamp, getDoc, setDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import type { BusinessManagedEntity, TicketType, EventBox, EventPromoterAssignment, TicketTypeFormData, GeneratedCode, Business, EventBoxFormData, BatchBoxFormData, CommissionRule, BusinessPromoterLink, QrTemplateLayout } from "@/lib/types";
 import { isEntityCurrentlyActivatable, anyToDate, calculateMaxAttendance, sanitizeObjectForFirestore } from "@/lib/utils";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BusinessEventForm, type EventDetailsFormValues } from '@/components/business/forms/BusinessEventForm';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as UIDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { BusinessEventForm, type EventDetailsFormRef } from '@/components/business/forms/BusinessEventForm';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { TicketTypeForm } from '@/components/business/forms/TicketTypeForm';
 import { EventBoxForm } from '@/components/business/forms/EventBoxForm';
+import { BatchBoxForm } from '@/components/business/forms/BatchBoxForm';
 import { CreateCodesDialog } from '@/components/business/dialogs/CreateCodesDialog';
 import { ManageCodesDialog } from '@/components/business/dialogs/ManageCodesDialog';
+import { QrTemplateDialog } from '@/components/business/dialogs/QrTemplateDialog';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
-// Helper component extracted to the top level of the file
 const ManageEventDialog = ({
     isManageEventDialogOpen,
     setIsManageEventDialogOpen,
     editingEvent,
     isDuplicating,
-    isSubmitting,
     availablePromoters,
-    handleSaveEvent,
-    setEditingEvent,
+    onSave,
+    isSubmitting,
 }: {
     isManageEventDialogOpen: boolean;
     setIsManageEventDialogOpen: (isOpen: boolean) => void;
     editingEvent: BusinessManagedEntity | null;
     isDuplicating: boolean;
-    isSubmitting: boolean;
     availablePromoters: BusinessPromoterLink[];
-    handleSaveEvent: (event: BusinessManagedEntity | null) => void;
-    setEditingEvent: React.Dispatch<React.SetStateAction<BusinessManagedEntity | null>>;
+    onSave: (event: BusinessManagedEntity, imageFile: File | null) => Promise<void>;
+    isSubmitting: boolean;
 }) => {
+    const eventDetailsFormRef = useRef<EventDetailsFormRef>(null);
+    const [currentEventData, setCurrentEventData] = useState<BusinessManagedEntity | null>(editingEvent);
     const [activeTab, setActiveTab] = useState("details");
-    const [localEventState, setLocalEventState] = useState<BusinessManagedEntity | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+    
     const [isTicketFormOpen, setIsTicketFormOpen] = useState(false);
     const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
+    const [isBoxFormOpen, setIsBoxFormOpen] = useState(false);
+    const [editingBox, setEditingBox] = useState<EventBox | null>(null);
+    const [isBatchBoxFormOpen, setIsBatchBoxFormOpen] = useState(false);
 
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [showUnsavedChangesAlert, setShowUnsavedChangesAlert] = useState(false);
+    const initialDataSnapshot = useRef<string | null>(null);
+
+    const [batchCommissionValue, setBatchCommissionValue] = useState<number | string>("");
+    const [batchCommissionDesc, setBatchCommissionDesc] = useState("");
+    
+    const { toast } = useToast();
+
+    const boxStatusTranslations: Record<EventBox['status'], string> = {
+        available: 'Disponible',
+        reserved: 'Reservado',
+        sold: 'Vendido',
+    };
+    
     useEffect(() => {
         if (isManageEventDialogOpen && editingEvent) {
-            setLocalEventState({ ...editingEvent });
-            // When a new event is opened for editing, reset to the details tab.
-            setActiveTab("details");
-        } else {
-            setLocalEventState(null);
+            setCurrentEventData(editingEvent);
+            setImageFile(null);
+            setImagePreviewUrl(editingEvent.imageUrl || null);
+            initialDataSnapshot.current = JSON.stringify(editingEvent);
+            setHasUnsavedChanges(false);
         }
-    }, [isManageEventDialogOpen, editingEvent]);
+    }, [editingEvent, isManageEventDialogOpen]);
+    
+    useEffect(() => {
+        if (currentEventData && initialDataSnapshot.current) {
+            const currentDataString = JSON.stringify(currentEventData);
+            setHasUnsavedChanges(currentDataString !== initialDataSnapshot.current);
+        }
+    }, [currentEventData]);
 
-    const handleDetailsChange = useCallback((values: EventDetailsFormValues) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                name: values.name,
-                description: values.description,
-                termsAndConditions: values.termsAndConditions,
-                startDate: values.startDate.toISOString(),
-                endDate: values.endDate.toISOString(),
-                unlimitedAttendance: values.unlimitedAttendance,
-                maxAttendance: values.unlimitedAttendance ? 0 : values.maxAttendance,
-                isActive: values.isActive,
-                imageUrl: values.imageUrl,
-                aiHint: values.aiHint,
+    const handleImageFileChange = (file: File | null) => {
+      if (file) {
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+        const previewUrl = URL.createObjectURL(file);
+        setImageFile(file);
+        setImagePreviewUrl(previewUrl);
+        setCurrentEventData(prev => prev ? { ...prev, imageUrl: '' } : null);
+      } else {
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+        setImageFile(null);
+        setImagePreviewUrl(editingEvent?.imageUrl || null);
+      }
+    };
+
+
+    useEffect(() => {
+      return () => {
+        if (imagePreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(imagePreviewUrl);
+        }
+      };
+    }, [imagePreviewUrl]);
+
+
+    const handleSaveChanges = async () => {
+        const isFormValid = await eventDetailsFormRef.current?.trigger();
+        if (!isFormValid) {
+            toast({ title: "Formulario inválido", description: "Revisa los campos marcados en rojo en la pestaña 'Detalles'.", variant: "destructive" });
+            setActiveTab("details"); // Focus on the details tab
+            return;
+        }
+
+        const formValues = eventDetailsFormRef.current?.getValues();
+        
+        if (currentEventData && formValues) {
+             const dataToSave: BusinessManagedEntity = {
+                ...currentEventData,
+                ...formValues,
             };
-        });
-    }, []);
+            await onSave(dataToSave, imageFile);
+        } else {
+            toast({ title: "Error", description: "No hay datos del evento para guardar.", variant: "destructive" });
+        }
+    };
 
+    const handleAttemptClose = () => {
+        if (hasUnsavedChanges) {
+            setShowUnsavedChangesAlert(true);
+        } else {
+            setIsManageEventDialogOpen(false);
+        }
+    };
+    
     const handleTicketSubmit = (ticketData: TicketTypeFormData) => {
-        setLocalEventState(prev => {
-            if (!prev) return null;
-            let updatedTicketTypes: TicketType[];
-            const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
-            const newOrUpdatedTicket: TicketType = {
-                ...ticketData,
-                id: ticketId,
-                eventId: prev.id,
-                businessId: prev.businessId,
-            };
+        const ticketId = editingTicket?.id || `ticket_${Date.now()}`;
+        const newOrUpdatedTicket: TicketType = sanitizeObjectForFirestore({
+            ...ticketData,
+            id: ticketId,
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
+        }) as TicketType;
 
-            if (editingTicket) {
-                updatedTicketTypes = (prev.ticketTypes || []).map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t);
-            } else {
-                updatedTicketTypes = [...(prev.ticketTypes || []), newOrUpdatedTicket];
-            }
-            return { ...prev, ticketTypes: updatedTicketTypes };
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            const existingTickets = prev.ticketTypes || [];
+            const updatedTickets = editingTicket
+                ? existingTickets.map(t => t.id === editingTicket.id ? newOrUpdatedTicket : t)
+                : [...existingTickets, newOrUpdatedTicket];
+            return { ...prev, ticketTypes: updatedTickets };
         });
+
         setIsTicketFormOpen(false);
         setEditingTicket(null);
     };
     
     const handleTicketDelete = (ticketId: string) => {
-        setLocalEventState(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
-            const updatedTicketTypes = (prev.ticketTypes || []).filter(t => t.id !== ticketId);
-            return { ...prev, ticketTypes: updatedTicketTypes };
+            return { ...prev, ticketTypes: (prev.ticketTypes || []).filter(t => t.id !== ticketId) };
+        });
+    };
+    
+     const handleBoxSubmit = (boxData: EventBoxFormData) => {
+        const boxId = editingBox?.id || `box_${Date.now()}`;
+        
+        let finalBoxData: Omit<EventBox, 'id' | 'eventId' | 'businessId'> = {...boxData};
+        
+        if (boxData.status === 'available') {
+             finalBoxData = {
+                ...boxData,
+                promoterName: "",
+                ownerName: "",
+                ownerDni: "",
+                ownerPhone: "",
+            };
+        }
+        const newOrUpdatedBox: EventBox = sanitizeObjectForFirestore({
+            ...finalBoxData,
+            id: boxId,
+            eventId: currentEventData?.id || '',
+            businessId: currentEventData?.businessId || '',
+        }) as EventBox;
+        
+         setCurrentEventData(prev => {
+            if (!prev) return null;
+            const existingBoxes = prev.eventBoxes || [];
+            const updatedBoxes = editingBox
+                ? existingBoxes.map(b => b.id === editingBox.id ? newOrUpdatedBox : b)
+                : [...existingBoxes, newOrUpdatedBox];
+            return { ...prev, eventBoxes: updatedBoxes };
+        });
+        
+        setIsBoxFormOpen(false);
+        setEditingBox(null);
+    };
+    
+    const handleBatchBoxSubmit = (batchData: BatchBoxFormData) => {
+        const newBoxes: EventBox[] = [];
+        for (let i = batchData.fromNumber; i <= batchData.toNumber; i++) {
+            newBoxes.push(sanitizeObjectForFirestore({
+                id: `box_batch_${Date.now()}_${i}`,
+                eventId: currentEventData?.id || '',
+                businessId: currentEventData?.businessId || '',
+                name: `${batchData.prefix} ${i}`,
+                cost: batchData.cost,
+                description: batchData.description,
+                capacity: batchData.capacity,
+                status: 'available',
+            }) as EventBox);
+        }
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, eventBoxes: [...(prev.eventBoxes || []), ...newBoxes] };
+        });
+        setIsBatchBoxFormOpen(false);
+    };
+
+    const handleBoxDelete = (boxId: string) => {
+        setCurrentEventData(prev => {
+            if (!prev) return null;
+            return { ...prev, eventBoxes: (prev.eventBoxes || []).filter(b => b.id !== boxId) };
         });
     };
 
-    const handlePromoterAssignmentChange = (promoterId: string, isChecked: boolean) => {
-        const promoterData = availablePromoters.find(p => p.platformUserUid === promoterId);
-        if (!promoterData) return;
+    const handlePromoterAssignmentChange = (promoter: BusinessPromoterLink, isChecked: boolean) => {
+        const promoterProfileId = promoter.platformUserUid;
+        if (!promoterProfileId) {
+            toast({ title: "Error de Datos", description: `El promotor ${promoter.promoterName} no tiene un ID de usuario de plataforma.`, variant: "destructive"});
+            return;
+        }
 
-        setLocalEventState(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
-            
             let updatedAssignments = [...(prev.assignedPromoters || [])];
 
             if (isChecked) {
-                const isAlreadyAssigned = updatedAssignments.some(p => p.promoterProfileId === promoterId);
-                if (!isAlreadyAssigned) {
-                    const newAssignment: EventPromoterAssignment = {
-                        promoterProfileId: promoterData.platformUserUid!,
-                        promoterName: promoterData.promoterName,
-                        promoterEmail: promoterData.promoterEmail,
+                if (!updatedAssignments.some(p => p.promoterProfileId === promoterProfileId)) {
+                    updatedAssignments.push({
+                        promoterProfileId: promoterProfileId,
+                        promoterName: promoter.promoterName,
+                        promoterEmail: promoter.promoterEmail,
                         commissionRules: [],
-                    };
-                    updatedAssignments.push(newAssignment);
+                    });
                 }
             } else {
-                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterId);
+                updatedAssignments = updatedAssignments.filter(p => p.promoterProfileId !== promoterProfileId);
             }
-
             return { ...prev, assignedPromoters: updatedAssignments };
         });
     };
 
 
     const handleCommissionRuleChange = (promoterId: string, ruleIndex: number, field: keyof CommissionRule, value: any) => {
-        setLocalEventState(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
-                    const updatedRules = [...p.commissionRules!];
-                    updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
+                    const updatedRules = [...(p.commissionRules || [])];
+                    if (updatedRules[ruleIndex]) {
+                        updatedRules[ruleIndex] = { ...updatedRules[ruleIndex], [field]: value };
+                    }
                     return { ...p, commissionRules: updatedRules };
                 }
                 return p;
@@ -168,7 +297,7 @@ const ManageEventDialog = ({
     };
 
     const handleAddCommissionRule = (promoterId: string) => {
-        setLocalEventState(prev => {
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
                 if (p.promoterProfileId === promoterId) {
@@ -177,8 +306,22 @@ const ManageEventDialog = ({
                         appliesTo: 'event_general',
                         commissionType: 'fixed',
                         commissionValue: 0,
+                        description: 'Por entrada general'
                     };
                     return { ...p, commissionRules: [...(p.commissionRules || []), newRule] };
+                }
+                return p;
+            });
+             return { ...prev, assignedPromoters: updatedAssignments };
+        });
+    };
+    
+    const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
+       setCurrentEventData(prev => {
+            if (!prev) return null;
+            const updatedAssignments = (prev.assignedPromoters || []).map(p => {
+                if (p.promoterProfileId === promoterId) {
+                    return { ...p, commissionRules: (p.commissionRules || []).filter(r => r.id !== ruleId) };
                 }
                 return p;
             });
@@ -186,61 +329,132 @@ const ManageEventDialog = ({
         });
     };
     
-    const handleRemoveCommissionRule = (promoterId: string, ruleId: string) => {
-         setLocalEventState(prev => {
+    const handleSelectAllPromoters = (isChecked: boolean) => {
+        if (!isChecked) {
+            setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: [] } : null);
+        } else {
+            const allAssignments: EventPromoterAssignment[] = availablePromoters
+                .filter(promoter => promoter.platformUserUid) // Make sure UID exists
+                .map(promoter => ({
+                    promoterProfileId: promoter.platformUserUid!,
+                    promoterName: promoter.promoterName,
+                    promoterEmail: promoter.promoterEmail,
+                    commissionRules: [],
+                }));
+            setCurrentEventData(prev => prev ? { ...prev, assignedPromoters: allAssignments } : null);
+        }
+    };
+
+    const applyBatchCommission = () => {
+        const commissionValue = Number(batchCommissionValue);
+        if (isNaN(commissionValue)) {
+            toast({ title: "Error", description: "El monto de la comisión debe ser un número.", variant: "destructive" });
+            return;
+        }
+
+        setCurrentEventData(prev => {
             if (!prev) return null;
             const updatedAssignments = (prev.assignedPromoters || []).map(p => {
-                if (p.promoterProfileId === promoterId) {
-                    const updatedRules = (p.commissionRules || []).filter(r => r.id !== ruleId);
-                    return { ...p, commissionRules: updatedRules };
-                }
-                return p;
+                
+                const newRule: CommissionRule = {
+                    id: `rule_batch_${Date.now()}`,
+                    appliesTo: 'event_general',
+                    commissionType: 'fixed',
+                    commissionValue: commissionValue,
+                    description: batchCommissionDesc || 'Por entrada general',
+                };
+                
+                return {
+                    ...p,
+                    commissionRules: [newRule],
+                };
             });
             return { ...prev, assignedPromoters: updatedAssignments };
         });
+
+        toast({ title: "Éxito", description: `Comisión aplicada a ${currentEventData?.assignedPromoters?.length || 0} promotor(es).` });
     };
 
-    if (!isManageEventDialogOpen || !localEventState) return null;
+    const maxAttendanceFromTickets = useMemo(() => calculateMaxAttendance(currentEventData?.ticketTypes), [currentEventData?.ticketTypes]);
+    
+    const assignedPromoterIds = useMemo(() => {
+        return (currentEventData?.assignedPromoters || []).map(p => p.promoterProfileId);
+    }, [currentEventData?.assignedPromoters]);
+
+    const allPromotersSelected = useMemo(() => {
+        return availablePromoters.length > 0 && assignedPromoterIds.length === availablePromoters.length;
+    }, [assignedPromoterIds, availablePromoters]);
+
+    const somePromotersSelected = useMemo(() => {
+        return assignedPromoterIds.length > 0 && !allPromotersSelected;
+    }, [assignedPromoterIds, allPromotersSelected]);
+
+    if (!isManageEventDialogOpen || !currentEventData) return null;
+    
+    const assignedPromoters = currentEventData.assignedPromoters || [];
+    const ticketTypes = currentEventData.ticketTypes || [];
+    const eventBoxes = currentEventData.eventBoxes || [];
 
     return (
         <>
-            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) setEditingEvent(null); setIsManageEventDialogOpen(isOpen); }}>
-                <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>{editingEvent?.id && !isDuplicating ? `Editar Evento: ${localEventState.name}` : "Crear Nuevo Evento"}</DialogTitle>
-                        <DialogDescription>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</DialogDescription>
+            <Dialog open={isManageEventDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) handleAttemptClose(); }}>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-2 shrink-0">
+                        <DialogTitle className="font-headline">{currentEventData.id && !isDuplicating ? `Editar Evento: ${currentEventData.name}` : "Crear Nuevo Evento"}</DialogTitle>
+                        <UIDialogDescriptionComponent>Gestiona todos los aspectos de tu evento usando las pestañas a continuación.</UIDialogDescriptionComponent>
                     </DialogHeader>
                     
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col overflow-hidden">
-                        <TabsList className="w-full grid grid-cols-4">
-                            <TabsTrigger value="details">Detalles</TabsTrigger>
-                            <TabsTrigger value="tickets">Entradas ({calculateMaxAttendance(localEventState.ticketTypes) || 'Ilimitado'})</TabsTrigger>
-                            <TabsTrigger value="boxes">Boxes</TabsTrigger>
-                            <TabsTrigger value="promoters">Promotores ({localEventState.assignedPromoters?.length || 0})</TabsTrigger>
-                        </TabsList>
-
-                        <div className="flex-grow overflow-y-auto mt-4 pr-2">
-                            <TabsContent value="details">
-                                <BusinessEventForm 
-                                    event={localEventState} 
-                                    onFormChange={handleDetailsChange} 
-                                    isSubmitting={isSubmitting}
-                                />
+                    <div className="px-6 border-b shrink-0">
+                        <div className="overflow-x-auto">
+                           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                                <TabsList className="w-max">
+                                    <TabsTrigger value="details">Detalles</TabsTrigger>
+                                    <TabsTrigger value="tickets">Entradas ({maxAttendanceFromTickets || 'Ilimitado'})</TabsTrigger>
+                                    <TabsTrigger value="boxes">Boxes ({eventBoxes.length})</TabsTrigger>
+                                    <TabsTrigger value="promoters">Promotores ({assignedPromoters.length})</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        </div>
+                    </div>
+                    
+                    <div className="flex-grow overflow-y-auto">
+                        <Tabs value={activeTab} className="h-full">
+                            <TabsContent value="details" className="p-6 h-full">
+                                <Card>
+                                  <CardHeader>
+                                    <CardTitle className="font-headline">Detalles Principales del Evento</CardTitle>
+                                    <CardDescription>Configura la información básica y las fechas de tu evento.</CardDescription>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <BusinessEventForm 
+                                        ref={eventDetailsFormRef}
+                                        event={currentEventData} 
+                                        isSubmitting={isSubmitting}
+                                        setCurrentEventData={setCurrentEventData}
+                                        imagePreviewUrl={imagePreviewUrl}
+                                        onImageFileChange={handleImageFileChange}
+                                    />
+                                  </CardContent>
+                                </Card>
                             </TabsContent>
-                            <TabsContent value="tickets">
-                               <Card>
+                            <TabsContent value="tickets" className="p-6 h-full">
+                                <Card>
                                  <CardHeader>
-                                     <CardTitle>Gestión de Tipos de Entrada</CardTitle>
+                                     <CardTitle className="font-headline">Gestión de tipos de entrada</CardTitle>
                                      <CardDescription>Añade y configura las entradas para tu evento. El aforo total se calcula sumando las cantidades de cada tipo.</CardDescription>
                                  </CardHeader>
                                  <CardContent>
                                      <Button onClick={() => { setEditingTicket(null); setIsTicketFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Tipo de Entrada</Button>
-                                     <Table className="mt-4">
+                                     <div className="mt-4 overflow-x-auto">
+                                     <Table>
                                          <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Costo (S/)</TableHead><TableHead>Cantidad</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
                                          <TableBody>
-                                             {(localEventState.ticketTypes || []).map(ticket => (
+                                             {ticketTypes.map(ticket => (
                                                  <TableRow key={ticket.id}>
-                                                     <TableCell>{ticket.name}</TableCell>
+                                                     <TableCell className="flex items-center">
+                                                       <div className="w-4 h-4 rounded-full mr-2" style={{ backgroundColor: ticket.color || 'hsl(var(--muted))' }}></div>
+                                                       {ticket.name}
+                                                     </TableCell>
                                                      <TableCell>{ticket.cost.toFixed(2)}</TableCell>
                                                      <TableCell>{ticket.quantity || 'Ilimitadas'}</TableCell>
                                                      <TableCell className="text-right">
@@ -248,7 +462,7 @@ const ManageEventDialog = ({
                                                          <AlertDialog>
                                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
                                                             <AlertDialogContent>
-                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><UIDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</UIDialogDescription></AlertDialogHeader>
+                                                                <AlertDialogHeader><AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle><AlertDialogDescription>Se eliminará el tipo de entrada "{ticket.name}".</AlertDialogDescription></AlertDialogHeader>
                                                                 <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleTicketDelete(ticket.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                                             </AlertDialogContent>
                                                          </AlertDialog>
@@ -257,87 +471,267 @@ const ManageEventDialog = ({
                                              ))}
                                          </TableBody>
                                      </Table>
-                                      {(!localEventState.ticketTypes || localEventState.ticketTypes.length === 0) && (
+                                     </div>
+                                      {ticketTypes.length === 0 && (
                                         <p className="text-center text-muted-foreground mt-4">No hay tipos de entrada definidos.</p>
                                       )}
                                  </CardContent>
-                               </Card>
-                            </TabsContent>
-                            <TabsContent value="boxes">
-                                <Card><CardHeader><CardTitle>Gestión de Boxes</CardTitle></CardHeader><CardContent><p>Funcionalidad en construcción.</p></CardContent></Card>
-                            </TabsContent>
-                           <TabsContent value="promoters">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Asignar Promotores al Evento</CardTitle>
-                                        <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento y luego configura sus comisiones.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-6">
-                                        <div>
-                                            <Label className="font-semibold">Promotores del Negocio</Label>
-                                            <div className="mt-2 p-3 border rounded-md max-h-48 overflow-y-auto space-y-2">
-                                                {availablePromoters.length > 0 ? availablePromoters.map(promoter => {
-                                                    const isChecked = (localEventState.assignedPromoters || []).some(p => p.promoterProfileId === promoter.platformUserUid);
-                                                    return (
-                                                        <div key={promoter.platformUserUid} className="flex items-center space-x-2">
-                                                            <Checkbox
-                                                                id={`promoter-${promoter.platformUserUid}`}
-                                                                checked={isChecked}
-                                                                onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter.platformUserUid!, Boolean(checked))}
-                                                            />
-                                                            <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
-                                                        </div>
-                                                    );
-                                                }) : <p className="text-sm text-muted-foreground">No hay promotores vinculados a tu negocio.</p>}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                          <h4 className="font-semibold">Promotores Asignados ({localEventState.assignedPromoters?.length || 0})</h4>
-                                          {(localEventState.assignedPromoters || []).map(assignment => (
-                                              <div key={assignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-muted/50">
-                                                  <div className="flex justify-between items-center">
-                                                      <p className="font-medium">{assignment.promoterName}</p>
-                                                      {/* El promotor se desasigna desmarcando el checkbox de arriba */}
-                                                  </div>
-                                                  
-                                                  <div className="space-y-2">
-                                                      {(assignment.commissionRules || []).map((rule, index) => (
-                                                          <div key={rule.id} className="flex items-center gap-2 bg-background p-2 rounded-md border">
-                                                              <div className="flex-grow grid grid-cols-2 gap-2">
-                                                                  <Input placeholder="Valor (ej: 5 o 10)" value={rule.commissionValue} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'commissionValue', parseFloat(e.target.value) || 0)} type="number" step="0.01"/>
-                                                                  <Input placeholder="Descripción (ej: por entrada VIP)" value={rule.description || ""} onChange={e => handleCommissionRuleChange(assignment.promoterProfileId, index, 'description', e.target.value)} />
-                                                              </div>
-                                                              <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleRemoveCommissionRule(assignment.promoterProfileId, rule.id)}><Trash2 className="h-4 w-4"/></Button>
-                                                          </div>
-                                                      ))}
-                                                      <Button size="sm" variant="outline" onClick={() => handleAddCommissionRule(assignment.promoterProfileId)}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Regla de Comisión</Button>
-                                                  </div>
-                                              </div>
-                                          ))}
-                                          {(!localEventState.assignedPromoters || localEventState.assignedPromoters.length === 0) && (
-                                              <p className="text-sm text-muted-foreground text-center py-4">No hay promotores asignados a este evento.</p>
-                                          )}
-                                        </div>
-                                    </CardContent>
                                 </Card>
                             </TabsContent>
-                        </div>
-                    </Tabs>
-                    
-                    <DialogFooter className="pt-4 border-t mt-auto">
-                        <Button variant="outline" onClick={() => setIsManageEventDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                        <Button onClick={() => handleSaveEvent(localEventState)} disabled={isSubmitting || !localEventState.name}>
+                            <TabsContent value="boxes" className="p-6 h-full">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="font-headline">Gestión de boxes</CardTitle>
+                                            <CardDescription>Añade y configura los boxes para tu evento, de forma individual o masiva.</CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="flex gap-2">
+                                                <Button onClick={() => { setEditingBox(null); setIsBoxFormOpen(true); }}><PlusCircle className="h-4 w-4 mr-2"/>Añadir Box</Button>
+                                                <Button onClick={() => setIsBatchBoxFormOpen(true)} variant="outline"><Box className="h-4 w-4 mr-2"/>Crear en Lote</Button>
+                                            </div>
+                                            
+                                            <div className="md:hidden space-y-4 mt-4">
+                                                {eventBoxes.map(box => (
+                                                    <Card key={box.id} className={cn("overflow-hidden border-2 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 ease-in-out", {
+                                                        "bg-green-500/10 border-green-300": box.status === 'available',
+                                                        "bg-blue-500/10 border-blue-300": box.status === 'reserved',
+                                                        "bg-purple-500/10 border-purple-300": box.status === 'sold',
+                                                    })}>
+                                                        <CardHeader className="p-3">
+                                                            <CardTitle className="text-base">{box.name}</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="p-3 grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                                                            <div className="text-muted-foreground">Costo:</div><div className="font-semibold">S/ {box.cost.toFixed(2)}</div>
+                                                            <div className="text-muted-foreground">Capacidad:</div><div className="font-semibold">{box.capacity || 'N/A'}</div>
+                                                            <div className="text-muted-foreground">Estado:</div>
+                                                            <div className="flex flex-col">
+                                                              <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
+                                                              {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
+                                                            </div>
+                                                             {box.ownerName && (
+                                                                <>
+                                                                    <div className="col-span-2 mt-2 pt-2 border-t text-muted-foreground flex items-center">
+                                                                        <User size={14} className="mr-1.5" />Dueño: <span className="font-medium text-foreground ml-1">{box.ownerName}</span>
+                                                                    </div>
+                                                                    <div className="col-span-2 text-muted-foreground flex items-center">
+                                                                        <User size={14} className="mr-1.5 opacity-0" />DNI/CE: <span className="font-medium text-foreground ml-1">{box.ownerDni}</span>
+                                                                    </div>
+                                                                    <div className="col-span-2 text-muted-foreground flex items-center">
+                                                                      <Phone size={14} className="mr-1.5" />Celular: <span className="font-medium text-foreground ml-1">{box.ownerPhone}</span>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </CardContent>
+                                                        <CardFooter className="p-2 bg-muted/50 justify-center">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs">
+                                                                        Acciones
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent>
+                                                                    <DropdownMenuItem onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4 mr-2"/>Editar</DropdownMenuItem>
+                                                                    <AlertDialog>
+                                                                        <AlertDialogTrigger asChild><DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:text-destructive"><Trash2 className="h-4 w-4 mr-2"/>Eliminar</DropdownMenuItem></AlertDialogTrigger>
+                                                                        <AlertDialogContent>
+                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><AlertDialogDescription>Se eliminará el box "{box.name}".</AlertDialogDescription></AlertDialogHeader>
+                                                                            <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                                        </AlertDialogContent>
+                                                                    </AlertDialog>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </CardFooter>
+                                                    </Card>
+                                                ))}
+                                            </div>
+
+                                            <div className="hidden md:block mt-4 overflow-x-auto">
+                                                <Table>
+                                                    <TableHeader>
+                                                      <TableRow>
+                                                        <TableHead>Nombre</TableHead>
+                                                        <TableHead>Costo (S/)</TableHead>
+                                                        <TableHead>Capacidad</TableHead>
+                                                        <TableHead>Estado</TableHead>
+                                                        <TableHead>Dueño del Box</TableHead>
+                                                        <TableHead className="text-right">Acciones</TableHead>
+                                                      </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {eventBoxes.map(box => (
+                                                            <TableRow key={box.id}>
+                                                                <TableCell>{box.name}</TableCell>
+                                                                <TableCell>S/ {box.cost.toFixed(2)}</TableCell>
+                                                                <TableCell>{box.capacity || 'N/A'}</TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex flex-col">
+                                                                        <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn(box.status === 'available' && 'bg-green-500')}>{boxStatusTranslations[box.status]}</Badge>
+                                                                        {box.status !== 'available' && box.promoterName && <span className="text-xs text-muted-foreground mt-1">Por: {box.promoterName}</span>}
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {box.ownerName ? (
+                                                                        <div className="text-xs">
+                                                                            <p className="font-semibold">{box.ownerName}</p>
+                                                                            <p className="text-muted-foreground">DNI: {box.ownerDni}</p>
+                                                                            <p className="text-muted-foreground">Cel: {box.ownerPhone || 'N/A'}</p>
+                                                                        </div>
+                                                                    ) : "N/A"}
+                                                                </TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button variant="ghost" size="icon" onClick={() => { setEditingBox(box); setIsBoxFormOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                                    <AlertDialog>
+                                                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive"><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
+                                                                        <AlertDialogContent>
+                                                                            <AlertDialogHeader><AlertDialogTitle>¿Eliminar Box?</AlertDialogTitle><AlertDialogDescription>Se eliminará el box "{box.name}".</AlertDialogDescription></AlertDialogHeader>
+                                                                            <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleBoxDelete(box.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                                                        </AlertDialogContent>
+                                                                    </AlertDialog>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
+
+                                            {eventBoxes.length === 0 && (
+                                                <p className="text-center text-muted-foreground mt-4">No hay boxes definidos para este evento.</p>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                            </TabsContent>
+                           <TabsContent value="promoters" className="p-6 h-full">
+                                <div className="space-y-6">
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="font-headline">Promotores del Negocio</CardTitle>
+                                            <CardDescription>Selecciona los promotores de tu negocio para vincularlos a este evento.</CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center space-x-2 border-b pb-2">
+                                                    <Checkbox
+                                                        id="select-all-promoters"
+                                                        checked={allPromotersSelected}
+                                                        onCheckedChange={handleSelectAllPromoters}
+                                                        aria-checked={somePromotersSelected ? 'mixed' : allPromotersSelected}
+                                                    />
+                                                    <Label htmlFor="select-all-promoters" className="font-semibold">Seleccionar Todos</Label>
+                                                </div>
+                                                <div className="max-h-40 overflow-y-auto space-y-2 p-1">
+                                                    {availablePromoters.length > 0 ? (
+                                                        availablePromoters.map(promoter => (
+                                                            <div key={promoter.platformUserUid} className="flex items-center space-x-2">
+                                                                <Checkbox
+                                                                    id={`promoter-${promoter.platformUserUid}`}
+                                                                    checked={assignedPromoterIds.includes(promoter.platformUserUid!)}
+                                                                    onCheckedChange={(checked) => handlePromoterAssignmentChange(promoter, Boolean(checked))}
+                                                                />
+                                                                <Label htmlFor={`promoter-${promoter.platformUserUid}`} className="font-normal">{promoter.promoterName}</Label>
+                                                            </div>
+                                                        ))
+                                                    ) : <p className="text-sm text-muted-foreground">No hay promotores vinculados a tu negocio.</p>}
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                    
+                                     <Card>
+                                        <CardHeader>
+                                            <CardTitle className="font-headline">Configurar Comisiones ({assignedPromoters.length})</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-3 p-4 border rounded-md bg-muted/50">
+                                                <h4 className="font-semibold text-sm">Aplicar Comisión Grupal</h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        placeholder="Monto (ej: 5)"
+                                                        value={batchCommissionValue}
+                                                        onChange={(e) => setBatchCommissionValue(e.target.value)}
+                                                    />
+                                                    <Input
+                                                        placeholder="Descripción (ej: por entrada general)"
+                                                        value={batchCommissionDesc}
+                                                        onChange={(e) => setBatchCommissionDesc(e.target.value)}
+                                                        className="sm:col-span-2"
+                                                    />
+                                                </div>
+                                                <Button size="sm" onClick={applyBatchCommission} className="bg-black text-white hover:bg-black/80">Aplicar a todos los seleccionados</Button>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                {assignedPromoters.map((promoterAssignment) => (
+                                                    <div key={promoterAssignment.promoterProfileId} className="border p-3 rounded-md space-y-3 bg-background">
+                                                        <p className="font-medium">{promoterAssignment.promoterName}</p>
+                                                        {(promoterAssignment.commissionRules || []).map((rule, ruleIndex) => (
+                                                          <div key={rule.id} className="flex items-center gap-2 text-sm pl-4">
+                                                              <Input
+                                                                  type="number"
+                                                                  value={rule.commissionValue}
+                                                                  onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'commissionValue', Number(e.target.value))}
+                                                                  className="w-24 h-8"
+                                                              />
+                                                              <Input
+                                                                  value={rule.description || 'Soles por entrada general'}
+                                                                  onChange={(e) => handleCommissionRuleChange(promoterAssignment.promoterProfileId, ruleIndex, 'description', e.target.value)}
+                                                                  className="w-full h-8"
+                                                                  placeholder="Descripción (ej: por entrada)"
+                                                              />
+                                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveCommissionRule(promoterAssignment.promoterProfileId, rule.id)}>
+                                                                  <Trash2 size={14} />
+                                                              </Button>
+                                                          </div>
+                                                        ))}
+                                                        <Button variant="outline" size="xs" onClick={() => handleAddCommissionRule(promoterAssignment.promoterProfileId)}>
+                                                            Añadir regla
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+
+                    <DialogFooter className="p-6 pt-2 border-t mt-auto shrink-0">
+                        <Button variant="outline" onClick={handleAttemptClose} disabled={isSubmitting}>Cancelar</Button>
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting} className="bg-black text-white hover:bg-black/80">
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Guardar Evento
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={showUnsavedChangesAlert} onOpenChange={setShowUnsavedChangesAlert}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Has realizado cambios que no se han guardado. ¿Estás seguro de que quieres cerrar y descartar estos cambios?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <ShadcnAlertDialogFooter>
+                        <AlertDialogCancel>No, continuar editando</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                setShowUnsavedChangesAlert(false);
+                                setIsManageEventDialogOpen(false);
+                            }}
+                            className="bg-destructive hover:bg-destructive/90"
+                        >
+                            Sí, descartar
+                        </AlertDialogAction>
+                    </ShadcnAlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <Dialog open={isTicketFormOpen} onOpenChange={setIsTicketFormOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingTicket ? 'Editar Tipo de Entrada' : 'Nuevo Tipo de Entrada'}</DialogTitle>
+                  <DialogTitle className="font-headline">{editingTicket ? 'Editar Tipo de Entrada' : 'Nuevo Tipo de Entrada'}</DialogTitle>
                 </DialogHeader>
                 <TicketTypeForm 
                     ticketType={editingTicket || undefined} 
@@ -346,6 +740,32 @@ const ManageEventDialog = ({
                     isSubmitting={isSubmitting}
                 />
               </DialogContent>
+            </Dialog>
+            <Dialog open={isBoxFormOpen} onOpenChange={setIsBoxFormOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="font-headline">{editingBox ? 'Editar Box' : 'Nuevo Box'}</DialogTitle>
+                    </DialogHeader>
+                    <EventBoxForm
+                        eventBox={editingBox || undefined}
+                        onSubmit={handleBoxSubmit}
+                        onCancel={() => setIsBoxFormOpen(false)}
+                        isSubmitting={isSubmitting}
+                    />
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isBatchBoxFormOpen} onOpenChange={setIsBatchBoxFormOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="font-headline">Crear Boxes en Lote</DialogTitle>
+                    </DialogHeader>
+                    <BatchBoxForm
+                        existingBoxes={currentEventData?.eventBoxes || []}
+                        onSubmit={handleBatchBoxSubmit}
+                        onCancel={() => setIsBatchBoxFormOpen(false)}
+                        isSubmitting={isSubmitting}
+                    />
+                </DialogContent>
             </Dialog>
         </>
     );
@@ -375,6 +795,13 @@ export default function BusinessEventsPage() {
   const [selectedEventForStats, setSelectedEventForStats] = useState<BusinessManagedEntity | null>(null);
 
   const [availablePromoters, setAvailablePromoters] = useState<BusinessPromoterLink[]>([]);
+  
+  const [showQrTemplateModal, setShowQrTemplateModal] = useState(false);
+  const [selectedEventForTemplate, setSelectedEventForTemplate] = useState<BusinessManagedEntity | null>(null);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+
 
   useEffect(() => {
     if (!loadingAuth && !loadingProfile && userProfile?.businessId) {
@@ -443,27 +870,33 @@ export default function BusinessEventsPage() {
         setIsLoading(false);
     }
   }, [currentBusinessId, fetchEventsAndPromoters, loadingAuth, loadingProfile]);
+  
+  const totalPages = Math.ceil(events.length / rowsPerPage);
+  const paginatedEvents = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return events.slice(startIndex, startIndex + rowsPerPage);
+  }, [events, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [rowsPerPage]);
 
   const handleOpenManageEventDialog = (event: BusinessManagedEntity | null, duplicate = false) => {
     setIsSubmitting(false);
     setIsDuplicating(duplicate);
     if (duplicate && event) {
-        const { id, createdAt, maxAttendance, generatedCodes, ...eventToDuplicate } = event;
+        const { id, createdAt, ...eventToDuplicate } = event;
         setEditingEvent({
             ...eventToDuplicate,
             id: '',
             name: `${event.name} (Copia)`,
             isActive: true,
             createdAt: undefined,
-            maxAttendance: event.maxAttendance, // Keep maxAttendance
-            ticketTypes: event.ticketTypes || [],
-            eventBoxes: event.eventBoxes || [],
-            assignedPromoters: event.assignedPromoters || [],
             generatedCodes: [],
         });
-    } else if (event) { // Editing existing event
+    } else if (event) {
       setEditingEvent(event);
-    } else { // Creating a new event from scratch
+    } else { 
       const now = new Date();
       const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
       setEditingEvent({
@@ -472,9 +905,11 @@ export default function BusinessEventsPage() {
         type: 'event',
         name: '',
         description: '',
+        locationAddress: businessDetails?.publicAddress || '',
         startDate: now.toISOString(),
         endDate: oneWeekFromNow.toISOString(),
         isActive: true,
+        isPublicAccess: false,
         generatedCodes: [],
         ticketTypes: [],
         eventBoxes: [],
@@ -485,11 +920,21 @@ export default function BusinessEventsPage() {
     setIsManageEventDialogOpen(true);
   };
   
-  const handleDeleteEvent = async (eventId: string, eventName: string) => {
+  const handleDeleteEvent = async (eventToDelete: BusinessManagedEntity) => {
     setIsSubmitting(true);
     try {
-        await deleteDoc(doc(db, "businessEntities", eventId));
-        toast({ title: "Evento Eliminado", description: `El evento "${eventName}" ha sido eliminado.`, variant: "destructive" });
+        await deleteDoc(doc(db, "businessEntities", eventToDelete.id));
+        toast({ title: "Evento Eliminado", description: `El evento "${eventToDelete.name}" ha sido eliminado.`, variant: "destructive" });
+        if (eventToDelete.imageUrl && eventToDelete.imageUrl.includes("firebase")) {
+            try {
+                const imageRef = ref(storage, eventToDelete.imageUrl);
+                await deleteObject(imageRef);
+            } catch (deleteError: any) {
+                if (deleteError.code !== 'storage/object-not-found') {
+                    console.warn("Could not delete event image:", deleteError);
+                }
+            }
+        }
         if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
     } catch (error: any) {
         toast({ title: "Error al Eliminar", description: error.message, variant: "destructive" });
@@ -498,37 +943,75 @@ export default function BusinessEventsPage() {
     }
   };
   
-  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity | null) => {
+  const handleSaveEvent = async (eventDataToSave: BusinessManagedEntity, imageFile: File | null) => {
       if(!currentBusinessId) {
           toast({title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive"});
           return;
       }
-       if(!eventDataToSave) {
-          toast({title: "Error", description: "No hay datos de evento para guardar.", variant: "destructive"});
-          return;
-      }
       setIsSubmitting(true);
       
-      const payload = {
-        ...eventDataToSave,
-        businessId: currentBusinessId,
-        type: 'event' as 'event',
-        startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
-        endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
-      };
+      const isNewEntity = !eventDataToSave.id || isDuplicating;
+      const entityId = isNewEntity ? doc(collection(db, "businessEntities")).id : eventDataToSave.id;
       
+      let fileToUpload: File | null = imageFile;
+
       try {
-          if(eventDataToSave.id && !isDuplicating) {
-              const { id, createdAt, ...updateData } = payload;
-              await updateDoc(doc(db, "businessEntities", id), sanitizeObjectForFirestore(updateData));
-              toast({title: "Evento Actualizado", description: "Los cambios se han guardado correctamente."});
-          } else {
-              const { id, ...createData } = payload;
-              await addDoc(collection(db, "businessEntities"), {...createData, createdAt: serverTimestamp()});
-              toast({title: "Evento Creado", description: `El evento "${payload.name}" ha sido creado.`});
-          }
-          setIsManageEventDialogOpen(false);
-          if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
+        if (isDuplicating && !imageFile && eventDataToSave.imageUrl) {
+            try {
+                const response = await fetch(eventDataToSave.imageUrl);
+                const blob = await response.blob();
+                const originalFileName = eventDataToSave.imageUrl.split('/').pop()?.split('?')[0] || `image_${entityId}.jpg`;
+                fileToUpload = new File([blob], originalFileName, { type: blob.type });
+            } catch (fetchError) {
+                console.error("Could not fetch original image for duplication:", fetchError);
+                toast({ title: "Advertencia", description: "No se pudo duplicar la imagen original. Se creará el evento sin imagen.", variant: "default" });
+            }
+        }
+
+        let finalImageUrl = eventDataToSave.imageUrl || "";
+        const oldImageUrl = !isNewEntity && editingEvent?.imageUrl ? editingEvent.imageUrl : null;
+        
+        if (fileToUpload) {
+            toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
+            const storageRef = ref(storage, `event-images/${currentBusinessId}/${entityId}/${fileToUpload.name}`);
+            const uploadResult = await uploadBytes(storageRef, fileToUpload);
+            finalImageUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        const payload = {
+            ...eventDataToSave,
+            imageUrl: finalImageUrl,
+            businessId: currentBusinessId,
+            type: 'event' as 'event',
+            startDate: Timestamp.fromDate(new Date(eventDataToSave.startDate)),
+            endDate: Timestamp.fromDate(new Date(eventDataToSave.endDate)),
+            maxAttendance: eventDataToSave.maxAttendance || 0,
+        };
+      
+        if (isNewEntity) {
+            const { id, ...createData } = payload;
+            await setDoc(doc(db, "businessEntities", entityId), { ...sanitizeObjectForFirestore(createData), createdAt: serverTimestamp() });
+            toast({title: "Evento Creado", description: `El evento "${payload.name}" ha sido creado.`});
+        } else {
+            const { id, createdAt, ...updateData } = payload;
+            await updateDoc(doc(db, "businessEntities", id), sanitizeObjectForFirestore(updateData));
+            toast({title: "Evento Actualizado", description: "Los cambios se han guardado correctamente."});
+        }
+
+        if (fileToUpload && oldImageUrl && oldImageUrl.includes("firebase") && oldImageUrl !== finalImageUrl) {
+            try {
+              const oldImageRef = ref(storage, oldImageUrl);
+              await deleteObject(oldImageRef);
+            } catch (deleteError: any) {
+              if (deleteError.code !== 'storage/object-not-found') {
+                console.warn("Could not delete old event image:", deleteError);
+              }
+            }
+        }
+          
+        setIsManageEventDialogOpen(false);
+        setEditingEvent(null);
+        if(currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
       } catch (error: any) {
           toast({title: "Error al Guardar", description: error.message, variant: "destructive"});
           console.error("Error saving event:", error);
@@ -536,6 +1019,60 @@ export default function BusinessEventsPage() {
           setIsSubmitting(false);
       }
   };
+
+  const handleSaveQrTemplate = async (entityId: string, templateFile: File | null, layout: QrTemplateLayout) => {
+    if (!currentBusinessId) {
+        toast({ title: "Error", description: "No se ha identificado el negocio actual.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+
+    try {
+        const entityRef = doc(db, "businessEntities", entityId);
+        const currentDoc = await getDoc(entityRef);
+        if (!currentDoc.exists()) {
+            throw new Error("El evento no existe.");
+        }
+
+        const oldTemplateUrl = currentDoc.data().qrTemplateImageUrl;
+        let finalTemplateUrl = oldTemplateUrl;
+
+        if (templateFile) {
+            toast({ title: "Subiendo plantilla...", description: "Por favor, espera." });
+            const storageRef = ref(storage, `event-qr-templates/${currentBusinessId}/${entityId}/${templateFile.name}`);
+            const uploadResult = await uploadBytes(storageRef, templateFile);
+            finalTemplateUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        const updateData = {
+            qrTemplateImageUrl: finalTemplateUrl,
+            qrTemplateLayout: layout,
+        };
+
+        await updateDoc(entityRef, updateData);
+
+        if (templateFile && oldTemplateUrl && oldTemplateUrl !== finalTemplateUrl && oldTemplateUrl.includes("firebase")) {
+            try {
+                const oldTemplateRef = ref(storage, oldTemplateUrl);
+                await deleteObject(oldTemplateRef);
+            } catch (deleteError: any) {
+                if (deleteError.code !== 'storage/object-not-found') {
+                    console.warn("Could not delete old QR template image:", deleteError);
+                }
+            }
+        }
+        
+        toast({ title: "Plantilla Guardada", description: "La plantilla QR para este evento ha sido actualizada." });
+        if (currentBusinessId) fetchEventsAndPromoters(currentBusinessId);
+        setShowQrTemplateModal(false);
+
+    } catch (error: any) {
+        toast({ title: "Error al Guardar Plantilla", description: error.message, variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
 
   const handleNewCodesCreated = async (entityId: string, newCodes: GeneratedCode[], observation?: string) => {
     if (!userProfile?.name || !userProfile.uid) {
@@ -612,21 +1149,21 @@ export default function BusinessEventsPage() {
       </div>
 
       {!currentBusinessId && !isLoading ? (
-          <Card><CardHeader><AlertDialogTitle className="text-destructive">Negocio no identificado</AlertDialogTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
+          <Card><CardHeader><CardTitle className="text-destructive font-headline">Negocio no identificado</CardTitle></CardHeader><CardContent><p>Tu perfil no está asociado a un negocio.</p></CardContent></Card>
       ) : isLoading ? (
           <div className="flex justify-center items-center h-60"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>
       ) : events.length === 0 ? (
-          <Card><CardHeader><CardTitle>Sin Eventos</CardTitle></CardHeader><CardContent><p className="text-muted-foreground">Aún no has creado ningún evento. ¡Haz clic en "Crear Evento" para empezar!</p></CardContent></Card>
+          <Card><CardHeader><CardTitle className="font-headline">Sin Eventos</CardTitle></CardHeader><CardContent><p className="text-muted-foreground">Aún no has creado ningún evento. ¡Haz clic en "Crear Evento" para empezar!</p></CardContent></Card>
       ) : (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Mis Eventos</CardTitle>
+            <CardTitle className="font-headline">Mis Eventos</CardTitle>
             <CardDescription>Lista de todos los eventos creados para tu negocio.</CardDescription>
           </CardHeader>
           <CardContent>
             {/* Mobile View */}
             <div className="md:hidden space-y-4">
-              {events.map(event => {
+              {paginatedEvents.map(event => {
                 const isActivatable = isEntityCurrentlyActivatable(event);
                 const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
                 const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
@@ -635,7 +1172,7 @@ export default function BusinessEventsPage() {
                 return (
                   <Card key={event.id} className="overflow-hidden">
                     <CardHeader className="p-4">
-                       <CardTitle>{event.name}</CardTitle>
+                       <CardTitle className="font-headline">{event.name}</CardTitle>
                        <CardDescription>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</CardDescription>
                     </CardHeader>
                     <CardContent className="p-4 space-y-2">
@@ -650,33 +1187,49 @@ export default function BusinessEventsPage() {
                             </Badge>
                         </div>
                     </CardContent>
-                    <CardFooter className="p-2 bg-muted/50">
+                    <CardFooter className="p-2 bg-muted/50 justify-center">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="w-full justify-center">
-                                    Acciones <MoreVertical className="ml-2 h-4 w-4"/>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white px-3 h-8 text-xs font-bold">
+                                    Acciones
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                               <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
-                                  <QrCodeIcon className="h-4 w-4 mr-2" /> Crear Códigos
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Gestionar Evento
+                                </DropdownMenuItem>
+                                 <DropdownMenuItem onClick={() => { setSelectedEventForTemplate(event); setShowQrTemplateModal(true); }}>
+                                    <ImageIcon className="h-4 w-4 mr-2" />
+                                    Plantilla QR
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable}>
+                                    <QrCodeIcon className="h-4 w-4 mr-2" />
+                                    Crear Códigos
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }}>
-                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos ({event.generatedCodes?.length || 0})
+                                    <ListChecks className="h-4 w-4 mr-2" />
+                                    Ver Códigos
                                 </DropdownMenuItem>
-                               <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
-                                  <Edit className="h-4 w-4 mr-2" /> Editar
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event, true)}>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Duplicar Evento
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator/>
+                                <DropdownMenuSeparator />
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
-                                            <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Eliminar
                                         </DropdownMenuItem>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
-                                        <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
-                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
+                                            <AlertDialogDescription>Se eliminará el evento "{event.name}".</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
                             </DropdownMenuContent>
@@ -691,15 +1244,16 @@ export default function BusinessEventsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>#</TableHead>
                     <TableHead>Evento</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Aforo Total</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-center">Fecha</TableHead>
+                    <TableHead className="text-center">Aforo Total</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {events.map(event => {
+                  {paginatedEvents.map((event, index) => {
                     const isActivatable = isEntityCurrentlyActivatable(event);
                     const attendanceFromTickets = calculateMaxAttendance(event.ticketTypes);
                     const displayAttendance = (event.maxAttendance && event.maxAttendance > 0)
@@ -708,10 +1262,11 @@ export default function BusinessEventsPage() {
                     
                     return (
                       <TableRow key={event.id}>
+                        <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                         <TableCell className="font-medium">{event.name}</TableCell>
-                        <TableCell>{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
-                        <TableCell>{displayAttendance}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">{format(parseISO(event.startDate), "dd MMM yyyy", { locale: es })}</TableCell>
+                        <TableCell className="text-center">{displayAttendance}</TableCell>
+                        <TableCell className="text-center">
                           <Badge variant={isActivatable ? "default" : "outline"} className={cn(isActivatable ? 'bg-green-500' : '')}>
                             {isActivatable ? "Vigente" : "Finalizado/Inactivo"}
                           </Badge>
@@ -719,14 +1274,42 @@ export default function BusinessEventsPage() {
                         <TableCell className="text-right space-x-1">
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForCreatingCodes(event); setShowCreateCodesModal(true); }} disabled={!isActivatable} className="px-2 py-1 h-auto text-xs"><QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos</Button>
                           <Button variant="outline" size="xs" onClick={() => { setSelectedEntityForViewingCodes(event); setShowManageCodesModal(true); }} className="px-2 py-1 h-auto text-xs"><ListChecks className="h-3 w-3 mr-1" /> Ver Códigos ({event.generatedCodes?.length || 0})</Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenManageEventDialog(event)}><Edit className="h-4 w-4" /></Button>
-                          <AlertDialog>
-                              <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                              <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><UIDialogDescription>Se eliminará el evento "{event.name}". Esta acción es irreversible.</UIDialogDescription></AlertDialogHeader>
-                              <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event.id, event.name)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
-                              </AlertDialogContent>
-                          </AlertDialog>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                               <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                                <span className="sr-only">Abrir menú</span>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event)}>
+                                    <Edit className="mr-2 h-4 w-4" /> Gestionar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setSelectedEventForTemplate(event); setShowQrTemplateModal(true); }}>
+                                    <ImageIcon className="mr-2 h-4 w-4" /> Plantilla QR
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenManageEventDialog(event, true)}>
+                                    <Copy className="mr-2 h-4 w-4" /> Duplicar
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={e => e.preventDefault()} className="text-destructive focus:bg-destructive/10">
+                                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                        </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                     <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>¿Confirmar?</AlertDialogTitle>
+                                            <AlertDialogDescription>Se eliminará "{event.name}" irreversiblemente.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <ShadcnAlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteEvent(event)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></ShadcnAlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+
                         </TableCell>
                       </TableRow>
                     )
@@ -735,6 +1318,47 @@ export default function BusinessEventsPage() {
               </Table>
             </div>
           </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+              <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page-events">Filas por página:</Label>
+                <Select
+                  value={`${rowsPerPage}`}
+                  onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                  <SelectTrigger id="rows-per-page-events" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 25].map((pageSize) => (
+                      <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+          </CardFooter>
         </Card>
       )}
       <ManageEventDialog 
@@ -742,29 +1366,32 @@ export default function BusinessEventsPage() {
         setIsManageEventDialogOpen={setIsManageEventDialogOpen}
         editingEvent={editingEvent}
         isDuplicating={isDuplicating}
-        isSubmitting={isSubmitting}
         availablePromoters={availablePromoters}
-        handleSaveEvent={handleSaveEvent}
-        setEditingEvent={setEditingEvent}
+        onSave={handleSaveEvent}
+        isSubmitting={isSubmitting}
       />
+
+      {showQrTemplateModal && selectedEventForTemplate && (
+          <QrTemplateDialog
+              open={showQrTemplateModal}
+              onOpenChange={(isOpen) => { if (!isOpen) setSelectedEventForTemplate(null); setShowQrTemplateModal(isOpen); }}
+              entity={selectedEventForTemplate}
+              onSave={handleSaveQrTemplate}
+              isSubmitting={isSubmitting}
+          />
+      )}
 
       {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
           open={showCreateCodesModal}
           onOpenChange={(isOpen) => { if(!isOpen) setSelectedEntityForCreatingCodes(null); setShowCreateCodesModal(isOpen);}}
-          entityName={selectedEntityForCreatingCodes.name}
-          entityId={selectedEntityForCreatingCodes.id!}
+          entity={selectedEntityForCreatingCodes}
           existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
           onCodesCreated={handleNewCodesCreated}
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
-          maxAttendance={
-            (selectedEntityForCreatingCodes.maxAttendance && selectedEntityForCreatingCodes.maxAttendance > 0)
-            ? selectedEntityForCreatingCodes.maxAttendance
-            : calculateMaxAttendance(selectedEntityForCreatingCodes.ticketTypes)
-          }
-          currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
+          currentUserRoles={userProfile.roles}
         />
       )}
 
@@ -788,6 +1415,7 @@ export default function BusinessEventsPage() {
           }}
           isPromoterView={false} 
           currentUserProfileName={userProfile.name}
+          currentUserProfileUid={userProfile.uid}
           businessPersonalPhone={businessDetails?.personalPhone}
         />
       )}
@@ -795,4 +1423,3 @@ export default function BusinessEventsPage() {
     </div>
   );
 }
-

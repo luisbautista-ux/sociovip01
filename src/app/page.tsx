@@ -12,11 +12,12 @@ import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, Search, Calendar, UserCircle } from "lucide-react";
+import { Loader2, Building, Tag, Search, Calendar, UserCircle, PartyPopper } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SocioVipLogo } from "@/components/icons";
+import { HeroCarousel } from "@/components/home/HeroCarousel";
 
 interface EnrichedEntity extends BusinessManagedEntity {
   businessName?: string;
@@ -128,21 +129,21 @@ export default function HomePage() {
 
   const EntityCard = ({ entity }: { entity: EnrichedEntity }) => {
     const businessUrl = entity.businessCustomUrlPath
-      ? `/b/${entity.businessCustomUrlPath}`
-      : `/business/${entity.businessId}`;
+      ? `/${entity.businessCustomUrlPath}`
+      : `/`; // Fallback to home if no custom URL
     
     const isEvent = entity.type === 'event';
 
     return (
-      <Card key={entity.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col overflow-hidden rounded-lg bg-card group">
+      <Card key={entity.id} className="shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2">
         <Link href={businessUrl} passHref>
           <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
             <NextImage
               src={entity.imageUrl || "https://placehold.co/600x400.png"}
               alt={entity.name}
               fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+              style={{ objectPosition: entity.imageObjectPosition || '50% 50%' }}
               data-ai-hint={entity.aiHint || "discount offer"}
             />
           </div>
@@ -179,7 +180,7 @@ export default function HomePage() {
             Válido hasta el {format(parseISO(entity.endDate), "dd MMMM, yyyy", { locale: es })}
           </p>
           <Link href={businessUrl} passHref className="w-full">
-            <Button className="w-full bg-gradient-to-r from-purple-800 to-red-600 text-white hover:opacity-90 transition-opacity">
+            <Button className="w-full text-white hover:opacity-90 transition-opacity bg-header-gradient">
               {isEvent ? <Calendar className="mr-2 h-4 w-4" /> : <Tag className="mr-2 h-4 w-4" />}
                {isEvent ? "Ver Evento" : "Ver Promoción"}
             </Button>
@@ -191,114 +192,97 @@ export default function HomePage() {
 
   const showPromotions = view === 'all' || view === 'promotions';
   const showEvents = view === 'all' || view === 'events';
-
-  return (
-    <div className="min-h-screen bg-muted/40 text-foreground">
-      <header className="sticky top-0 z-20 w-full bg-background shadow-sm">
-        <div className="bg-gradient-to-r from-purple-800 to-red-600">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-start h-12 gap-6">
-                    <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
-                    <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
-                    <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
+  
+  if (isLoading) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
+            <div className="flex flex-col items-center justify-center text-center">
+                <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
+                    <SocioVipLogo size={70} />
                 </div>
+                <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
             </div>
         </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
+      <HeroCarousel searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+       
+      <div className="bg-header-gradient shadow-md sticky top-0 z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-start h-12 gap-6">
+                  <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
+                  <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
+                  <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
+              </div>
+          </div>
+      </div>
+          <main className="flex-grow w-full py-8">
+            <div className="max-w-7xl mx-auto space-y-12">
+              {showEvents && (
+                <section className="px-4 sm:px-6 lg:px-8">
+                  <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center">
+                    <Calendar className="h-7 w-7 mr-3 text-primary" />
+                    <span className="text-gradient">Próximos Eventos</span>
+                  </h2>
+                  {filteredEvents.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                    </div>
+                  ) : (
+                    <Card className="col-span-full">
+                      <CardHeader className="items-center text-center">
+                        <PartyPopper className="h-12 w-12 text-primary/70" />
+                        <CardTitle className="mt-4">
+                          {searchTerm ? "Sin Resultados" : "No Hay Eventos Disponibles"}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-center">
+                        <CardDescription>
+                          {searchTerm
+                            ? `No se encontraron eventos que coincidan con "${searchTerm}".`
+                            : "Vuelve pronto, siempre estamos añadiendo nuevas experiencias."}
+                        </CardDescription>
+                      </CardContent>
+                    </Card>
+                  )}
+                </section>
+              )}
+
+              {showPromotions && (
+                <section className="px-4 sm:px-6 lg:px-8">
+                  <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center">
+                    <Tag className="h-7 w-7 mr-3 text-primary" />
+                    <span className="text-gradient">Promociones Vigentes</span>
+                  </h2>
+                  {filteredPromotions.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                    </div>
+                  ) : (
+                     <Card className="col-span-full">
+                      <CardHeader className="items-center text-center">
+                        <PartyPopper className="h-12 w-12 text-primary/70" />
+                        <CardTitle className="mt-4">
+                          {searchTerm ? "Sin Resultados" : "No Hay Promociones Disponibles"}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-center">
+                        <CardDescription>
+                          {searchTerm
+                            ? `No se encontraron promociones que coincidan con "${searchTerm}".`
+                            : "¡Los negocios están preparando sus mejores ofertas! Vuelve pronto."}
+                        </CardDescription>
+                      </CardContent>
+                    </Card>
+                  )}
+                </section>
+              )}
+            </div>
+          </main>
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between sm:h-20 gap-4">
-              <div className="flex items-center justify-between w-full sm:w-auto">
-                <div className="flex items-center gap-3">
-                  <SocioVipLogo size={50} />
-                  <div>
-                      <h1 className="text-2xl font-bold tracking-tight text-gradient">SocioVIP</h1>
-                  </div>
-                </div>
-                <div className="sm:hidden">
-                    <Link href="/login" passHref>
-                        <Button variant="outline" size="sm" className="text-primary border-primary/50 hover:bg-gradient-to-r from-purple-800 to-red-600 hover:text-white font-bold">
-                            <UserCircle className="mr-2 h-5 w-5" />
-                            Inicia Sesión
-                        </Button>
-                    </Link>
-                </div>
-              </div>
-
-              <div className="flex-grow flex justify-center items-center w-full sm:w-auto">
-                 <div className="relative w-full max-w-lg">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        placeholder="Buscar promociones, eventos o negocios..."
-                        className="pl-10 w-full rounded-full h-12 text-base"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-              </div>
-
-              <div className="hidden sm:flex items-center">
-                <Link href="/login" passHref>
-                    <Button variant="outline" size="lg" className="text-primary border-primary/50 hover:bg-gradient-to-r from-purple-800 to-red-600 hover:text-white font-bold">
-                        <UserCircle className="mr-2 h-5 w-5" />
-                        Inicia Sesión
-                    </Button>
-                </Link>
-              </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center text-center py-20">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="mt-4 text-lg text-muted-foreground">Cargando...</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {showEvents && (
-              <section>
-                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
-                  <Calendar className="h-7 w-7 mr-3 text-purple-800" /> Próximos Eventos
-                </h2>
-                {filteredEvents.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                    <p className="text-lg font-semibold">No se encontraron eventos</p>
-                    <p className="text-muted-foreground mt-1">
-                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevos eventos."}
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {showPromotions && (
-              <section>
-                <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center text-gradient">
-                  <Tag className="h-7 w-7 mr-3 text-purple-800" /> Promociones Vigentes
-                </h2>
-                {filteredPromotions.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 rounded-lg border-2 border-dashed">
-                    <p className="text-lg font-semibold">No se encontraron promociones</p>
-                    <p className="text-muted-foreground mt-1">
-                      {searchTerm ? "Intenta con otra búsqueda." : "Vuelve más tarde para ver nuevas promociones."}
-                    </p>
-                  </div>
-                )}
-              </section>
-            )}
-          </div>
-        )}
-      </main>
     </div>
   );
 }

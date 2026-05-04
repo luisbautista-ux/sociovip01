@@ -22,7 +22,7 @@ export default function BusinessSurveysPage() {
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Gestión de Encuestas</CardTitle>
+          <CardTitle className="font-headline">Gestión de Encuestas</CardTitle>
           <CardDescription>Crea y administra encuestas para tus clientes.</CardDescription>
         </CardHeader>
         <CardContent className="h-60 flex items-center justify-center">

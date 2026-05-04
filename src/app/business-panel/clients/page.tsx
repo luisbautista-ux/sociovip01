@@ -21,61 +21,12 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { cn, renderDate, anyToDate } from "@/lib/utils";
+import * as ExcelJS from "exceljs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 /* ===================== Helpers de fecha (aceptan Timestamp/Date/string/number) ===================== */
-function anyToDate(value: any): Date | null {
-  if (!value) return null;
-
-  // Date nativa
-  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-
-  // Firestore: objetos con toDate()
-  if (typeof value?.toDate === "function") {
-    const d = value.toDate();
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // Firestore: objetos { seconds, nanoseconds }
-  if (typeof value?.seconds === "number") {
-    const ms = value.seconds * 1000 + Math.floor((value.nanoseconds ?? 0) / 1e6);
-    const d = new Date(ms);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // Número: milisegundos epoch
-  if (typeof value === "number") {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  // String
-  if (typeof value === "string") {
-    // Soporte a dd/MM/yyyy o dd-MM-yyyy (con o sin hora)
-    const m = value.match(
-      /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-    );
-    if (m) {
-      const norm = value.replace(/-/g, "/");
-      const hasTime = !!m[4];
-      const pattern = hasTime ? "dd/MM/yyyy HH:mm:ss" : "dd/MM/yyyy";
-      const candidate = hasTime && norm.length === 16 ? `${norm}:00` : norm; // completa :ss si falta
-      const d = parse(candidate, pattern, new Date());
-      return isNaN(d.getTime()) ? null : d;
-    }
-
-    // ISO u otros formatos que Date pueda entender
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  return null;
-}
-
-function renderDate(value: any, fmt = "P p") {
-  const d = anyToDate(value);
-  return d ? format(d, fmt, { locale: es }) : "N/A";
-}
 
 // Evita warnings de hidratación en Next (fecha se calcula 100% en el cliente)
 const ClientSideFormattedDateTime = ({ value, fmt = "P p" }: { value: any; fmt?: string }) => {
@@ -99,7 +50,7 @@ type QrClient = {
 };
 
 export default function BusinessClientsPage() {
-  const { userProfile } = useAuth(); // debe proveer roles[] y businessId
+  const { userProfile } = useAuth(); // solo para verificar si es superadmin
   const { toast } = useToast();
 
   const [qrClients, setQrClients] = useState<QrClient[]>([]);
@@ -108,59 +59,19 @@ export default function BusinessClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
 
-  const isSuperAdmin = !!userProfile?.roles?.includes?.("superadmin");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
 
   useEffect(() => {
     const load = async () => {
-      if (!userProfile) return;
-      if (!isSuperAdmin && !userProfile.businessId) return;
-
       setLoading(true);
       try {
         const qrRef = collection(db, "qrClients");
-        
-        // Superadmin gets all clients without filtering
-        if (isSuperAdmin) {
-            const allClientsSnap = await getDocs(qrRef);
-            const allClients = allClientsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
-            setQrClients(allClients);
-            return; // Termina la función para superadmin
-        }
-        
-        // Business admin logic with two queries
-        const businessId = userProfile.businessId;
-        if (!businessId) {
-          setQrClients([]);
-          return;
-        }
-
-        // Query 1: For new data model (array contains)
-        const newModelQuery = query(qrRef, where("associatedBusinessIds", "array-contains", businessId));
-        
-        // Query 2: For old data model (single ID)
-        const oldModelQuery = query(qrRef, where("generatedForBusinessId", "==", businessId));
-
-        const [newClientsSnap, oldClientsSnap] = await Promise.all([
-            getDocs(newModelQuery),
-            getDocs(oldModelQuery),
-        ]);
-        
-        const clientsMap = new Map<string, QrClient>();
-
-        newClientsSnap.forEach(d => {
-            if (!clientsMap.has(d.id)) {
-                clientsMap.set(d.id, { id: d.id, ...(d.data() as any) });
-            }
-        });
-        
-        oldClientsSnap.forEach(d => {
-            if (!clientsMap.has(d.id)) {
-                clientsMap.set(d.id, { id: d.id, ...(d.data() as any) });
-            }
-        });
-
-        const combinedClients = Array.from(clientsMap.values());
-        setQrClients(combinedClients);
+        // Se elimina la lógica de filtrado por negocio. Ahora siempre obtiene todos los clientes.
+        const allClientsSnap = await getDocs(qrRef);
+        const allClients = allClientsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as QrClient[];
+        setQrClients(allClients);
 
       } catch (e: any) {
         console.error("Error cargando clientes:", e?.code, e?.message);
@@ -175,7 +86,7 @@ export default function BusinessClientsPage() {
     };
 
     load();
-  }, [userProfile, isSuperAdmin, toast]);
+  }, [toast]);
   
   const filteredClients = useMemo(() => {
     return qrClients.filter((c) => {
@@ -202,7 +113,19 @@ export default function BusinessClientsPage() {
     });
   }, [searchTerm, filterDate, qrClients]);
 
-  const handleExportCsv = () => {
+  const totalPages = Math.ceil(filteredClients.length / rowsPerPage);
+  
+  const paginatedClients = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredClients.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredClients, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterDate, rowsPerPage]);
+
+
+  const handleExport = async () => {
     if (filteredClients.length === 0) {
       toast({
         title: "Sin Datos",
@@ -212,35 +135,67 @@ export default function BusinessClientsPage() {
       return;
     }
   
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Clientes QR");
+
     const headers = [
-      "ID", "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nacimiento", "Fecha Registro",
+      "Nombres", "Apellidos", "DNI/CE", "Teléfono", "Fecha Nac.", "Fecha Registro",
     ];
-  
-    const rows = filteredClients.map((c) => [
-      c.id,
-      c.name,
-      c.surname,
-      `'${c.dni}`, // Precede con ' para tratar como texto
-      `'${c.phone || "N/A"}`, // Precede con '
-      renderDate(c.dob, "P"),
-      renderDate(c.registrationDate, "P p"),
-    ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`)); // Quoting and escaping
-  
-    const csvContent = [
-      headers.map(h => `"${h}"`).join(';'),
-      ...rows.map(r => r.join(';'))
-    ].join('\n');
-  
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF5D2A8E' } 
+        };
+        cell.font = {
+            bold: true,
+            color: { argb: 'FFFFFFFF' }
+        };
+        cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
+    });
+
+    filteredClients.forEach(client => {
+        const rowData = [
+          client.name,
+          client.surname,
+          client.dni,
+          client.phone || "N/A",
+          renderDate(client.dob, "P"),
+          renderDate(client.registrationDate, "P p"),
+        ];
+        const row = worksheet.addRow(rowData);
+        row.eachCell((cell) => {
+            cell.border = {
+                top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' }
+            };
+        });
+    });
+
+    worksheet.columns.forEach(column => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, cell => {
+            const columnLength = cell.value ? cell.value.toString().length : 10;
+            if (columnLength > maxLength) {
+                maxLength = columnLength;
+            }
+        });
+        column.width = maxLength < 10 ? 10 : maxLength + 2;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `clientes_${isSuperAdmin ? "todos_negocios" : userProfile?.businessId ?? "negocio"}.csv`);
+    link.href = URL.createObjectURL(blob);
+    link.download = `SocioVip_Clientes_QR_Todos.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  
-    toast({ title: "Exportación Exitosa", description: `${filteredClients.length} clientes exportados.` });
+
+    toast({ title: "Exportación Exitosa", description: "Se ha descargado el archivo de Excel." });
   };
 
   if (loading) return <p>Cargando clientes…</p>;
@@ -249,20 +204,20 @@ export default function BusinessClientsPage() {
     <div className="space-y-6">
        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-primary flex items-center self-start">
-          <Contact className="h-8 w-8 mr-2" /> Mis Clientes
+          <Contact className="h-8 w-8 mr-2" /> Clientes de la Plataforma
         </h1>
         <div className="self-end sm:self-center">
-            <Button onClick={handleExportCsv} variant="gradient">
-              <Download className="mr-2 h-4 w-4" /> Exportar CSV
+            <Button onClick={handleExport} variant="gradient">
+              <Download className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
         </div>
       </div>
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Listado de Clientes QR</CardTitle>
+          <CardTitle className="font-headline">Listado de Clientes QR</CardTitle>
           <CardDescription>
-            {isSuperAdmin ? "Visualizando clientes de todos los negocios." : "Visualizando todos los clientes que han generado un QR para tu negocio."}
+            Visualizando todos los clientes que han generado un QR en la plataforma.
           </CardDescription>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
             <div className="relative">
@@ -310,8 +265,8 @@ export default function BusinessClientsPage() {
         <CardContent>
           {/* Mobile View */}
           <div className="md:hidden space-y-4">
-            {filteredClients.length > 0 ? (
-                filteredClients.map((c) => (
+            {paginatedClients.length > 0 ? (
+                paginatedClients.map((c) => (
                   <Card key={c.id} className="overflow-hidden">
                      <CardHeader className="p-4">
                        <CardTitle className="text-lg">{c.name} {c.surname}</CardTitle>
@@ -344,6 +299,7 @@ export default function BusinessClientsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>#</TableHead>
                   <TableHead>Nombre Completo</TableHead>
                   <TableHead className="hidden md:table-cell">DNI/CE</TableHead>
                   <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
@@ -353,9 +309,10 @@ export default function BusinessClientsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.length > 0 ? (
-                  filteredClients.map((c) => (
+                {paginatedClients.length > 0 ? (
+                  paginatedClients.map((c, index) => (
                     <TableRow key={c.id}>
+                      <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                       <TableCell className="font-medium">
                         {c.name} {c.surname}
                       </TableCell>
@@ -376,7 +333,7 @@ export default function BusinessClientsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">
+                    <TableCell colSpan={7} className="text-center h-24">
                       No se encontraron clientes con los filtros aplicados.
                     </TableCell>
                   </TableRow>
@@ -385,6 +342,47 @@ export default function BusinessClientsPage() {
             </Table>
           </div>
         </CardContent>
+        <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+          <div className="flex items-center space-x-2 text-sm">
+            <Label htmlFor="rows-per-page">Filas por página:</Label>
+            <Select
+              value={`${rowsPerPage}`}
+              onValueChange={(value) => setRowsPerPage(Number(value))}
+            >
+              <SelectTrigger id="rows-per-page" className="h-8 w-[70px]">
+                <SelectValue placeholder={rowsPerPage} />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 25, 50, 100].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Página {currentPage} de {totalPages}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   );

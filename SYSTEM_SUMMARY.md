@@ -25,7 +25,7 @@ La plataforma SocioVIP es un sistema multi-panel diseñado para que negocios (di
 -   **Página Principal (`/`)**:
     -   **Funcionalidad:** Muestra un listado de todas las promociones activas y vigentes de todos los negocios registrados en la plataforma.
     -   **Flujo:** Los usuarios pueden ver tarjetas de promociones, buscar por nombre o negocio, y hacer clic en una promoción para ser redirigidos a la página pública del negocio correspondiente.
--   **Página Pública del Negocio (`/b/[url-personalizada]` o `/business/[businessId]`)**:
+-   **Página Pública del Negocio (`/[url-personalizada]` o `/business/[businessId]`)**:
     -   **Funcionalidad:** Es la vitrina de un negocio. Muestra todas sus promociones y eventos activos y vigentes.
     -   **Flujo para Clientes:**
         1.  El cliente ve una lista de promociones/eventos.
@@ -114,4 +114,4 @@ La plataforma SocioVIP es un sistema multi-panel diseñado para que negocios (di
     -   Se añadieron feedbacks visuales (loaders, toasts, mensajes de error detallados).
     -   Se crearon archivos de documentación como `ACCESS_CREDENTIALS.md` y este mismo `SYSTEM_SUMMARY.md` para facilitar el uso y entendimiento de la plataforma.
     -   Se hicieron enlaces de elementos (como el nombre del negocio) para mejorar la navegabilidad.
-    -   Se implementó la lógica de redirección a páginas con URL personalizada (`/b/[slug]`) para mejorar el SEO y la experiencia de marca.
+    -   Se implementó la lógica de redirección a páginas con URL personalizada (`/[slug]`) para mejorar el SEO y la experiencia de marca.

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; 
@@ -14,11 +15,12 @@ import { Input } from "@/components/ui/input";
 import { BusinessForm } from "@/components/admin/forms/BusinessForm";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter as ShadcnAlertDialogFooter, AlertDialogHeader, AlertDialogTitle as UIAlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"; 
-import { db } from "@/lib/firebase"; 
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit } from "firebase/firestore";
+import { db, storage } from "@/lib/firebase"; 
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, query, where, limit, setDoc } from "firebase/firestore";
 import Link from "next/link";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 
 
 export default function AdminBusinessesPage() {
@@ -54,7 +56,7 @@ export default function AdminBusinessesPage() {
           managerDni: data.managerDni || undefined,
           businessType: data.businessType || undefined,
           logoUrl: data.logoUrl || undefined,
-          publicCoverImageUrl: data.publicCoverImageUrl || undefined,
+          publicCoverImageUrls: data.publicCoverImageUrls || [],
           slogan: data.slogan || undefined,
           publicContactEmail: data.publicContactEmail || undefined,
           publicPhone: data.publicPhone || undefined,
@@ -99,14 +101,14 @@ export default function AdminBusinessesPage() {
       toast({ title: "Sin Datos", description: "No hay negocios para exportar.", variant: "default" });
       return;
     }
-    const headers = ["ID", "Nombre Comercial", "Razón Social", "RUC", "Email Contacto", "Fecha Ingreso", "Giro", "Departamento", "Provincia", "Distrito", "Dirección", "Gerente", "DNI Gerente", "URL Personalizada", "Logo URL", "Portada URL", "Slogan", "Email Público", "Teléfono Público", "Dirección Pública"];
+    const headers = ["ID", "Nombre Comercial", "Razón Social", "RUC", "Email Contacto", "Fecha Ingreso", "Giro", "Departamento", "Provincia", "Distrito", "Dirección", "Gerente", "DNI Gerente", "URL Personalizada", "Logo URL", "Portada URLs", "Slogan", "Email Público", "Teléfono Público", "Dirección Pública"];
     const rows = filteredBusinesses.map(biz => [
       biz.id, biz.name, biz.razonSocial || "N/A", `'${biz.ruc || "N/A"}`, biz.contactEmail,
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
       biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
       biz.managerName || "N/A", `'${biz.managerDni || "N/A"}`, 
-      biz.customUrlPath ? `sociosvip.app/b/${biz.customUrlPath}` : `sociosvip.app/business/${biz.id}`,
-      biz.logoUrl || "N/A", biz.publicCoverImageUrl || "N/A", biz.slogan || "N/A",
+      biz.customUrlPath ? `sociovip.app/${biz.customUrlPath}` : `sociovip.app/business/${biz.id}`,
+      biz.logoUrl || "N/A", (biz.publicCoverImageUrls || []).join(', '), biz.slogan || "N/A",
       biz.publicContactEmail || "N/A", `'${biz.publicPhone || "N/A"}`, biz.publicAddress || "N/A",
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
     
@@ -119,7 +121,7 @@ export default function AdminBusinessesPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "sociosvip_negocios.csv");
+    link.setAttribute("download", "sociovip_negocios.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -149,7 +151,7 @@ export default function AdminBusinessesPage() {
     
     const cleanedCustomUrlPath = data.customUrlPath && data.customUrlPath.trim() !== "" 
         ? data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') 
-        : null; // Ensure it's null if empty
+        : null; 
 
     if (cleanedCustomUrlPath) {
       const isUnique = await checkCustomUrlPathUniqueness(cleanedCustomUrlPath, currentBusinessId);
@@ -160,43 +162,48 @@ export default function AdminBusinessesPage() {
       }
     }
     
-    const businessPayloadRaw: Omit<Partial<Business>, 'id' | 'joinDate'> & { joinDate?: any } = {
-        name: data.name,
-        contactEmail: data.contactEmail,
-        ruc: data.ruc || null,
-        razonSocial: data.razonSocial || null,
-        department: data.department || null,
-        province: data.province || null,
-        district: data.district || null,
-        address: data.address || null,
-        managerName: data.managerName || null,
-        managerDni: data.managerDni || null,
-        businessType: data.businessType || null,
-        logoUrl: data.logoUrl || null,
-        publicCoverImageUrl: data.publicCoverImageUrl || null,
-        slogan: data.slogan || null,
-        publicContactEmail: data.publicContactEmail || null,
-        publicPhone: data.publicPhone || null,
-        publicAddress: data.publicAddress || null,
-        customUrlPath: cleanedCustomUrlPath, 
-    };
-    
-    const businessPayload = sanitizeObjectForFirestore(businessPayloadRaw);
-
     try {
-      if (currentBusinessId) { 
-        const businessRef = doc(db, "businesses", currentBusinessId);
-        await updateDoc(businessRef, businessPayload);
-        toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
-      } else { 
-        businessPayload.joinDate = serverTimestamp();
-        const docRef = await addDoc(collection(db, "businesses"), businessPayload);
-        toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${docRef.id}.` });
-      }
-      setShowCreateEditModal(false);
-      setEditingBusiness(null);
-      await fetchBusinesses(); // Await fetchBusinesses
-      return { success: true };
+        const businessId = currentBusinessId || doc(collection(db, "businesses")).id;
+        let finalLogoUrl = editingBusiness?.logoUrl || "";
+
+        if (data.logoFile) {
+            toast({ description: "Subiendo logo..." });
+            const oldLogoUrl = editingBusiness?.logoUrl;
+            if (oldLogoUrl && oldLogoUrl.includes('firebase')) {
+                try {
+                    await deleteObject(ref(storage, oldLogoUrl));
+                } catch (e: any) {
+                    if (e.code !== 'storage/object-not-found') console.warn("Old logo not deleted:", e);
+                }
+            }
+            const logoStorageRef = ref(storage, `business-logos/${businessId}/${data.logoFile.name}`);
+            const uploadResult = await uploadBytes(logoStorageRef, data.logoFile);
+            finalLogoUrl = await getDownloadURL(uploadResult.ref);
+        }
+
+        const { logoFile, ...restOfData } = data;
+
+        const businessPayloadRaw = {
+            ...restOfData,
+            logoUrl: finalLogoUrl,
+            customUrlPath: cleanedCustomUrlPath,
+        };
+        
+        const businessPayload = sanitizeObjectForFirestore(businessPayloadRaw);
+
+        if (currentBusinessId) { 
+            const businessRef = doc(db, "businesses", currentBusinessId);
+            await updateDoc(businessRef, businessPayload);
+            toast({ title: "Negocio Actualizado", description: `El negocio "${data.name}" ha sido actualizado.` });
+        } else { 
+            businessPayload.joinDate = serverTimestamp();
+            await setDoc(doc(db, "businesses", businessId), businessPayload);
+            toast({ title: "Negocio Creado", description: `El negocio "${data.name}" ha sido creado con ID: ${businessId}.` });
+        }
+        setShowCreateEditModal(false);
+        setEditingBusiness(null);
+        await fetchBusinesses();
+        return { success: true };
     } catch (error: any) {
       console.error("Failed to create/update business:", error);
       toast({ title: "Error al Guardar", description: `No se pudo guardar el negocio. ${error.message}`, variant: "destructive"});
@@ -225,7 +232,6 @@ export default function AdminBusinessesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
         <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
           <Building className="h-8 w-8 text-primary !block" />
           Negocios
@@ -272,7 +278,7 @@ export default function AdminBusinessesPage() {
               <div className="md:hidden space-y-4">
                 {filteredBusinesses.map(biz => {
                    const publicLink = biz.customUrlPath && biz.customUrlPath.trim() !== ""
-                        ? `/b/${biz.customUrlPath.trim()}`
+                        ? `/${biz.customUrlPath.trim()}`
                         : `/business/${biz.id}`;
                   
                   return (
@@ -289,7 +295,7 @@ export default function AdminBusinessesPage() {
                         <div className="flex justify-between items-start">
                           <span className="text-muted-foreground">URL Pública</span>
                           <Link href={publicLink} target="_blank" className="font-semibold text-primary hover:underline text-xs flex items-center text-right break-all">
-                              {publicLink} <ExternalLink className="ml-1 h-3 w-3 flex-shrink-0" />
+                              {`sociovip.app${publicLink}`} <ExternalLink className="ml-1 h-3 w-3 flex-shrink-0" />
                           </Link>
                         </div>
                       </CardContent>
@@ -341,10 +347,10 @@ export default function AdminBusinessesPage() {
                     {filteredBusinesses.length > 0 ? (
                       filteredBusinesses.map((biz) => {
                         const publicLink = biz.customUrlPath && biz.customUrlPath.trim() !== ""
-                          ? `/b/${biz.customUrlPath.trim()}`
+                          ? `/${biz.customUrlPath.trim()}`
                           : `/business/${biz.id}`;
                         const displayUrl = biz.customUrlPath && biz.customUrlPath.trim() !== ""
-                          ? `sociosvip.app/b/${biz.customUrlPath.trim()}`
+                          ? `sociovip.app/${biz.customUrlPath.trim()}`
                           : `.../${biz.id.substring(0, 10)}...`;
 
                         return (

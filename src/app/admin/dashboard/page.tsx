@@ -1,3 +1,4 @@
+
 "use client";
 
 import { StatCard } from "@/components/admin/StatCard";
@@ -208,7 +209,7 @@ export default function AdminDashboardPage() {
         <StatCard title="Negocios Registrados" value={stats.totalBusinesses} icon={Building} />
         <StatCard title="Usuarios de Plataforma" value={stats.totalPlatformUsers} icon={Users} />
         <StatCard title="Socios VIP Activos" value={stats.totalSocioVipMembers} icon={Star} /> 
-        <StatCard title="Códigos Creados (Total)" value={stats.totalQrCodesGenerated} icon={ScanLine} />
+        <StatCard title="QRs Generados" value={stats.totalQrCodesGenerated} icon={ScanLine} />
       </div>
 
       <Card className="shadow-lg col-span-1 lg:col-span-2">

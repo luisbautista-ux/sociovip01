@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -6,8 +7,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadcnCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { QrCode as QrCodeIcon, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar } from "lucide-react";
-import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView } from "@/lib/types";
+import { QrCode, ListChecks, Gift, Building, Loader2, Info, Ticket, Calendar, Box, Star, Search, ScanLine, CheckCircle, Phone, User as UserIcon } from "lucide-react";
+import type { BusinessManagedEntity, GeneratedCode, Business, PromoterEntityView, EventBox, QrClient, SocioVipMember } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CreateCodesDialog } from "@/components/business/dialogs/CreateCodesDialog";
@@ -16,13 +17,17 @@ import { useToast } from "@/hooks/use-toast";
 import { isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, updateDoc, getDoc, runTransaction } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { User as FirebaseUser } from "firebase/auth";
 
 export default function PromoterEntitiesPage() {
-  const { userProfile, loadingAuth, loadingProfile } = useAuth();
+  const { userProfile, loadingAuth, loadingProfile, currentUser } = useAuth();
   const [promotions, setPromotions] = useState<PromoterEntityView[]>([]);
   const [events, setEvents] = useState<PromoterEntityView[]>([]);
   const [businessesMap, setBusinessesMap] = useState<Map<string, Business>>(new Map());
@@ -35,9 +40,9 @@ export default function PromoterEntitiesPage() {
   
   const [showManageCodesModal, setShowManageCodesModal] = useState(false);
   const [selectedEntityForViewingCodes, setSelectedEntityForViewingCodes] = useState<BusinessManagedEntity | null>(null);
-  
-  const [showStatsModal, setShowStatsModal] = useState(false);
-  const [selectedEntityForStats, setSelectedEntityForStats] = useState<PromoterEntityView | null>(null);
+
+  const [showBoxesModal, setShowBoxesModal] = useState(false);
+  const [selectedEventForBoxes, setSelectedEventForBoxes] = useState<PromoterEntityView | null>(null);
 
   const getPromoterCodeStats = useCallback((entityGeneratedCodes: GeneratedCode[] | undefined): { created: number; used: number } => {
     if (!userProfile || !entityGeneratedCodes) return { created: 0, used: 0 };
@@ -52,92 +57,89 @@ export default function PromoterEntitiesPage() {
   }, [userProfile]);
   
   const fetchAssignedEntities = useCallback(async () => {
-    if (!userProfile || !userProfile.businessIds || userProfile.businessIds.length === 0) {
-      console.warn("Promoter Entities Page: No businessIds found in profile, cannot fetch entities.");
-      setPromotions([]);
-      setEvents([]);
-      setIsLoading(false);
-      return;
+    if (!userProfile?.uid || !userProfile.businessIds || userProfile.businessIds.length === 0) {
+        setIsLoading(false);
+        return;
     }
     
     setIsLoading(true);
-    console.log(`Promoter Entities Page: Fetching entities for businesses:`, userProfile.businessIds);
-
     try {
-      const assignedBusinessIds = userProfile.businessIds;
-      const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", assignedBusinessIds));
-      const businessesSnapshot = await getDocs(businessesQuery);
-      const businessesDataMap = new Map<string, Business>();
-      businessesSnapshot.forEach(doc => {
-          businessesDataMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
-      });
-      setBusinessesMap(businessesDataMap);
+        const businessIds = userProfile.businessIds;
 
-      const entitiesQuery = query(
-        collection(db, "businessEntities"),
-        where("businessId", "in", assignedBusinessIds),
-        where("isActive", "==", true)
-      );
-      const entitiesSnap = await getDocs(entitiesQuery);
-      
-      const promoterAssignedPromotions: PromoterEntityView[] = [];
-      const promoterAssignedEvents: PromoterEntityView[] = [];
+        const businessesQuery = query(collection(db, "businesses"), where("__name__", "in", businessIds));
+        const businessesSnapshot = await getDocs(businessesQuery);
+        const businessesDataMap = new Map<string, Business>();
+        businessesSnapshot.forEach(doc => {
+            businessesDataMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
+        });
+        setBusinessesMap(businessesDataMap);
 
-      entitiesSnap.forEach(docSnap => {
-        const data = docSnap.data();
-        const nowISO = new Date().toISOString();
-        let startDateStr: string;
-        if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
-        else if (typeof data.startDate === 'string') startDateStr = data.startDate;
-        else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
-        else startDateStr = nowISO;
+        const allBusinessEntitiesQuery = query(
+            collection(db, "businessEntities"),
+            where('businessId', 'in', businessIds),
+            where('isActive', '==', true)
+        );
+        const entitiesSnap = await getDocs(allBusinessEntitiesQuery);
 
-        let endDateStr: string;
-        if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
-        else if (typeof data.endDate === 'string') endDateStr = data.endDate;
-        else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
-        else endDateStr = nowISO;
+        const allAssignedEntities: PromoterEntityView[] = [];
+
+        entitiesSnap.forEach(docSnap => {
+            const data = docSnap.data();
+            const isAssigned = (data.assignedPromoters || []).some((p: any) => p.promoterProfileId === userProfile.uid);
+
+            if (!isAssigned) {
+                return;
+            }
+
+            const nowISO = new Date().toISOString();
+            let startDateStr: string;
+            if (data.startDate instanceof Timestamp) startDateStr = data.startDate.toDate().toISOString();
+            else if (typeof data.startDate === 'string') startDateStr = data.startDate;
+            else if (data.startDate instanceof Date) startDateStr = data.startDate.toISOString();
+            else startDateStr = nowISO;
+
+            let endDateStr: string;
+            if (data.endDate instanceof Timestamp) endDateStr = data.endDate.toDate().toISOString();
+            else if (typeof data.endDate === 'string') endDateStr = data.endDate;
+            else if (data.endDate instanceof Date) endDateStr = data.endDate.toISOString();
+            else endDateStr = nowISO;
+            
+            const entity: BusinessManagedEntity = {
+                id: docSnap.id,
+                ...data,
+                startDate: startDateStr,
+                endDate: endDateStr,
+            } as BusinessManagedEntity;
+
+            if (isEntityCurrentlyActivatable(entity)) {
+                const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
+                const enrichedEntity: PromoterEntityView = {
+                    ...entity,
+                    businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
+                    promoterCodesCreated: promoterCodeStats.created,
+                    promoterCodesUsed: promoterCodeStats.used,
+                };
+                allAssignedEntities.push(enrichedEntity);
+            }
+        });
         
-        const entity: BusinessManagedEntity = {
-          id: docSnap.id,
-          ...data,
-          startDate: startDateStr,
-          endDate: endDateStr,
-        } as BusinessManagedEntity;
+        const promoterAssignedPromotions = allAssignedEntities.filter(e => e.type === 'promotion');
+        const promoterAssignedEvents = allAssignedEntities.filter(e => e.type === 'event');
+        
+        promoterAssignedPromotions.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        promoterAssignedEvents.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
-        if (isEntityCurrentlyActivatable(entity)) {
-          const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
-          const isAssignedToEvent = (entity.type === 'event' && (entity.assignedPromoters || []).some(p => p.promoterProfileId === userProfile.uid));
-          const isPromotion = entity.type === 'promotion';
-          
-          if(isPromotion || isAssignedToEvent) {
-             const enrichedEntity: PromoterEntityView = {
-              ...entity,
-              businessName: businessesDataMap.get(entity.businessId)?.name || "Negocio Desconocido",
-              promoterCodesCreated: promoterCodeStats.created,
-              promoterCodesUsed: promoterCodeStats.used,
-            };
-            if(entity.type === 'promotion') promoterAssignedPromotions.push(enrichedEntity);
-            if(entity.type === 'event') promoterAssignedEvents.push(enrichedEntity);
-          }
-        }
-      });
-      
-      promoterAssignedPromotions.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      promoterAssignedEvents.sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-
-      setPromotions(promoterAssignedPromotions);
-      setEvents(promoterAssignedEvents);
-      console.log(`Promoter Entities Page: Fetched ${promoterAssignedPromotions.length} promotions and ${promoterAssignedEvents.length} events.`);
+        setPromotions(promoterAssignedPromotions);
+        setEvents(promoterAssignedEvents);
 
     } catch (error: any) {
-      console.error("Promoter Entities Page: Error fetching assigned entities:", error.code, error.message, error);
-      toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones y eventos asignados. ${error.message}`, variant: "destructive"});
-      setPromotions([]);
-      setEvents([]);
-      setBusinessesMap(new Map());
+        console.error("Promoter Entities Page: Error fetching assigned entities:", error);
+        toast({ title: "Error al cargar entidades", description: `No se pudieron cargar tus promociones y eventos asignados. ${error.message}`, variant: "destructive"});
+        setPromotions([]);
+        setEvents([]);
+        setBusinessesMap(new Map());
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   }, [userProfile, toast, getPromoterCodeStats]);
 
@@ -157,43 +159,50 @@ export default function PromoterEntitiesPage() {
 
     try {
         const targetEntityRef = doc(db, "businessEntities", entityId);
-        const targetEntitySnap = await getDoc(targetEntityRef);
-        if (!targetEntitySnap.exists()) {
-            throw new Error(`La entidad "${entityId}" no fue encontrada.`);
-        }
-        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
-        
-        const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
-            ...code,
-            id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            entityId: entityId,
-            value: code.value,
-            status: 'available',
-            generatedByName: userProfile.name,
-            generatedByUid: userProfile.uid,
-            generatedDate: new Date().toISOString(),
-            observation: observation || null,
-            redemptionDate: null, 
-            redeemedByInfo: null, 
-            isVipCandidate: false,
-        }) as GeneratedCode));
-        
-        const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-        const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
-        
-        await updateDoc(targetEntityRef, { generatedCodes: updatedCodes });
-        
-        // Update local state instead of full refetch
-        const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
-            e.id === entityId ? { ...e, generatedCodes: updatedCodes } : e
-        );
-        setPromotions(updateLocalState);
-        setEvents(updateLocalState);
+        await runTransaction(db, async (transaction) => {
+            const targetEntitySnap = await transaction.get(targetEntityRef);
+            if (!targetEntitySnap.exists()) {
+                throw new Error(`La entidad "${entityId}" no fue encontrada.`);
+            }
+            const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
+            
+            const newCodesWithDetails: GeneratedCode[] = newCodes.map(code => (sanitizeObjectForFirestore({
+                ...code,
+                id: code.id || `code-${entityId}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                entityId: entityId,
+                value: code.value,
+                status: 'available',
+                generatedByName: userProfile.name,
+                generatedByUid: userProfile.uid,
+                generatedDate: new Date().toISOString(),
+                observation: observation || null,
+                redemptionDate: null, 
+                redeemedByInfo: null, 
+                isVipCandidate: false,
+                ownerName: code.ownerName,
+                ownerDni: code.ownerDni,
+                ownerPhone: code.ownerPhone,
+                ticketTypeId: code.ticketTypeId,
+                ticketTypeName: code.ticketTypeName,
+            }) as GeneratedCode));
+            
+            const existingSanitizedCodes = (targetEntityData.generatedCodes || []).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+            const updatedCodes = [...existingSanitizedCodes, ...newCodesWithDetails];
+            
+            transaction.update(targetEntityRef, { generatedCodes: updatedCodes });
 
-        toast({ title: "Códigos Creados", description: `${newCodes.length} código(s) añadido(s) a "${targetEntityData.name}".` });
+            const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
+                e.id === entityId ? { ...e, generatedCodes: updatedCodes, promoterCodesCreated: e.promoterCodesCreated + newCodes.length } : e
+            );
+            setPromotions(updateLocalState);
+            setEvents(updateLocalState);
+        });
+        
+        toast({ title: "Códigos creados", description: `${newCodes.length} código(s) añadido(s).` });
     } catch (error: any) {
         console.error("Promoter Page: Error saving new codes:", error);
         toast({ title: "Error al Guardar Códigos", description: `No se pudieron guardar los códigos. ${error.message}`, variant: "destructive" });
+        fetchAssignedEntities();
         throw error;
     }
   };
@@ -209,35 +218,38 @@ export default function PromoterEntitiesPage() {
 
     const targetEntityRef = doc(db, "businessEntities", entityId);
     try {
-      const targetEntitySnap = await getDoc(targetEntityRef);
-      if (!targetEntitySnap.exists()) {
-        toast({ title: "Error", description: `Entidad "${entityId}" no encontrada para actualizar códigos.`, variant: "destructive" });
-        setIsSubmitting(false);
-        return;
-      }
-      const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
-      
-      const otherPromotersCodes = (targetEntityData.generatedCodes || []).filter(
-        c => c.generatedByUid !== userProfile.uid 
-      ).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
-      
-      const thisPromotersUpdatedCodes = updatedCodesFromDialog
-        .filter(c => c.generatedByUid === userProfile.uid)
-        .map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+      await runTransaction(db, async (transaction) => {
+        const targetEntitySnap = await transaction.get(targetEntityRef);
+        if (!targetEntitySnap.exists()) {
+            throw new Error(`Entidad "${entityId}" no encontrada para actualizar códigos.`);
+        }
+        const targetEntityData = targetEntitySnap.data() as BusinessManagedEntity;
+        
+        const otherPromotersCodes = (targetEntityData.generatedCodes || []).filter(
+            c => c.generatedByUid !== userProfile.uid 
+        ).map(c => sanitizeObjectForFirestore(c as GeneratedCode));
+        
+        const thisPromotersUpdatedCodes = updatedCodesFromDialog
+            .filter(c => c.generatedByUid === userProfile.uid)
+            .map(c => sanitizeObjectForFirestore(c as GeneratedCode));
 
-      const finalCodesToSave = [...otherPromotersCodes, ...thisPromotersUpdatedCodes];
+        const finalCodesToSave = [...otherPromotersCodes, ...thisPromotersUpdatedCodes];
 
-      await updateDoc(targetEntityRef, { generatedCodes: finalCodesToSave });
-      toast({ title: "Mis Códigos Actualizados", description: `Tus códigos para "${targetEntityData.name}" han sido actualizados.` });
+        transaction.update(targetEntityRef, { generatedCodes: finalCodesToSave });
+        
+        const updateLocalState = (prev: PromoterEntityView[]) => prev.map(e => 
+            e.id === entityId ? { ...e, generatedCodes: finalCodesToSave } : e
+        );
+        setPromotions(updateLocalState);
+        setEvents(updateLocalState);
+      });
       
-      fetchAssignedEntities(); 
-
-      if (selectedEntityForViewingCodes?.id === entityId) {
-        setSelectedEntityForViewingCodes(prev => prev ? {...prev, generatedCodes: finalCodesToSave} : null);
-      }
+      toast({ title: "Mis Códigos Actualizados", description: `Tus códigos han sido actualizados.` });
+      
     } catch (error: any) {
       console.error("Promoter Entities Page: Error saving updated codes from ManageDialog:", error.code, error.message, error);
       toast({ title: "Error al Actualizar Códigos", description: `No se pudieron actualizar tus códigos. ${error.message}`, variant: "destructive" });
+      fetchAssignedEntities();
     } finally {
       setIsSubmitting(false);
     }
@@ -260,6 +272,59 @@ export default function PromoterEntitiesPage() {
     setSelectedEntityForViewingCodes(entity);
     setShowManageCodesModal(true);
   };
+
+  const handleUpdateBoxOwner = async (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => {
+      if (!userProfile) return;
+      setIsSubmitting(true);
+      const entityRef = doc(db, "businessEntities", entityId);
+
+      try {
+          await runTransaction(db, async (transaction) => {
+              const entitySnap = await transaction.get(entityRef);
+              if (!entitySnap.exists()) throw new Error("El evento ya no existe.");
+
+              const entityData = entitySnap.data() as BusinessManagedEntity;
+              const boxes = [...(entityData.eventBoxes || [])];
+              const boxIndex = boxes.findIndex(b => b.id === boxId);
+              
+              if (boxIndex === -1) throw new Error("El box ya no existe.");
+              const currentBox = boxes[boxIndex];
+
+              if (currentBox.status !== 'available' && currentBox.promoterId !== userProfile.uid) {
+                  throw new Error("Este box ya fue reservado por otro promotor.");
+              }
+
+              boxes[boxIndex] = {
+                ...currentBox,
+                status: newStatus,
+                ownerName,
+                ownerDni,
+                ownerPhone,
+                promoterId: userProfile.uid,
+                promoterName: userProfile.name,
+              };
+
+              transaction.update(entityRef, { eventBoxes: boxes });
+              
+              const updateFunc = (prev: PromoterEntityView[]) => prev.map(e => {
+                  if (e.id === entityId) {
+                      const updatedEvent = { ...e, eventBoxes: boxes };
+                      if (selectedEventForBoxes?.id === entityId) {
+                          setSelectedEventForBoxes(updatedEvent);
+                      }
+                      return updatedEvent;
+                  }
+                  return e;
+              });
+              setEvents(updateFunc);
+          });
+          toast({ title: "Box Actualizado", description: "Los datos del dueño del box se guardaron." });
+      } catch (error: any) {
+          toast({ title: "Error al Actualizar Box", description: error.message, variant: "destructive" });
+      } finally {
+          setIsSubmitting(false);
+      }
+  };
   
   const EntityTable = ({ entitiesToShow, type }: { entitiesToShow: PromoterEntityView[], type: 'promotion' | 'event' }) => {
     if (entitiesToShow.length === 0) {
@@ -273,13 +338,12 @@ export default function PromoterEntitiesPage() {
 
     return (
       <div className="space-y-4">
-        {/* Vista para pantallas grandes (tabla) */}
         <div className="hidden md:block">
             <Table>
                 <TableHeader>
                 <TableRow>
                     <TableHead className="min-w-[300px]">{type === 'event' ? 'Evento' : 'Promoción'}</TableHead>
-                    <TableHead className="min-w-[250px]">Mis Códigos y QRs</TableHead>
+                    <TableHead className="min-w-[250px]">Mis códigos y QRs</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -288,93 +352,89 @@ export default function PromoterEntitiesPage() {
                     const isActivatable = isEntityCurrentlyActivatable(entity);
                     
                     return (
-                    <TableRow key={entity.id || `entity-fallback-${Math.random()}`}>
-                        <TableCell className="font-medium align-top py-3 space-y-1">
-                            <div className="font-semibold text-base">{entity.name}</div>
-                            {entity.businessName && <div className="text-xs text-muted-foreground flex items-center mt-0.5"><Building size={14} className="mr-1"/>{entity.businessName}</div>}
-                            <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
-                                    className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
-                                {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
-                            </Badge>
-                            <div className="flex flex-col items-start gap-1 pt-1.5">
-                            <Button 
-                                variant="outline" 
-                                size="xs" 
-                                onClick={() => openCreateCodesDialog(entity)} 
-                                disabled={!isActivatable || isSubmitting}
-                                className="px-2 py-1 h-auto text-xs"
-                            >
-                                <QrCodeIcon className="h-3 w-3 mr-1" /> Crear Códigos
-                            </Button>
-                            <Button 
-                                variant="outline" 
-                                size="xs" 
-                                onClick={() => openViewCodesDialog(entity)}
-                                disabled={isSubmitting}
-                                className="px-2 py-1 h-auto text-xs"
-                            >
-                                <ListChecks className="h-3 w-3 mr-1" /> Ver Mis Códigos ({promoterCodeStats.created})
-                            </Button>
-                            </div>
-                        </TableCell>
-                        
-                        <TableCell className="align-top py-3 text-left text-xs">
-                        <div className="flex flex-col space-y-0.5">
-                            <div>Códigos Creados ({promoterCodeStats.created})</div>
-                            <div>QRs Generados ({entity.promoterCodesUsed || 0})</div>
-                            <div>QRs Usados ({entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0})</div>
-                        </div>
-                        </TableCell>
-                    </TableRow>
+                    <React.Fragment key={entity.id || `entity-fallback-${Math.random()}`}>
+                        <TableRow>
+                            <TableCell className="font-medium align-top py-3 space-y-1">
+                                <div className="font-semibold text-base">{entity.name}</div>
+                                {entity.businessName && <div className="text-xs text-muted-foreground flex items-center mt-0.5"><Building size={14} className="mr-1"/>{entity.businessName}</div>}
+                                <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
+                                        className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
+                                    {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
+                                </Badge>
+                                <div className="flex items-center gap-1 pt-1.5">
+                                    <Button variant="outline" size="xs" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                        <QrCode className="h-3 w-3 mr-1" /> Crear códigos
+                                    </Button>
+                                    <Button variant="outline" size="xs" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting} className="px-2 py-1 h-auto text-xs">
+                                        <ListChecks className="h-3 w-3 mr-1" /> Ver mis códigos ({promoterCodeStats.created})
+                                    </Button>
+                                    {entity.type === 'event' && entity.eventBoxes && entity.eventBoxes.length > 0 && (
+                                        <Button variant="outline" size="xs" onClick={() => {setSelectedEventForBoxes(entity); setShowBoxesModal(true);}} className="px-2 py-1 h-auto text-xs">
+                                            <Box className="h-3 w-3 mr-1" /> Ver boxes ({entity.eventBoxes.length})
+                                        </Button>
+                                    )}
+                                </div>
+                            </TableCell>
+                            
+                            <TableCell className="align-top py-3 text-left text-sm">
+                              <div className="flex flex-col space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <QrCode className="h-4 w-4 text-primary" />
+                                    Códigos creados: <span className="font-semibold">{promoterCodeStats.created}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <ScanLine className="h-4 w-4 text-blue-600" />
+                                    QRs generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    QRs usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span>
+                                  </div>
+                              </div>
+                            </TableCell>
+                        </TableRow>
+                    </React.Fragment>
                     )})}
                 </TableBody>
             </Table>
         </div>
-        {/* Vista para pantallas pequeñas (tarjetas) */}
         <div className="md:hidden space-y-4">
            {entitiesToShow.map(entity => {
                 const promoterCodeStats = getPromoterCodeStats(entity.generatedCodes);
                 const isActivatable = isEntityCurrentlyActivatable(entity);
                 return (
                     <Card key={entity.id} className="overflow-hidden">
-                        <CardHeader className="p-4">
-                            <CardTitle className="text-lg">{entity.name}</CardTitle>
-                            {entity.businessName && <ShadcnCardDescription className="text-xs text-muted-foreground flex items-center pt-1"><Building size={14} className="mr-1.5"/>{entity.businessName}</ShadcnCardDescription>}
+                        <CardHeader className="p-4 flex flex-row justify-between items-start">
+                            <div>
+                                <CardTitle className="text-lg">{entity.name}</CardTitle>
+                                {entity.businessName && <ShadcnCardDescription className="text-xs text-muted-foreground flex items-center pt-1"><Building size={14} className="mr-1.5"/>{entity.businessName}</ShadcnCardDescription>}
+                            </div>
+                            <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
+                                    className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1 shrink-0")}>
+                                {entity.isActive ? (isActivatable ? "Vigente" : "Fuera de Fecha") : "Inactiva"}
+                            </Badge>
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                            <div className="flex justify-between items-start gap-4">
-                                <div>
-                                    <Badge variant={entity.isActive && isActivatable ? "default" : (entity.isActive ? "outline" : "destructive")} 
-                                            className={cn(entity.isActive && isActivatable ? "bg-green-500 hover:bg-green-600" : (entity.isActive ? "border-yellow-500 text-yellow-600" : ""), "text-xs mt-1")}>
-                                        {entity.isActive ? (isActivatable ? "Vigente" : "Activa (Fuera de Fecha)") : "Inactiva"}
-                                    </Badge>
-                                </div>
-                                <div className="text-xs text-right shrink-0">
-                                    <p>Códigos Creados: <span className="font-semibold">{promoterCodeStats.created}</span></p>
-                                    <p>QRs Generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></p>
-                                    <p>QRs Usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></p>
+                                <div className="text-sm text-left shrink-0 space-y-2">
+                                    <div className="flex items-center gap-2"><QrCode className="h-4 w-4 text-primary" />Códigos creados: <span className="font-semibold">{promoterCodeStats.created}</span></div>
+                                    <div className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-blue-600" />QRs generados: <span className="font-semibold">{entity.promoterCodesUsed || 0}</span></div>
+                                    <div className="flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-600" />QRs usados: <span className="font-semibold">{entity.generatedCodes?.filter(c => c.generatedByUid === userProfile?.uid && c.status === 'used').length || 0}</span></div>
                                 </div>
                            </div>
                            <Separator />
-                           <div className="flex gap-2">
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="flex-1"
-                                    onClick={() => openCreateCodesDialog(entity)} 
-                                    disabled={!isActivatable || isSubmitting}
-                                >
-                                    <QrCodeIcon className="h-4 w-4 mr-2" /> Crear
+                           <div className="flex flex-col gap-2">
+                                <Button variant="outline" size="sm" className="w-full" onClick={() => openCreateCodesDialog(entity)} disabled={!isActivatable || isSubmitting}>
+                                    <QrCode className="h-4 w-4 mr-2" /> Crear códigos
                                 </Button>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="flex-1"
-                                    onClick={() => openViewCodesDialog(entity)}
-                                    disabled={isSubmitting}
-                                >
-                                    <ListChecks className="h-4 w-4 mr-2" /> Ver Códigos
+                                <Button variant="outline" size="sm" className="w-full" onClick={() => openViewCodesDialog(entity)} disabled={isSubmitting}>
+                                    <ListChecks className="h-4 w-4 mr-2" /> Ver mis códigos
                                 </Button>
+                                {entity.type === 'event' && entity.eventBoxes && entity.eventBoxes.length > 0 && (
+                                    <Button variant="outline" size="sm" className="w-full" onClick={() => {setSelectedEventForBoxes(entity); setShowBoxesModal(true);}}>
+                                        <Box className="h-4 w-4 mr-2" /> Ver boxes ({entity.eventBoxes.length})
+                                    </Button>
+                                )}
                            </div>
                         </CardContent>
                     </Card>
@@ -389,7 +449,7 @@ export default function PromoterEntitiesPage() {
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando promociones y eventos asignados...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Cargando campañas asignadas...</p>
       </div>
     );
   }
@@ -398,8 +458,8 @@ export default function PromoterEntitiesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
       <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-  <Gift className="h-8 w-8 text-primary !block" /> Promociones y Eventos
-</h1>
+          <Gift className="h-8 w-8 text-primary !block" /> Campañas
+        </h1>
       </div>
       
       <section>
@@ -420,20 +480,48 @@ export default function PromoterEntitiesPage() {
         </Card>
       </section>
 
+    <Dialog open={showBoxesModal} onOpenChange={(isOpen) => { if (!isOpen) setSelectedEventForBoxes(null); setShowBoxesModal(isOpen); }}>
+        <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Boxes para: {selectedEventForBoxes?.name}</DialogTitle>
+                <DialogDescription>
+                    Gestiona los boxes disponibles para este evento.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto space-y-2 p-1">
+                {(selectedEventForBoxes?.eventBoxes && selectedEventForBoxes.eventBoxes.length > 0) ? (
+                    selectedEventForBoxes.eventBoxes.map(box => (
+                        <BoxManagementCard 
+                            key={box.id}
+                            box={box}
+                            eventId={selectedEventForBoxes.id}
+                            userProfile={userProfile}
+                            isSubmitting={isSubmitting}
+                            onUpdateBoxOwner={handleUpdateBoxOwner}
+                            currentUser={currentUser}
+                        />
+                    ))
+                ) : (
+                    <p className="text-center text-muted-foreground py-8">Este evento no tiene boxes disponibles.</p>
+                )}
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowBoxesModal(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
     {selectedEntityForCreatingCodes && userProfile && (
         <CreateCodesDialog
           open={showCreateCodesModal}
           onOpenChange={(isOpen) => { if(!isOpen) setSelectedEntityForCreatingCodes(null); setShowCreateCodesModal(isOpen);}}
-          entityName={selectedEntityForCreatingCodes.name}
-          entityId={selectedEntityForCreatingCodes.id!}
+          entity={selectedEntityForCreatingCodes}
           existingCodesValues={(selectedEntityForCreatingCodes.generatedCodes || []).map(c => c.value)}
           onCodesCreated={handleNewCodesCreated}
           isSubmittingMain={isSubmitting}
           currentUserProfileName={userProfile.name}
           currentUserProfileUid={userProfile.uid}
-          maxAttendance={selectedEntityForCreatingCodes.maxAttendance}
-          currentCodeCount={selectedEntityForCreatingCodes.generatedCodes?.length || 0}
+          currentUserRoles={userProfile.roles}
         />
       )}
 
@@ -457,7 +545,7 @@ export default function PromoterEntitiesPage() {
                     toast({
                         title: "Acción no permitida",
                         description: `Esta ${currentEntity.type === 'event' ? 'evento' : 'promoción'} no está activa o está fuera de su periodo de vigencia.`,
-                        variant: "destructive",
+                        variant: "destructive"
                     });
                  }
             }
@@ -470,4 +558,183 @@ export default function PromoterEntitiesPage() {
       )}
     </div>
   );
+}
+
+function BoxManagementCard({ box, eventId, userProfile, isSubmitting, onUpdateBoxOwner, currentUser }: { box: EventBox; eventId: string; userProfile: any; isSubmitting: boolean; onUpdateBoxOwner: (entityId: string, boxId: string, ownerName: string, ownerDni: string, ownerPhone: string, newStatus: 'reserved' | 'sold') => void; currentUser: FirebaseUser | null; }) {
+    const [ownerDni, setOwnerDni] = useState(box.ownerDni || "");
+    const [ownerName, setOwnerName] = useState(box.ownerName || "");
+    const [ownerPhone, setOwnerPhone] = useState(box.ownerPhone || "");
+    const [docType, setDocType] = useState<'dni' | 'ce'>('dni');
+    const [isDniLoading, setIsDniLoading] = useState(false);
+    const { toast } = useToast();
+
+    const isReservedByMe = box.status === 'reserved' && box.promoterId === userProfile?.uid;
+    const isSoldByMe = box.status === 'sold' && box.promoterId === userProfile?.uid;
+    const canManage = box.status === 'available' || isReservedByMe;
+    
+    const isValidPhone = (phone: string) => /^9\d{8}$/.test(phone);
+    const isValidDni = ownerDni.length >= 8 && ownerDni.length <= 20;
+    const canSubmit = !isSubmitting && ownerName && isValidDni && isValidPhone(ownerPhone);
+
+
+    const getBadgeContent = () => {
+        if (box.status === 'available') return 'Disponible';
+        if (isReservedByMe) return 'Reservado por ti';
+        if (box.status === 'reserved') return 'Reservado';
+        if (isSoldByMe) return 'Vendido por ti';
+        if (box.status === 'sold') return 'Vendido';
+        return box.status;
+    };
+
+    useEffect(() => {
+        setOwnerDni(box.ownerDni || "");
+        setOwnerName(box.ownerName || "");
+        setOwnerPhone(box.ownerPhone || "");
+    }, [box]);
+
+    const handleVerifyDni = async () => {
+        if (!ownerDni || !currentUser) return;
+        
+        const dniRegex = /^\d{8}$/;
+        const ceRegex = /^\d{7,20}$/;
+
+        if (docType === 'dni' && !dniRegex.test(ownerDni)) {
+            toast({ title: "DNI Inválido", description: "El DNI debe contener 8 dígitos numéricos.", variant: "destructive" });
+            return;
+        }
+        if (docType === 'ce' && !ceRegex.test(ownerDni)) {
+            toast({ title: "CE Inválido", description: "El Carnet de Extranjería debe tener entre 7 y 20 dígitos.", variant: "destructive" });
+            return;
+        }
+
+        setIsDniLoading(true);
+        try {
+            const idToken = await currentUser.getIdToken();
+            const response = await fetch(`/api/promoter/get-client-name?dni=${ownerDni}&docType=${docType}`, {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Error del servidor (${response.status})`);
+            }
+            
+            const data = await response.json();
+            
+            let toastMessages: string[] = [];
+            if (data.name) {
+                setOwnerName(data.name);
+                toastMessages.push(`Nombre: ${data.name}.`);
+            }
+            if (data.phone) {
+                setOwnerPhone(data.phone);
+                toastMessages.push(`Celular: ${data.phone}.`);
+            }
+
+            if (toastMessages.length > 0) {
+                toast({ title: "Cliente Encontrado", description: `Datos autocompletados. ${toastMessages.join(' ')}` });
+            } else {
+                toast({ title: "No Encontrado", description: "No se encontró un cliente. Por favor, ingrese los datos manualmente.", variant: "default"});
+            }
+
+        } catch (error: any) {
+            console.error("Error fetching client by DNI:", error);
+            toast({ title: "Error de Búsqueda", description: `No se pudo verificar el DNI. ${error.message}`, variant: "destructive"});
+        } finally {
+            setIsDniLoading(false);
+        }
+    };
+    
+    return (
+        <div className={cn("p-4 rounded-lg space-y-3 transition-all duration-300 ease-in-out border-2 shadow-lg hover:shadow-xl hover:-translate-y-1",
+            {
+                "bg-green-500/10 border-green-300": box.status === 'available',
+                "bg-blue-500/10 border-blue-300": box.status === 'reserved',
+                "bg-purple-500/10 border-purple-300": box.status === 'sold',
+            }
+        )}>
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="font-semibold text-base text-foreground">{box.name}</p>
+                    <p className="text-sm text-muted-foreground">Capacidad: {box.capacity || 'N/A'}</p>
+                    <p className="text-2xl font-bold text-primary">S/ {box.cost.toFixed(2)}</p>
+                </div>
+                <Badge variant={box.status === 'available' ? 'default' : 'secondary'} className={cn("shrink-0", { 'bg-green-500 text-white': box.status === 'available', 'bg-blue-600 text-white': isReservedByMe, 'bg-purple-600 text-white': isSoldByMe, 'bg-gray-500 text-white': (box.status === 'sold' || box.status === 'reserved') && !isReservedByMe && !isSoldByMe })}>{getBadgeContent()}</Badge>
+            </div>
+
+            {(isSoldByMe || isReservedByMe) && (
+                <div className="pt-3 border-t text-sm space-y-1">
+                    <p className="font-semibold">Información del Cliente:</p>
+                    <div className="text-muted-foreground flex items-center">
+                        <UserIcon size={14} className="mr-1.5"/>Dueño: <span className="font-medium text-foreground ml-1">{box.ownerName}</span>
+                    </div>
+                    <div className="text-muted-foreground flex items-center">
+                        <UserIcon size={14} className="mr-1.5 opacity-0"/>DNI/CE: <span className="font-medium text-foreground ml-1">{box.ownerDni}</span>
+                    </div>
+                    {box.ownerPhone && 
+                        <div className="text-muted-foreground flex items-center">
+                            <Phone size={14} className="mr-1.5"/>Celular: <span className="font-medium text-foreground ml-1">{box.ownerPhone}</span>
+                        </div>
+                    }
+                </div>
+            )}
+            
+            {canManage && (
+                <div className="space-y-3 pt-3 border-t">
+                    <div className="flex items-center p-1 rounded-lg bg-muted w-full">
+                        <Button
+                            type="button"
+                            onClick={() => setDocType('dni')}
+                            variant={docType === 'dni' ? 'default' : 'ghost'}
+                            className={cn("flex-1 text-xs h-7", docType === 'dni' && 'bg-primary text-primary-foreground')}
+                            size="sm"
+                        >
+                            DNI
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => setDocType('ce')}
+                            variant={docType === 'ce' ? 'default' : 'ghost'}
+                            className={cn("flex-1 text-xs h-7", docType === 'ce' && 'bg-primary text-primary-foreground')}
+                            size="sm"
+                        >
+                            Carnet Ext.
+                        </Button>
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label htmlFor={`dni-${box.id}`} className="text-xs">Número de Documento del dueño <span className="text-destructive">*</span></Label>
+                        <div className="flex gap-2">
+                            <Input id={`dni-${box.id}`} value={ownerDni} onChange={e => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                const maxLength = docType === 'dni' ? 8 : 20;
+                                setOwnerDni(val.slice(0, maxLength));
+                            }} placeholder={docType === 'dni' ? "8 dígitos" : "8-20 dígitos"} disabled={isSubmitting || isDniLoading} />
+                            <Button size="icon" variant="outline" onClick={handleVerifyDni} disabled={isSubmitting || isDniLoading || !ownerDni}>
+                                {isDniLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
+                            </Button>
+                        </div>
+                         {!isValidDni && ownerDni.length > 0 && <p className="text-xs text-destructive mt-1">Debe tener entre 8 y 20 dígitos.</p>}
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor={`phone-${box.id}`} className="text-xs">Celular del dueño <span className="text-destructive">*</span></Label>
+                        <Input id={`phone-${box.id}`} type="tel" value={ownerPhone} onChange={e => setOwnerPhone(e.target.value.replace(/[^0-9]/g, '').slice(0,9))} placeholder="987654321" maxLength={9} disabled={isSubmitting} />
+                        {!isValidPhone(ownerPhone) && ownerPhone.length > 0 && <p className="text-xs text-destructive mt-1">Debe ser un celular válido de 9 dígitos que empiece con 9.</p>}
+                    </div>
+                     <div className="space-y-1">
+                        <Label htmlFor={`name-${box.id}`} className="text-xs">Nombre del dueño <span className="text-destructive">*</span></Label>
+                        <Input id={`name-${box.id}`} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Nombre del cliente" disabled={isSubmitting} />
+                    </div>
+                    <div className="flex gap-2 justify-end pt-2">
+                       {box.status === 'available' && (
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'reserved')} disabled={!canSubmit}>Reservar</Button>
+                       )}
+                       {isReservedByMe && (
+                         <Button size="sm" onClick={() => onUpdateBoxOwner(eventId, box.id, ownerName, ownerDni, ownerPhone, 'sold')} disabled={!canSubmit}>Marcar como Vendido</Button>
+                       )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }

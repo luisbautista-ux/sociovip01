@@ -5,6 +5,7 @@ import * as React from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import type { BusinessManagedEntity, GeneratedCode, Business } from "@/lib/types";
@@ -222,7 +223,7 @@ export function ManageCodesDialog({
     
     setInternalCodes(updatedRawCodes); 
     onCodesUpdated(entity.id, updatedRawCodes); 
-    toast({ title: "Códigos del Lote Eliminados", description: `${codesToDeleteFromBatchIds.length} código(s) no canjeado(s) del lote han sido eliminados.`, variant: "destructive" });
+    toast({ title: "Códigos del lote eliminados", description: `${codesToDeleteFromBatchIds.length} código(s) no canjeado(s) del lote han sido eliminados.`, variant: "destructive" });
     
     const remainingInBatch = updatedRawCodes.filter(c => batchItem.codesInBatch?.some(orig => orig.id === c.id));
     if (remainingInBatch.length === 0 && batchItem.batchId) {
@@ -245,12 +246,12 @@ export function ManageCodesDialog({
           return;
       }
 
-      const businessUrl = businessDetails?.customUrlPath
-          ? `https://sociosvip.app/b/${businessDetails.customUrlPath}`
-          : `https://sociosvip.app/business/${entity?.businessId}`;
-
+      const shareUrl = businessDetails?.customUrlPath
+        ? `https://sociovip.app/${businessDetails.customUrlPath}`
+        : `https://sociovip.app/business/${entity?.businessId}`;
+      
       const codesText = codes.join('\n');
-      const message = `Genera tu entrada QR con tu código en:\n${businessUrl}\n\n${codesText}`;
+      const message = `Genera tu entrada QR con tu código en:\n${shareUrl}\n\n${codesText}`;
       const whatsappUrl = `https://wa.me/${phoneToUse}?text=${encodeURIComponent(message)}`;
       
       window.open(whatsappUrl, '_blank');
@@ -271,7 +272,7 @@ export function ManageCodesDialog({
     const handleShareAllAvailableCodes = () => {
         const availableCodes = internalCodes.filter(c => c.status === 'available').map(c => c.value);
         if (availableCodes.length === 0) {
-            toast({ title: "Sin Códigos Disponibles", description: "No hay códigos disponibles para compartir." });
+            toast({ title: "Sin códigos disponibles", description: "No hay códigos disponibles para compartir." });
             return;
         }
         openWhatsApp(availableCodes);
@@ -312,6 +313,11 @@ export function ManageCodesDialog({
       <TableCell className="py-1.5 px-2 text-center">
           <Badge variant={GENERATED_CODE_STATUS_COLORS[code.status] || 'outline'} className="text-xs">{GENERATED_CODE_STATUS_TRANSLATIONS[code.status] || code.status}</Badge>
       </TableCell>
+      {!isPromoterView && (
+        <TableCell className="py-1.5 px-2 text-center text-muted-foreground">
+          {code.generatedByName || 'N/A'}
+        </TableCell>
+      )}
       <TableCell className="py-1.5 px-2 text-center">
         {code.redemptionDate ? format(new Date(code.redemptionDate), "dd/MM/yy HH:mm", { locale: es }) : "N/A"}
       </TableCell>
@@ -322,85 +328,84 @@ export function ManageCodesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl"> 
         <DialogHeader>
-          <DialogTitle>Mis Códigos para: {entity.name}</DialogTitle>
+          <DialogTitle>{isPromoterView ? 'Mis códigos para:' : 'Códigos para:'} {entity.name}</DialogTitle>
           <DialogDescription>
-            Visualiza los códigos que has generado para esta campaña. Se agrupan si se crearon juntos.
+            {isPromoterView 
+              ? "Visualiza los códigos que has generado para esta campaña. Se agrupan si se crearon juntos."
+              : "Visualiza todos los códigos generados para esta campaña, agrupados por lote de creación."
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="my-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <Button onClick={onRequestCreateNewCodes} variant="default" className="bg-primary hover:bg-primary/90">
-            <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevos Códigos
+            <PlusCircle className="mr-2 h-4 w-4" /> Crear nuevos códigos
           </Button>
           <Button
             onClick={handleShareAllAvailableCodes}
             variant="outline"
             disabled={!internalCodes.some(c => c.status === 'available')}
           >
-            <WhatsAppIcon className="mr-2 h-4 w-4" /> Compartir Disponibles ({internalCodes.filter(c => c.status === 'available').length})
+            <WhatsAppIcon className="mr-2 h-4 w-4" /> Compartir disponibles ({internalCodes.filter(c => c.status === 'available').length})
           </Button>
         </div>
 
         {isLoadingCodes ? (
           <div className="flex justify-center items-center h-[50vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="ml-3 text-muted-foreground">Cargando mis códigos...</p>
+            <p className="ml-3 text-muted-foreground">Cargando códigos...</p>
           </div>
         ) : processedAndGroupedCodes.length > 0 ? (
-          <ScrollArea className="h-[50vh] border rounded-md">
+          <div className="overflow-x-auto h-[50vh] border rounded-md">
             <Table>
-              <TableHeader>
+                <TableHeader>
                 <TableRow className="text-sm">
-                  <TableHead className="w-1/3 px-2 py-2 text-center">Código</TableHead>
-                  <TableHead className="w-1/3 px-2 py-2 text-center">Estado</TableHead>
-                  <TableHead className="w-1/3 px-2 py-2 text-center">Fecha Canje</TableHead>
+                    <TableHead className="w-[140px] px-2 py-2">Código</TableHead>
+                    <TableHead className="w-[110px] px-2 py-2 text-center">Estado</TableHead>
+                    {!isPromoterView && <TableHead className="w-[120px] px-2 py-2 text-center">Creado por</TableHead>}
+                    <TableHead className="w-[120px] px-2 py-2 text-center">Fecha canje</TableHead>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
+                </TableHeader>
+                <TableBody>
                 {processedAndGroupedCodes.map((item) => {
-                  if (item.isBatch && item.codesInBatch && item.batchId) {
+                    if (item.isBatch && item.codesInBatch && item.batchId) {
                     const isExpanded = !!expandedBatches[item.batchId];
-                    
                     return (
-                      <React.Fragment key={item.id}>
+                        <React.Fragment key={item.id}>
                         <TableRow 
                             className="border-b hover:bg-muted/30 cursor-pointer data-[state=open]:bg-muted/30"
                             onClick={() => toggleBatchExpansion(item.batchId!)}
                             data-state={isExpanded ? "open" : "closed"}
                         >
-                          <TableCell colSpan={3} className="py-2 px-3 text-xs">
-                             <div className="flex items-center justify-between group w-full">
-                              <div className="flex items-center">
+                            <TableCell colSpan={isPromoterView ? 3 : 4} className="py-2 px-3 text-xs">
+                            <div className="flex items-center justify-between group w-full">
+                                <div className="flex items-center">
                                 {isExpanded ? <ChevronUp className="h-3.5 w-3.5 mr-2 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 mr-2 shrink-0" />}
-                                <span>Lote de {item.codesInBatch.length} códigos</span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    className="text-xs h-auto py-1 px-1.5"
-                                    onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}
-                                >
-                                    <WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir Lote ({item.codesInBatch!.length})
-                                </Button>
-                              </div>
+                                <div className="flex flex-col">
+                                    <span className="font-semibold">Lote de {item.codesInBatch.length} códigos</span>
+                                    {!isPromoterView && <span className="text-muted-foreground text-[11px]">Creado por: {item.generatedByName}</span>}
+                                </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                <Button variant="ghost" size="xs" className="text-xs h-auto py-1 px-1.5" onClick={(e) => { e.stopPropagation(); handleShareBatchCodes(item.codesInBatch);}}><WhatsAppIcon className="mr-1 h-4 w-4" /> Compartir lote ({item.codesInBatch!.length})</Button>
+                                </div>
                             </div>
-                          </TableCell>
+                            </TableCell>
                         </TableRow>
                         {isExpanded && item.codesInBatch.map(code => renderCodeRow(code, true, item.batchId))}
-                      </React.Fragment>
+                        </React.Fragment>
                     );
-                  } else if (item.singleCode) {
+                    } else if (item.singleCode) {
                     return renderCodeRow(item.singleCode, false);
-                  }
-                  return null;
+                    }
+                    return null;
                 })}
-              </TableBody>
+                </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-muted-foreground border border-dashed rounded-md p-4 text-center">
-            <p>No has generado códigos para esta entidad aún.</p>
+            <p>No hay códigos generados para esta campaña.</p>
             <p className="text-sm">Haz clic en "Crear Nuevos Códigos" para empezar.</p>
           </div>
         )}

@@ -1,16 +1,17 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog as UIDialog, DialogContent as UIDialogContent, DialogHeader as UIDialogHeader, DialogTitle as UIDialogTitle, DialogDescription as UIDialogDescription, DialogFooter as UIDialogFooter } from "@/components/ui/dialog";
-import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle, Check, ChevronsUpDown, MoreVertical } from "lucide-react";
+import { Users, PlusCircle, Download, Search, Edit, Trash2, Loader2, AlertTriangle, Check, ChevronsUpDown, MoreVertical, Info } from "lucide-react";
 import type { PlatformUser, PlatformUserFormData, Business, QrClient, SocioVipMember, PlatformUserRole, InitialDataForPlatformUserCreation } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { PlatformUserForm } from "@/components/admin/forms/PlatformUserForm";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 import { db } from "@/lib/firebase";
@@ -87,8 +89,14 @@ export default function AdminUsersPage() {
   const [showCreateEditModal, setShowCreateEditModal] = useState(false); 
   
   const [showDniIsPlatformUserAlert, setShowDniIsPlatformUserAlert] = useState(false);
+  const [showUserNotFoundAlert, setShowUserNotFoundAlert] = useState(false);
+  const [dniNotFound, setDniNotFound] = useState("");
+
   const [existingPlatformUserToEdit, setExistingPlatformUserToEdit] = useState<PlatformUser | null>(null);
   const [existingPlatformUserRoles, setExistingPlatformUserRoles] = useState<PlatformUserRole[]>([]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
 
   const dniEntryForm = useForm<DniEntryValues>({
@@ -165,6 +173,16 @@ export default function AdminUsersPage() {
     (user.dni?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
   
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filteredUsers.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredUsers, currentPage, rowsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, rowsPerPage]);
+
   const handleExport = () => {
     if (filteredUsers.length === 0) {
       toast({ title: "Sin Datos", description: "No hay usuarios para exportar.", variant: "destructive" });
@@ -194,7 +212,7 @@ export default function AdminUsersPage() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "sociosvip_usuarios_plataforma.csv");
+    link.setAttribute("download", "sociovip_usuarios_plataforma.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -256,6 +274,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     setExistingPlatformUserRoles([]);
     setDniForVerification(""); 
     setShowDniEntryModal(true); 
+    setShowUserNotFoundAlert(false);
+    setDniNotFound("");
   };
 
   const handleDniVerificationSubmit = async (values: DniEntryValues) => {
@@ -270,56 +290,28 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     setIsSubmitting(true); 
     setDniForVerification(docNumberCleaned); 
     
-    const dbCheckResult = await checkDniExists(docNumberCleaned);
-    
-    let initialData: InitialDataForPlatformUserCreation = { dni: docNumberCleaned };
-    
-    if (dbCheckResult.exists) {
-        if (dbCheckResult.userType === 'PlatformUser' && dbCheckResult.platformUserData) {
-            setIsSubmitting(false);
+    try {
+        const dbCheckResult = await checkDniExists(docNumberCleaned);
+        
+        if (dbCheckResult.exists && dbCheckResult.userType === 'PlatformUser' && dbCheckResult.platformUserData) {
             setExistingPlatformUserToEdit(dbCheckResult.platformUserData);
             setExistingPlatformUserRoles(dbCheckResult.platformUserRoles || []);
-            initialData.existingPlatformUser = dbCheckResult.platformUserData;
-            initialData.existingPlatformUserRoles = dbCheckResult.platformUserRoles || [];
             setShowDniIsPlatformUserAlert(true); 
-            setShowDniEntryModal(false); 
-            return; 
-        } else if (dbCheckResult.userType === 'SocioVipMember' && dbCheckResult.socioVipData) {
-            initialData.name = `${dbCheckResult.socioVipData.name} ${dbCheckResult.socioVipData.surname}`;
-            initialData.email = dbCheckResult.socioVipData.email;
-            initialData.preExistingUserType = 'SocioVipMember';
-        } else if (dbCheckResult.userType === 'QrClient' && dbCheckResult.qrClientData) {
-            initialData.name = `${dbCheckResult.qrClientData.name} ${dbCheckResult.qrClientData.surname}`;
-            initialData.preExistingUserType = 'QrClient';
+            setShowDniEntryModal(false);
+        } else {
+            setDniNotFound(docNumberCleaned);
+            setShowUserNotFoundAlert(true);
+            setShowDniEntryModal(false);
         }
-    } else {
-        // If DNI doesn't exist in our DB, consult the external API
-        if (values.docType === 'dni') {
-            try {
-                const response = await fetch('/api/admin/consult-dni', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dni: docNumberCleaned }),
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.nombreCompleto) {
-                        initialData.name = data.nombreCompleto;
-                    }
-                } else {
-                   console.warn("DNI consultation failed, proceeding with manual entry.");
-                }
-            } catch (error) {
-                console.error("Error calling DNI consultation API:", error);
-            }
-        }
+    } catch (error: any) {
+        toast({
+            title: "Error de Verificación",
+            description: `Hubo un problema al buscar el documento: ${error.message}`,
+            variant: "destructive"
+        });
+    } finally {
+        setIsSubmitting(false);
     }
-    
-    setIsSubmitting(false);
-    setVerifiedDniResult(initialData);
-    setEditingUser(null); 
-    setShowDniEntryModal(false); 
-    setShowCreateEditModal(true); 
   };
   
   const handleEditExistingPlatformUser = () => {
@@ -499,6 +491,9 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
               disabled={isLoading}
             />
           </div>
+           <div className="text-sm text-muted-foreground pt-4">
+            Mostrando <span className="font-semibold text-foreground">{paginatedUsers.length}</span> de <span className="font-semibold text-foreground">{filteredUsers.length}</span> usuarios totales.
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -514,7 +509,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             <>
               {/* Mobile View */}
               <div className="md:hidden space-y-4">
-                {filteredUsers.map(user => (
+                {paginatedUsers.map(user => (
                    <Card key={user.id} className="overflow-hidden">
                       <CardHeader className="p-4">
                         <CardTitle>{user.name}</CardTitle>
@@ -529,7 +524,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                             <span className="text-muted-foreground">Roles</span>
                             <div className="flex flex-wrap gap-1 justify-end">
                                 {user.roles && user.roles.map(role => (
-                                    <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="text-xs">
+                                    <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole) || role === 'promoter' ? 'secondary' : 'outline')} className="text-xs">
                                         {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
                                     </Badge>
                                 ))}
@@ -577,6 +572,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>#</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI/CE <span className="text-destructive">*</span></TableHead>
                       <TableHead className="hidden md:table-cell">Email <span className="text-destructive">*</span></TableHead>
@@ -587,8 +583,8 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUsers.length > 0 ? (
-                      filteredUsers.map((user) => {
+                    {paginatedUsers.length > 0 ? (
+                      paginatedUsers.map((user, index) => {
                         const lastLoginDate = anyToDate(user.lastLogin);
                         const getBusinessDisplay = () => {
                           if (user.roles.includes('promoter')) {
@@ -605,12 +601,13 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
 
                         return (
                         <TableRow key={user.id}>
+                          <TableCell className="text-muted-foreground">{((currentPage - 1) * rowsPerPage) + index + 1}</TableCell>
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell>{user.dni}</TableCell>
                           <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                           <TableCell>
                             {user.roles && user.roles.map(role => (
-                                <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role) || role === 'promoter' ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
+                                <Badge key={role} variant={role === 'superadmin' ? 'default' : (ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole) || role === 'promoter' ? 'secondary' : 'outline')} className="mr-1 mb-1 text-xs">
                                     {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole] || role}
                                 </Badge>
                             ))}
@@ -658,7 +655,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                       )})
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
+                        <TableCell colSpan={8} className="text-center h-24">No se encontraron usuarios con los filtros aplicados.</TableCell>
                       </TableRow>
                     )}
                   </TableBody>
@@ -667,6 +664,49 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             </>
           )}
         </CardContent>
+        {totalPages > 1 && (
+            <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t">
+            <div className="flex items-center space-x-2 text-sm">
+                <Label htmlFor="rows-per-page">Filas por página:</Label>
+                <Select
+                value={`${rowsPerPage}`}
+                onValueChange={(value) => setRowsPerPage(Number(value))}
+                >
+                <SelectTrigger id="rows-per-page" className="h-8 w-[70px]">
+                    <SelectValue placeholder={rowsPerPage} />
+                </SelectTrigger>
+                <SelectContent>
+                    {[10, 25, 50, 100].map((pageSize) => (
+                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                    </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            </div>
+            <div className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+            </div>
+            <div className="flex items-center space-x-2">
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                >
+                Anterior
+                </Button>
+                <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                >
+                Siguiente
+                </Button>
+            </div>
+            </CardFooter>
+        )}
       </Card>
       
       <UIDialog open={showDniEntryModal} onOpenChange={setShowDniEntryModal}>
@@ -736,7 +776,10 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                   <FormItem>
                     <FormLabel>Número de Documento <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "9-12 dígitos numéricos"} 
                         {...field} 
                         maxLength={watchedDocType === 'dni' ? 8 : 12}
@@ -828,8 +871,38 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={showUserNotFoundAlert} onOpenChange={setShowUserNotFoundAlert}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <UIAlertDialogTitle className="flex items-center">
+                    <Info className="h-6 w-6 mr-2 text-blue-500"/> Usuario no Registrado
+                </UIAlertDialogTitle>
+                <ShadcnAlertDialogDescription className="pt-4 space-y-3">
+                    <p>El documento <strong>{dniNotFound}</strong> no corresponde a un usuario con una cuenta en la plataforma.</p>
+                    <p>Para asignarle un rol de plataforma (admin, staff, etc.), el usuario primero debe tener una cuenta personal en SocioVIP.</p>
+                    <div className="bg-muted p-3 rounded-md text-center">
+                        <p className="text-sm font-semibold">Indícale al usuario que se registre en:</p>
+                        <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.app/signup</a>
+                        <p className="text-xs text-muted-foreground mt-1">Una vez registrado, podrás buscar su DNI aquí para asignarle un rol.</p>
+                    </div>
+                </ShadcnAlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setShowUserNotFoundAlert(false)} className="bg-primary hover:bg-primary/90">
+                    Entendido
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
     </div>
   );
 }
+
+    
+
+    
+
+    
 
     

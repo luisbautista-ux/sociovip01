@@ -1,13 +1,11 @@
 
 import { NextResponse } from 'next/server';
-import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 
 export async function GET(request: Request) {
   try {
-    // Inicializa la app de admin
-    await initializeAdminApp();
-    // Obtiene la instancia de Firestore desde el SDK de admin
-    const adminDb = admin.firestore();
+    // La inicialización ahora se maneja de forma centralizada.
+    // adminDb ya está disponible para su uso.
     
     const [
       businessesSnap, 
@@ -21,11 +19,11 @@ export async function GET(request: Request) {
       adminDb.collection('businessEntities').get() 
     ]);
 
-    let totalCodes = 0;
+    let totalCodesRedeemed = 0;
     businessEntitiesSnap.forEach(doc => {
       const data = doc.data();
       if (data.generatedCodes && Array.isArray(data.generatedCodes)) {
-        totalCodes += data.generatedCodes.length;
+        totalCodesRedeemed += data.generatedCodes.filter(c => c.status === 'redeemed' || c.status === 'used').length;
       }
     });
     
@@ -33,7 +31,7 @@ export async function GET(request: Request) {
       totalBusinesses: businessesSnap.data().count,
       totalPlatformUsers: platformUsersSnap.data().count,
       totalSocioVipMembers: socioVipMembersSnap.data().count,
-      totalQrCodesGenerated: totalCodes,
+      totalQrCodesGenerated: totalCodesRedeemed,
     };
 
     return NextResponse.json(stats);

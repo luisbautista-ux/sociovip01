@@ -207,14 +207,15 @@ export default function BusinessDashboardPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-primary flex items-center">
-        <LayoutDashboard className="h-8 w-8 mr-2" /> Dashboard
+        <LayoutDashboard className="h-8 w-8 mr-2" />
+        Dashboard
       </h1>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Promociones Activas" value={stats.activeEntities} icon={Ticket} />
         <StatCard title="Códigos Creados" value={stats.totalCodesCreated} icon={QrCodeLucide} />
-        <StatCard title="Códigos Canjeados (QR Generados)" value={stats.totalCodesRedeemed} icon={TicketCheck} />
-        <StatCard title="QR Validados (Asistencia)" value={stats.totalCodesUsed} icon={ScanSearch} />
+        <StatCard title="QRs Generados" value={stats.totalCodesRedeemed} icon={ScanLine} iconColor="text-blue-600" />
+        <StatCard title="QR Validados (Asistencia)" value={stats.totalCodesUsed} icon={CheckCircle} iconColor="text-green-600" />
       </div>
 
       <Card className="shadow-lg">

@@ -1,12 +1,11 @@
 
 // src/app/api/user/update-last-login/route.ts
 import { NextResponse } from 'next/server';
-import { initializeAdminApp, admin } from '@/lib/firebase/firebaseAdmin';
+import { admin, adminDb } from '@/lib/firebase/firebaseAdmin';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { headers } from 'next/headers';
 
-// Helper function to verify the token and get the UID
 async function getUidFromToken(authorizationHeader: string): Promise<string> {
   if (!authorizationHeader.startsWith('Bearer ')) {
     throw new Error('Invalid authorization header format.');
@@ -18,10 +17,6 @@ async function getUidFromToken(authorizationHeader: string): Promise<string> {
 
 export async function POST(request: Request) {
   try {
-    await initializeAdminApp();
-    const adminDb = admin.firestore();
-    
-    // Obtener el idToken de la cabecera de autorización
     const authorization = headers().get('Authorization');
 
     if (!authorization) {
@@ -36,7 +31,6 @@ export async function POST(request: Request) {
 
     const userDocRef = adminDb.collection('platformUsers').doc(uid);
     
-    // Actualizar el documento del usuario con la marca de tiempo del servidor
     await userDocRef.update({
       lastLogin: FieldValue.serverTimestamp(),
     });

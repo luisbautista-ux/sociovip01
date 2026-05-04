@@ -10,7 +10,7 @@ Este archivo proporciona las URLs, roles de usuario y credenciales de ejemplo pa
 
 ### Panel de Super Administrador
 -   **URL de acceso:** `/login`
--   **Email de Ejemplo:** `superadmin@sociosvip.app`
+-   **Email de Ejemplo:** `superadmin@sociovip.app`
 -   **Contraseña:** `password123`
 -   **Descripción:** Tiene acceso completo a toda la plataforma, incluida la gestión de negocios, todos los usuarios y los análisis de toda la plataforma. Después de iniciar sesión, serás redirigido a `/admin/dashboard`.
 
@@ -23,7 +23,7 @@ Este archivo proporciona las URLs, roles de usuario y credenciales de ejemplo pa
 
 ### Panel de Promotor
 -   **URL de acceso:** `/login`
--   **Email de Ejemplo:** `promoter@sociosvip.app`
+-   **Email de Ejemplo:** `promoter@sociovip.app`
 -   **Contraseña:** `password123`
 -   **Descripción:** Puede ver las promociones/eventos a los que está asignado y generar códigos únicos para ellos. Después de iniciar sesión, serás redirigido a `/promoter/dashboard`.
 
@@ -44,7 +44,7 @@ Esta sección detalla las rutas internas de la aplicación y qué roles de usuar
 -   `/`: Página principal de la aplicación.
 -   `/login`: Página de inicio de sesión de usuario.
 -   `/signup`: Página de registro de Super Administrador.
--   `/b/[customUrlPath]`: Página pública para un negocio con una URL personalizada (ej., `/b/pandora-lounge`).
+-   `/[customUrlPath]`: Página pública para un negocio con una URL personalizada (ej., `/pandora-lounge`).
 -   `/business/[businessId]`: Página pública para un negocio sin una URL personalizada.
 
 ### Rutas de Autenticación (Internas)

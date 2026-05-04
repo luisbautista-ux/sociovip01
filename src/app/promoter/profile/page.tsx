@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,9 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, UserCircle } from "lucide-react";
+import { Loader2, UserCircle, Upload } from "lucide-react";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const profileFormSchema = z.object({
@@ -27,19 +28,16 @@ const profileFormSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
 export default function PromoterProfilePage() {
-  const { userProfile, currentUser, loadingAuth, loadingProfile } = useAuth();
+  const { userProfile, currentUser, loadingAuth, loadingProfile, refreshUserProfile } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      name: "",
-      dni: "",
-      email: "",
-      phone: "",
-      photoURL: "",
-    },
+    defaultValues: { name: "", dni: "", email: "", phone: "", photoURL: "" },
   });
 
   useEffect(() => {
@@ -51,8 +49,23 @@ export default function PromoterProfilePage() {
         phone: userProfile.phone || "",
         photoURL: userProfile.photoURL || "",
       });
+      if(userProfile.photoURL) {
+        setPreviewUrl(userProfile.photoURL);
+      }
     }
   }, [userProfile, form]);
+  
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({ title: "Archivo muy grande", description: "Por favor, selecciona una imagen de menos de 2MB.", variant: "destructive" });
+        return;
+      }
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
 
   const handleUpdateProfile = async (values: ProfileFormValues) => {
     if (!currentUser) {
@@ -60,22 +73,66 @@ export default function PromoterProfilePage() {
       return;
     }
     setIsSubmitting(true);
+    
+    let uploadedPhotoURL = userProfile?.photoURL || "";
+    const oldPhotoURL = userProfile?.photoURL; // Save old URL for deletion
+
     try {
+      if (selectedFile) {
+        toast({ title: "Subiendo imagen...", description: "Por favor, espera." });
+        const storageRef = ref(storage, `promoter-avatars/${currentUser.uid}/${selectedFile.name}`);
+        const uploadResult = await uploadBytes(storageRef, selectedFile);
+        uploadedPhotoURL = await getDownloadURL(uploadResult.ref);
+      }
+
       const userDocRef = doc(db, "platformUsers", currentUser.uid);
       await updateDoc(userDocRef, {
         name: values.name,
         phone: values.phone || null,
-        photoURL: values.photoURL || null,
+        photoURL: uploadedPhotoURL || null,
       });
+
+      // After successful update, delete old photo if a new one was uploaded and there was an old one.
+      if (selectedFile && oldPhotoURL) {
+        try {
+          const oldPhotoRef = ref(storage, oldPhotoURL);
+          await deleteObject(oldPhotoRef);
+          console.log("Old profile photo deleted successfully.");
+        } catch (deleteError: any) {
+          // Log deletion error but don't fail the whole operation for the user
+          if (deleteError.code !== 'storage/object-not-found') {
+            console.error("Failed to delete old profile photo:", deleteError);
+          }
+        }
+      }
+
+      // After successful update, refresh the user profile in context
+      if (refreshUserProfile) {
+        await refreshUserProfile();
+      }
+
       toast({
         title: "Perfil Actualizado",
         description: "Tu información ha sido guardada correctamente.",
       });
+
+      setSelectedFile(null);
+
     } catch (error: any) {
+      console.error("Error updating profile:", error);
+      let errorMessage = "Ocurrió un error inesperado.";
+      if (error.code === 'storage/unauthorized') {
+        errorMessage = "No tienes permiso para subir esta imagen. Revisa las reglas de Storage.";
+      } else if (error.code === 'storage/object-not-found') {
+        errorMessage = "No se encontró la ruta de subida en el servidor.";
+      } else {
+        errorMessage = error.message || "No se pudo guardar tu perfil.";
+      }
       toast({
         title: "Error al Actualizar",
-        description: `No se pudo guardar tu perfil. ${error.message}`,
+        description: errorMessage,
         variant: "destructive",
+        duration: 9000,
       });
     } finally {
       setIsSubmitting(false);
@@ -118,26 +175,28 @@ export default function PromoterProfilePage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleUpdateProfile)} className="space-y-6">
-              <div className="flex justify-center mb-6">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={form.watch('photoURL') || userProfile?.photoURL || undefined} alt={userProfile.name} />
-                  <AvatarFallback className="text-3xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
+              
+              <div className="flex flex-col items-center justify-center mb-6 space-y-3">
+                <Avatar className="h-28 w-28 border-4 border-muted-foreground/20">
+                  <AvatarImage src={previewUrl || undefined} alt={userProfile.name} />
+                  <AvatarFallback className="text-4xl">{userProfile.name ? userProfile.name.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
                 </Avatar>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/png, image/jpeg, image/webp"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSubmitting}
+                  className="text-sm font-bold text-primary focus:outline-none"
+                >
+                  Editar
+                </button>
               </div>
-
-              <FormField
-                control={form.control}
-                name="photoURL"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>URL de Foto de Perfil</FormLabel>
-                    <FormControl>
-                      <Input placeholder="https://ejemplo.com/tu-foto.jpg" {...field} value={field.value || ""} disabled={isSubmitting} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={form.control}

@@ -1,0 +1,1451 @@
+"use client";
+
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import NextImage from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  Timestamp,
+  doc,
+  updateDoc,
+  addDoc,
+  serverTimestamp,
+  limit,
+  getDoc,
+  runTransaction,
+  arrayUnion
+} from "firebase/firestore";
+import type {
+  BusinessManagedEntity,
+  Business,
+  QrClient,
+  QrCodeData,
+  NewQrClientFormData,
+  GeneratedCode,
+  TicketType
+} from "@/lib/types";
+import { format, isPast, parse, isAfter } from "date-fns";
+import { es } from "date-fns/locale";
+import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
+import {
+  Loader2,
+  Building,
+  Tag,
+  CalendarDays,
+  QrCode as QrCodeIcon,
+  PackageOpen,
+  UserCircle,
+  AlertTriangle,
+  Info,
+  Download,
+  Calendar,
+  ArrowLeft,
+  History,
+  Video,
+  MapPin,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle as UIDialogTitleComponent,
+  DialogDescription as UIDialogDescriptionComponent,
+  DialogFooter as ShadcnDialogFooter,
+} from "@/components/ui/dialog";
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage,
+  FormDescription 
+} from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, type SubmitHandler } from "react-hook-form";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+import QRCode from "qrcode";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
+import { useAuth } from "@/context/AuthContext";
+import { LoginModal } from "@/components/auth/LoginModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription as UIDialogDescription,
+  AlertDialogFooter as ShadcnAlertDialogFooterAliased,
+  AlertDialogHeader,
+  AlertDialogTitle as UIAlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import React from "react";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { SocioVipLogo } from "@/components/icons";
+import { Separator } from "@/components/ui/separator";
+import * as htmlToImage from 'html-to-image';
+import { ImageCarousel } from "@/components/business/ImageCarousel";
+import { VideoCarousel } from "@/components/business/VideoCarousel";
+import { parseISO } from "date-fns/parseISO";
+import { ScrollReveal } from "@/components/ui/scroll-reveal";
+
+
+// --- Helpers robustos para códigos ---
+const normalizeCode = (v: unknown) =>
+  String(v ?? "")
+    .toUpperCase()
+    .replace(/[\s-]/g, "")            // quita espacios y guiones
+    .replace(/[^A-Z0-9]/g, "");       // deja solo A-Z-0-9
+
+const extractCodeString = (codeObj: any) =>
+  normalizeCode(codeObj?.value ?? codeObj?.code ?? codeObj?.codigo ?? codeObj?.val);
+
+const isCodeAvailableForUse = (codeObj: any) => {
+  const status = String(codeObj?.status ?? codeObj?.estado ?? "").toLowerCase();
+  const usedFlag = Boolean(codeObj?.used ?? codeObj?.redeemed ?? codeObj?.isUsed);
+  // disponible si NO tiene flags de usado y su status es vacío/available/nuevo/libre
+  return !usedFlag && (status === "" || status === "available" || status === "nuevo" || status === "libre");
+};
+
+
+// helper `cn` local
+const cn = (...c: (string | false | undefined | null)[]) => c.filter(Boolean).join(" ");
+
+const specificCodeFormSchema = z.object({
+  specificCode: z
+    .string()
+    .length(9, "El código debe tener 9 caracteres alfanuméricos.")
+    .regex(/^[A-Z0-9]{9}$/, "El código debe ser alfanumérico y en mayúsculas."),
+});
+type SpecificCodeFormValues = z.infer<typeof specificCodeFormSchema>;
+
+const DniEntrySchema = z.object({
+  docType: z.enum(['dni', 'ce'], { required_error: "Debes seleccionar un tipo de documento." }),
+  docNumber: z.string().min(1, "El número de documento es requerido."),
+}).superRefine((data, ctx) => {
+    if (data.docType === 'dni') {
+        if (!/^\d{8}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El DNI debe contener exactamente 8 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    } else if (data.docType === 'ce') {
+        if (!/^\d{10,20}$/.test(data.docNumber)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "El Carnet de Extranjería debe tener entre 10 y 20 dígitos numéricos.",
+                path: ['docNumber'],
+            });
+        }
+    }
+});
+type DniFormValues = z.infer<typeof DniEntrySchema>;
+
+const newQrClientSchema = z.object({
+  name: z.string().min(2, { message: "Nombre es requerido." }),
+  surname: z.string().min(2, { message: "Apellido es requerido." }),
+  phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9."),
+  dob: z.date({ required_error: "Fecha de nacimiento es requerida." }),
+  dni: z.string().min(7, "DNI/CE debe tener al menos 7 caracteres.").max(15, "DNI/CE no debe exceder 15 caracteres."),
+});
+
+type NewQrClientFormData = z.infer<typeof newQrClientSchema>;
+
+function hexToHsl(hex: string | undefined): string | null {
+  if (!hex || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(hex)) {
+    return null;
+  }
+  let r = 0, g = 0, b = 0;
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  h = Math.round(h * 360);
+  s = Math.round(s * 100);
+  l = Math.round(l * 100);
+  return `${h} ${s}% ${l}%`;
+}
+
+
+export default function BusinessPublicPageClient({ customUrlPath }: { customUrlPath: string }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const { currentUser, userProfile, logout, loadingAuth, loadingProfile } = useAuth();
+
+  const [businessDetails, setBusinessDetails] = useState<Business | null>(null);
+  const [promotions, setPromotions] = useState<BusinessManagedEntity[]>([]);
+  const [allEvents, setAllEvents] = useState<BusinessManagedEntity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
+
+  const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
+  const [showDniModal, setShowDniModal] = useState(false);
+  const [currentStepInModal, setCurrentStepInModal] = useState<"enterDni" | "newUserForm">("enterDni");
+  const [activeEntityForQr, setActiveEntityForQr] = useState<BusinessManagedEntity | null>(null);
+  const [validatedCodeObject, setValidatedCodeObject] = useState<GeneratedCode | null>(null);
+  const [enteredDni, setEnteredDni] = useState<string>("");
+  const [qrData, setQrData] = useState<QrCodeData | null>(null);
+  const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
+  const [isLoadingQrFlow, setIsLoadingQrFlow] = useState(false);
+  const [isConsultingDni, setIsConsultingDni] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // For custom template rendering
+
+  const dniForm = useForm<DniFormValues>({
+    resolver: zodResolver(DniEntrySchema),
+    defaultValues: { docType: 'dni', docNumber: "" },
+  });
+  const watchedDocType = dniForm.watch('docType');
+
+  const newQrClientForm = useForm<NewQrClientFormData>({
+    resolver: zodResolver(newQrClientSchema),
+    defaultValues: { name: "", surname: "", phone: "", dob: undefined, dni: "" },
+  });
+
+  const fetchBusinessDataByCustomUrl = useCallback(async () => {
+    if (!customUrlPath || typeof customUrlPath !== "string") {
+      setError("URL de negocio inválida.");
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const businessQuery = query(
+        collection(db, "businesses"),
+        where("customUrlPath", "==", customUrlPath.toLowerCase().trim()),
+        limit(1)
+      );
+      const businessSnap = await getDocs(businessQuery);
+
+      if (businessSnap.empty) {
+        setError("Negocio no encontrado. Verifica que la URL sea correcta.");
+        setBusinessDetails(null);
+        setPromotions([]);
+        setAllEvents([]);
+      } else {
+        const businessDoc = businessSnap.docs[0];
+        const bizData = businessDoc.data();
+        const fetchedBusiness: Business = {
+          id: businessDoc.id,
+          name: bizData.name || "Nombre de Negocio Desconocido",
+          contactEmail: bizData.contactEmail || "",
+          joinDate: anyToDate(bizData.joinDate)?.toISOString() || new Date().toISOString(),
+          customUrlPath: bizData.customUrlPath || customUrlPath,
+          logoUrl: bizData.logoUrl || undefined,
+          publicCoverImageUrls: bizData.publicCoverImageUrls || [],
+          publicVideoUrls: bizData.publicVideoUrls || [],
+          slogan: bizData.slogan || undefined,
+          publicContactEmail: bizData.publicContactEmail || undefined,
+          publicPhone: bizData.publicPhone || undefined,
+          publicAddress: bizData.publicAddress, // Keep as is
+          primaryColor: bizData.primaryColor || '#B080D0',
+          secondaryColor: bizData.secondaryColor || '#8E5EA2',
+        };
+        setBusinessDetails(fetchedBusiness);
+
+        const entitiesQuery = query(
+          collection(db, "businessEntities"),
+          where("businessId", "==", fetchedBusiness.id),
+        );
+        const entitiesSnapshot = await getDocs(entitiesQuery);
+
+        const currentPromotions: BusinessManagedEntity[] = [];
+        const events: BusinessManagedEntity[] = [];
+
+        entitiesSnapshot.forEach((docSnap) => {
+          const entityData = docSnap.data();
+
+          const entity: BusinessManagedEntity = {
+            id: docSnap.id,
+            businessId: entityData.businessId,
+            type: entityData.type,
+            name: entityData.name || "Entidad sin nombre",
+            description: entityData.description || "",
+            startDate: anyToDate(entityData.startDate)?.toISOString() || "",
+            endDate: anyToDate(entityData.endDate)?.toISOString() || "",
+            isActive: entityData.isActive === undefined ? true : entityData.isActive,
+            isPublicAccess: entityData.isPublicAccess || false,
+            locationAddress: entityData.locationAddress || "",
+            usageLimit: entityData.usageLimit || 0,
+            maxAttendance: entityData.maxAttendance || 0,
+            ticketTypes: Array.isArray(entityData.ticketTypes)
+              ? entityData.ticketTypes.map((tt: any) => sanitizeObjectForFirestore({ ...tt }))
+              : [],
+            eventBoxes: Array.isArray(entityData.eventBoxes)
+              ? entityData.eventBoxes.map((eb: any) => sanitizeObjectForFirestore({ ...eb }))
+              : [],
+            assignedPromoters: Array.isArray(entityData.assignedPromoters)
+              ? entityData.assignedPromoters.map((ap: any) => sanitizeObjectForFirestore({ ...ap }))
+              : [],
+            generatedCodes: Array.isArray(entityData.generatedCodes)
+              ? entityData.generatedCodes.map((gc: any) => sanitizeObjectForFirestore({ ...gc }))
+              : [],
+            imageUrl: entityData.imageUrl,
+            imageObjectPosition: entityData.imageObjectPosition,
+            aiHint: entityData.aiHint,
+            termsAndConditions: entityData.termsAndConditions,
+            createdAt: anyToDate(entityData.createdAt)?.toISOString() || "",
+            qrTemplateImageUrl: entityData.qrTemplateImageUrl,
+            qrTemplateLayout: entityData.qrTemplateLayout,
+          };
+
+          if (entity.type === 'promotion' && entity.isActive) {
+            currentPromotions.push(entity);
+          } else if (entity.type === 'event') {
+            events.push(entity);
+          }
+        });
+        
+        setPromotions(
+          currentPromotions.filter(p => isEntityCurrentlyActivatable(p)).sort(
+            (a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime()
+          )
+        );
+        setAllEvents(
+          events.sort(
+            (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+          )
+        );
+      }
+    } catch (err: any) {
+      setError("No se pudo cargar la información del negocio. Inténtalo de nuevo más tarde.");
+      setBusinessDetails(null);
+      setPromotions([]);
+      setAllEvents([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [customUrlPath]);
+
+  useEffect(() => {
+    if (typeof customUrlPath === "string" && customUrlPath.trim() !== "") {
+      fetchBusinessDataByCustomUrl();
+    } else if (typeof customUrlPath === "string" && customUrlPath.trim() === "") {
+      setError("URL de negocio inválida.");
+      setIsLoading(false);
+    }
+  }, [customUrlPath, fetchBusinessDataByCustomUrl]);
+  
+  useEffect(() => {
+    if (businessDetails) {
+      const primaryHsl = hexToHsl(businessDetails.primaryColor);
+      const accentHsl = hexToHsl(businessDetails.secondaryColor);
+      
+      if (primaryHsl) {
+        document.documentElement.style.setProperty('--primary', primaryHsl);
+      }
+      if (accentHsl) {
+        document.documentElement.style.setProperty('--accent', accentHsl);
+        // Garantizar que el anillo de enfoque use el color de marca
+        document.documentElement.style.setProperty('--ring', accentHsl);
+      }
+    }
+    // Cleanup function to reset colors when component unmounts
+    return () => {
+      document.documentElement.style.removeProperty('--primary');
+      document.documentElement.style.removeProperty('--accent');
+      document.documentElement.style.removeProperty('--ring');
+    };
+  }, [businessDetails]);
+
+
+const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
+  const codeToValidate = normalizeCode(codeInputValue);
+
+  if (codeToValidate.length !== 9) {
+    toast({
+      title: "Código inválido",
+      description: "El código debe tener 9 caracteres alfanuméricos.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setIsLoadingQrFlow(true);
+  try {
+    const entityRef = doc(db, "businessEntities", entity.id);
+    const snap = await getDoc(entityRef);
+
+    if (!snap.exists()) {
+      toast({ title: "Error", description: "La promoción o evento ya no existe.", variant: "destructive" });
+      return;
+    }
+    
+    const realTimeEntityData: BusinessManagedEntity = { 
+        id: snap.id, 
+        ...(snap.data() as any),
+        startDate: anyToDate(snap.data().startDate)?.toISOString() || "",
+        endDate: anyToDate(snap.data().endDate)?.toISOString() || "",
+    };
+
+    if (!isEntityCurrentlyActivatable(realTimeEntityData)) {
+      toast({
+        title: "Promoción/Evento no disponible",
+        description: "Esta oferta no está vigente en este momento.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const codes: any[] = Array.isArray(realTimeEntityData.generatedCodes) ? realTimeEntityData.generatedCodes : [];
+    const foundCodeObject = codes.find((c) => extractCodeString(c) === codeToValidate);
+
+    if (foundCodeObject && isCodeAvailableForUse(foundCodeObject)) {
+      setActiveEntityForQr(realTimeEntityData);
+      setValidatedCodeObject(foundCodeObject);
+      setCurrentStepInModal("enterDni");
+      dniForm.reset({ docType: 'dni', docNumber: "" });
+      setShowDniModal(true);
+    } else {
+      toast({
+        title: "Código inválido o no disponible",
+        description: `El código "${codeToValidate}" no existe, ya fue utilizado o está vencido.`,
+        variant: "destructive",
+      });
+    }
+  } catch (e) {
+    console.error("Error validating specific code:", e);
+    toast({ title: "Error de validación", description: "No se pudo validar el código.", variant: "destructive" });
+  } finally {
+    setIsLoadingQrFlow(false);
+  }
+};
+
+const handlePublicAccessSubmit = (entity: BusinessManagedEntity) => {
+    if (!isEntityCurrentlyActivatable(entity)) {
+        toast({ title: "Evento no disponible", description: "Este evento no está vigente en este momento.", variant: "destructive" });
+        return;
+    }
+    setActiveEntityForQr(entity);
+    setValidatedCodeObject({
+        id: 'PUBLIC_ACCESS',
+        value: 'PUBLIC_ACCESS',
+        status: 'available',
+        entityId: entity.id,
+        generatedByName: 'Sistema',
+        generatedDate: new Date().toISOString(),
+    } as any);
+    setCurrentStepInModal("enterDni");
+    dniForm.reset({ docType: 'dni', docNumber: "" });
+    setShowDniModal(true);
+};
+
+const getFreshEntityData = async (entityId: string): Promise<BusinessManagedEntity> => {
+    const entityRef = doc(db, "businessEntities", entityId);
+    const docSnap = await getDoc(entityRef);
+    if (!docSnap.exists()) {
+      throw new Error("La entidad ya no existe.");
+    }
+    const data = docSnap.data();
+    // Ensure all nested date-like fields are properly converted.
+    return { 
+        id: docSnap.id, 
+        ...data,
+        startDate: anyToDate(data.startDate)?.toISOString() || "",
+        endDate: anyToDate(data.endDate)?.toISOString() || "",
+        createdAt: anyToDate(data.createdAt)?.toISOString(),
+        qrTemplateImageUrl: data.qrTemplateImageUrl,
+        qrTemplateLayout: data.qrTemplateLayout,
+    } as BusinessManagedEntity;
+};
+
+const consultExternalDniApi = async (dni: string, docType: 'dni' | 'ce') => {
+    try {
+        const response = await fetch('/api/public/consult-document', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni, docType }),
+        });
+        if (response.ok) {
+            return await response.json();
+        }
+        return null;
+    } catch (e) {
+        console.warn("External DNI API call failed, user will fill manually.", e);
+        return null;
+    }
+};
+
+const handleDniSubmitInModal: SubmitHandler<DniFormValues> = async (data) => {
+    if (!activeEntityForQr || !validatedCodeObject || !businessDetails?.id) {
+        toast({ title: "Error interno", description: "Falta información clave para continuar (entidad, código o negocio).", variant: "destructive" });
+        return;
+    }
+    setIsLoadingQrFlow(true);
+    const docNumberCleaned = data.docNumber.trim();
+    setEnteredDni(docNumberCleaned);
+
+    try {
+        const response = await fetch('/api/redeem-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                entityId: activeEntityForQr.id,
+                codeId: validatedCodeObject.id,
+                dni: docNumberCleaned,
+                businessId: businessDetails.id
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Ocurrió un error en el servidor.');
+        }
+
+        if (result.action === 'newUser') {
+            newQrClientForm.reset({ name: "", surname: "", phone: "", dob: undefined, dni: docNumberCleaned });
+            setCurrentStepInModal("newUserForm");
+            
+            setIsConsultingDni(true);
+            try {
+                const apiData = await consultExternalDniApi(docNumberCleaned, data.docType);
+                if (apiData) {
+                    if (apiData.nombreCompleto) {
+                        const nameParts = apiData.nombreCompleto.split(' ');
+                        const surname = nameParts.slice(-2).join(' ');
+                        const name = nameParts.slice(0, -2).join(' ');
+                        newQrClientForm.setValue('name', name || "");
+                        newQrClientForm.setValue('surname', surname || "");
+                    } else if (apiData.nombres && apiData.apellidoPaterno) {
+                        newQrClientForm.setValue('name', apiData.nombres || "");
+                        newQrClientForm.setValue('surname', `${apiData.apellidoPaterno || ''} ${apiData.apellidoMaterno || ''}`.trim());
+                    }
+
+                    if (apiData.fechaNacimiento) {
+                        const parsedDate = parse(apiData.fechaNacimiento, 'dd/MM/yyyy', new Date());
+                        if (!isNaN(parsedDate.getTime())) {
+                            newQrClientForm.setValue('dob', parsedDate);
+                        }
+                    }
+                } else {
+                   console.warn(`DNI/CE consultation failed.`);
+                }
+            } catch (e) {
+                console.warn("DNI/CE consultation API call failed, user will fill manually.", e);
+            } finally {
+                setIsConsultingDni(false);
+            }
+            
+        } else if (result.action === 'userExists' || result.action === 'alreadyRedeemed') {
+            const finalCodeObject = result.code || validatedCodeObject;
+            toast({ title: "¡Éxito!", description: result.action === 'alreadyRedeemed' ? "QR Recuperado. Redirigiendo..." : "QR Generado. Redirigiendo..." });
+            router.push(`/qr/${finalCodeObject.id}`);
+        }
+    } catch (e: any) {
+        toast({ title: "Error de Verificación", description: `No se pudo procesar la solicitud. ${e.message}`, variant: "destructive" });
+        resetQrFlow();
+    } finally {
+        setIsLoadingQrFlow(false);
+    }
+};
+
+const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (formData) => {
+    if (!activeEntityForQr || !validatedCodeObject || !enteredDni || !businessDetails) {
+      toast({ title: "Error interno", description: "Falta información para registrar cliente.", variant: "destructive" });
+      return;
+    }
+    
+    if (formData.dni.trim() !== enteredDni.trim()) {
+      toast({ title: "Inconsistencia de DNI", description: "El DNI del formulario no coincide. Por favor, reinicia el proceso.", variant: "destructive" });
+      return;
+    }
+
+    setIsLoadingQrFlow(true);
+    try {
+        const response = await fetch('/api/redeem-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                entityId: activeEntityForQr.id,
+                codeId: validatedCodeObject.id,
+                dni: enteredDni,
+                businessId: businessDetails.id,
+                newClientData: {
+                    name: formData.name,
+                    surname: formData.surname,
+                    phone: formData.phone,
+                    dob: formData.dob.toISOString()
+                }
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Ocurrió un error al registrar el nuevo cliente.');
+        }
+        
+        const freshEntityData = await getFreshEntityData(activeEntityForQr.id);
+        const clientForQr: QrClient = result.clientData;
+        const ticketType = freshEntityData.ticketTypes?.find(t => t.id === validatedCodeObject.ticketTypeId);
+        const qrCodeDetails: QrCodeData["promotion"] = {
+            id: freshEntityData.id,
+            title: freshEntityData.name,
+            description: freshEntityData.description,
+            validUntil: freshEntityData.endDate,
+            imageUrl: freshEntityData.imageUrl || "",
+            promoCode: validatedCodeObject.value,
+            qrValue: validatedCodeObject.id,
+            aiHint: freshEntityData.aiHint || "",
+            type: freshEntityData.type,
+            termsAndConditions: freshEntityData.termsAndConditions,
+            qrTemplateImageUrl: freshEntityData.qrTemplateImageUrl,
+            qrTemplateLayout: freshEntityData.qrTemplateLayout,
+            ticketType: ticketType ? { name: ticketType.name, cost: ticketType.cost, color: ticketType.color } : undefined,
+        };
+  
+        setQrData({ user: clientForQr, promotion: qrCodeDetails, code: validatedCodeObject.id, status: "redeemed" });
+        setShowDniModal(false);
+        setPageViewState("qrDisplay");
+        toast({ title: "Registro Exitoso", description: "Cliente registrado. Generando QR." });
+
+    } catch (e: any) {
+      toast({ title: "Error de Registro", description: "No se pudo registrar al cliente. " + e.message, variant: "destructive" });
+      resetQrFlow();
+    } finally {
+      setIsLoadingQrFlow(false);
+    }
+  };
+
+
+ useEffect(() => {
+    if (qrData?.promotion.qrValue && !qrData?.promotion.qrTemplateImageUrl) {
+      QRCode.toDataURL(qrData.promotion.qrValue, { width: 400, errorCorrectionLevel: 'H' }, (err, url) => {
+        if (err) {
+          console.error("Failed to generate QR code:", err);
+          setQrCodeImage(null);
+        } else {
+          setQrCodeImage(url);
+        }
+      });
+    } else {
+      setQrCodeImage(null);
+    }
+  }, [qrData]);
+
+  const handleSaveQrWithDetails = async () => {
+    const elementToCapture = qrData?.promotion.qrTemplateImageUrl ? canvasRef.current : cardRef.current;
+    if (!elementToCapture) {
+        toast({ title: "Error", description: "No se encontró el elemento para descargar.", variant: "destructive" });
+        return;
+    }
+    try {
+        const dataUrl = await htmlToImage.toPng(elementToCapture, {
+          quality: 1.0,
+          pixelRatio: 2,
+        });
+        const link = document.createElement('a');
+        link.download = `SocioVIP_QR_${qrData?.promotion.promoCode}.png`;
+        link.href = dataUrl;
+        link.click();
+        toast({ title: "QR Guardado", description: "La imagen de la tarjeta se ha descargado." });
+    } catch (error) {
+        console.error('oops, something went wrong!', error);
+        toast({ title: "Error al Guardar", description: "No se pudo generar la imagen de la tarjeta.", variant: "destructive" });
+    }
+  };
+  
+    const drawPreviewOnCanvas = useCallback(async () => {
+        const canvas = canvasRef.current;
+        if (!canvas || !qrData || !qrData.promotion.qrTemplateImageUrl) return;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        try {
+            const templateImg = new Image();
+            templateImg.crossOrigin = "anonymous";
+            templateImg.src = qrData.promotion.qrTemplateImageUrl;
+            await new Promise<void>((resolve, reject) => {
+                templateImg.onload = () => resolve();
+                templateImg.onerror = (err) => {
+                  console.error("Failed to load template image:", err);
+                  reject(new Error("Image load error"));
+                };
+            });
+
+            canvas.width = templateImg.width;
+            canvas.height = templateImg.height;
+            ctx.drawImage(templateImg, 0, 0);
+
+            const layout = qrData.promotion.qrTemplateLayout || {
+                qr: { x: 190, y: 350, size: 80, color: '#000000' },
+                name: { x: 190, y: 450, size: 16, color: '#FFFFFF' },
+                dni: { x: 190, y: 470, size: 12, color: '#FFFFFF' },
+                promoTitle: { x: 190, y: 500, size: 14, color: '#FFFFFF' },
+            };
+
+            const qrDataUrl = await QRCode.toDataURL(qrData.promotion.qrValue, { 
+                width: layout.qr.size, 
+                errorCorrectionLevel: 'H', 
+                margin: 1,
+                color: {
+                  dark: layout.qr.color || '#000000',
+                  light: '#0000' // Transparent background
+                }
+            });
+            const qrImage = new Image();
+            qrImage.src = qrDataUrl;
+            await new Promise(resolve => qrImage.onload = resolve);
+            ctx.drawImage(qrImage, layout.qr.x - layout.qr.size / 2, layout.qr.y - layout.qr.size / 2, layout.qr.size, layout.qr.size);
+
+            ctx.textAlign = 'center';
+            
+            const fullName = `${qrData.user.name} ${qrData.user.surname}`;
+            let nameFontSize = layout.name.size || 16;
+            ctx.font = `bold ${nameFontSize}px Arial`;
+            ctx.fillStyle = layout.name.color || '#FFFFFF';
+            const maxWidth = canvas.width * 0.9;
+            while(ctx.measureText(fullName).width > maxWidth && nameFontSize > 8) {
+                nameFontSize--;
+                ctx.font = `bold ${nameFontSize}px Arial`;
+            }
+            ctx.fillText(fullName, layout.name.x, layout.name.y);
+            
+            ctx.font = `bold ${layout.dni.size || 12}px Arial`;
+            ctx.fillStyle = layout.dni.color || '#FFFFFF';
+            ctx.fillText(`DNI/CE: ${qrData.user.dni}`, layout.dni.x, layout.dni.y);
+            
+            let promoFontSize = layout.promoTitle.size || 14;
+            ctx.font = `bold ${promoFontSize}px Arial`;
+            ctx.fillStyle = layout.promoTitle.color || '#FFFFFF';
+            while(ctx.measureText(qrData.promotion.title).width > maxWidth && promoFontSize > 8) {
+                promoFontSize--;
+                ctx.font = `bold ${promoFontSize}px Arial`;
+            }
+            ctx.fillText(qrData.promotion.title, layout.promoTitle.x, layout.promoTitle.y);
+            
+            // --- Dibuja la pulsera del tipo de entrada ---
+            if (qrData.promotion.ticketType && qrData.promotion.ticketType.name) {
+                const ticketType = qrData.promotion.ticketType;
+                const rectY = layout.promoTitle.y + 15;
+                const rectHeight = 35;
+                const textY = rectY + rectHeight / 2 + 5;
+                
+                ctx.fillStyle = ticketType.color || "#888888";
+                ctx.fillRect(0, rectY, canvas.width, rectHeight);
+
+                ctx.font = "bold 16px Arial";
+                ctx.fillStyle = "#FFFFFF";
+                ctx.textAlign = "center";
+                ctx.fillText(ticketType.name.toUpperCase(), canvas.width / 2, textY);
+            }
+
+
+        } catch (error) {
+            console.error("Error drawing on canvas:", error);
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'red';
+            ctx.font = '16px Arial';
+            ctx.fillText('Error al cargar plantilla.', canvas.width / 2, canvas.height / 2);
+        }
+    }, [qrData]);
+
+    useEffect(() => {
+        if (pageViewState === 'qrDisplay' && qrData?.promotion.qrTemplateImageUrl) {
+            drawPreviewOnCanvas();
+        }
+    }, [pageViewState, qrData, drawPreviewOnCanvas]);
+
+
+  const resetQrFlow = useCallback(() => {
+    setPageViewState("entityList");
+    setQrData(null);
+    setQrCodeImage(null);
+    setActiveEntityForQr(null);
+    setValidatedCodeObject(null);
+    setEnteredDni("");
+    dniForm.reset();
+    newQrClientForm.reset();
+    setShowDniModal(false);
+  }, [dniForm, newQrClientForm]);
+
+  const SpecificCodeEntryForm = ({ entity }: { entity: BusinessManagedEntity }) => {
+    const form = useForm<SpecificCodeFormValues>({
+      resolver: zodResolver(specificCodeFormSchema),
+      defaultValues: { specificCode: "" },
+    });
+    
+    const isEvent = entity.type === 'event';
+
+    return (
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit((data) => handleSpecificCodeSubmit(entity, data.specificCode))}
+          className="space-y-2 mt-2"
+        >
+          <FormField
+            control={form.control}
+            name="specificCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel htmlFor={`specificCode-${entity.id}`} className="text-xs text-muted-foreground">
+                  Código Alfanumérico (9 dígitos) <span className="text-destructive">*</span>
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    id={`specificCode-${entity.id}`}
+                    placeholder="ABC123XYZ"
+                    {...field}
+                    onChange={(e) => field.onChange(normalizeCode(e.target.value))}
+                    maxLength={9}
+                    className="text-sm h-9 w-full focus-visible:ring-offset-0 transition-all border-2"
+                    disabled={isLoadingQrFlow}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button
+            type="submit"
+            size="sm"
+            className="w-full h-9 text-white font-bold transition-all hover:scale-105 active:scale-95"
+            style={{
+                backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`
+            }}
+            disabled={isLoadingQrFlow}
+          >
+            {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (isEvent ? <Calendar className="h-4 w-4 mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />)}
+            {isEvent ? "Obtener Entrada" : "Generar QR"}
+          </Button>
+        </form>
+      </Form>
+    );
+  };
+
+  const PastEventCardFooter = ({ entity }: { entity: BusinessManagedEntity }) => {
+    const isFinished = isPast(anyToDate(entity.endDate) || new Date());
+    
+    return (
+      <CardFooter className="flex-col items-center justify-center p-4 border-t bg-muted/50">
+          <div className="flex items-center text-sm font-semibold text-muted-foreground">
+              <History className="h-4 w-4 mr-2" />
+              <span>{isFinished ? "Evento Finalizado" : "Evento No Disponible"}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+              {isFinished 
+                ? `Finalizó el ${format(anyToDate(entity.endDate)!, "dd MMMM, yyyy", { locale: es })}`
+                : "La generación de QRs está desactivada temporalmente."
+              }
+          </p>
+      </CardFooter>
+    );
+  };
+
+  const showPromotions = (view === 'all' || view === 'promotions') && promotions.length > 0;
+  const showEvents = (view === 'all' || view === 'events') && allEvents.length > 0;
+  const noContentToShow = !isLoading && (
+    (view === 'all' && promotions.length === 0 && allEvents.length === 0) ||
+    (view === 'promotions' && promotions.length === 0) ||
+    (view === 'events' && allEvents.length === 0)
+  );
+
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
+            <SocioVipLogo size={70} />
+          </div>
+          <p className="mt-4 text-lg font-semibold text-white/90">
+            Cargando información del negocio...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
+          <AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-destructive">{error}</h1>
+          <p className="text-muted-foreground mt-2">Ruta intentada: /{customUrlPath}</p>
+          <Link href="/" passHref>
+            <Button variant="outline" className="mt-6">
+              Volver a la Página Principal
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!businessDetails && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-center p-4 bg-background">
+        <div className="flex flex-col items-center justify-center flex-grow pt-12">
+          <Building className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-foreground">Negocio No Encontrado</h1>
+          <p className="text-muted-foreground mt-2">
+            La página del negocio con la URL "/{customUrlPath}" no existe o la URL es incorrecta.
+          </p>
+          <Link href="/" passHref>
+            <Button variant="outline" className="mt-6">
+              Volver a la Página Principal
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  
+  if (pageViewState === "qrDisplay" && qrData && activeEntityForQr && businessDetails) {
+    // This view is now handled by redirecting to /qr/[codeId], so this is a fallback.
+    return <div>Redirigiendo a tu QR...</div>;
+  }
+
+  if (!businessDetails) return null;
+
+  return (
+    <div className="h-screen flex flex-col bg-muted/40">
+       <header className="sticky top-0 z-50 w-full bg-background shadow-sm shrink-0">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-3">
+                 <Link href="/" className="flex items-center gap-2">
+                    <SocioVipLogo size={32} />
+                    <span className="font-bold text-xl text-black hidden sm:inline">SocioVIP</span>
+                 </Link>
+              </div>
+              <div className="flex items-center gap-2">
+                 <Link href="/" passHref>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="font-semibold text-sm text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
+                    >
+                      <ArrowLeft className="h-5 w-5 md:mr-2" />
+                      <span className="hidden md:inline">Volver al Inicio</span>
+                    </Button>
+                 </Link>
+                  <Link href="/login" passHref>
+                     <Button
+                        variant="outline"
+                        size="icon"
+                        className="font-semibold text-sm border-foreground/20 text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
+                      >
+                      <UserCircle className="h-5 w-5 md:mr-2" />
+                      <span className="hidden md:inline">Iniciar Sesión</span>
+                    </Button>
+                  </Link>
+              </div>
+            </div>
+         </div>
+       </header>
+
+       <main className="flex-grow overflow-y-auto">
+            <div className="max-w-7xl mx-auto w-full px-0 sm:px-6 lg:px-8 pt-0">
+                <ScrollReveal direction="none">
+                    <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 md:mt-8 mb-4">
+                        <div className="md:col-span-2">
+                            <ImageCarousel
+                            images={businessDetails.publicCoverImageUrls || []}
+                            primaryColor={businessDetails.primaryColor}
+                            title={businessDetails.name}
+                            slogan={businessDetails.slogan}
+                            logoUrl={businessDetails.logoUrl}
+                            />
+                        </div>
+                        <aside className="hidden md:block h-full">
+                            <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor}/>
+                        </aside>
+                    </div>
+                </ScrollReveal>
+
+                <ScrollReveal direction="none" delay={200}>
+                    <div className="relative overflow-x-hidden whitespace-nowrap py-2 text-sm font-bold text-white" style={{ backgroundColor: businessDetails.primaryColor }}>
+                        <div className="animate-scroll inline-block">
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                        </div>
+                        <div className="animate-scroll inline-block">
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                            <span className="mx-4">•</span>
+                            <span className="mx-4">Genera tus entradas QR gratis</span>
+                        </div>
+                    </div>
+                </ScrollReveal>
+            
+                <div className="sticky top-0 z-30 py-2 bg-background px-4">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
+                            <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Ver Todo</button>
+                            <button onClick={() => setView('promotions')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'promotions' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Promociones</button>
+                            <button onClick={() => setView('events')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'events' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Eventos</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-12 px-4 sm:px-0 mt-8">
+                    {showPromotions && (
+                      <section>
+                        <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
+                          <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-8">
+                          {promotions.map((promo, index) => (
+                            <ScrollReveal key={promo.id} delay={index * 100}>
+                                <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
+                                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                                    <NextImage 
+                                        src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} 
+                                        alt={promo.name} fill 
+                                        className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
+                                        style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} 
+                                        data-ai-hint={promo.aiHint || "discount offer"}
+                                    />
+                                </div>
+                                <CardHeader className="pb-3"><CardTitle className="text-xl font-headline">{promo.name}</CardTitle></CardHeader>
+                                <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p><p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
+                                <CardFooter className="flex-col items-start p-4 border-t bg-muted/10"><SpecificCodeEntryForm entity={promo} /></CardFooter>
+                                </Card>
+                            </ScrollReveal>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+                    
+                    {showEvents && (
+                      <section>
+                        <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
+                          <Calendar className="h-7 w-7 mr-3" /> Eventos
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
+                          {allEvents.map((event, index) => {
+                            const location = event.locationAddress || (businessDetails.publicAddress);
+                            return (
+                                <ScrollReveal key={event.id} delay={index * 100}>
+                                    <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
+                                    <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
+                                        <NextImage 
+                                            src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} 
+                                            alt={event.name} fill 
+                                            className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
+                                            style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} 
+                                            data-ai-hint={event.aiHint || "party concert"}
+                                        />
+                                        {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />)}
+                                    </div>
+                                    <CardHeader className="pb-3"><CardTitle className="text-xl font-headline">{event.name}</CardTitle></CardHeader>
+                                    <CardContent className="flex-grow space-y-2">
+                                        <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
+                                        <p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p>
+                                        {location && (
+                                            <a
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors pt-1 group"
+                                            >
+                                                <MapPin className="h-4 w-4 mr-1.5 shrink-0" />
+                                                <span className="group-hover:underline">{location}</span>
+                                            </a>
+                                        )}
+                                    </CardContent>
+                                    {isEntityCurrentlyActivatable(event) ? (
+                                        <CardFooter className="flex-col items-start p-4 border-t bg-muted/10">
+                                            {event.isPublicAccess ? (
+                                                <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-9 text-white font-bold shadow-lg transition-all hover:scale-105" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`}}>
+                                                    <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
+                                                </Button>
+                                            ) : (
+                                                <SpecificCodeEntryForm entity={event} />
+                                            )}
+                                        </CardFooter>
+                                        ) : (<PastEventCardFooter entity={event} />)
+                                    }
+                                    </Card>
+                                </ScrollReveal>
+                            )
+                        })}
+                        </div>
+                      </section>
+                    )}
+
+                    {noContentToShow && (
+                      <div className="py-12"><Card className="col-span-full border-dashed"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">{view === 'promotions' && 'No hay Promociones por Ahora'}{view === 'events' && 'No hay Eventos por Ahora'}{view === 'all' && 'No hay Promociones y Eventos por Ahora'}</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>{view === 'promotions' && 'Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!'}{view === 'events' && 'Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!'}{view === 'all' && 'Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!'}</CardDescription></CardContent></Card></div>
+                    )}
+                </div>
+            </div>
+            
+            {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
+                <footer className="w-full bg-background border-t mt-12 py-8">
+                    <ScrollReveal direction="down">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-muted-foreground text-sm">
+                            <div className="w-full flex justify-center mb-4 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
+                                <SocioVipLogo size={48} />
+                            </div>
+                            <p className="font-semibold text-foreground mb-2">Información de Contacto</p>
+                            {businessDetails.publicAddress && (<p>{businessDetails.publicAddress}</p>)}
+                            {businessDetails.publicPhone && (<p>Teléfono: {businessDetails.publicPhone}</p>)}
+                            {businessDetails.publicContactEmail && (<p>Email: <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
+                        </div>
+                    </ScrollReveal>
+                </footer>
+            ) : null}
+      </main>
+
+      <Dialog
+        open={showDniModal}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            resetQrFlow();
+          }
+          setShowDniModal(isOpen);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <UIDialogTitleComponent className="font-headline text-2xl">
+              {currentStepInModal === "enterDni" ? "Ingresa tu Documento" : "Completa tus Datos"}
+            </UIDialogTitleComponent>
+            <UIDialogDescriptionComponent>
+              {currentStepInModal === "enterDni"
+                ? `Para obtener tu QR para "${activeEntityForQr?.name}".`
+                : "Necesitamos algunos datos para generar tu QR."}
+            </UIDialogDescriptionComponent>
+          </DialogHeader>
+          {currentStepInModal === "enterDni" ? (
+            <Form {...dniForm}>
+              <form onSubmit={dniForm.handleSubmit(handleDniSubmitInModal)} className="space-y-4 py-2">
+                <FormField
+                control={dniForm.control}
+                name="docType"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel>Tipo de Documento</FormLabel>
+                    <FormControl>
+                        <RadioGroup
+                            onValueChange={(value) => {
+                                field.onChange(value);
+                                dniForm.setValue('docNumber', ''); // Reset docNumber on type change
+                                dniForm.clearErrors('docNumber');
+                            }}
+                            defaultValue={field.value}
+                            className="grid grid-cols-2 gap-2"
+                        >
+                           <FormItem className="flex items-center space-x-3 space-y-0">
+                            <Label
+                              htmlFor="docType-dni-public"
+                              className={cn(
+                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium transition-all hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                field.value === 'dni' && "bg-black text-white border-black"
+                              )}
+                            >
+                              <FormControl>
+                                <RadioGroupItem value="dni" id="docType-dni-public" className="sr-only" />
+                              </FormControl>
+                              DNI
+                            </Label>
+                          </FormItem>
+
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <Label
+                              htmlFor="docType-ce-public"
+                              className={cn(
+                                "w-full flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 font-medium transition-all hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                                field.value === 'ce' && "bg-black text-white border-black"
+                              )}
+                            >
+                              <FormControl>
+                                <RadioGroupItem value="ce" id="docType-ce-public" className="sr-only" />
+                              </FormControl>
+                              Carnet de Extranjería
+                            </Label>
+                          </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+                <FormField
+                  control={dniForm.control}
+                  name="docNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Número de Documento <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder={watchedDocType === 'dni' ? "8 dígitos numéricos" : "10-20 dígitos numéricos"} 
+                            {...field} 
+                            className="focus-visible:ring-offset-0 border-2"
+                            maxLength={watchedDocType === 'dni' ? 8 : 20}
+                            onChange={(e) => {
+                                const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(numericValue);
+                            }}
+                            autoFocus 
+                            disabled={isLoadingQrFlow}
+                          />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <ShadcnDialogFooter className="pt-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowDniModal(false);
+                      resetQrFlow();
+                    }}
+                    disabled={isLoadingQrFlow}
+                  >
+                    Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 bg-black text-white font-bold shadow-lg hover:bg-black/80 transition-all"
+                      disabled={isLoadingQrFlow}
+                    >
+                      {isLoadingQrFlow ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        "Verificar"
+                      )}
+                    </Button>
+                </ShadcnDialogFooter>
+              </form>
+            </Form>
+          ) : (
+            <Form {...newQrClientForm}>
+              <form onSubmit={newQrClientForm.handleSubmit(handleNewUserSubmitInModal)} className="space-y-3 py-1 max-h-[60vh] overflow-y-auto pr-2">
+                {isConsultingDni && (
+                    <div 
+                        className="flex flex-col items-center justify-center p-6 rounded-lg my-3 text-white shadow-inner"
+                        style={{
+                            backgroundSize: '400% 400%',
+                            animation: 'gradient-animation 15s ease infinite',
+                            backgroundImage: `linear-gradient(-45deg, ${businessDetails.primaryColor}, ${businessDetails.secondaryColor}, #ee7752, #e73c7e, #23a6d5, #23d5ab)`
+                        }}
+                    >
+                        <Loader2 className="h-8 w-8 animate-spin mb-3"/>
+                        <p className="text-base font-semibold">Verificando identidad...</p>
+                        <p className="text-sm opacity-90">Estamos consultando tus datos, un momento.</p>
+                    </div>
+                )}
+                <FormField
+                  control={newQrClientForm.control}
+                  name="dni"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        DNI / Carnet de Extranjería <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Confirma tu número de documento"
+                          {...field}
+                          disabled={true}
+                          className="disabled:bg-muted/30 border-2"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                 <FormField
+                  control={newQrClientForm.control}
+                  name="surname"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Apellido(s) <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tus apellidos" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} className="border-2"/>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={newQrClientForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Nombre(s) <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tus nombres" {...field} value={field.value || ""} disabled={isLoadingQrFlow || isConsultingDni} className="border-2"/>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                </div>
+                <FormField
+                  control={newQrClientForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Celular <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                            type="tel" 
+                            placeholder="987654321" 
+                            {...field} 
+                            maxLength={9}
+                            onChange={(e) => {
+                                const numericValue = e.target.value.replace(/[^0-9]/g, '');
+                                field.onChange(numericValue);
+                            }}
+                            className="border-2"
+                            disabled={isLoadingQrFlow || isConsultingDni} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={newQrClientForm.control}
+                  name="dob"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>
+                        Fecha de Nacimiento <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn("w-full pl-3 text-left font-normal border-2", !field.value && "text-muted-foreground")}
+                              disabled={isLoadingQrFlow || isConsultingDni}
+                            >
+                              {field.value ? format(field.value, "d MMMM yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
+                              <CalendarDays className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <DayPicker
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            locale={es}
+                            captionLayout="dropdown"
+                            fromYear={1920}
+                            toYear={new Date().getFullYear() - 10}
+                            disabled={(date) =>
+                              date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1920-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <ShadcnDialogFooter className="pt-3 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setCurrentStepInModal("enterDni");
+                      newQrClientForm.reset({ dni: enteredDni });
+                      dniForm.setValue("docNumber", enteredDni);
+                    }}
+                    disabled={isLoadingQrFlow || isConsultingDni}
+                  >
+                    Volver
+                  </Button>
+                  <Button type="submit" className="flex-1 text-white font-bold shadow-lg transition-all hover:scale-105" 
+                    style={{
+                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                    }}
+                    disabled={isLoadingQrFlow || isConsultingDni}>
+                    {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar y Generar QR"}
+                  </Button>
+                </ShadcnDialogFooter>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
+    </div>
+  );
+}

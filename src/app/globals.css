@@ -85,17 +85,27 @@
   }
   body {
     @apply bg-background text-foreground;
-    @apply font-body; /* Apply Baskervville as default body font */
+    @apply font-body; /* Apply Inter as default body font */
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-headline; /* Apply Baskervville to all headings */
+    @apply font-headline; /* Apply Bebas Neue to all headings */
+  }
+  
+  /* Override browser autofill styles */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover, 
+  input:-webkit-autofill:focus, 
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--card)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    transition: background-color 5000s ease-in-out 0s;
   }
 }
 
 /* Custom utility for gradient text */
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text;
+    @apply bg-gradient-to-r from-primary to-accent text-transparent bg-clip-text;
   }
   .hover-gradient {
     @apply hover:bg-gradient-to-r from-primary to-accent hover:text-primary-foreground;
@@ -109,9 +119,32 @@
   .no-spinner {
     -moz-appearance: textfield;
   }
+
+  .animated-gradient-border-wrapper {
+      position: relative;
+      background-color: hsl(var(--background));
+  }
+
+  .animated-gradient-border-wrapper::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px;
+      right: -2px; bottom: -2px;
+      background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary)));
+      background-size: 200% 100%;
+      border-radius: inherit; /* Usa el mismo borde que el contenedor */
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+  }
+  
+  .group:focus-within .animated-gradient-border-wrapper::before {
+      opacity: 1;
+      animation: border-gradient-animation 3s linear infinite;
+  }
 }
 
-/* Custom Animated Gradient Background for Loaders */
+/* Custom Animated Gradient Background */
 @keyframes gradient-animation {
   0% {
     background-position: 0% 50%;
@@ -124,8 +157,29 @@
   }
 }
 
+@keyframes border-gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
 .bg-gradient-loader {
-  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)), #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  /* Se usan colores HSL fijos de SocioVIP para que no cambien con el negocio */
+  background: linear-gradient(-45deg, hsl(258 69% 42%), hsl(0 79% 49%), #8e44ad, #c0392b, #2980b9);
   background-size: 400% 400%;
   animation: gradient-animation 15s ease infinite;
+}
+
+.bg-header-gradient {
+  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)));
+  background-size: 400% 400%;
+  animation: gradient-animation 15s ease infinite;
+}
+
+.bg-header-gradient-static {
+  background: linear-gradient(-45deg, hsl(var(--primary)), hsl(var(--accent)));
+  background-size: 400% 400%;
 }

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from "react";
@@ -27,6 +26,7 @@ const ticketTypeFormSchema = z.object({
   cost: z.coerce.number().min(0, "El costo no puede ser negativo."),
   description: z.string().optional(),
   quantity: z.coerce.number().int().min(0, "La cantidad no puede ser negativa.").optional().or(z.literal(undefined)),
+  color: z.string().optional(),
 });
 
 type TicketTypeFormValues = z.infer<typeof ticketTypeFormSchema>;
@@ -46,6 +46,7 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
       cost: ticketType?.cost || 0,
       description: ticketType?.description || "",
       quantity: ticketType?.quantity === undefined || ticketType?.quantity === null ? undefined : ticketType.quantity,
+      color: ticketType?.color || "#8E5EA2",
     },
   });
 
@@ -55,6 +56,7 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
       cost: ticketType?.cost || 0,
       description: ticketType?.description || "",
       quantity: ticketType?.quantity === undefined || ticketType?.quantity === null ? undefined : ticketType.quantity,
+      color: ticketType?.color || "#8E5EA2",
     });
   }, [ticketType, form]);
 
@@ -76,23 +78,44 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="cost"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Costo (S/) <span className="text-destructive">*</span></FormLabel>
-              <FormControl><Input type="number" placeholder="50.00" {...field} disabled={isSubmitting} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="cost"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Costo (S/) <span className="text-destructive">*</span></FormLabel>
+                  <FormControl><Input type="number" placeholder="50.00" {...field} disabled={isSubmitting} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Color Identificador</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="color"
+                      {...field}
+                      value={field.value || "#8E5EA2"}
+                      className="h-10 p-1 w-full"
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        </div>
         <FormField
           control={form.control}
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Descripción (Opcional)</FormLabel>
+              <FormLabel>Descripción </FormLabel>
               <FormControl><Textarea placeholder="Detalles de la entrada, ej: Acceso a zona preferencial." {...field} value={field.value || ""} rows={3} disabled={isSubmitting} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -103,7 +126,7 @@ export function TicketTypeForm({ ticketType, onSubmit, onCancel, isSubmitting = 
           name="quantity"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Cantidad Disponible (Opcional)</FormLabel>
+              <FormLabel>Cantidad Disponible </FormLabel>
               <FormControl><Input type="number" placeholder="100" {...field} value={field.value ?? ""} onChange={e => field.onChange(parseInt(e.target.value, 10) || undefined)} disabled={isSubmitting} /></FormControl>
               <FormDescription>Dejar vacío o 0 para cantidad ilimitada.</FormDescription>
               <FormMessage />

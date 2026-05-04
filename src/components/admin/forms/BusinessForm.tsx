@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,11 +18,13 @@ import {
 import { Input } from "@/components/ui/input";
 import type { Business, BusinessFormData, BusinessType } from "@/lib/types";
 import { DialogFooter } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, ImageIcon as ImageIconLucide } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PERU_LOCATIONS, BUSINESS_TYPES } from "@/lib/constants";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import NextImage from "next/image";
+import { useToast } from "@/hooks/use-toast";
 
 
 const businessFormSchemaBase = z.object({
@@ -37,8 +40,8 @@ const businessFormSchemaBase = z.object({
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
   managerDni: z.string().min(8, "Debe tener al menos 8 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^\d+$/, "Solo debe contener números.").optional().or(z.literal("")),
   
-  logoUrl: z.string().url("URL de logo inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
-  publicCoverImageUrl: z.string().url("URL de imagen de portada inválida. Asegúrate que incluya http:// o https://").optional().or(z.literal("")),
+  logoFile: z.custom<File | null>().optional(),
+  publicCoverImageUrls: z.array(z.string().url()).optional(),
   slogan: z.string().max(100, "El slogan no debe exceder 100 caracteres.").optional().or(z.literal("")),
   publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")),
   publicPhone: z.string().regex(/^[\+]?[(]?[0-9\s-()]{7,20}$/, "Número de teléfono público inválido.").optional().or(z.literal("")),
@@ -61,6 +64,10 @@ interface BusinessFormProps {
 }
 
 export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = false, existingCustomUrlPaths }: BusinessFormProps) {
+  const { toast } = useToast();
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   const businessFormSchema = businessFormSchemaBase.refine(data => {
     if (data.customUrlPath && data.customUrlPath.trim() !== "") {
       const currentPath = data.customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -75,30 +82,11 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
 
   const form = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
-    defaultValues: {
-      name: business?.name || "",
-      contactEmail: business?.contactEmail || "",
-      ruc: business?.ruc || "",
-      razonSocial: business?.razonSocial || "",
-      department: business?.department || "",
-      province: business?.province || "",
-      district: business?.district || "",
-      address: business?.address || "",
-      managerName: business?.managerName || "",
-      managerDni: business?.managerDni || "",
-      businessType: business?.businessType,
-      logoUrl: business?.logoUrl || "",
-      publicCoverImageUrl: business?.publicCoverImageUrl || "",
-      slogan: business?.slogan || "",
-      publicContactEmail: business?.publicContactEmail || "",
-      publicPhone: business?.publicPhone || "",
-      publicAddress: business?.publicAddress || "",
-      customUrlPath: business?.customUrlPath || "",
-    },
+    defaultValues: {},
   });
   
   useEffect(() => {
-    form.reset({
+    const defaultValues = {
       name: business?.name || "",
       contactEmail: business?.contactEmail || "",
       ruc: business?.ruc || "",
@@ -110,14 +98,16 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       managerName: business?.managerName || "",
       managerDni: business?.managerDni || "",
       businessType: business?.businessType,
-      logoUrl: business?.logoUrl || "",
-      publicCoverImageUrl: business?.publicCoverImageUrl || "",
       slogan: business?.slogan || "",
       publicContactEmail: business?.publicContactEmail || "",
       publicPhone: business?.publicPhone || "",
       publicAddress: business?.publicAddress || "",
       customUrlPath: business?.customUrlPath || "",
-    });
+      logoFile: null,
+      publicCoverImageUrls: business?.publicCoverImageUrls || [],
+    };
+    form.reset(defaultValues);
+    setLogoPreview(business?.logoUrl || null);
   }, [business, form]);
   
   const selectedDepartment = form.watch("department");
@@ -127,16 +117,28 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
   const provinces = selectedDepartment ? Object.keys(PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS] || {}) : [];
   const districts = selectedDepartment && selectedProvince ? PERU_LOCATIONS[selectedDepartment as keyof typeof PERU_LOCATIONS]?.[selectedProvince as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || [] : [];
   
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({ title: "Archivo de logo muy grande", description: "Por favor, selecciona una imagen de menos de 2MB.", variant: "destructive" });
+        return;
+      }
+      form.setValue("logoFile", file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+  
   const processSubmit = async (values: BusinessFormValues) => {
     const dataToSubmit: BusinessFormData = {
       ...values,
+      logoFile: values.logoFile,
       ruc: values.ruc || undefined,
       razonSocial: values.razonSocial || undefined,
       address: values.address || undefined,
       managerName: values.managerName || undefined,
       managerDni: values.managerDni || undefined,
-      logoUrl: values.logoUrl || undefined,
-      publicCoverImageUrl: values.publicCoverImageUrl || undefined,
+      publicCoverImageUrls: values.publicCoverImageUrls || [],
       slogan: values.slogan || undefined,
       publicContactEmail: values.publicContactEmail || undefined,
       publicPhone: values.publicPhone || undefined,
@@ -150,6 +152,27 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
     <Form {...form}>
       <form onSubmit={form.handleSubmit(processSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-3 pl-1 py-1">
         <h3 className="text-lg font-semibold pt-2 border-b pb-2 mb-3">Información General</h3>
+        
+        <div className="space-y-2">
+            <FormLabel>Logo del Negocio</FormLabel>
+            <div className="flex items-center gap-4">
+                <div className="w-20 h-20 flex-shrink-0 border p-1 rounded-md flex items-center justify-center bg-muted">
+                  {logoPreview ? (
+                    <NextImage src={logoPreview} alt="Vista previa del logo" width={80} height={80} className="object-contain" />
+                  ) : (
+                    <ImageIconLucide className="text-muted-foreground h-10 w-10"/>
+                  )}
+                </div>
+                <div className="w-full flex flex-col gap-2">
+                   <input type="file" ref={logoInputRef} onChange={handleLogoFileChange} className="hidden" accept="image/png, image/jpeg, image/gif, image/webp" />
+                   <Button type="button" variant="outline" className="w-full" onClick={() => logoInputRef.current?.click()} disabled={isSubmittingForm}>
+                     <Upload className="mr-2 h-4 w-4" /> Cambiar Logo
+                   </Button>
+                   <FormDescription className="text-xs">Recomendado: PNG cuadrado con fondo transparente.</FormDescription>
+                </div>
+            </div>
+          </div>
+        
         <FormField control={form.control} name="name" render={({ field }) => (
           <FormItem><FormLabel>Nombre Comercial <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Ej: Pandora Lounge Bar" {...field} value={field.value || ''} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
@@ -195,7 +218,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
           <FormItem>
             <FormLabel>Ruta URL Personalizada (Slug)</FormLabel>
             <div className="flex items-center">
-              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociosvip.app/b/</span>
+              <span className="px-3 py-2 bg-muted text-muted-foreground rounded-l-md border border-r-0 border-input text-sm">sociovip.app/b/</span>
               <FormControl>
                 <Input 
                   placeholder="mi-negocio-genial" 
@@ -221,12 +244,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
         <FormField control={form.control} name="slogan" render={({ field }) => (
           <FormItem><FormLabel>Slogan del Negocio (Público)</FormLabel><FormControl><Input placeholder="Tu frase pegajosa aquí" {...field} value={field.value || ""} maxLength={100} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
-        <FormField control={form.control} name="logoUrl" render={({ field }) => (
-          <FormItem><FormLabel>URL del Logo (Público)</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/logo.png" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormDescription className="text-xs">URL pública de tu logo. Idealmente PNG con fondo transparente.</FormDescription><FormMessage /></FormItem>
-        )}/>
-        <FormField control={form.control} name="publicCoverImageUrl" render={({ field }) => (
-          <FormItem><FormLabel>URL Imagen de Portada (Pública)</FormLabel><FormControl><Input type="url" placeholder="https://ejemplo.com/portada.jpg" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormDescription className="text-xs">Imagen para la página pública de tu negocio.</FormDescription><FormMessage /></FormItem>
-        )}/>
+        
         <FormField control={form.control} name="publicAddress" render={({ field }) => (
           <FormItem><FormLabel>Dirección Pública (si difiere de la principal)</FormLabel><FormControl><Textarea placeholder="Ej: Av. Comercial 456, Referencia..." {...field} value={field.value || ""} disabled={isSubmittingForm} rows={2}/></FormControl><FormMessage /></FormItem>
         )}/>

@@ -1,8 +1,10 @@
 
+
 // src/lib/constants.ts
 import type { GeneratedCode, SocioVipMember, PlatformUserRole } from "./types";
 
-export const DEFAULT_COMMISSION_PER_CODE = 5.00; // S/ 5.00 por código usado
+// ✅ Se define la URL de la imagen como una constante de string aquí.
+export const LOGO_IMAGE_URL = "https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png";
 
 export const GENERATED_CODE_STATUS_TRANSLATIONS: Record<GeneratedCode['status'], string> = {
   available: "Disponible",
@@ -37,21 +39,24 @@ export const MESES_DEL_ANO_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
 
-export const ALL_PLATFORM_USER_ROLES: PlatformUserRole[] = ['superadmin', 'business_admin', 'staff', 'promoter', 'host', 'lector_qr'];
+// Updated roles
+export const ALL_PLATFORM_USER_ROLES: PlatformUserRole[] = ['superadmin', 'business_admin', 'staff', 'promoter', 'lector_qr', 'client_gratis', 'vip_premium'];
 
 export const PLATFORM_USER_ROLE_TRANSLATIONS: Record<PlatformUserRole | 'QrClient' | 'SocioVipMember', string> = {
   superadmin: "Super Admin",
   business_admin: "Admin Negocio",
   staff: "Staff Negocio",
   promoter: "Promotor",
-  host: "Anfitrión",
+  host: "Anfitrión", // Se mantiene por si hay datos legados, pero no se usa en la UI
   lector_qr: "Lector QR",
+  client_gratis: "SocioVIP Gratis",
+  vip_premium: "SocioVIP Premium",
   QrClient: "Cliente QR",
   SocioVipMember: "Socio VIP",
 };
 
 // Roles que requieren un (y solo un) businessId
-export const ROLES_REQUIRING_BUSINESS_ID: PlatformUserRole[] = ['business_admin', 'staff', 'host', 'lector_qr'];
+export const ROLES_REQUIRING_BUSINESS_ID: PlatformUserRole[] = ['business_admin', 'staff', 'lector_qr'];
 
 export const BUSINESS_TYPES = [
   "Restaurante",
@@ -67,6 +72,17 @@ export const BUSINESS_TYPES = [
   "Salud y Bienestar",
   "Viajes y Turismo",
   "Otro",
+] as const;
+
+export const AVAILABLE_FONTS = [
+  { name: 'Roboto', value: "'Roboto', sans-serif" },
+  { name: 'Montserrat', value: "'Montserrat', sans-serif" },
+  { name: 'Oswald', value: "'Oswald', sans-serif" },
+  { name: 'Lato', value: "'Lato', sans-serif" },
+  { name: 'Playfair Display', value: "'Playfair Display', serif" },
+  { name: 'Bebas Neue', value: "'Bebas Neue', sans-serif" },
+  { name: 'Poppins', value: "'Poppins', sans-serif" },
+  { name: 'Arial', value: 'Arial, sans-serif' },
 ] as const;
 
 
@@ -229,14 +245,14 @@ export const PERU_LOCATIONS = {
     "LAMBAYEQUE": ["CHOCHOPE", "ILLIMO", "JAYANCA", "LAMBAYEQUE", "MOCHUMI", "MORROPE", "MOTUPE", "OLMOS", "PACORA", "SALAS", "SAN JOSE", "TUCUME"]
   },
   "LIMA": {
-    "BARRANCA": ["BARRANCA", "PARAMONGA", "PATIVILCA", "SUPE", "SUPE PUERTO"],
+    "BARRANCA": ["BARRANCA", "PARAMONGA", "PATIVILca", "SUPE", "SUPE PUERTO"],
     "CAJATAMBO": ["CAJATAMBO", "COPA", "GORGOR", "HUANCAPON", "MANAS"],
     "CANTA": ["ARAHUAY", "CANTA", "HUAMANTANGA", "HUAROS", "LACHAQUI", "SAN BUENAVENTURA", "SANTA ROSA DE QUIVES"],
     "CAÑETE": ["ASIA", "CALANGO", "CERRO AZUL", "CHILCA", "COAYLLO", "IMPERIAL", "LUNAHUANA", "MALA", "NUEVO IMPERIAL", "PACARAN", "QUILMANA", "SAN ANTONIO", "SAN LUIS", "SAN VICENTE DE CAÑETE", "SANTA CRUZ DE FLORES", "ZUÑIGA"],
     "HUARAL": ["ATAVILLOS ALTO", "ATAVILLOS BAJO", "AUCALLAMA", "CHANCAY", "HUARAL", "IHUARI", "LAMPIAN", "PACARAOS", "SAN MIGUEL DE ACOS", "SANTA CRUZ DE ANDAMARCA", "SUMBILCA", "VEINTISIETE DE NOVIEMBRE"],
     "HUAROCHIRI": ["ANTIOQUIA", "CALLAHUANCA", "CARAMPOMA", "CHICLA", "CUENCA", "HUACHUPAMPA", "HUANZA", "HUAROCHIRI", "LAHUAYTAMBO", "LANGA", "LARAOS", "MARIATANA", "MATUCANA", "RICARDO PALMA", "SAN ANDRES DE TUPICOCHA", "SAN ANTONIO", "SAN BARTOLOME", "SAN DAMIAN", "SAN JUAN DE IRIS", "SAN JUAN DE TANTARANCHE", "SAN LORENZO DE QUINTI", "SAN MATEO", "SAN MATEO DE OTAO", "SAN PEDRO DE CASTA", "SAN PEDRO DE HUANCAYRE", "SANGALLAYA", "SANTA CRUZ DE COCACHACRA", "SANTA EULALIA", "SANTIAGO DE ANCHUCAYA", "SANTIAGO DE TUNA", "SANTO DOMINGO DE LOS OLLEROS", "SURCO"],
     "HUAURA": ["AMBAR", "CALETA DE CARQUIN", "CHECRAS", "HUACHO", "HUALMAY", "HUAURA", "LEONCIO PRADO", "PACCHO", "SANTA LEONOR", "SANTA MARIA", "SAYAN", "VEGUETA"],
-    "LIMA": ["ANCON", "ATE", "BARRANCO", "BREÑA", "CARABAYLLO", "CHACLACAYO", "CHORRILLOS", "CIENEGUILLA", "COMAS", "EL AGUSTINO", "INDEPENDENCIA", "JESUS MARIA", "LA MOLINA", "LA VICTORIA", "LIMA", "LINCE", "LOS OLIVOS", "LURIGANCHO", "LURIN", "MAGDALENA DEL MAR", "MIRAFLORES", "PACHACAMAC", "PUCUSANA", "PUEBLO LIBRE", "PUENTE PIEDRA", "PUNTA HERMOSA", "PUNTA NEGRA", "RIMAC", "SAN BARTOLO", "SAN BORJA", "SAN ISIDRO", "SAN JUAN DE LURIGANCHO", "SAN JUAN DE MIRAFLORES", "SAN LUIS", "SAN MARTIN DE PORRES", "SAN MIGUEL", "SANTA ANITA", "SANTA MARIA DEL MAR", "SANTA ROSA", "SANTIAGO DE SURCO", "SURQUILLO", "VILLA EL SALVADOR", "VILLA MARIA DEL TRIUNFO"],
+    "LIMA": ["ANCON", "ATE", "BARRANCO", "BREÑA", "CARABAYLLO", "CHACLACAYO", "CHORRILLOS", "CIENEGUILLA", "COMAS", "EL AGUSTINO", "INDEPENDENCIA", "JESUS MARIA", "LA MOLINA", "LA VICTORIA", "LIMA", "LINCE", "LOS OLIVOS", "LURIGANCHO", "LURIN", "PACHACAMAC", "PUCUSANA", "PUEBLO LIBRE", "PUENTE PIEDRA", "PUNTA HERMOSA", "PUNTA NEGRA", "RIMAC", "SAN BARTOLO", "SAN BORJA", "SAN ISIDRO", "SAN JUAN DE LURIGANCHO", "SAN JUAN DE MIRAFLORES", "SAN LUIS", "SAN MARTIN DE PORRES", "SAN MIGUEL", "SANTA ANITA", "SANTA MARIA DEL MAR", "SANTA ROSA", "SANTIAGO DE SURCO", "SURQUILLO", "VILLA EL SALVADOR", "VILLA MARIA DEL TRIUNFO"],
     "OYON": ["ANDAJES", "CAUJUL", "COCHAMARCA", "NAVAN", "OYON", "PACHANGARA"],
     "YAUYOS": ["ALIS", "AYAUCA", "AYAVIRI", "AZANGARO", "CACRA", "CARANIA", "CATAHUASI", "CHOCOS", "COCHAS", "COLONIA", "HONGOS", "HUAMPARA", "HUANCAYA", "HUANGASCAR", "HUANTAN", "HUAÑEC", "LARAOS", "LINCHA", "MADEAN", "MIRAFLORES", "OMAS", "PUTINZA", "QUINCHES", "QUINOCAY", "SAN JOAQUIN", "SAN PEDRO DE PILAS", "TANTA", "TAURIPAMPA", "TOMAS", "TUPE", "VIÑAC", "VITIS", "YAUYOS"]
   },
@@ -293,7 +309,7 @@ export const PERU_LOCATIONS = {
     "BELLAVISTA": ["ALTO BIAVO", "BAJO BIAVO", "BELLAVISTA", "HUALLAGA", "SAN PABLO", "SAN RAFAEL"],
     "EL DORADO": ["AGUA BLANCA", "SAN JOSE DE SISA", "SAN MARTIN", "SANTA ROSA", "SHATOJA"],
     "HUALLAGA": ["ALTO SAPOSOA", "EL ESLABON", "PISCOYACU", "SACANCHE", "SAPOSOA", "TINGO DE SAPOA"],
-    "LAMAS": ["ALONSO DE ALVARADO", "BARRANQUITA", "CAYNARACHI", "CUÑUMBUQUI", "LAMAS", "PINTO RECODO", "RUMISAPA", "SAN ROQUE DE CUMBAZA", "SHANAO", "TABALOSOS", "ZAPATERO"],
+    "LAMAS": ["ALONSO DE ALVARADO", "BARRANQUita", "CAYNARACHI", "CUÑUMBUQUI", "LAMAS", "PINTO RECODO", "RUMISAPA", "SAN ROQUE DE CUMBAZA", "SHANAO", "TABALOSOS", "ZAPATERO"],
     "MARISCAL CACERES": ["CAMPANILLA", "HUICUNGO", "JUANJUI", "PACHIZA", "PAJARILLO"],
     "MOYOBAMBA": ["CALZADA", "HABANA", "JEPELACIO", "MOYOBAMBA", "SORITOR", "YANTALO"],
     "PICOTA": ["BUENOS AIRES", "CASPISAPA", "PICOTA", "PILLUANA", "PUCACACA", "SAN CRISTOBAL", "SAN HILARION", "SHAMBOYACU", "TINGO DE PONASA", "TRES UNIDOS"],
@@ -319,5 +335,16 @@ export const PERU_LOCATIONS = {
     "PURUS": ["PURUS"]
   }
 };
+    
 
-      
+    
+export const DEFAULT_COMMISSION_PER_CODE = 3;
+    
+
+    
+
+
+
+
+
+

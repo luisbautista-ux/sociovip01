@@ -1,8 +1,34 @@
-
-
 // src/lib/types.ts
 import type { Timestamp } from "firebase/firestore";
-import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES } from "./constants"; 
+import type { BUSINESS_TYPES, ALL_PLATFORM_USER_ROLES, AVAILABLE_FONTS } from "./constants"; 
+
+export interface TicketType {
+  id: string;
+  eventId: string; 
+  businessId: string;
+  name: string;
+  cost: number;
+  description?: string;
+  quantity?: number; 
+  color?: string;
+}
+
+export interface EventSchedule {
+  id: string;
+  label: string; // Ej: "Día 1 - La Yunza"
+  startDate: string;
+  endDate: string;
+}
+
+export interface CheckIn {
+  scheduleId: string;
+  scheduleLabel: string;
+  timestamp: string;
+  validatedBy: {
+    uid: string;
+    name: string;
+  };
+}
 
 export interface PromotionDetails { 
   id: string;
@@ -10,11 +36,15 @@ export interface PromotionDetails {
   description: string;
   validUntil: string; 
   imageUrl: string;
-  promoCode: string; // The original 9-digit code
-  qrValue: string; // The value embedded in the QR (e.g., the code's unique ID)
+  promoCode: string;
+  qrValue: string;
   aiHint: string;
   type: 'promotion' | 'event';
   termsAndConditions?: string;
+  qrTemplateImageUrl?: string;
+  qrTemplateLayout?: QrTemplateLayout;
+  ticketType?: Pick<TicketType, 'name' | 'cost' | 'color'>;
+  schedules?: EventSchedule[]; // Añadido para mostrar en QR
 }
 
 export type QrCodeStatusGenerated = 'available' | 'redeemed' | 'used' | 'expired';
@@ -27,19 +57,19 @@ export interface QrClient {
   phone: string;
   dob: Timestamp | string; 
   registrationDate: Timestamp | string;
-  generatedForBusinessId?: string; // Legacy field
-  associatedBusinessIds?: string[]; // New field for multiple associations
+  email?: string;
+  generatedForBusinessId?: string;
+  associatedBusinessIds?: string[];
 }
 
 export interface QrCodeData { 
   user: QrClient;
   promotion: PromotionDetails; 
-  code: string; // This will now be the code's unique ID, not the 9-digit value
+  code: string;
   status: QrCodeStatusGenerated;
 }
 
 export type BusinessType = typeof BUSINESS_TYPES[number];
-
 
 export interface Business {
   id: string; 
@@ -56,15 +86,17 @@ export interface Business {
   managerDni?: string;
   businessType?: BusinessType;
   logoUrl?: string;
-  publicCoverImageUrl?: string;
+  publicCoverImageUrls?: string[];
+  publicVideoUrls?: string[];
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
-  personalPhone?: string; // Teléfono para uso interno/admin (ej: WhatsApp)
+  personalPhone?: string;
   publicAddress?: string;
   customUrlPath?: string | null; 
   primaryColor?: string;
   secondaryColor?: string;
+  gmailRefreshToken?: string;
 }
 
 export type PlatformUserRole = typeof ALL_PLATFORM_USER_ROLES[number];
@@ -77,10 +109,12 @@ export interface PlatformUser {
   email: string;
   roles: PlatformUserRole[];
   businessId?: string | null; 
-  businessIds?: string[]; // Para promotores con multiples negocios
+  businessIds?: string[];
   lastLogin: Timestamp | string; 
   phone?: string;
   photoURL?: string;
+  dob?: Timestamp | string;
+  assignedBusinessId?: string | null;
 }
 
 export interface SocioVipMember {
@@ -101,7 +135,6 @@ export interface SocioVipMember {
   authUid?: string; 
 }
 
-
 export interface AdminDashboardStats {
   totalBusinesses: number;
   totalPlatformUsers: number;
@@ -115,12 +148,11 @@ export interface BusinessDashboardStats {
   totalQrUsed: number; 
 }
 
-
 export interface PromotionAnalyticsData { 
   month: string;
   promotionsCreated: number; 
-  qrCodesGenerated: number; // Reverted for consistency with chart
-  qrCodesUtilized: number; // Reverted for consistency with chart
+  qrCodesGenerated: number;
+  qrCodesUtilized: number;
 }
 
 export interface RegisteredClient { 
@@ -135,28 +167,33 @@ export type CommissionStatus = 'unpaid' | 'paid';
 export interface GeneratedCode { 
   id: string; 
   entityId: string; 
-  value: string; // The 9-digit alphanumeric code
-  status: QrCodeStatusGenerated; // available -> redeemed (by client) -> used (at door)
+  value: string;
+  status: QrCodeStatusGenerated;
   generatedByName: string; 
   generatedByUid?: string;
   generatedDate: string; 
-  redemptionDate?: string | null; // When client generated their QR
+  redemptionDate?: string | null;
   redeemedByInfo?: {
     dni: string;
     name: string;
     phone?: string;
   } | null;
-  usedDate?: string | null; // When host scanned the QR at the door
-  usedByInfo?: { // Info of the host/staff who scanned
+  usedDate?: string | null; // Legacy single use
+  usedByInfo?: {
     uid: string;
     name: string;
   } | null;
+  checkIns?: CheckIn[]; // Soporte para múltiples entradas
   observation?: string | null;
   isVipCandidate?: boolean;
-  // New fields for commissions
+  ownerName?: string;
+  ownerDni?: string;
+  ownerPhone?: string;
   commissionGenerated?: number;
   commissionStatus?: CommissionStatus;
-  paymentId?: string | null; // Links to a document in promoterPayments
+  paymentId?: string | null;
+  ticketTypeId?: string;
+  ticketTypeName?: string;
 }
 
 export type CommissionRuleType = 'fixed' | 'percentage';
@@ -179,28 +216,28 @@ export interface EventPromoterAssignment {
   notes?: string;
 }
 
-export interface TicketType {
-  id: string;
-  eventId: string; 
-  businessId: string;
-  name: string;
-  cost: number;
-  description?: string;
-  quantity?: number; 
-}
-
 export interface EventBox {
   id: string;
-  eventId: string; 
+  eventId: string;
   businessId: string;
   name: string;
   cost: number;
   description?: string;
-  status: 'available' | 'unavailable';
+  status: 'available' | 'reserved' | 'sold';
   capacity?: number;
-  sellerName?: string;
+  promoterId?: string;
+  promoterName?: string;
   ownerName?: string;
   ownerDni?: string;
+  ownerPhone?: string;
+}
+
+export interface QrTemplateLayout {
+  qr: { x: number; y: number; size: number; color?: string; };
+  name: { x: number; y: number; size?: number; color?: string; fontFamily?: string; };
+  dni: { x: number; y: number; size?: number; color?: string; fontFamily?: string; };
+  promoTitle: { x: number; y: number; size?: number; color?: string; fontFamily?: string; };
+  ticketType?: { x: number; y: number; width: number; height: number; textColor?: string; size?: number; fontFamily?: string; };
 }
 
 export interface BusinessManagedEntity { 
@@ -211,22 +248,32 @@ export interface BusinessManagedEntity {
   description: string;
   startDate: string; 
   endDate: string; 
+  locationAddress?: string;
   usageLimit?: number; 
   isActive: boolean;
+  isPublicAccess?: boolean;
   imageUrl?: string;
+  imageObjectPosition?: string;
   aiHint?: string;
   termsAndConditions?: string;
   generatedCodes?: GeneratedCode[];
-  // Event-specific fields
+  schedules?: EventSchedule[]; // Múltiples horarios/fechas
   maxAttendance?: number;
   ticketTypes?: TicketType[];
   eventBoxes?: EventBox[];
   assignedPromoters?: EventPromoterAssignment[];
-  // Common fields
   businessName?: string; 
   businessLogoUrl?: string;
   businessCustomUrlPath?: string | null;
   createdAt?: string; 
+  qrTemplateImageUrl?: string;
+  templateObjectPosition?: string;
+  qrTemplateLayout?: QrTemplateLayout;
+}
+
+export interface PromoterEntityView extends BusinessManagedEntity {
+    promoterCodesCreated: number;
+    promoterCodesUsed: number;
 }
 
 export interface PromoterProfile { 
@@ -251,6 +298,10 @@ export interface BusinessPromoterLink {
   joinDate: Timestamp | string; 
 }
 
+export interface BusinessPromoterLinkWithCommissions extends BusinessPromoterLink {
+  pendingAmount: number;
+  paidAmount: number;
+}
 
 export type BusinessClientType = 'qr' | 'vip';
 
@@ -268,8 +319,6 @@ export interface BusinessClientView {
   membershipStatus?: SocioVipMember['membershipStatus'];
 }
 
-
-// Form data types
 export interface BusinessFormData {
   name: string;
   contactEmail: string;
@@ -282,8 +331,9 @@ export interface BusinessFormData {
   managerName?: string;
   managerDni?: string;
   businessType?: BusinessType;
-  logoUrl?: string;
-  publicCoverImageUrl?: string;
+  logoFile?: File | null;
+  publicCoverImageUrls?: string[];
+  publicVideoUrls?: string[];
   slogan?: string;
   publicContactEmail?: string;
   publicPhone?: string;
@@ -295,7 +345,9 @@ export interface PlatformUserFormData {
   uid?: string; 
   dni: string;
   name: string;
-  email: string;
+  email?: string;
+  phone: string;
+  dob: Date;
   roles: PlatformUserRole[]; 
   businessId?: string | null;
   businessIds?: string[];
@@ -308,7 +360,7 @@ export interface SocioVipMemberFormData {
   name: string;
   surname: string;
   phone: string;
-  dob: Date; 
+  dob: Date;
   email: string;
   address?: string;
   profession?: string;
@@ -330,11 +382,16 @@ export interface BusinessPromotionFormData {
   description: string;
   startDate: Date;
   endDate: Date;
-  usageLimit?: number | string; // Allow string for empty input
+  usageLimit?: number | string;
   isActive: boolean;
   imageUrl?: string;
-  aiHint?: string;
+  imageFile?: File | null;
+  imageObjectPosition?: string;
+  templateObjectPosition?: string;
   termsAndConditions?: string;
+  qrTemplateImageUrl?: string;
+  qrTemplateFile?: File | null;
+  qrTemplateLayout?: QrTemplateLayout;
 }
 
 export interface BusinessEventFormData {
@@ -342,73 +399,35 @@ export interface BusinessEventFormData {
   description: string;
   startDate: Date;
   endDate: Date;
+  locationAddress?: string;
   maxAttendance?: number;
+  unlimitedAttendance?: boolean;
   isActive: boolean;
+  isPublicAccess: boolean;
   imageUrl?: string;
+  imageFile?: File | null;
   aiHint?: string;
   termsAndConditions?: string;
+  schedules?: EventSchedule[];
 }
 
 export interface BusinessPromoterFormData { 
   promoterName: string;
   promoterEmail: string;
+  promoterDni: string;
   promoterPhone?: string;
   commissionRate?: string; 
   password?: string;
 }
  
-export interface SpecificCodeFormValues { // Para el input de código de 9 dígitos en la página pública del negocio
+export interface SpecificCodeFormValues {
   specificCode: string;
 }
 
-export interface DniEntryValues { // Para el input de DNI en varios flujos
+export interface DniEntryValues {
   dni: string;
 }
 
-export interface PromoterCommissionEntry { 
-    id: string;
-    businessName: string;
-    entityName: string;
-    entityType: 'promotion' | 'event';
-    promoterCodesRedeemed: number; 
-    commissionRateApplied: string; // Ej: "10%" o "S/ 5.00 por código"
-    commissionEarned: number;
-    paymentStatus: 'Pendiente' | 'Pagado';
-    period: string; // Ej: "Mayo 2025"
-    entityId: string;
-    promoterId: string;
-    businessId?: string; // Added for filtering
-}
-
-export interface TicketTypeFormData {
-  name: string;
-  cost: number;
-  description?: string;
-  quantity?: number; 
-}
-
-export interface EventBoxFormData {
-  name: string;
-  cost: number;
-  description?: string;
-  status: 'available' | 'unavailable';
-  capacity?: number;
-  sellerName?: string;
-  ownerName?: string;
-  ownerDni?: string;
-}
-
-export interface BatchBoxFormData {
-  prefix: string;
-  fromNumber: number;
-  toNumber: number;
-  cost: number;
-  capacity?: number;
-  description?: string;
-  status: 'available' | 'unavailable';
-}
-
-// Para el flujo "DNI-primero"
 export interface InitialDataForPlatformUserCreation {
   dni: string;
   name?: string;
@@ -437,13 +456,49 @@ export interface InitialDataForPromoterLink {
   existingLink?: BusinessPromoterLink; 
   existingPlatformUserPromoter?: PlatformUser; 
   qrClientData?: QrClient; 
-  socioVipData?: SocioVipMember; 
+  socioVipData?: SocioVipMember;
 }
 
-export interface PromoterEntityView extends BusinessManagedEntity {
-    businessName: string;
-    promoterCodesCreated: number;
-    promoterCodesUsed: number;
+export interface PlatformSettings {
+  defaultBusinessesForFreeUsers?: string[];
 }
 
-      
+export interface TicketTypeFormData {
+  name: string;
+  cost: number;
+  description?: string;
+  quantity?: number;
+  color?: string;
+}
+
+export interface EventBoxFormData {
+  name: string;
+  cost: number;
+  description?: string;
+  status: 'available' | 'reserved' | 'sold';
+  capacity?: number;
+  promoterName?: string;
+  ownerName?: string;
+  ownerDni?: string;
+  ownerPhone?: string;
+}
+
+export interface BatchBoxFormData {
+  prefix: string;
+  fromNumber: number;
+  toNumber: number;
+  cost: number;
+  capacity?: number;
+  description?: string;
+}
+
+export interface AutomationRule {
+  id?: string;
+  businessId: string;
+  type: 'loyalty' | 'retention' | 'birthday';
+  name: string;
+  isEnabled: boolean;
+  threshold: number;
+  actionPromoId: string;
+  lastRun?: Timestamp | string;
+}

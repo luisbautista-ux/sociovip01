@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// Documentación de Storage Rules: https://firebase.google.com/docs/storage/security
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Regla general: por defecto, nadie puede leer o escribir.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+    
+    // PERFIL DE PROMOTOR
+    // Reglas para las imágenes de perfil de los promotores.
+    // La ruta es: promoter-avatars/{userId}/{fileName}
+    match /promoter-avatars/{userId}/{allPaths=**} {
+        // Permitir que cualquiera lea las imágenes (son públicas).
+        allow read: if true;
+
+        // Permitir escritura (crear, actualizar, eliminar) solo si el usuario autenticado
+        // es el dueño de esa carpeta.
+        allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Función reutilizable para verificar si un usuario pertenece a un negocio.
+    function isBusinessMember(businessId) {
+      // Obtener el perfil del usuario desde Firestore.
+      let userProfile = get(/databases/$(database)/documents/platformUsers/$(request.auth.uid)).data;
+      // Verificar si el businessId del recurso coincide con el businessId del usuario (para admins/staff)
+      // O si está incluido en la lista de businessIds (para promotores).
+      return userProfile.businessId == businessId || (businessId in userProfile.businessIds);
+    }
+
+    // IMAGENES DE NEGOCIOS (LOGOS, PORTADAS, ETC)
+    // La ruta es: business-assets/{businessId}/{fileName}
+    match /business-assets/{businessId}/{allPaths=**} {
+        // Permitir que cualquiera lea las imágenes (son públicas).
+        allow read: if true;
+        // Permitir escritura si el usuario autenticado es miembro de ese negocio.
+        allow write: if request.auth != null && isBusinessMember(businessId);
+    }
+
+    // IMÁGENES DE PROMOCIÓN
+    // La ruta es: promotion-images/{businessId}/{entityId}/{fileName}
+    match /promotion-images/{businessId}/{entityId}/{allPaths=**} {
+      // Permitir que cualquiera lea las imágenes (son públicas).
+      allow read: if true;
+      // Permitir escritura si el usuario autenticado es miembro de ese negocio.
+      allow write: if request.auth != null && isBusinessMember(businessId);
+    }
+  }
+}
