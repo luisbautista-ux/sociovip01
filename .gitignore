@@ -45,3 +45,4 @@ firebase-debug.log
 firestore-debug.logserviceAccountKey.json
 src/lib/firebase/serviceAccountKey.json
 .idx/
+.idx/
