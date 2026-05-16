@@ -112,8 +112,8 @@ export default function AdminAnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
-      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-        <BarChart3 className="h-8 w-8 text-primary !block" />
+      <h1 className="text-3xl font-bold text-primary flex items-center gap-3 mb-6">
+        <BarChart3 className="h-8 w-8 text-primary" />
         Analíticas 
       </h1>
 

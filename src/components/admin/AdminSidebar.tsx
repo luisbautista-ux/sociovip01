@@ -47,9 +47,8 @@ export function AdminSidebar({ closeSheet }: AdminSidebarProps) {
 
   return (
     <aside className="w-full h-full bg-card text-card-foreground flex flex-col">
-      <div className="p-4 border-b border-border flex items-center space-x-2">
-        <SocioVipLogo className="h-8 w-8" />
-        <h1 className="text-xl font-bold text-gradient">SocioVIP Admin</h1>
+      <div className="p-5 border-b border-border flex justify-center overflow-hidden bg-white/50">
+        <SocioVipLogo size={180} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto object-fill drop-shadow-lg" />
       </div>
       <nav className="flex-grow p-4 space-y-2">
         {navItems.map((item) => (
@@ -58,8 +57,8 @@ export function AdminSidebar({ closeSheet }: AdminSidebarProps) {
             href={item.href}
             onClick={handleLinkClick}
             className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
-              pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-secondary hover:text-secondary-foreground transition-colors",
+              pathname.startsWith(item.href) ? "bg-primary text-primary-foreground" : "text-muted-foreground"
             )}
           >
             <item.icon className="h-5 w-5" />
@@ -75,7 +74,7 @@ export function AdminSidebar({ closeSheet }: AdminSidebarProps) {
         )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
             </Button>
           </AlertDialogTrigger>
@@ -94,7 +93,7 @@ export function AdminSidebar({ closeSheet }: AdminSidebarProps) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <p className="text-xs text-muted-foreground text-center mt-2">© {new Date().getFullYear()} SocioVIP SuperAdmin</p>
+        <p className="text-xs text-muted-foreground text-center mt-2">© {new Date().getFullYear()} SocioVIP <span className="text-primary font-bold">SuperAdmin</span></p>
       </div>
     </aside>
   );

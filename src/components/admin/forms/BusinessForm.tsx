@@ -36,15 +36,15 @@ const businessFormSchemaBase = z.object({
   province: z.string().min(1, "Provincia es requerida."),
   district: z.string().min(1, "Distrito es requerida."),
   address: z.string().min(5, "La dirección debe tener al menos 5 caracteres.").optional().or(z.literal("")),
-  contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }),
+  contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }).refine(val => val.toLowerCase().endsWith("@gmail.com"), { message: "El email debe terminar en @gmail.com" }),
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
-  managerDni: z.string().min(8, "Debe tener al menos 8 caracteres.").max(15, "No debe exceder 15 caracteres.").regex(/^\d+$/, "Solo debe contener números.").optional().or(z.literal("")),
+  managerDni: z.string().max(20, "No debe exceder 20 caracteres.").regex(/^\d*$/, "Solo debe contener números.").optional().or(z.literal("")),
   
   logoFile: z.custom<File | null>().optional(),
   publicCoverImageUrls: z.array(z.string().url()).optional(),
   slogan: z.string().max(100, "El slogan no debe exceder 100 caracteres.").optional().or(z.literal("")),
-  publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")),
-  publicPhone: z.string().regex(/^[\+]?[(]?[0-9\s-()]{7,20}$/, "Número de teléfono público inválido.").optional().or(z.literal("")),
+  publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")).refine(val => !val || val.toLowerCase().endsWith("@gmail.com"), { message: "El email debe terminar en @gmail.com" }),
+  publicPhone: z.string().regex(/^9\d{8}$/, "El teléfono debe empezar con 9 y tener 9 dígitos.").optional().or(z.literal("")),
   publicAddress: z.string().max(200, "La dirección pública no debe exceder 200 caracteres.").optional().or(z.literal("")),
   customUrlPath: z.string()
     .min(3, "La ruta URL debe tener al menos 3 caracteres.")
@@ -61,9 +61,10 @@ interface BusinessFormProps {
   onCancel: () => void;
   isSubmittingForm?: boolean;
   existingCustomUrlPaths: string[]; 
+  onDirtyChange?: (isDirty: boolean) => void;
 }
 
-export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = false, existingCustomUrlPaths }: BusinessFormProps) {
+export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = false, existingCustomUrlPaths, onDirtyChange }: BusinessFormProps) {
   const { toast } = useToast();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -82,11 +83,7 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
 
   const form = useForm<BusinessFormValues>({
     resolver: zodResolver(businessFormSchema),
-    defaultValues: {},
-  });
-  
-  useEffect(() => {
-    const defaultValues = {
+    defaultValues: {
       name: business?.name || "",
       contactEmail: business?.contactEmail || "",
       ruc: business?.ruc || "",
@@ -105,10 +102,40 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
       customUrlPath: business?.customUrlPath || "",
       logoFile: null,
       publicCoverImageUrls: business?.publicCoverImageUrls || [],
-    };
-    form.reset(defaultValues);
-    setLogoPreview(business?.logoUrl || null);
+    },
+  });
+  
+  useEffect(() => {
+    if (business) {
+      form.reset({
+        name: business.name || "",
+        contactEmail: business.contactEmail || "",
+        ruc: business.ruc || "",
+        razonSocial: business.razonSocial || "",
+        department: business.department || "",
+        province: business.province || "",
+        district: business.district || "",
+        address: business.address || "",
+        managerName: business.managerName || "",
+        managerDni: business.managerDni || "",
+        businessType: business.businessType,
+        slogan: business.slogan || "",
+        publicContactEmail: business.publicContactEmail || "",
+        publicPhone: business.publicPhone || "",
+        publicAddress: business.publicAddress || "",
+        customUrlPath: business.customUrlPath || "",
+        logoFile: null,
+        publicCoverImageUrls: business.publicCoverImageUrls || [],
+      });
+      setLogoPreview(business.logoUrl || null);
+    }
   }, [business, form]);
+
+  const { isDirty } = form.formState;
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
   
   const selectedDepartment = form.watch("department");
   const selectedProvince = form.watch("province");
@@ -180,7 +207,13 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
           <FormItem><FormLabel>Razón Social</FormLabel><FormControl><Input placeholder="Nombre legal de la empresa" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="ruc" render={({ field }) => (
-          <FormItem><FormLabel>RUC</FormLabel><FormControl><Input placeholder="11 dígitos numéricos" {...field} value={field.value || ""} maxLength={11} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
+          <FormItem>
+            <FormLabel>RUC</FormLabel>
+            <FormControl>
+              <Input placeholder="10XXXXXXXXX" {...field} value={field.value || ""} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').substring(0, 11))} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
         )}/>
         <FormField control={form.control} name="businessType" render={({ field }) => (
           <FormItem><FormLabel>Giro de Negocio <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona un giro" /></SelectTrigger></FormControl><SelectContent>{BUSINESS_TYPES.map((type) => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>
@@ -189,13 +222,52 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
         <h3 className="text-lg font-semibold pt-4 border-t mt-6 pb-2 mb-3">Ubicación Principal</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField control={form.control} name="department" render={({ field }) => (
-            <FormItem><FormLabel>Departamento <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); form.setValue("province", ""); form.setValue("district", ""); }} value={field.value || ''} disabled={isSubmittingForm}><FormControl><SelectTrigger><SelectValue placeholder="Selecciona Dept." /></SelectTrigger></FormControl><SelectContent>{departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+            <FormItem>
+              <FormLabel>Departamento <span className="text-destructive">*</span></FormLabel>
+              <Select onValueChange={(value) => { field.onChange(value); form.setValue("province", ""); form.setValue("district", ""); }} value={field.value || ''} disabled={isSubmittingForm}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona Dept." />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
           )}/>
           <FormField control={form.control} name="province" render={({ field }) => (
-            <FormItem><FormLabel>Provincia <span className="text-destructive">*</span></FormLabel><Select onValueChange={(value) => { field.onChange(value); form.setValue("district", ""); }} value={field.value || ''} disabled={isSubmittingForm || !selectedDepartment || provinces.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedDepartment ? "Selecciona Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona Prov.")} /></SelectTrigger></FormControl><SelectContent>{provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+            <FormItem>
+              <FormLabel>Provincia <span className="text-destructive">*</span></FormLabel>
+              <Select onValueChange={(value) => { field.onChange(value); form.setValue("district", ""); }} value={field.value || ''} disabled={isSubmittingForm || !selectedDepartment || provinces.length === 0}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder={!selectedDepartment ? "Primero elige Dept." : (provinces.length === 0 ? "No hay provincias" : "Selecciona Prov.")} />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
           )}/>
           <FormField control={form.control} name="district" render={({ field }) => (
-            <FormItem><FormLabel>Distrito <span className="text-destructive">*</span></FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm || !selectedProvince || districts.length === 0}><FormControl><SelectTrigger><SelectValue placeholder={!selectedProvince ? "Selecciona Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona Dist.")} /></SelectTrigger></FormControl><SelectContent>{districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+            <FormItem>
+              <FormLabel>Distrito <span className="text-destructive">*</span></FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ''} disabled={isSubmittingForm || !selectedProvince || districts.length === 0}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder={!selectedProvince ? "Primero elige Prov." : (districts.length === 0 ? "No hay distritos" : "Selecciona Dist.")} />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
           )}/>
         </div>
         <FormField control={form.control} name="address" render={({ field }) => (
@@ -210,7 +282,13 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
           <FormItem><FormLabel>Nombre del Gerente o Representante Legal</FormLabel><FormControl><Input placeholder="Nombre completo del gerente" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="managerDni" render={({ field }) => (
-          <FormItem><FormLabel>DNI/CE del Gerente o Representante</FormLabel><FormControl><Input placeholder="DNI o Carnet de Extranjería" {...field} value={field.value || ""} maxLength={15} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
+          <FormItem>
+            <FormLabel>DNI/CE del Representante</FormLabel>
+            <FormControl>
+              <Input placeholder="Número de documento" {...field} value={field.value || ""} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').substring(0, 20))} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
         )}/>
 
         <h3 className="text-lg font-semibold pt-4 border-t mt-6 pb-2 mb-3">Branding y Página Pública</h3>
@@ -252,12 +330,18 @@ export function BusinessForm({ business, onSubmit, onCancel, isSubmittingForm = 
           <FormItem><FormLabel>Email Público de Contacto</FormLabel><FormControl><Input type="email" placeholder="Ej: info@minegocio.com" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="publicPhone" render={({ field }) => (
-          <FormItem><FormLabel>Teléfono Público de Contacto</FormLabel><FormControl><Input type="tel" placeholder="+51 1 2345678 / 987654321" {...field} value={field.value || ""} disabled={isSubmittingForm} /></FormControl><FormMessage /></FormItem>
+          <FormItem>
+            <FormLabel>Teléfono Público de Contacto</FormLabel>
+            <FormControl>
+              <Input placeholder="9XXXXXXXX" {...field} value={field.value || ""} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').substring(0, 9))} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
         )}/>
 
         <DialogFooter className="pt-6 sticky bottom-0 bg-background pb-4 -mb-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmittingForm}>Cancelar</Button>
-          <Button type="submit" variant="gradient" disabled={isSubmittingForm}>
+          <Button type="submit" disabled={isSubmittingForm} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
             {isSubmittingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {business ? "Guardar Cambios" : "Crear Negocio"}
           </Button>

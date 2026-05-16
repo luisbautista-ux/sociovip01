@@ -102,7 +102,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-2xl text-center">Iniciar Sesión</DialogTitle>
+            <DialogTitle className="text-2xl text-center text-primary font-bold">Iniciar Sesión</DialogTitle>
             <DialogDescription className="text-center">
               Accede a tu cuenta SocioVIP.
             </DialogDescription>
@@ -145,7 +145,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
                   ¿Olvidaste tu contraseña?
                 </Button>
               </div>
-              <Button type="submit" className="w-full" variant="gradient" disabled={isSubmitting}>
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Ingresar"}
               </Button>
             </form>

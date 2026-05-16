@@ -5,7 +5,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2 } from "lucide-react";
+import { SocioVipLogo } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AuthDispatcherPage() {
@@ -82,9 +82,13 @@ export default function AuthDispatcherPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gradient-loader">
-      <Loader2 className="h-16 w-16 animate-spin text-white" />
-      <p className="mt-6 text-xl text-white/90">Verificando y redirigiendo...</p>
-      <p className="mt-2 text-sm text-white/70">Serás dirigido a tu panel en unos momentos.</p>
+      <div className="flex flex-col items-center justify-center text-center">
+        <div className="mb-6 max-w-[85vw] animate-drop-in animate-float">
+          <SocioVipLogo size={180} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto object-fill border-[1px] border-white/95 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.3)] drop-shadow-lg" />
+        </div>
+        <p className="mt-6 text-xl font-semibold text-white/90">Verificando y redirigiendo...</p>
+        <p className="mt-2 text-sm text-white/70">Serás dirigido a tu panel en unos momentos.</p>
+      </div>
     </div>
   );
 }

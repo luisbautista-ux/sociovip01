@@ -62,8 +62,8 @@ export function ImageCarousel({
   }
 
   return (
-    <div className="relative w-full h-full px-0 md:px-0">
-      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] md:rounded-xl overflow-hidden group shadow-md">
+    <div className="relative w-full h-full px-0">
+      <div className="relative w-full aspect-[4/3] md:aspect-[16/7] md:rounded-2xl overflow-hidden group shadow-2xl">
         {/* Imagen */}
         {images.map((image, index) => (
           <NextImage
@@ -98,28 +98,31 @@ export function ImageCarousel({
         )}
 
         {/* Overlay centrado */}
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black/30 backdrop-blur-[1px] px-4 md:px-8">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black/40 backdrop-blur-[1px] px-4 md:px-8">
           {logoUrl && (
-            <div className="relative w-16 h-16 md:w-20 md:h-20 mb-4">
+            <div className="relative w-20 h-20 md:w-24 md:h-24 mb-6 animate-fade-in-down">
               <NextImage
                 src={logoUrl}
                 alt="Logo del negocio"
                 fill
                 quality={100}
-                className="object-contain drop-shadow-md rounded-md"
-                sizes="(max-width: 768px) 64px, 80px"
+                className="object-contain drop-shadow-2xl rounded-lg"
+                sizes="(max-width: 768px) 80px, 96px"
               />
             </div>
           )}
-          <h2 className="text-2xl md:text-3xl font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]">
+          <h2 className="text-4xl md:text-6xl font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] tracking-tight animate-fade-in">
             {title}
           </h2>
-          <p
-            className="text-sm md:text-lg text-white/90 mt-1 max-w-2xl font-medium leading-snug"
-            style={{ textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}
-          >
-            {slogan}
-          </p>
+          {slogan && (
+            <div className="mt-4 flex items-center justify-center">
+                <div className="h-[2px] w-12 bg-white/50 mr-4 rounded-full" />
+                <p className="text-base md:text-xl text-white/90 font-bold uppercase tracking-[0.2em] drop-shadow-md">
+                    {slogan}
+                </p>
+                <div className="h-[2px] w-12 bg-white/50 ml-4 rounded-full" />
+            </div>
+          )}
         </div>
 
         {/* Indicadores de progreso circulares */}

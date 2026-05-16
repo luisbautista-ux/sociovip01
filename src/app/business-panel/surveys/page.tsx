@@ -14,7 +14,7 @@ export default function BusinessSurveysPage() {
           <ClipboardList className="h-8 w-8 mr-2" /> Mis Encuestas
         </h1>
         <div className="self-end sm:self-center">
-            <Button variant="gradient">
+            <Button>
               <PlusCircle className="mr-2 h-4 w-4" /> Crear Encuesta
             </Button>
         </div>

@@ -484,15 +484,19 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-          <Star className="h-8 w-8 text-primary !block" />
+        <h1 className="text-3xl font-bold text-primary flex items-center gap-3 mb-6">
+          <Star className="h-8 w-8 text-primary" />
           Socios VIP
         </h1>
         <div className="flex space-x-2">
           <Button onClick={handleExport} variant="outline" disabled={isLoading || members.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={handleOpenCreateSocioVipFlow} variant="gradient" disabled={isLoading}>
+          <Button 
+            onClick={handleOpenCreateSocioVipFlow} 
+            className="bg-primary text-primary-foreground hover:bg-secondary hover:text-secondary-foreground shadow-md transition-all" 
+            disabled={isLoading}
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Socio VIP
           </Button>
         </div>
@@ -550,6 +554,9 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="text-sm text-muted-foreground pt-4">
+            Mostrando <span className="font-semibold text-foreground">{paginatedMembers.length}</span> de <span className="font-semibold text-foreground">{filteredMembers.length}</span> socios VIP totales.
           </div>
         </CardHeader>
         <CardContent>
@@ -843,7 +850,7 @@ const checkDniAcrossCollections = async (dniToVerify: string): Promise<CheckSoci
                 <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>
                   Cancelar
                 </Button>
-                <Button type="submit" variant="gradient" disabled={isSubmitting}>
+                <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                 </Button>
               </UIDialogFooter>

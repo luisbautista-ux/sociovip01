@@ -38,9 +38,9 @@ import type {
   GeneratedCode,
   TicketType
 } from "@/lib/types";
-import { format, isPast, parse, isAfter } from "date-fns";
+import { format, isPast, parse, isAfter, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore } from "@/lib/utils";
+import { anyToDate, isEntityCurrentlyActivatable, sanitizeObjectForFirestore, cn } from "@/lib/utils";
 import {
   Loader2,
   Building,
@@ -57,6 +57,7 @@ import {
   History,
   Video,
   MapPin,
+  Smartphone,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -105,7 +106,6 @@ import { Separator } from "@/components/ui/separator";
 import * as htmlToImage from 'html-to-image';
 import { ImageCarousel } from "@/components/business/ImageCarousel";
 import { VideoCarousel } from "@/components/business/VideoCarousel";
-import { parseISO } from "date-fns/parseISO";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 
 
@@ -216,7 +216,7 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
   const [allEvents, setAllEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
+  const [view, setView] = useState<'description' | 'promotions' | 'events'>('description');
 
   const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
   const [showDniModal, setShowDniModal] = useState(false);
@@ -283,8 +283,9 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
           publicContactEmail: bizData.publicContactEmail || undefined,
           publicPhone: bizData.publicPhone || undefined,
           publicAddress: bizData.publicAddress, // Keep as is
-          primaryColor: bizData.primaryColor || '#B080D0',
-          secondaryColor: bizData.secondaryColor || '#8E5EA2',
+          primaryColor: bizData.primaryColor || '#053264',
+          secondaryColor: bizData.secondaryColor || '#ccffbc',
+          description: bizData.description || "",
         };
         setBusinessDetails(fetchedBusiness);
 
@@ -848,7 +849,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             size="sm"
             className="w-full h-9 text-white font-bold transition-all hover:scale-105 active:scale-95"
             style={{
-                backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`
+                backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#053264'}, ${businessDetails?.secondaryColor || '#ccffbc'})`
             }}
             disabled={isLoadingQrFlow}
           >
@@ -879,10 +880,10 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     );
   };
 
-  const showPromotions = (view === 'all' || view === 'promotions') && promotions.length > 0;
-  const showEvents = (view === 'all' || view === 'events') && allEvents.length > 0;
+  const showDescription = view === 'description';
+  const showPromotions = view === 'promotions';
+  const showEvents = view === 'events';
   const noContentToShow = !isLoading && (
-    (view === 'all' && promotions.length === 0 && allEvents.length === 0) ||
     (view === 'promotions' && promotions.length === 0) ||
     (view === 'events' && allEvents.length === 0)
   );
@@ -892,8 +893,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
-          <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
-            <SocioVipLogo size={70} />
+          <div className="relative p-[2px] rounded-full shadow-2xl bg-white/95 animate-drop-in animate-float mb-6 max-w-[85vw]">
+            <SocioVipLogo size={180} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto object-fill drop-shadow-lg" />
           </div>
           <p className="mt-4 text-lg font-semibold text-white/90">
             Cargando información del negocio...
@@ -986,19 +987,14 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
        <main className="flex-grow overflow-y-auto">
             <div className="max-w-7xl mx-auto w-full px-0 sm:px-6 lg:px-8 pt-0">
                 <ScrollReveal direction="none">
-                    <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8 md:mt-8 mb-4">
-                        <div className="md:col-span-2">
-                            <ImageCarousel
-                            images={businessDetails.publicCoverImageUrls || []}
-                            primaryColor={businessDetails.primaryColor}
-                            title={businessDetails.name}
-                            slogan={businessDetails.slogan}
-                            logoUrl={businessDetails.logoUrl}
-                            />
-                        </div>
-                        <aside className="hidden md:block h-full">
-                            <VideoCarousel videos={businessDetails.publicVideoUrls || []} primaryColor={businessDetails.primaryColor}/>
-                        </aside>
+                    <div className="w-full md:mt-8 mb-4">
+                        <ImageCarousel
+                        images={businessDetails.publicCoverImageUrls || []}
+                        primaryColor={businessDetails.primaryColor}
+                        title={businessDetails.name}
+                        slogan={businessDetails.slogan}
+                        logoUrl={businessDetails.logoUrl}
+                        />
                     </div>
                 </ScrollReveal>
 
@@ -1033,105 +1029,250 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         </div>
                     </div>
                 </ScrollReveal>
-            
-                <div className="sticky top-0 z-30 py-2 bg-background px-4">
+                <div className="sticky top-0 z-30 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
                     <div className="max-w-7xl mx-auto">
-                        <div className="flex items-center justify-start h-10 gap-6 border-b" style={{borderColor: businessDetails.primaryColor}}>
-                            <button onClick={() => setView('all')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'all' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Ver Todo</button>
-                            <button onClick={() => setView('promotions')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'promotions' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Promociones</button>
-                            <button onClick={() => setView('events')} className={cn("font-semibold text-sm transition-colors hover:opacity-80", view === 'events' ? `border-b-2 text-black border-black` : 'text-muted-foreground')}>Eventos</button>
+                        <div className="grid grid-cols-3 min-w-[300px]">
+                            <button 
+                                onClick={() => setView('description')} 
+                                className={cn(
+                                    "flex flex-col items-center justify-center py-4 px-2 gap-1 transition-all border-r", 
+                                    view === 'description' 
+                                        ? "text-white" 
+                                        : "text-muted-foreground hover:bg-slate-50 hover:text-foreground"
+                                )}
+                                style={view === 'description' ? { backgroundColor: businessDetails.primaryColor } : {}}
+                            >
+                                <Info className={cn("h-6 w-6 transition-colors", view === 'description' ? "text-white" : "text-muted-foreground")} />
+                                <span className="font-bold text-[10px] sm:text-xs uppercase tracking-widest">Descripción</span>
+                            </button>
+                            
+                            <button 
+                                onClick={() => setView('promotions')} 
+                                className={cn(
+                                    "flex flex-col items-center justify-center py-4 px-2 gap-1 transition-all border-r", 
+                                    view === 'promotions' 
+                                        ? "text-white" 
+                                        : "text-muted-foreground hover:bg-slate-50 hover:text-foreground"
+                                )}
+                                style={view === 'promotions' ? { backgroundColor: businessDetails.primaryColor } : {}}
+                            >
+                                <Tag className={cn("h-6 w-6 transition-colors", view === 'promotions' ? "text-white" : "text-muted-foreground")} />
+                                <span className="font-bold text-[10px] sm:text-xs uppercase tracking-widest">Promociones</span>
+                            </button>
+                            
+                            <button 
+                                onClick={() => setView('events')} 
+                                className={cn(
+                                    "flex flex-col items-center justify-center py-4 px-2 gap-1 transition-all", 
+                                    view === 'events' 
+                                        ? "text-white" 
+                                        : "text-muted-foreground hover:bg-slate-50 hover:text-foreground"
+                                )}
+                                style={view === 'events' ? { backgroundColor: businessDetails.primaryColor } : {}}
+                            >
+                                <Calendar className={cn("h-6 w-6 transition-colors", view === 'events' ? "text-white" : "text-muted-foreground")} />
+                                <span className="font-bold text-[10px] sm:text-xs uppercase tracking-widest">Eventos</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-12 px-4 sm:px-0 mt-8">
+                <div className="px-4 sm:px-6 lg:px-8 mt-10 max-w-7xl mx-auto mb-20">
+                    {showDescription && (
+                        <ScrollReveal direction="up">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                {/* Main Content Column */}
+                                <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border p-8 sm:p-12">
+                                    <div className="prose prose-slate max-w-none">
+                                        <h2 className="text-4xl font-bold mb-8 tracking-tight" style={{ color: businessDetails.primaryColor }}>
+                                            Descripción
+                                        </h2>
+                                        
+                                        <div className="text-xl leading-relaxed text-slate-700 whitespace-pre-wrap font-medium">
+                                            {businessDetails.description || "Este negocio aún no ha proporcionado una descripción detallada."}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Sidebar Column */}
+                                <div className="lg:col-span-4 space-y-6">
+                                    <div className="bg-white rounded-2xl shadow-sm border p-8">
+                                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2 border-b pb-4">
+                                            <Info className="h-5 w-5" style={{ color: businessDetails.primaryColor }} />
+                                            Detalles del Negocio
+                                        </h3>
+                                        
+                                        <div className="space-y-8">
+                                            <div className="flex gap-4">
+                                                <div className="mt-1 bg-slate-100 p-2 rounded-lg h-fit">
+                                                    <MapPin className="h-5 w-5 text-slate-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sm text-slate-900 uppercase tracking-wider mb-1">Ubicación</h4>
+                                                    <p className="text-slate-600 text-sm leading-relaxed">
+                                                        {businessDetails.publicAddress || "Dirección no disponible"}
+                                                    </p>
+                                                    {businessDetails.publicAddress && (
+                                                        <a 
+                                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(businessDetails.publicAddress)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs font-bold mt-2 inline-block hover:underline"
+                                                            style={{ color: businessDetails.primaryColor }}
+                                                        >
+                                                            Ver en Google Maps
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-4">
+                                                <div className="mt-1 bg-slate-100 p-2 rounded-lg h-fit">
+                                                    <CalendarDays className="h-5 w-5 text-slate-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-sm text-slate-900 uppercase tracking-wider mb-1">Horario</h4>
+                                                    <p className="text-slate-600 text-sm leading-relaxed">
+                                                        Abierto de Lunes a Domingo.<br/>
+                                                        Consulta promociones para horarios especiales.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {businessDetails.publicPhone && (
+                                                <div className="flex gap-4">
+                                                    <div className="mt-1 bg-slate-100 p-2 rounded-lg h-fit">
+                                                        <Smartphone className="h-5 w-5 text-slate-600" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-sm text-slate-900 uppercase tracking-wider mb-1">Contacto</h4>
+                                                        <p className="text-slate-600 text-sm font-medium">
+                                                            {businessDetails.publicPhone}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Small branding card */}
+                                    <div className="bg-slate-50 rounded-2xl p-6 border border-dashed flex flex-col items-center text-center">
+                                        <SocioVipLogo size={40} className="mb-3 opacity-50 grayscale" />
+                                        <p className="text-xs text-muted-foreground font-medium">
+                                            Miembro verificado de SocioVIP<br/>
+                                            Garantía de calidad y servicio.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </ScrollReveal>
+                    )}
+
                     {showPromotions && (
                       <section>
-                        <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
-                          <Tag className="h-7 w-7 mr-3" /> Promociones Vigentes
+                        <h2 className="text-3xl font-bold tracking-tight mb-8 flex items-center" style={{ color: businessDetails.primaryColor }}>
+                          <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-8">
-                          {promotions.map((promo, index) => (
-                            <ScrollReveal key={promo.id} delay={index * 100}>
-                                <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
-                                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                                    <NextImage 
-                                        src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} 
-                                        alt={promo.name} fill 
-                                        className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
-                                        style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} 
-                                        data-ai-hint={promo.aiHint || "discount offer"}
-                                    />
-                                </div>
-                                <CardHeader className="pb-3"><CardTitle className="text-xl font-headline">{promo.name}</CardTitle></CardHeader>
-                                <CardContent className="flex-grow space-y-1"><p className="text-sm text-muted-foreground line-clamp-3">{promo.description}</p><p className="text-xs text-muted-foreground">Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}</p></CardContent>
-                                <CardFooter className="flex-col items-start p-4 border-t bg-muted/10"><SpecificCodeEntryForm entity={promo} /></CardFooter>
-                                </Card>
-                            </ScrollReveal>
-                          ))}
-                        </div>
+                        {promotions.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-8">
+                                {promotions.map((promo, index) => (
+                                    <ScrollReveal key={promo.id} delay={index * 100}>
+                                        <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-xl bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
+                                        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-xl">
+                                            <NextImage 
+                                                src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} 
+                                                alt={promo.name} fill 
+                                                className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
+                                                style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} 
+                                                data-ai-hint={promo.aiHint || "discount offer"}
+                                            />
+                                        </div>
+                                        <CardHeader className="pb-3 px-6 pt-6">
+                                            <CardTitle className="text-xl font-bold">{promo.name}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow space-y-2 px-6">
+                                            <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{promo.description}</p>
+                                            <p className="text-xs font-semibold text-muted-foreground bg-muted/50 py-1 px-2 rounded inline-block">
+                                                Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
+                                            </p>
+                                        </CardContent>
+                                        <CardFooter className="flex-col items-start p-6 border-t bg-muted/5"><SpecificCodeEntryForm entity={promo} /></CardFooter>
+                                        </Card>
+                                    </ScrollReveal>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-12"><Card className="col-span-full border-dashed"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">No hay Promociones por Ahora</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!</CardDescription></CardContent></Card></div>
+                        )}
                       </section>
                     )}
                     
                     {showEvents && (
                       <section>
-                        <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center" style={{ color: businessDetails.primaryColor }}>
-                          <Calendar className="h-7 w-7 mr-3" /> Eventos
+                        <h2 className="text-3xl font-bold tracking-tight mb-8 flex items-center" style={{ color: businessDetails.primaryColor }}>
+                          <Calendar className="h-8 w-8 mr-3" /> Próximos Eventos
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
-                          {allEvents.map((event, index) => {
-                            const location = event.locationAddress || (businessDetails.publicAddress);
-                            return (
-                                <ScrollReveal key={event.id} delay={index * 100}>
-                                    <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
-                                    <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
-                                        <NextImage 
-                                            src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} 
-                                            alt={event.name} fill 
-                                            className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
-                                            style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} 
-                                            data-ai-hint={event.aiHint || "party concert"}
-                                        />
-                                        {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />)}
-                                    </div>
-                                    <CardHeader className="pb-3"><CardTitle className="text-xl font-headline">{event.name}</CardTitle></CardHeader>
-                                    <CardContent className="flex-grow space-y-2">
-                                        <p className="text-sm text-muted-foreground line-clamp-3">{event.description}</p>
-                                        <p className="text-xs text-muted-foreground">Fecha: {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}</p>
-                                        {location && (
-                                            <a
-                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors pt-1 group"
-                                            >
-                                                <MapPin className="h-4 w-4 mr-1.5 shrink-0" />
-                                                <span className="group-hover:underline">{location}</span>
-                                            </a>
-                                        )}
-                                    </CardContent>
-                                    {isEntityCurrentlyActivatable(event) ? (
-                                        <CardFooter className="flex-col items-start p-4 border-t bg-muted/10">
-                                            {event.isPublicAccess ? (
-                                                <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-9 text-white font-bold shadow-lg transition-all hover:scale-105" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#B080D0'}, ${businessDetails?.secondaryColor || '#8E5EA2'})`}}>
-                                                    <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
-                                                </Button>
-                                            ) : (
-                                                <SpecificCodeEntryForm entity={event} />
-                                            )}
-                                        </CardFooter>
-                                        ) : (<PastEventCardFooter entity={event} />)
-                                    }
-                                    </Card>
-                                </ScrollReveal>
-                            )
-                        })}
-                        </div>
+                        {allEvents.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-12">
+                            {allEvents.map((event, index) => {
+                                const location = event.locationAddress || (businessDetails.publicAddress);
+                                return (
+                                    <ScrollReveal key={event.id} delay={index * 100}>
+                                        <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-xl bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
+                                        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-xl">
+                                            <NextImage 
+                                                src={event.imageUrl || "https://placehold.co/600x400.png?text=Evento"} 
+                                                alt={event.name} fill 
+                                                className="object-cover transition-transform duration-500 ease-in-out group-hover:scale-110" 
+                                                style={{ objectPosition: event.imageObjectPosition || '50% 50%' }} 
+                                                data-ai-hint={event.aiHint || "party concert"}
+                                            />
+                                            {isPast(new Date(event.endDate)) && (<div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />)}
+                                        </div>
+                                        <CardHeader className="pb-3 px-6 pt-6">
+                                            <CardTitle className="text-xl font-bold">{event.name}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow space-y-3 px-6">
+                                            <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{event.description}</p>
+                                            <div className="space-y-1.5">
+                                                <div className="flex items-center text-xs font-semibold text-primary">
+                                                    <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                                                    {format(parseISO(event.startDate), "dd MMMM, yyyy", { locale: es })}
+                                                </div>
+                                                {location && (
+                                                    <a
+                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors pt-1 group"
+                                                    >
+                                                        <MapPin className="h-4 w-4 mr-1.5 shrink-0" />
+                                                        <span className="group-hover:underline line-clamp-1">{location}</span>
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                        {isEntityCurrentlyActivatable(event) ? (
+                                            <CardFooter className="flex-col items-start p-6 border-t bg-muted/5">
+                                                {event.isPublicAccess ? (
+                                                    <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-10 text-white font-bold shadow-lg transition-all hover:scale-105" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#053264'}, ${businessDetails?.secondaryColor || '#ccffbc'})`}}>
+                                                        <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
+                                                    </Button>
+                                                ) : (
+                                                    <SpecificCodeEntryForm entity={event} />
+                                                )}
+                                            </CardFooter>
+                                            ) : (<PastEventCardFooter entity={event} />)
+                                        }
+                                        </Card>
+                                    </ScrollReveal>
+                                )
+                            })}
+                            </div>
+                        ) : (
+                            <div className="py-12"><Card className="col-span-full border-dashed"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">No hay Eventos por Ahora</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!</CardDescription></CardContent></Card></div>
+                        )}
                       </section>
-                    )}
-
-                    {noContentToShow && (
-                      <div className="py-12"><Card className="col-span-full border-dashed"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">{view === 'promotions' && 'No hay Promociones por Ahora'}{view === 'events' && 'No hay Eventos por Ahora'}{view === 'all' && 'No hay Promociones y Eventos por Ahora'}</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>{view === 'promotions' && 'Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!'}{view === 'events' && 'Este negocio no tiene eventos activos en este momento. ¡Vuelve pronto!'}{view === 'all' && 'Este negocio no tiene promociones o eventos activos en este momento. ¡Vuelve pronto!'}</CardDescription></CardContent></Card></div>
                     )}
                 </div>
             </div>
@@ -1434,7 +1575,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   </Button>
                   <Button type="submit" className="flex-1 text-white font-bold shadow-lg transition-all hover:scale-105" 
                     style={{
-                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#B080D0'}, ${businessDetails.secondaryColor || '#8E5EA2'})`
+                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#053264'}, ${businessDetails.secondaryColor || '#ccffbc'})`
                     }}
                     disabled={isLoadingQrFlow || isConsultingDni}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar y Generar QR"}

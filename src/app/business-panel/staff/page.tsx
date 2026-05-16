@@ -295,7 +295,7 @@ export default function BusinessStaffPage() {
           <Users className="h-8 w-8 mr-2" /> Mi Personal
         </h1>
         <div className="self-end sm:self-center">
-            <Button onClick={handleOpenCreateUserFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
+            <Button onClick={handleOpenCreateUserFlow} disabled={isLoading || !currentBusinessId}>
               <PlusCircle className="mr-2 h-4 w-4" /> Añadir Personal
             </Button>
         </div>

@@ -161,7 +161,7 @@ export default function ClientProfilePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+      <h1 className="text-3xl font-bold text-primary flex items-center gap-2 mb-6">
         <UserCircle className="h-8 w-8 text-primary !block" /> Mi Perfil
       </h1>
 
@@ -200,7 +200,7 @@ export default function ClientProfilePage() {
                   <FormItem><FormLabel>Email (Cuenta)</FormLabel><FormControl><Input type="email" {...field} disabled={true} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={isSubmitting} variant="gradient">
+                  <Button type="submit" disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Guardar Cambios"}
                   </Button>
                 </div>

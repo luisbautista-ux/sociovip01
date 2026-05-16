@@ -40,7 +40,7 @@ const platformUserFormSchema = z.object({
   dni: z.string().min(7, "El DNI/CE debe tener entre 7 y 15 caracteres.").max(15),
   email: z.string().email("Debe ser un email válido.").optional().or(z.literal("")),
   phone: z.string().regex(/^9\d{8}$/, "El celular debe tener 9 dígitos y empezar con 9.").optional().or(z.literal("")),
-  dob: z.date({ required_error: "La fecha de nacimiento es requerida."}),
+  dob: z.date().optional().nullable(),
   password: z.string().optional(),
   roles: z.array(z.string()).refine((value) => value.length > 0, {
     message: "Debes seleccionar al menos un rol.",
@@ -60,6 +60,7 @@ interface PlatformUserFormProps {
   onCancel: () => void;
   isSubmitting?: boolean;
   disableSubmitOverride?: boolean;
+  onDirtyStateChange?: (isDirty: boolean) => void;
 }
 
 // Helper robusto para convertir a fecha
@@ -84,6 +85,7 @@ export function PlatformUserForm({
   onCancel,
   isSubmitting = false,
   disableSubmitOverride = false,
+  onDirtyStateChange,
 }: PlatformUserFormProps) {
   const { userProfile: currentUserProfile, signupWithGoogle } = useAuth();
   const isSuperAdminView = currentUserProfile?.roles.includes('superadmin') || false;
@@ -146,6 +148,12 @@ export function PlatformUserForm({
     form.reset(getInitialValues());
 
   }, [user, initialDataForCreation, form]);
+
+  const { isDirty } = form.formState;
+
+  useEffect(() => {
+    onDirtyStateChange?.(isDirty);
+  }, [isDirty, onDirtyStateChange]);
 
   const selectedRoles = form.watch("roles", user?.roles || []);
   const showBusinessIdSelector = isSuperAdminView && selectedRoles.some(role => ROLES_REQUIRING_BUSINESS_ID.includes(role as PlatformUserRole));
@@ -212,23 +220,23 @@ export function PlatformUserForm({
          )}
         
         <FormField control={form.control} name="dni" render={({ field }) => (
-            <FormItem><FormLabel>DNI/CE <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Número de documento" {...field} disabled={isSubmitting || isEditing || !!initialDataForCreation?.dni} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>DNI/CE <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Número de documento" {...field} className="border-primary" disabled={isSubmitting || isEditing || !!initialDataForCreation?.dni} /></FormControl><FormMessage /></FormItem>
         )}/>
         <FormField control={form.control} name="name" render={({ field }) => (
-            <FormItem><FormLabel>Nombre Completo <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Nombre del usuario" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Nombre Completo <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Nombre del usuario" {...field} className="border-primary" disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
         )}/>
 
         {!isEditing && (
             <>
                 <FormField control={form.control} name="phone" render={({ field }) => (
-                    <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} maxLength={9} value={field.value || ""} disabled={isSubmitting}/></FormControl><FormMessage/></FormItem>
+                    <FormItem><FormLabel>Celular <span className="text-destructive">*</span></FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} maxLength={9} value={field.value || ""} className="border-primary" disabled={isSubmitting}/></FormControl><FormMessage/></FormItem>
                 )}/>
                 <FormField control={form.control} name="dob" render={({ field }) => (
                     <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
                         <Popover>
                             <PopoverTrigger asChild>
                             <FormControl>
-                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
+                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal border-primary", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
                                 {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona la fecha</span>}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
@@ -259,7 +267,7 @@ export function PlatformUserForm({
                         {rolesToDisplay.map((role) => (
                             <FormItem key={role} className="flex items-center space-x-3 space-y-0">
                                 <FormControl>
-                                    <RadioGroupItem value={role} />
+                                    <RadioGroupItem value={role} className="border-primary" />
                                 </FormControl>
                                 <FormLabel className="font-normal">
                                     {PLATFORM_USER_ROLE_TRANSLATIONS[role as PlatformUserRole]}
@@ -280,7 +288,7 @@ export function PlatformUserForm({
             render={() => (
               <FormItem>
                 <FormLabel>Negocio Principal (Para Staff/Admin/Lector) <span className="text-destructive">*</span></FormLabel>
-                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded-md">
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border border-primary/30 p-2 rounded-md">
                   {businesses.map((biz) => (
                     <FormField
                       key={biz.id}
@@ -291,6 +299,7 @@ export function PlatformUserForm({
                           <FormControl>
                             <Checkbox
                               checked={field.value === biz.id}
+                              className="border-primary"
                               onCheckedChange={() => {
                                 field.onChange(biz.id);
                               }}
@@ -313,18 +322,24 @@ export function PlatformUserForm({
         {showMultipleBusinessSelector && (
              <FormField control={form.control} name="businessIds" render={() => (
                 <FormItem><FormLabel>Negocios Asignados (Para Promotor)</FormLabel>
-                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded-md">
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border border-primary/30 p-2 rounded-md">
                   {businesses.map(biz => (
-                     <FormField key={biz.id} control={form.control} name="businessIds" render={({ field }) => (
-                       <FormItem className="flex items-center space-x-2"><FormControl><Checkbox
-                            checked={field.value?.includes(biz.id)}
-                            onCheckedChange={(checked) => {
-                              return checked
-                                ? field.onChange([...(field.value || []), biz.id])
-                                : field.onChange((field.value || []).filter((id) => id !== biz.id))
-                            }}
-                        /></FormControl><FormLabel className="font-normal text-sm">{biz.name}</FormLabel></FormItem>
-                     )}/>
+                      <FormField key={biz.id} control={form.control} name="businessIds" render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(biz.id)}
+                              className="border-primary"
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...(field.value || []), biz.id])
+                                  : field.onChange((field.value || []).filter((id) => id !== biz.id))
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal text-sm">{biz.name}</FormLabel>
+                        </FormItem>
+                      )}/>
                   ))}
                 </div>
                 <FormDescription className="text-xs">Negocios en los que el promotor puede generar códigos.</FormDescription><FormMessage /></FormItem>

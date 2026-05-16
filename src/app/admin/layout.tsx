@@ -31,8 +31,8 @@ export default function AdminLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
-          <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-              <SocioVipLogo size={80} className="animate-pulse" />
+          <div className="mb-6 animate-drop-in animate-float">
+            <SocioVipLogo size={180} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto object-fill border-[1px] border-white/95 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.3)] drop-shadow-lg" />
           </div>
           <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
         </div>
@@ -56,7 +56,7 @@ export default function AdminLayout({
               No se encontró un perfil de usuario en la base de datos para tu cuenta de autenticación (UID: {currentUser.uid}).
               Asegúrate de que este UID esté correctamente vinculado a un perfil en la colección 'platformUsers' y que dicho perfil tenga un campo 'roles' (array de strings).
             </CardDescription>
-            <Button onClick={() => { logout(); router.push('/login'); }} variant="gradient" className="mt-6">
+            <Button onClick={() => { logout(); router.push('/login'); }} className="mt-6 bg-primary hover:bg-primary/90 text-white font-bold">
               Cerrar Sesión e Ir a Login
             </Button>
           </CardContent>
@@ -78,7 +78,7 @@ export default function AdminLayout({
               Roles actuales: {userProfile.roles && Array.isArray(userProfile.roles) ? userProfile.roles.join(', ') : 'Roles no definidos o inválidos'}.
               Si crees que esto es un error, por favor contacta al soporte.
             </CardDescription>
-            <Button onClick={() => router.push('/')} variant="gradient" className="mt-6">
+            <Button onClick={() => router.push('/')} className="mt-6 bg-primary hover:bg-primary/90 text-white font-bold px-8">
               Ir a la Página Principal
             </Button>
           </CardContent>

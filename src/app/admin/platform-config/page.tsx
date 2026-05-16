@@ -98,7 +98,7 @@ export default function PlatformConfigPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2">
+      <h1 className="text-3xl font-bold text-primary flex items-center gap-3 mb-6">
         <Cog className="h-8 w-8 text-primary" />
         Configuración de la Plataforma
       </h1>
@@ -149,7 +149,11 @@ export default function PlatformConfigPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSaveChanges} disabled={isSaving || isLoading} variant="gradient">
+        <Button 
+          onClick={handleSaveChanges} 
+          disabled={isSaving || isLoading} 
+          className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md transition-all"
+        >
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Guardar Cambios
         </Button>

@@ -385,8 +385,8 @@ export default function QrDisplayPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
-          <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
-            <SocioVipLogo size={70} />
+          <div className="relative p-[2px] rounded-full shadow-2xl bg-white/95 animate-drop-in animate-float mb-6 max-w-[85vw]">
+            <SocioVipLogo size={240} variant="pill" />
           </div>
           <p className="mt-4 text-lg font-semibold text-white/90">Generando tu entrada QR, por favor espera...</p>
           <p className="mt-1 text-sm text-white/80">No cierres esta ventana.</p>

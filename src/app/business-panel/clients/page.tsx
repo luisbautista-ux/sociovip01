@@ -207,7 +207,7 @@ export default function BusinessClientsPage() {
           <Contact className="h-8 w-8 mr-2" /> Clientes de la Plataforma
         </h1>
         <div className="self-end sm:self-center">
-            <Button onClick={handleExport} variant="gradient">
+            <Button onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
         </div>

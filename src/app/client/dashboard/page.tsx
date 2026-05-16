@@ -64,7 +64,7 @@ export default function ClientDashboardPage() {
   
   useEffect(() => {
     if (currentUser?.uid) {
-      QRCode.toDataURL(currentUser.uid, { width: 400, errorCorrectionLevel: 'H' }, (err, url) => {
+      QRCode.toDataURL(currentUser.uid, { width: 400, errorCorrectionLevel: 'H', margin: 1 }, (err, url) => {
         if (err) {
           console.error("Failed to generate QR code:", err);
           setQrCodeImage(null);
@@ -81,7 +81,11 @@ export default function ClientDashboardPage() {
       return;
     }
     try {
-      const dataUrl = await htmlToImage.toPng(cardRef.current, { quality: 1.0, pixelRatio: 2 });
+      const dataUrl = await htmlToImage.toPng(cardRef.current, { 
+        quality: 1.0, 
+        pixelRatio: 2,
+        skipFonts: true 
+      });
       const link = document.createElement('a');
       link.download = `Carnet_SocioVIP_${userProfile?.name?.replace(/\s/g, '_') || currentUser?.uid}.png`;
       link.href = dataUrl;
@@ -111,40 +115,54 @@ export default function ClientDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
         {/* QR Card */}
         <div className="md:col-span-1 md:sticky md:top-8">
-          <Card ref={cardRef} className="shadow-lg text-center overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-primary to-accent text-primary-foreground p-4 flex flex-row items-center justify-center space-x-3 space-y-0">
-               <SocioVipLogo size={40} className="bg-white/20 p-1 rounded-md" />
-               <div>
-                  <CardTitle className="text-xl">Carnet de SocioVIP</CardTitle>
-                  <CardDescription className="text-primary-foreground/90 text-left">
-                    Presenta este QR en los negocios de tu red.
-                  </CardDescription>
+          <Card ref={cardRef} className="shadow-2xl border-none overflow-hidden bg-[#053264] flex flex-col items-center min-h-[400px] relative">
+            {/* Top Logo Section */}
+            <div className="w-full pt-6 pb-4 flex justify-center px-6">
+              <img 
+                src="https://i.ibb.co/j97wm1nQ/LOGO-SOCIOVIP-1.png" 
+                alt="SocioVIP Logo" 
+                className="w-[180px] h-auto object-contain mix-blend-lighten"
+              />
+            </div>
+
+            {/* QR Code Section */}
+            <div className="flex-grow flex flex-col items-center justify-center px-6 pb-6 w-full">
+              <div className="bg-white p-1 rounded-sm shadow-inner relative overflow-hidden group transition-all duration-500 hover:scale-[1.02]">
+                {qrCodeImage ? (
+                  <NextImage src={qrCodeImage} alt="Tu código QR personal" width={180} height={180} className="rounded-none"/>
+                ) : (
+                  <div className="h-[180px] w-[180px] flex items-center justify-center bg-muted rounded-lg">
+                    <Loader2 className="animate-spin h-8 w-8 text-muted-foreground"/>
+                  </div>
+                )}
               </div>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3 flex flex-col items-center">
-              {qrCodeImage ? (
-                <NextImage src={qrCodeImage} alt="Tu código QR personal" width={220} height={220} className="rounded-lg border-4 border-white shadow-md"/>
-              ) : (
-                <div className="h-[220px] w-[220px] flex items-center justify-center bg-muted rounded-lg"><Loader2 className="animate-spin h-8 w-8 text-muted-foreground"/></div>
-              )}
-              <div className="pt-2">
-                <p className="font-semibold text-lg">{userProfile?.name}</p>
-                <p className="text-sm text-muted-foreground">DNI: {userProfile?.dni || 'No registrado'}</p>
+              
+              <div className="mt-4 text-center text-white/90">
+                <p className="font-bold text-xl uppercase tracking-tighter leading-none">{userProfile?.name}</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] mt-1 opacity-60">DNI: {userProfile?.dni || 'No registrado'}</p>
               </div>
-            </CardContent>
-             <CardContent className="p-4 pt-0">
-                <Button onClick={handleDownloadQrCard} className="w-full" variant="outline">
-                    <Download className="mr-2 h-4 w-4"/> Descargar Carnet
-                </Button>
-            </CardContent>
+            </div>
+
+            {/* Bottom VIP Bar */}
+            <div className="w-full bg-[#ccffbc] py-2.5 mt-auto">
+              <p className="text-[#053264] font-black text-xl text-center tracking-[0.2em] uppercase">
+                ACCESO VIP
+              </p>
+            </div>
           </Card>
+
+          <div className="mt-4 px-2">
+            <Button onClick={handleDownloadQrCard} className="w-full border-2 border-primary text-primary hover:bg-primary/5 font-bold rounded-lg transition-all" variant="outline">
+                <Download className="mr-2 h-4 w-4"/> Descargar Carnet
+            </Button>
+          </div>
         </div>
         
         {/* Assigned Businesses Section */}
         <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-gradient">Mis beneficios SocioVIP</CardTitle>
+              <CardTitle className="text-primary">Mis beneficios SocioVIP</CardTitle>
               <CardDescription>Con tu membresía gratuita, puedes usar tu carnet en los siguientes locales:</CardDescription>
             </CardHeader>
             <CardContent>
@@ -191,7 +209,7 @@ export default function ClientDashboardPage() {
             </CardHeader>
             <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-primary/90">Usa tu carnet en <strong className="font-bold">TODOS</strong> los negocios de la red y accede a beneficios exclusivos con la membresía Premium.</p>
-              <Button variant="gradient" disabled>Obtener Premium (Próximamente)</Button>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90" disabled>Obtener Premium (Próximamente)</Button>
             </CardContent>
           </Card>
         </div>

@@ -202,7 +202,7 @@ export default function EmailCampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center gap-3">
+      <h1 className="text-3xl font-bold text-primary flex items-center gap-3">
         <Mail className="h-8 w-8 text-primary" />
         Campañas de Email
       </h1>
@@ -213,7 +213,7 @@ export default function EmailCampaignsPage() {
           <AlertTitle>Conexión Requerida</AlertTitle>
           <AlertDescription className="flex items-center justify-between">
             Para enviar campañas de email, primero debes conectar tu cuenta de Gmail.
-            <Button onClick={handleGmailConnect} variant="gradient">Conectar Cuenta de Gmail</Button>
+            <Button onClick={handleGmailConnect}>Conectar Cuenta de Gmail</Button>
           </AlertDescription>
         </Alert>
       )}
@@ -310,7 +310,7 @@ export default function EmailCampaignsPage() {
                 </div>
             </CardContent>
             <CardContent>
-              <Button onClick={handleSendCampaign} disabled={!canSend || isSending} className="w-full" variant="gradient">
+              <Button onClick={handleSendCampaign} disabled={!canSend || isSending} className="w-full">
                 {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4"/>}
                 Enviar Campaña
               </Button>

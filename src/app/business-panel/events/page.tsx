@@ -1142,7 +1142,7 @@ export default function BusinessEventsPage() {
             <Calendar className="h-8 w-8 mr-2" /> Eventos
         </h1>
         <div className="self-end sm:self-center">
-            <Button onClick={() => handleOpenManageEventDialog(null)} variant="gradient" disabled={isLoading || !currentBusinessId}>
+            <Button onClick={() => handleOpenManageEventDialog(null)} disabled={isLoading || !currentBusinessId}>
               <PlusCircle className="h-4 w-4 mr-2" /> Crear Evento
             </Button>
         </div>

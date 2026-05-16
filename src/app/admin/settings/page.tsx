@@ -150,8 +150,8 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-6">
-       <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-          <Settings className="h-8 w-8 text-primary !block" /> Configuración de Perfil
+       <h1 className="text-3xl font-bold text-primary flex items-center gap-3 mb-6">
+          <Settings className="h-8 w-8 text-primary" /> Configuración de Perfil
         </h1>
 
       <Card className="shadow-lg max-w-2xl mx-auto">
@@ -240,7 +240,7 @@ export default function AdminSettingsPage() {
                 )}
               />
               <div className="flex justify-end">
-                <Button type="submit" disabled={isSubmitting} variant="gradient">
+                <Button type="submit" disabled={isSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Guardar Cambios"}
                 </Button>
               </div>

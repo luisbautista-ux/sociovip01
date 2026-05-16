@@ -96,6 +96,7 @@ export interface Business {
   customUrlPath?: string | null; 
   primaryColor?: string;
   secondaryColor?: string;
+  description?: string;
   gmailRefreshToken?: string;
 }
 

@@ -2,33 +2,62 @@
 "use client";
 
 import Image, { type ImageProps } from "next/image";
+import { LOGO_IMAGE_URL } from "@/lib/constants";
 
-// Se mueve LOGO_IMAGE_URL a `src/lib/constants.ts` para evitar conflictos de importación en `layout.tsx`.
+// Se mantiene LOGO_IMAGE_URL en `src/lib/constants.ts` para gestión centralizada.
 
 type SocioVipLogoProps = Omit<ImageProps, "src" | "alt"> & {
   size?: number;
   className?: string;
+  variant?: 'simple' | 'pill';
+  pillPadding?: string;
 };
 
 /**
  * Logo de SocioVIP como componente de imagen.
- * La URL ahora se gestiona centralmente en constants.ts.
+ * Soporta variante 'simple' (para headers/sidebars) y 'pill' (para login/loading).
  */
 export function SocioVipLogo({
   size = 28,
   className,
+  variant = 'simple',
+  pillPadding,
   ...rest
 }: SocioVipLogoProps) {
+  const isPill = variant === 'pill';
+
+  if (isPill) {
+    const paddingClass = pillPadding || "p-[2%]";
+    return (
+      <div 
+        className={`rounded-2xl overflow-hidden flex items-center justify-center bg-[#053264] aspect-square ${paddingClass} ${className ?? ""}`} 
+        style={{ width: size }}
+      >
+        <Image
+          src={LOGO_IMAGE_URL}
+          alt="SocioVIP"
+          width={size}
+          height={Math.round(size * 0.66)}
+          className={`w-full h-full ${className?.includes('object-') ? "" : "object-contain"}`}
+          priority
+          {...rest}
+        />
+      </div>
+    );
+  }
+
   return (
-    <Image
-      src="https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png"
-      alt="SocioVIP"
-      width={size}
-      height={size}
-      className={`rounded-full ring-1 ring-black/10 ${className ?? ""}`}
-      priority
-      {...rest}
-    />
+    <div className={`inline-flex items-center justify-center overflow-hidden rounded-lg ${className ?? ""}`} style={{ width: size, height: size }}>
+      <Image
+        src={LOGO_IMAGE_URL}
+        alt="SocioVIP"
+        width={size}
+        height={size}
+        className="object-contain w-full h-full"
+        priority
+        {...rest}
+      />
+    </div>
   );
 }
 

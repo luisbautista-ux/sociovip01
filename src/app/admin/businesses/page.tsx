@@ -28,8 +28,10 @@ export default function AdminBusinessesPage() {
   const [showCreateEditModal, setShowCreateEditModal] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFormDirty, setIsFormDirty] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [existingUrlPaths, setExistingUrlPaths] = useState<string[]>([]);
   const { toast } = useToast();
 
@@ -48,20 +50,20 @@ export default function AdminBusinessesPage() {
           joinDate: data.joinDate instanceof Timestamp ? data.joinDate.toDate().toISOString() : (data.joinDate || new Date().toISOString()),
           ruc: data.ruc || undefined,
           razonSocial: data.razonSocial || undefined,
-          department: data.department || undefined,
-          province: data.province || undefined,
-          district: data.district || undefined,
-          address: data.address || undefined,
-          managerName: data.managerName || undefined,
-          managerDni: data.managerDni || undefined,
+          department: data.department || "",
+          province: data.province || "",
+          district: data.district || "",
+          address: data.address || "",
+          managerName: data.managerName || "",
+          managerDni: data.managerDni || "",
           businessType: data.businessType || undefined,
           logoUrl: data.logoUrl || undefined,
           publicCoverImageUrls: data.publicCoverImageUrls || [],
-          slogan: data.slogan || undefined,
-          publicContactEmail: data.publicContactEmail || undefined,
-          publicPhone: data.publicPhone || undefined,
-          publicAddress: data.publicAddress || undefined,
-          customUrlPath: data.customUrlPath || undefined,
+          slogan: data.slogan || "",
+          publicContactEmail: data.publicContactEmail || "",
+          publicPhone: data.publicPhone || "",
+          publicAddress: data.publicAddress || "",
+          customUrlPath: data.customUrlPath || "",
         };
         fetchedBusinesses.push(businessData);
         if (data.customUrlPath && data.customUrlPath.trim() !== "") {
@@ -229,18 +231,41 @@ export default function AdminBusinessesPage() {
     }
   };
 
+  const handleCloseModalAttempt = (isOpen: boolean) => {
+    if (!isOpen && isFormDirty) {
+      setShowDiscardDialog(true);
+    } else {
+      setShowCreateEditModal(isOpen);
+      if (!isOpen) {
+        setEditingBusiness(null);
+        setIsFormDirty(false);
+      }
+    }
+  };
+
+  const confirmDiscard = () => {
+    setShowDiscardDialog(false);
+    setShowCreateEditModal(false);
+    setEditingBusiness(null);
+    setIsFormDirty(false);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-        <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-          <Building className="h-8 w-8 text-primary !block" />
+        <h1 className="text-3xl font-bold text-primary flex items-center gap-3 mb-6">
+          <Building className="h-8 w-8 text-primary" />
           Negocios
         </h1>
         <div className="flex space-x-2">
           <Button onClick={handleExport} variant="outline" disabled={isLoading || businesses.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={handleOpenCreateModal} variant="gradient" disabled={isLoading}>
+          <Button 
+            onClick={handleOpenCreateModal} 
+            className="bg-primary text-primary-foreground hover:bg-secondary hover:text-secondary-foreground shadow-md transition-all" 
+            disabled={isLoading}
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Negocio
           </Button>
         </div>
@@ -413,26 +438,41 @@ export default function AdminBusinessesPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={showCreateEditModal} onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setEditingBusiness(null);
-        }
-        setShowCreateEditModal(isOpen); 
-      }}>
+      <Dialog open={showCreateEditModal} onOpenChange={handleCloseModalAttempt}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingBusiness ? `Editar Negocio: ${editingBusiness.name}` : "Crear Nuevo Negocio"}</DialogTitle>
             <UIDialogDescription>{editingBusiness ? "Actualiza los detalles del negocio." : "Completa los detalles para registrar un nuevo negocio."}</UIDialogDescription>
           </DialogHeader>
-          <BusinessForm 
-            business={editingBusiness || undefined}
-            onSubmit={handleCreateOrEditBusiness} 
-            onCancel={() => { setShowCreateEditModal(false); setEditingBusiness(null);}}
-            isSubmittingForm={isSubmitting}
-            existingCustomUrlPaths={existingUrlPaths.filter(p => editingBusiness && p === editingBusiness.customUrlPath ? false : true)}
-          />
+
+            <BusinessForm 
+              business={editingBusiness || undefined} 
+              onSubmit={handleCreateOrEditBusiness} 
+              onCancel={() => handleCloseModalAttempt(false)}
+              isSubmittingForm={isSubmitting}
+              existingCustomUrlPaths={businesses.map(b => b.customUrlPath || "").filter(p => p !== "")}
+              onDirtyChange={setIsFormDirty}
+            />
+
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <UIAlertDialogTitle>¿Descartar cambios?</UIAlertDialogTitle>
+            <AlertDialogDescription>
+              Tienes cambios sin guardar. Si cierras ahora, perderás toda la información ingresada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ShadcnAlertDialogFooter>
+            <AlertDialogCancel>Seguir Editando</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDiscard} className="bg-destructive hover:bg-destructive/90">
+              Descartar Cambios
+            </AlertDialogAction>
+          </ShadcnAlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

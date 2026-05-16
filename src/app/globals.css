@@ -5,7 +5,7 @@
 
 @layer base {
   :root {
-    --background: 282 33% 95%; /* #f4eef7 */
+    --background: 212 90% 98%; /* Light blueish white */
     --foreground: 275 25% 15%; /* Dark Purple-Gray text */
 
     --card: 0 0% 100%;
@@ -14,24 +14,24 @@
     --popover: 0 0% 100%;
     --popover-foreground: 275 25% 15%;
 
-    --primary: 258 69% 42%;  /* purple-800 */
-    --primary-foreground: 0 0% 98%; /* White */
+    --primary: 212 90% 21%;  /* #053264 */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 270 50% 95%; /* Lighter purple for secondary elements */
-    --secondary-foreground: 270 50% 30%; /* Darker purple for text on secondary */
+    --secondary: 106 100% 87%; /* #ccffbc */
+    --secondary-foreground: 212 90% 10%;
 
     --muted: 270 30% 94%;
     --muted-foreground: 270 10% 45%;
 
-    --accent: 0 79% 49%;   /* red-600 */
-    --accent-foreground: 0 0% 98%;
+    --accent: 106 100% 87%;   /* #ccffbc */
+    --accent-foreground: 212 90% 10%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
     --border: 270 20% 88%;
     --input: 270 20% 98%;
-    --ring: 258 69% 52%; /* Lighter primary for focus rings */
+    --ring: 212 90% 21%; /* Match primary for focus rings */
 
     --radius: 0.5rem;
 
@@ -52,11 +52,11 @@
     --popover: 275 25% 5%;
     --popover-foreground: 270 30% 90%;
 
-    --primary: 258 75% 65%; 
-    --primary-foreground: 275 25% 10%;
+    --primary: 212 90% 35%; 
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 270 20% 20%;
-    --secondary-foreground: 270 30% 90%;
+    --secondary: 106 100% 70%;
+    --secondary-foreground: 212 90% 10%;
 
     --muted: 270 15% 25%;
     --muted-foreground: 270 15% 65%;
@@ -69,7 +69,7 @@
 
     --border: 270 15% 28%;
     --input: 270 15% 20%;
-    --ring: 258 75% 70%;
+    --ring: 212 90% 45%;
 
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -168,7 +168,7 @@
 
 .bg-gradient-loader {
   /* Se usan colores HSL fijos de SocioVIP para que no cambien con el negocio */
-  background: linear-gradient(-45deg, hsl(258 69% 42%), hsl(0 79% 49%), #8e44ad, #c0392b, #2980b9);
+  background: linear-gradient(-45deg, #053264, #ccffbc, #0a1e2b, #2c3e50);
   background-size: 400% 400%;
   animation: gradient-animation 15s ease infinite;
 }

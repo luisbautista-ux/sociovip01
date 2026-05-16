@@ -315,7 +315,7 @@ export function SocioVipMemberForm({
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" variant="gradient" disabled={isSubmitting || disableSubmitOverride}>
+          <Button type="submit" disabled={isSubmitting || disableSubmitOverride} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {member ? "Guardar Cambios" : "Crear Socio VIP"}
           </Button>

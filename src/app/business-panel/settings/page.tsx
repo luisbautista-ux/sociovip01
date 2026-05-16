@@ -3,10 +3,11 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Palette, ImageIcon as ImageIconLucide, Type, UploadCloud, Loader2, Link as LinkIcon, Smartphone, Upload, Trash2, Image as ImageIcon, Video } from "lucide-react"; 
+import { Settings, Palette, ImageIcon as ImageIconLucide, Type, UploadCloud, Loader2, Link as LinkIcon, Smartphone, Upload, Trash2, Image as ImageIcon, Video, Map, Info } from "lucide-react"; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import React, { useState, useEffect, useCallback, useRef } from 'react'; 
 import NextImage from "next/image"; 
 import { useToast } from "@/hooks/use-toast"; 
@@ -14,8 +15,11 @@ import { useAuth } from "@/context/AuthContext";
 import { db, storage } from "@/lib/firebase"; 
 import { doc, getDoc, updateDoc, type DocumentData } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import type { Business } from "@/lib/types";
+import type { Business, BusinessType } from "@/lib/types";
 import { sanitizeObjectForFirestore } from "@/lib/utils";
+import { PERU_LOCATIONS, BUSINESS_TYPES } from "@/lib/constants";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Mail, User, CreditCard, Building2, Globe, Hash } from "lucide-react";
 
 export default function BusinessSettingsPage() {
   const { userProfile, loadingAuth, loadingProfile } = useAuth();
@@ -25,10 +29,33 @@ export default function BusinessSettingsPage() {
 
   // Form state
   const [businessName, setBusinessName] = useState("");
+  const [razonSocial, setRazonSocial] = useState("");
+  const [ruc, setRuc] = useState("");
+  const [businessType, setBusinessType] = useState<BusinessType | undefined>(undefined);
+  
+  const [department, setDepartment] = useState("");
+  const [province, setProvince] = useState("");
+  const [district, setDistrict] = useState("");
+  const [address, setAddress] = useState("");
+
+  const [contactEmail, setContactEmail] = useState("");
+  const [managerName, setManagerName] = useState("");
+  const [managerDni, setManagerDni] = useState("");
+
+  const [customUrlPath, setCustomUrlPath] = useState("");
   const [slogan, setSlogan] = useState("");
-  const [personalPhone, setPersonalPhone] = useState(""); // <-- Añadido
+  const [publicAddress, setPublicAddress] = useState("");
+  const [publicContactEmail, setPublicContactEmail] = useState("");
+  const [publicPhone, setPublicPhone] = useState("");
+  const [personalPhone, setPersonalPhone] = useState(""); 
+  
   const [primaryColor, setPrimaryColor] = useState("#B080D0"); 
   const [secondaryColor, setSecondaryColor] = useState("#8E5EA2");
+  const [description, setDescription] = useState("");
+
+  const departments = Object.keys(PERU_LOCATIONS);
+  const provinces = department ? Object.keys(PERU_LOCATIONS[department as keyof typeof PERU_LOCATIONS] || {}) : [];
+  const districts = department && province ? PERU_LOCATIONS[department as keyof typeof PERU_LOCATIONS]?.[province as keyof typeof PERU_LOCATIONS[keyof typeof PERU_LOCATIONS]] || [] : [];
   
   const [logoUrl, setLogoUrl] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -58,10 +85,29 @@ export default function BusinessSettingsPage() {
           const data = businessSnap.data() as Business;
           
           setBusinessName(data.name || "");
+          setRazonSocial(data.razonSocial || "");
+          setRuc(data.ruc || "");
+          setBusinessType(data.businessType);
+          
+          setDepartment(data.department || "");
+          setProvince(data.province || "");
+          setDistrict(data.district || "");
+          setAddress(data.address || "");
+
+          setContactEmail(data.contactEmail || "");
+          setManagerName(data.managerName || "");
+          setManagerDni(data.managerDni || "");
+
+          setCustomUrlPath(data.customUrlPath || "");
           setSlogan(data.slogan || "");
-          setPersonalPhone(data.personalPhone || ""); // <-- Añadido
+          setPublicAddress(data.publicAddress || "");
+          setPublicContactEmail(data.publicContactEmail || "");
+          setPublicPhone(data.publicPhone || "");
+          setPersonalPhone(data.personalPhone || "");
+          
           setPrimaryColor(data.primaryColor || "#B080D0"); 
           setSecondaryColor(data.secondaryColor || "#8E5EA2");
+          setDescription(data.description || "");
           
           setLogoUrl(data.logoUrl || "");
           setLogoPreview(data.logoUrl || null);
@@ -195,6 +241,37 @@ export default function BusinessSettingsPage() {
       toast({ title: "Error", description: "ID de negocio no disponible.", variant: "destructive" });
       return;
     }
+
+    // --- VALIDACIONES ---
+    const rucClean = ruc.trim();
+    if (rucClean && !/^\d{11}$/.test(rucClean)) {
+        toast({ title: "RUC Inválido", description: "El RUC debe tener exactamente 11 dígitos numéricos.", variant: "destructive" });
+        return;
+    }
+
+    const contactEmailClean = contactEmail.trim().toLowerCase();
+    if (contactEmailClean && !contactEmailClean.endsWith("@gmail.com")) {
+        toast({ title: "Email Inválido", description: "El Email de Contacto del Negocio debe terminar en @gmail.com", variant: "destructive" });
+        return;
+    }
+
+    const managerDniClean = managerDni.trim();
+    if (managerDniClean && !/^\d{1,20}$/.test(managerDniClean)) {
+        toast({ title: "DNI/CE Inválido", description: "El DNI/CE debe contener solo números (máximo 20 dígitos).", variant: "destructive" });
+        return;
+    }
+
+    const publicEmailClean = publicContactEmail.trim().toLowerCase();
+    if (publicEmailClean && !publicEmailClean.endsWith("@gmail.com")) {
+        toast({ title: "Email Público Inválido", description: "El Email Público de Contacto debe terminar en @gmail.com", variant: "destructive" });
+        return;
+    }
+
+    const publicPhoneClean = publicPhone.trim();
+    if (publicPhoneClean && !/^9\d{8}$/.test(publicPhoneClean)) {
+        toast({ title: "Teléfono Inválido", description: "El Teléfono Público debe empezar con 9 y tener exactamente 9 dígitos.", variant: "destructive" });
+        return;
+    }
     
     setIsSaving(true);
     let finalLogoUrl = logoUrl;
@@ -264,13 +341,28 @@ export default function BusinessSettingsPage() {
 
       const updateData: Partial<Business> = {
           name: businessName,
+          razonSocial,
+          ruc,
+          businessType,
+          department,
+          province,
+          district,
+          address,
+          contactEmail,
+          managerName,
+          managerDni,
+          customUrlPath: customUrlPath.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
           slogan,
-          personalPhone, // <-- Añadido
+          publicAddress,
+          publicContactEmail,
+          publicPhone,
+          personalPhone,
           primaryColor,
           secondaryColor,
           logoUrl: finalLogoUrl,
           publicCoverImageUrls: finalCoverUrls,
           publicVideoUrls: finalVideoUrls,
+          description: description,
       };
 
       const businessDocRef = doc(db, "businesses", userProfile.businessId);
@@ -325,13 +417,30 @@ export default function BusinessSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 business-settings-page">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .business-settings-page input:focus-visible, 
+        .business-settings-page textarea:focus-visible,
+        .business-settings-page [role="combobox"]:focus-visible {
+          --ring: ${primaryColor} !important;
+          --tw-ring-color: ${primaryColor} !important;
+          border-color: ${primaryColor} !important;
+          outline: none !important;
+          box-shadow: 0 0 0 2px white, 0 0 0 4px ${primaryColor} !important;
+        }
+        .business-settings-page input:focus, 
+        .business-settings-page textarea:focus,
+        .business-settings-page [role="combobox"]:focus {
+          border-color: ${primaryColor} !important;
+          --tw-ring-color: ${primaryColor} !important;
+        }
+      ` }} />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-3xl font-bold text-primary flex items-center self-start">
           <Settings className="h-8 w-8 mr-2" /> Configuración
         </h1>
         <div className="self-end sm:self-center">
-          <Button onClick={handleSaveChanges} variant="gradient" disabled={isSaving || isLoadingData}>
+          <Button onClick={handleSaveChanges} style={{ backgroundColor: primaryColor }} disabled={isSaving || isLoadingData}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar Todos los Cambios
           </Button>
@@ -340,11 +449,10 @@ export default function BusinessSettingsPage() {
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Información Pública</CardTitle>
-          <CardDescription>Esta información será visible en la página pública de tu negocio.</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Building2 className="h-6 w-6" style={{ color: primaryColor }}/> Información General</CardTitle>
+          <CardDescription>Datos básicos y legales del negocio.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          
+        <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Logo del Negocio</Label>
             <div className="flex items-center gap-4">
@@ -363,7 +471,167 @@ export default function BusinessSettingsPage() {
                 </div>
             </div>
           </div>
-          
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="businessName">Nombre Comercial</Label>
+              <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} disabled={isSaving} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="razonSocial">Razón Social</Label>
+              <Input id="razonSocial" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} disabled={isSaving} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="ruc">RUC</Label>
+              <Input id="ruc" value={ruc} onChange={(e) => setRuc(e.target.value.replace(/\D/g, '').substring(0, 11))} disabled={isSaving} placeholder="10XXXXXXXXX" />
+            </div>
+            <div className="space-y-2">
+              <Label>Giro de Negocio</Label>
+              <Select value={businessType} onValueChange={(value) => setBusinessType(value as BusinessType)} disabled={isSaving}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un giro" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUSINESS_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Map className="h-6 w-6" style={{ color: primaryColor }}/> Ubicación Principal</CardTitle>
+          <CardDescription>Dirección física y legal del negocio.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Departamento</Label>
+              <Select value={department} onValueChange={(value) => { setDepartment(value); setProvince(""); setDistrict(""); }} disabled={isSaving}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona Dept." />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Provincia</Label>
+              <Select value={province} onValueChange={(value) => { setProvince(value); setDistrict(""); }} disabled={isSaving || !department || provinces.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={!department ? "Elige Dept." : "Selecciona Prov."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {provinces.map(prov => <SelectItem key={prov} value={prov}>{prov}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Distrito</Label>
+              <Select value={district} onValueChange={setDistrict} disabled={isSaving || !province || districts.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder={!province ? "Elige Prov." : "Selecciona Dist."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {districts.map(dist => <SelectItem key={dist} value={dist}>{dist}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="address">Dirección del Negocio</Label>
+            <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} disabled={isSaving} placeholder="Ej: Jr. Amazonas 123" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><User className="h-6 w-6" style={{ color: primaryColor }}/> Información de Contacto y Representante</CardTitle>
+          <CardDescription>Datos del representante legal y contacto administrativo.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="contactEmail" className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground"/> Email de Contacto del Negocio</Label>
+            <Input id="contactEmail" type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} disabled={isSaving} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="managerName">Nombre del Gerente / Representante</Label>
+              <Input id="managerName" value={managerName} onChange={(e) => setManagerName(e.target.value)} disabled={isSaving} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="managerDni">DNI/CE del Representante</Label>
+              <Input id="managerDni" value={managerDni} onChange={(e) => setManagerDni(e.target.value.replace(/\D/g, '').substring(0, 20))} disabled={isSaving} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Globe className="h-6 w-6" style={{ color: primaryColor }}/> Branding y Página Pública</CardTitle>
+          <CardDescription>Información que se muestra a los clientes finales.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="customUrlPath" className="flex items-center gap-2"><LinkIcon className="h-4 w-4 text-muted-foreground"/> Ruta URL Personalizada (Slug)</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground hidden sm:inline">sociovip.app/</span>
+                <Input id="customUrlPath" value={customUrlPath} onChange={(e) => setCustomUrlPath(e.target.value)} disabled={isSaving} placeholder="mi-negocio" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="slogan" className="flex items-center gap-2"><Type className="h-4 w-4 text-muted-foreground"/> Slogan del Negocio</Label>
+              <Input id="slogan" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSaving} placeholder="Tu frase pegajosa" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="publicAddress" className="flex items-center gap-2"><Map className="h-4 w-4 text-muted-foreground"/> Dirección Pública (si difiere de la principal)</Label>
+            <Input id="publicAddress" value={publicAddress} onChange={(e) => setPublicAddress(e.target.value)} disabled={isSaving} placeholder="Dirección amigable para el público" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="publicContactEmail" className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground"/> Email Público de Contacto</Label>
+              <Input id="publicContactEmail" type="email" value={publicContactEmail} onChange={(e) => setPublicContactEmail(e.target.value)} disabled={isSaving} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="publicPhone" className="flex items-center gap-2"><Smartphone className="h-4 w-4 text-muted-foreground"/> Teléfono Público de Contacto</Label>
+              <Input id="publicPhone" value={publicPhone} onChange={(e) => setPublicPhone(e.target.value.replace(/\D/g, '').substring(0, 9))} disabled={isSaving} placeholder="9XXXXXXXX" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description" className="flex items-center gap-2"><Info className="h-4 w-4 text-muted-foreground"/> Descripción del Negocio</Label>
+            <Textarea 
+                id="description" 
+                placeholder="Cuenta la historia de tu negocio..." 
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)} 
+                disabled={isSaving}
+                className="min-h-[120px] resize-y"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><ImageIcon className="h-6 w-6" style={{ color: primaryColor }}/> Multimedia</CardTitle>
+          <CardDescription>Imágenes y videos de la galería pública.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label>Imágenes de Portada (hasta 5)</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -429,29 +697,12 @@ export default function BusinessSettingsPage() {
             </div>
             <input type="file" ref={videoInputRef} onChange={handleVideoFilesChange} className="hidden" accept="video/mp4,video/webm,video/quicktime" multiple />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="businessName">Nombre del Negocio</Label>
-            <Input id="businessName" value={businessName} onChange={(e) => setBusinessName(e.target.value)} disabled={isSaving || isLoadingData} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="slogan" className="flex items-center"><Type className="h-4 w-4 mr-1 text-muted-foreground"/> Slogan del Negocio</Label>
-            <Input id="slogan" placeholder="Tu frase pegajosa aquí" value={slogan} onChange={(e) => setSlogan(e.target.value)} disabled={isSaving || isLoadingData} />
-          </div>
-
-           <div className="space-y-2">
-            <Label htmlFor="personalPhone" className="flex items-center"><Smartphone className="h-4 w-4 mr-1 text-muted-foreground"/> Teléfono Personal (para WhatsApp)</Label>
-            <Input id="personalPhone" type="tel" placeholder="51987654321" value={personalPhone} onChange={(e) => setPersonalPhone(e.target.value)} disabled={isSaving || isLoadingData} />
-            <p className="text-xs text-muted-foreground">Este número (incluyendo el código de país) se usará para compartir códigos. No será público.</p>
-          </div>
-
         </CardContent>
       </Card>
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center"><Palette className="h-6 w-6 mr-2 text-primary"/> Tema de Marca</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Palette className="h-6 w-6" style={{ color: primaryColor }}/> Tema de Marca</CardTitle>
           <CardDescription>Personaliza los colores de tu página pública y componentes.</CardDescription>
         </CardHeader>
         <CardContent>

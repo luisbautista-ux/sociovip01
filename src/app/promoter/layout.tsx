@@ -43,7 +43,7 @@ function PromoterSidebarNavContent({ closeSheet, promoterName, promoterEmail, pr
             <AvatarFallback>{promoterName ? promoterName.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-md font-semibold text-gradient">{promoterName || 'Panel Promotor'}</h1>
+          <h1 className="text-md font-semibold text-primary">{promoterName || 'Panel Promotor'}</h1>
           {promoterEmail && <p className="text-xs text-muted-foreground truncate">{promoterEmail}</p>}
         </div>
       </div>
@@ -153,8 +153,8 @@ export default function PromoterLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
-            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-                <SocioVipLogo size={80} className="animate-pulse" />
+            <div className="relative p-1 rounded-xl shadow-2xl bg-white/95 animate-drop-in animate-float mb-6">
+                <SocioVipLogo size={300} />
             </div>
             <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
         </div>
@@ -238,7 +238,7 @@ export default function PromoterLayout({
               <AvatarImage src={promoterPhotoUrl || undefined} alt={promoterDisplayNameMobile} />
               <AvatarFallback>{promoterDisplayNameMobile ? promoterDisplayNameMobile.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
             </Avatar>
-            <h1 className="font-semibold text-lg text-gradient">{promoterDisplayNameMobile}</h1>
+            <h1 className="font-semibold text-lg text-primary">{promoterDisplayNameMobile}</h1>
           </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>

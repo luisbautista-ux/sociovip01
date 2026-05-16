@@ -80,7 +80,7 @@ export function ResetPasswordModal({ open, onOpenChange }: ResetPasswordModalPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl text-center">Restablecer Contraseña</DialogTitle>
+          <DialogTitle className="text-2xl text-center text-primary font-bold">Restablecer Contraseña</DialogTitle>
           <DialogDescription className="text-center">
             Ingresa tu correo electrónico y te enviaremos un enlace para que puedas restablecer tu contraseña.
           </DialogDescription>
@@ -106,7 +106,7 @@ export function ResetPasswordModal({ open, onOpenChange }: ResetPasswordModalPro
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" variant="gradient" disabled={isSubmitting}>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Enviar Enlace de Recuperación"}
             </Button>
           </form>

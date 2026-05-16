@@ -4,7 +4,7 @@
 import type { GeneratedCode, SocioVipMember, PlatformUserRole } from "./types";
 
 // ✅ Se define la URL de la imagen como una constante de string aquí.
-export const LOGO_IMAGE_URL = "https://i.ibb.co/fVH01x3b/Dise-o-sin-t-tulo-1.png";
+export const LOGO_IMAGE_URL = "https://www.image2url.com/r2/default/gifs/1778856055296-8dce7785-4cc9-47b3-9f78-e80e17fcd3f7.gif";
 
 export const GENERATED_CODE_STATUS_TRANSLATIONS: Record<GeneratedCode['status'], string> = {
   available: "Disponible",
@@ -70,7 +70,10 @@ export const BUSINESS_TYPES = [
   "Entretenimiento",
   "Educación",
   "Salud y Bienestar",
-  "Viajes y Turismo",
+  "Lugares turísticos",
+  "Restobar",
+  "Transporte Interprovincial",
+  "Taxi",
   "Otro",
 ] as const;
 

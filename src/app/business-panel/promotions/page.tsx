@@ -527,7 +527,6 @@ export default function BusinessPromotionsPage() {
         <div className="self-end sm:self-center">
           <Button 
               onClick={() => handleOpenCreateEditModal(null)} 
-              variant="gradient"
               disabled={!currentBusinessId || isSubmitting || isLoadingPageData}
           >
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Promoción

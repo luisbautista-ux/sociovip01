@@ -97,6 +97,9 @@ export default function AdminUsersPage() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  const [isFormDirty, setIsFormDirty] = useState(false);
+  const [showDiscardAlert, setShowDiscardAlert] = useState(false);
 
 
   const dniEntryForm = useForm<DniEntryValues>({
@@ -148,6 +151,7 @@ export default function AdminUsersPage() {
           lastLogin: data.lastLogin, // Keep original data type
         };
       });
+
       setPlatformUsers(fetchedUsers);
 
     } catch (error: any) {
@@ -408,6 +412,22 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     }
   };
 
+  const handleCancelEdit = () => {
+    if (isFormDirty) {
+      setShowDiscardAlert(true);
+    } else {
+      closeEditModal();
+    }
+  };
+
+  const closeEditModal = () => {
+    setShowCreateEditModal(false);
+    setEditingUser(null);
+    setVerifiedDniResult(null);
+    setIsFormDirty(false);
+    setShowDiscardAlert(false);
+  };
+
   const handleDeleteUser = async (userToDelete: PlatformUser) => {
     if (isSubmitting) return;
 
@@ -462,15 +482,19 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
         {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
-        <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
-          <Users className="h-8 w-8 text-primary !block" />
+        <h1 className="text-3xl font-bold text-primary flex items-center gap-3 mb-6">
+          <Users className="h-8 w-8 text-primary" />
           Usuarios
         </h1>
         <div className="flex space-x-2">
            <Button onClick={handleExport} variant="outline" disabled={isLoading || platformUsers.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button onClick={handleOpenCreateUserFlow} variant="gradient" disabled={isLoading}>
+          <Button 
+            onClick={handleOpenCreateUserFlow} 
+            className="bg-primary text-primary-foreground hover:bg-secondary hover:text-secondary-foreground shadow-md transition-all" 
+            disabled={isLoading}
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Crear Usuario
           </Button>
         </div>
@@ -799,7 +823,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                 <Button type="button" variant="outline" onClick={() => setShowDniEntryModal(false)} disabled={isSubmitting}>
                   Cancelar
                 </Button>
-                <Button type="submit" variant="gradient" disabled={isSubmitting}>
+                <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar"}
                 </Button>
               </UIDialogFooter>
@@ -808,8 +832,14 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
         </UIDialogContent>
       </UIDialog>
 
-       <UIDialog open={showCreateEditModal} onOpenChange={setShowCreateEditModal}>
-        <UIDialogContent className="sm:max-w-lg">
+       <UIDialog open={showCreateEditModal} onOpenChange={(open) => {
+          if (!open) {
+            handleCancelEdit();
+          } else {
+            setShowCreateEditModal(true);
+          }
+       }}>
+        <UIDialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
           <UIDialogHeader>
             <UIDialogTitle>
               {editingUser 
@@ -835,9 +865,16 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                   initialDataForCreation={!editingUser ? verifiedDniResult : undefined}
                   businesses={availableBusinesses}
                   onSubmit={handleCreateOrEditUser}
-                  onCancel={() => { setShowCreateEditModal(false); setEditingUser(null); setVerifiedDniResult(null);}}
+                  onCancel={() => { 
+                    if (isFormDirty) {
+                        setShowDiscardAlert(true);
+                    } else {
+                        handleCancelEdit();
+                    }
+                  }}
                   isSubmitting={isSubmitting}
                   disableSubmitOverride={!editingUser && !!(verifiedDniResult?.existingPlatformUser)}
+                  onDirtyStateChange={setIsFormDirty}
                 />
             )
           }
@@ -894,6 +931,23 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+    
+    <AlertDialog open={showDiscardAlert} onOpenChange={setShowDiscardAlert}>
+        <AlertDialogContent className="sm:max-w-[400px]">
+          <AlertDialogHeader>
+            <UIAlertDialogTitle className="text-center text-xl">¿Descartar cambios?</UIAlertDialogTitle>
+            <ShadcnAlertDialogDescription className="text-center">
+              Tienes cambios sin guardar. Si cierras ahora, perderás toda la información ingresada.
+            </ShadcnAlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-2">
+            <Button variant="ghost" onClick={() => setShowDiscardAlert(false)}>Seguir Editando</Button>
+            <AlertDialogAction onClick={closeEditModal} className="bg-destructive hover:bg-destructive/90">
+              Descartar Cambios
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

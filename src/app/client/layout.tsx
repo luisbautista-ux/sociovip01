@@ -41,7 +41,7 @@ function ClientSidebarNavContent({ closeSheet, userName, userEmail, userPhotoUrl
             <AvatarFallback>{userName ? userName.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
         </Avatar>
         <div>
-          <h1 className="text-md font-semibold text-gradient">{userName || 'Panel Cliente'}</h1>
+          <h1 className="text-md font-semibold text-primary">{userName || 'Panel Cliente'}</h1>
           {userEmail && <p className="text-xs text-muted-foreground truncate">{userEmail}</p>}
         </div>
       </div>
@@ -52,8 +52,8 @@ function ClientSidebarNavContent({ closeSheet, userName, userEmail, userPhotoUrl
             href={item.href}
             onClick={closeSheet}
             className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors",
-              pathname.startsWith(item.href) ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium hover:bg-primary/90 hover:text-primary-foreground transition-colors",
+              pathname.startsWith(item.href) ? "bg-primary text-primary-foreground" : "text-muted-foreground"
             )}
           >
             <item.icon className="h-5 w-5" />
@@ -69,7 +69,7 @@ function ClientSidebarNavContent({ closeSheet, userName, userEmail, userPhotoUrl
         )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
               <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
             </Button>
           </AlertDialogTrigger>
@@ -117,8 +117,8 @@ function PromoterBottomNav() {
               className={cn(
                 "flex flex-col items-center justify-center text-xs font-medium w-full h-full transition-colors",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-primary/5 hover:text-primary"
               )}
             >
               <item.icon className="h-5 w-5 mb-0.5" />
@@ -150,8 +150,8 @@ export default function ClientLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
-            <div className="relative p-1 rounded-full shadow-lg bg-white/90">
-                <SocioVipLogo size={80} className="animate-pulse" />
+            <div className="relative p-1 rounded-xl shadow-2xl bg-white/95 animate-drop-in animate-float mb-6">
+                <SocioVipLogo size={300} />
             </div>
             <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
         </div>
@@ -184,7 +184,7 @@ export default function ClientLayout({
           <CardHeader><CardTitle className="text-2xl text-destructive">Acceso Denegado</CardTitle></CardHeader>
           <CardContent>
             <CardDescription>No tienes los permisos necesarios para acceder a este panel.</CardDescription>
-            <Button onClick={() => router.push('/')} variant="gradient">Ir a la Página Principal</Button>
+            <Button onClick={() => router.push('/')} className="bg-primary hover:bg-primary/90 text-white font-bold px-8">Ir a la Página Principal</Button>
           </CardContent>
         </Card>
       </div>
@@ -212,11 +212,13 @@ export default function ClientLayout({
               <AvatarImage src={userPhotoUrl || undefined} alt={userName} />
               <AvatarFallback>{userName ? userName.charAt(0).toUpperCase() : 'C'}</AvatarFallback>
             </Avatar>
-            <h1 className="font-semibold text-lg text-gradient">{userName}</h1>
+            <h1 className="font-semibold text-lg text-primary">{userName}</h1>
           </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" size="icon" title="Cerrar Sesión"><LogOut className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" title="Cerrar Sesión" className="border-primary text-primary hover:bg-primary/5">
+                <LogOut className="h-4 w-4" />
+              </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader><AlertDialogTitle>¿Cerrar Sesión?</AlertDialogTitle><AlertDialogDescription>¿Estás seguro de que quieres cerrar tu sesión?</AlertDialogDescription></AlertDialogHeader>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -12,25 +11,45 @@ import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { isEntityCurrentlyActivatable } from "@/lib/utils";
-import { Loader2, Building, Tag, Search, Calendar, UserCircle, PartyPopper } from "lucide-react";
+import { 
+  Loader2, 
+  Building, 
+  Tag, 
+  Search, 
+  Calendar, 
+  UserCircle, 
+  PartyPopper,
+  Sparkles,
+  ArrowLeft,
+  MessageSquare
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SocioVipLogo } from "@/components/icons";
-import { HeroCarousel } from "@/components/home/HeroCarousel";
+import { CleanHero } from "@/components/home/CleanHero";
+import { generateItinerary } from "@/ai/flows/generate-itinerary";
+import { BusinessConversationLayout } from "@/components/business/BusinessConversationLayout";
+import { MainHeader } from "@/components/layout/MainHeader";
 
 interface EnrichedEntity extends BusinessManagedEntity {
   businessName?: string;
   businessLogoUrl?: string;
   businessCustomUrlPath?: string | null;
+  businessProvince?: string;
+  businessDistrict?: string;
+  businessDepartment?: string;
+  businessType?: string;
 }
 
 export default function HomePage() {
   const [promotions, setPromotions] = useState<EnrichedEntity[]>([]);
   const [events, setEvents] = useState<EnrichedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
+  const [isConversationView, setIsConversationView] = useState(false);
+  const [isGeneratingItinerary, setIsGeneratingItinerary] = useState(false);
+  const [initialChatHistory, setInitialChatHistory] = useState<{role: "user" | "assistant", content: string}[]>([]);
   const { toast } = useToast();
 
   const fetchEntitiesAndBusinesses = useCallback(async () => {
@@ -52,10 +71,10 @@ export default function HomePage() {
       const allEvents: EnrichedEntity[] = [];
 
       entitiesSnap.forEach(doc => {
-        const entityData = doc.data() as Omit<BusinessManagedEntity, 'id'> & { startDate: Timestamp | string, endDate: Timestamp | string };
+        const entityData = doc.data() as any;
         const business = businessesMap.get(entityData.businessId);
         
-        const toSafeISOString = (dateValue: Timestamp | string | Date | undefined): string => {
+        const toSafeISOString = (dateValue: any): string => {
           if (!dateValue) return new Date().toISOString(); 
           if (dateValue instanceof Timestamp) return dateValue.toDate().toISOString();
           if (dateValue instanceof Date) return dateValue.toISOString();
@@ -76,6 +95,13 @@ export default function HomePage() {
             businessName: business.name,
             businessLogoUrl: business.logoUrl,
             businessCustomUrlPath: business.customUrlPath,
+            businessPhone: business.publicPhone || business.personalPhone || "",
+            businessProvince: business.province || "",
+            businessDistrict: business.district || "",
+            businessDepartment: business.department || "",
+            businessType: business.businessType || "Local",
+            businessVideoUrls: business.publicVideoUrls || [],
+            businessImageUrls: business.publicCoverImageUrls || [],
           };
           if (enrichedEntity.type === 'promotion') {
             allPromotions.push(enrichedEntity);
@@ -95,7 +121,7 @@ export default function HomePage() {
       console.error("Error fetching entities for homepage:", error);
       toast({
         title: "Error al Cargar Contenido",
-        description: "No se pudieron obtener las promociones y eventos. " + error.message,
+        description: "No se pudieron obtener las promociones y eventos.",
         variant: "destructive",
       });
     } finally {
@@ -107,35 +133,41 @@ export default function HomePage() {
     fetchEntitiesAndBusinesses();
   }, [fetchEntitiesAndBusinesses]);
   
-  const filteredPromotions = useMemo(() => {
-    if (!searchTerm) return promotions;
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return promotions.filter(entity => 
-      entity.name.toLowerCase().includes(lowercasedTerm) ||
-      (entity.description && entity.description.toLowerCase().includes(lowercasedTerm)) ||
-      entity.businessName?.toLowerCase().includes(lowercasedTerm)
-    );
-  }, [promotions, searchTerm]);
+  const handleGenerateItinerary = async (prompt: string) => {
+    setIsGeneratingItinerary(true);
+    try {
+        const contextData = JSON.stringify({
+            events: events.map(e => ({ name: e.name, description: e.description, business: e.businessName, date: e.startDate })),
+            promotions: promotions.map(p => ({ name: p.name, description: p.description, business: p.businessName }))
+        });
 
-  const filteredEvents = useMemo(() => {
-    if (!searchTerm) return events;
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return events.filter(entity => 
-      entity.name.toLowerCase().includes(lowercasedTerm) ||
-      (entity.description && entity.description.toLowerCase().includes(lowercasedTerm)) ||
-      entity.businessName?.toLowerCase().includes(lowercasedTerm)
-    );
-  }, [events, searchTerm]);
+        const result = await generateItinerary({
+            userPrompt: prompt,
+            contextData: contextData
+        });
+        setInitialChatHistory([
+          { role: "user", content: prompt },
+          { role: "assistant", content: result.itineraryText }
+        ]);
+        setIsConversationView(true);
+    } catch (error: any) {
+        console.error("Error generating itinerary:", error);
+        toast({
+            title: "Error del Asistente",
+            description: "No pudimos generar el itinerario en este momento.",
+            variant: "destructive"
+        });
+    } finally {
+        setIsGeneratingItinerary(false);
+    }
+  };
 
   const EntityCard = ({ entity }: { entity: EnrichedEntity }) => {
-    const businessUrl = entity.businessCustomUrlPath
-      ? `/${entity.businessCustomUrlPath}`
-      : `/`; // Fallback to home if no custom URL
-    
+    const businessUrl = entity.businessCustomUrlPath ? `/${entity.businessCustomUrlPath}` : `/`;
     const isEvent = entity.type === 'event';
 
     return (
-      <Card key={entity.id} className="shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2">
+      <Card key={entity.id} className="shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 border-none">
         <Link href={businessUrl} passHref>
           <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg">
             <NextImage
@@ -143,50 +175,45 @@ export default function HomePage() {
               alt={entity.name}
               fill
               className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-              style={{ objectPosition: entity.imageObjectPosition || '50% 50%' }}
-              data-ai-hint={entity.aiHint || "discount offer"}
             />
           </div>
         </Link>
         <CardHeader className="pb-3">
-          <CardTitle className="text-xl">
-            <Link href={businessUrl}>
+          <CardTitle className="text-xl font-bold">
+            <Link href={businessUrl} className="hover:text-primary transition-colors">
               {entity.name}
             </Link>
           </CardTitle>
           <CardDescription className="text-xs pt-1">
             <Link href={businessUrl} className="flex items-center text-muted-foreground hover:text-primary transition-colors">
-              {entity.businessLogoUrl ? (
+              {entity.businessLogoUrl && (
                 <NextImage
                   src={entity.businessLogoUrl}
                   alt={`${entity.businessName} logo`}
                   width={16}
                   height={16}
                   className="h-4 w-4 mr-1.5 rounded-full object-contain"
-                  data-ai-hint="logo business"
                 />
-              ) : (
-                <Building className="h-4 w-4 mr-1.5" />
               )}
-              <span>{entity.businessName}</span>
+              <span className="font-semibold uppercase tracking-wider">{entity.businessName}</span>
             </Link>
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-grow space-y-1">
-          <p className="text-sm text-muted-foreground line-clamp-3">{entity.description}</p>
+          <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{entity.description}</p>
         </CardContent>
-        <CardFooter className="flex-col items-start p-4 border-t bg-muted/50">
-          <p className="text-xs text-muted-foreground w-full mb-2">
+        <CardFooter className="flex-col items-start p-4 border-t bg-slate-50/50">
+          <p className="text-xs text-muted-foreground w-full mb-3">
             Válido hasta el {format(parseISO(entity.endDate), "dd MMMM, yyyy", { locale: es })}
           </p>
           <Link href={businessUrl} passHref className="w-full">
-            <Button className="w-full text-white hover:opacity-90 transition-opacity bg-header-gradient">
+            <Button className="w-full text-white font-bold uppercase tracking-widest text-[10px] bg-[#053264] hover:bg-[#053264]/90 transition-all rounded-md h-10 shadow-md">
               {isEvent ? <Calendar className="mr-2 h-4 w-4" /> : <Tag className="mr-2 h-4 w-4" />}
                {isEvent ? "Ver Evento" : "Ver Promoción"}
             </Button>
           </Link>
         </CardFooter>
-      </Card>
+      </Card> 
     );
   };
 
@@ -197,92 +224,146 @@ export default function HomePage() {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
             <div className="flex flex-col items-center justify-center text-center">
-                <div className="relative p-1 rounded-full shadow-lg bg-white/90 animate-drop-in animate-float">
-                    <SocioVipLogo size={70} />
+                <div className="mb-6 max-w-[85vw] animate-drop-in animate-float">
+                    <SocioVipLogo size={180} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto object-fill border-[1px] border-white/95 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.3)] drop-shadow-lg" />
                 </div>
-                <p className="mt-4 text-lg font-semibold text-white/90">Buscando las mejores experiencias...</p>
+                <p className="mt-4 text-lg font-semibold text-white/90 uppercase tracking-widest">Descubriendo experiencias...</p>
             </div>
         </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-muted/40 text-foreground flex flex-col">
-      <HeroCarousel searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
-       
-      <div className="bg-header-gradient shadow-md sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-start h-12 gap-6">
-                  <button onClick={() => setView('all')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'all' ? 'border-b-2 border-white' : '')}>Ver Todo</button>
-                  <button onClick={() => setView('promotions')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'promotions' ? 'border-b-2 border-white' : '')}>Promociones</button>
-                  <button onClick={() => setView('events')} className={cn("text-white font-semibold text-sm transition-colors hover:text-white/80", view === 'events' ? 'border-b-2 border-white' : '')}>Eventos</button>
-              </div>
-          </div>
-      </div>
-          <main className="flex-grow w-full py-8">
-            <div className="max-w-7xl mx-auto space-y-12">
-              {showEvents && (
-                <section className="px-4 sm:px-6 lg:px-8">
-                  <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center">
-                    <Calendar className="h-7 w-7 mr-3 text-primary" />
-                    <span className="text-gradient">Próximos Eventos</span>
-                  </h2>
-                  {filteredEvents.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                      {filteredEvents.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                    </div>
-                  ) : (
-                    <Card className="col-span-full">
-                      <CardHeader className="items-center text-center">
-                        <PartyPopper className="h-12 w-12 text-primary/70" />
-                        <CardTitle className="mt-4">
-                          {searchTerm ? "Sin Resultados" : "No Hay Eventos Disponibles"}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="text-center">
-                        <CardDescription>
-                          {searchTerm
-                            ? `No se encontraron eventos que coincidan con "${searchTerm}".`
-                            : "Vuelve pronto, siempre estamos añadiendo nuevas experiencias."}
-                        </CardDescription>
-                      </CardContent>
-                    </Card>
-                  )}
-                </section>
-              )}
+  if (isConversationView) {
+    const featuredBusiness = promotions[0] ? {
+      id: promotions[0].businessId,
+      name: promotions[0].businessName || "SocioVIP Concierge",
+      logoUrl: promotions[0].businessLogoUrl,
+      publicVideoUrls: (promotions[0] as any).businessVideoUrls || [],
+      publicAddress: promotions[0].locationAddress || "Lima, Perú",
+      primaryColor: "#053264",
+      secondaryColor: "#ccffbc",
+      publicImageUrls: (promotions[0] as any).businessImageUrls || [],
+      customUrlPath: (promotions[0] as any).businessCustomUrlPath || null,
+    } : {
+      id: "concierge",
+      name: "SocioVIP Concierge",
+      publicVideoUrls: [],
+      publicAddress: "Lima, Perú",
+      primaryColor: "#053264",
+      secondaryColor: "#ccffbc",
+      customUrlPath: null
+    };
 
-              {showPromotions && (
-                <section className="px-4 sm:px-6 lg:px-8">
-                  <h2 className="text-3xl font-bold tracking-tight mb-6 flex items-center">
-                    <Tag className="h-7 w-7 mr-3 text-primary" />
-                    <span className="text-gradient">Promociones Vigentes</span>
-                  </h2>
-                  {filteredPromotions.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                      {filteredPromotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
-                    </div>
-                  ) : (
-                     <Card className="col-span-full">
-                      <CardHeader className="items-center text-center">
-                        <PartyPopper className="h-12 w-12 text-primary/70" />
-                        <CardTitle className="mt-4">
-                          {searchTerm ? "Sin Resultados" : "No Hay Promociones Disponibles"}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="text-center">
-                        <CardDescription>
-                          {searchTerm
-                            ? `No se encontraron promociones que coincidan con "${searchTerm}".`
-                            : "¡Los negocios están preparando sus mejores ofertas! Vuelve pronto."}
-                        </CardDescription>
-                      </CardContent>
-                    </Card>
-                  )}
-                </section>
-              )}
-            </div>
-          </main>
+    return (
+      <div className="relative h-screen w-full bg-[#050510]">
+        <BusinessConversationLayout 
+          business={featuredBusiness as any}
+          promotions={promotions}
+          events={events}
+          initialMessages={initialChatHistory}
+          onBack={() => { setIsConversationView(false); setInitialChatHistory([]); }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white text-[#053264] flex flex-col font-sans">
+      <MainHeader />
+      
+      <main className="flex-grow">
+        <CleanHero 
+          onGenerateItinerary={handleGenerateItinerary}
+          isGenerating={isGeneratingItinerary}
+        />
         
+        {/* Navigation Tabs */}
+        <div className="bg-white border-b sticky top-0 z-40 shadow-sm overflow-x-auto no-scrollbar">
+            <div className="max-w-7xl mx-auto flex">
+                <button 
+                  onClick={() => setView('all')} 
+                  className={cn(
+                    "flex-1 min-w-[120px] py-6 text-[10px] font-black uppercase tracking-[0.3em] transition-all border-b-4", 
+                    view === 'all' ? "border-[#053264] text-[#053264]" : "border-transparent text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Ver Todo
+                </button>
+                <button 
+                  onClick={() => setView('promotions')} 
+                  className={cn(
+                    "flex-1 min-w-[120px] py-6 text-[10px] font-black uppercase tracking-[0.3em] transition-all border-b-4", 
+                    view === 'promotions' ? "border-[#053264] text-[#053264]" : "border-transparent text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Promociones
+                </button>
+                <button 
+                  onClick={() => setView('events')} 
+                  className={cn(
+                    "flex-1 min-w-[120px] py-6 text-[10px] font-black uppercase tracking-[0.3em] transition-all border-b-4", 
+                    view === 'events' ? "border-[#053264] text-[#053264]" : "border-transparent text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Eventos
+                </button>
+            </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8 space-y-20">
+          {showEvents && (
+            <section id="eventos" className="scroll-mt-24">
+              <div className="flex flex-col items-center text-center mb-12">
+                <h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Próximos Eventos</h2>
+                <div className="w-20 h-1 bg-[#053264] rounded-full" />
+                <p className="mt-4 text-slate-500 font-medium">No te pierdas las mejores experiencias de la semana.</p>
+              </div>
+              {events.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                  {events.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-2xl p-20 text-center border-2 border-dashed border-slate-200">
+                  <PartyPopper className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Cargando eventos...</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {showPromotions && (
+            <section id="promociones" className="scroll-mt-24">
+              <div className="flex flex-col items-center text-center mb-12">
+                <h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Promociones Vigentes</h2>
+                <div className="w-20 h-1 bg-[#053264] rounded-full" />
+                <p className="mt-4 text-slate-500 font-medium">Beneficios exclusivos para nuestros miembros.</p>
+              </div>
+              {promotions.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                  {promotions.map((entity) => <EntityCard key={entity.id} entity={entity} />)}
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-2xl p-20 text-center border-2 border-dashed border-slate-200">
+                  <Tag className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Buscando ofertas...</p>
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+      </main>
+
+      {/* WhatsApp Button */}
+      <a 
+        href="https://wa.me/51942401695" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="fixed bottom-10 left-10 z-[60] w-14 h-14 bg-[#25d366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"
+      >
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+          <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.767 5.767 0 1.267.405 2.454 1.093 3.417L6.643 18l2.711-.711c.85.503 1.839.791 2.898.791 3.181 0 5.767-2.586 5.767-5.767s-2.586-5.767-5.767-5.767zm0 10.495c-1.125 0-2.18-.344-3.053-.941l-.219-.131-1.61.423.431-1.57-.144-.229a4.67 4.67 0 0 1-.741-2.5c0-2.592 2.108-4.7 4.7-4.7 2.592 0 4.7 2.108 4.7 4.7s-2.108 4.7-4.7 4.7zM14.73 12.82c-.15-.075-.89-.439-1.028-.489-.138-.05-.238-.075-.338.075s-.389.489-.477.589-.175.112-.325.037a4.103 4.103 0 0 1-1.205-.744 4.53 4.53 0 0 1-.832-1.036c-.088-.15-.009-.23.066-.305.067-.067.15-.175.225-.262s.1-.15.15-.25c.05-.1.025-.188-.012-.262s-.338-.814-.463-1.114c-.122-.292-.245-.253-.338-.258-.088-.005-.188-.005-.288-.005s-.262.037-.4.188c-.138.15-.525.513-.525 1.25s.538 1.45.613 1.55c.075.1 1.058 1.615 2.564 2.264.358.154.638.246.856.316.36.114.688.098.947.059.288-.044.89-.363 1.014-.714s.124-.65.088-.714-.138-.113-.288-.188z"/>
+        </svg>
+      </a>
     </div>
   );
 }

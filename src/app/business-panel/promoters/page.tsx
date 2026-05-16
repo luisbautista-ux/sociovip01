@@ -259,7 +259,7 @@ export default function BusinessPromotersPage() {
             <UserPlus className="h-8 w-8 mr-2" /> Mis Promotores
           </h1>
           <div className="self-end sm:self-center">
-            <Button onClick={handleOpenAddPromoterFlow} variant="gradient" disabled={isLoading || !currentBusinessId}>
+            <Button onClick={handleOpenAddPromoterFlow} disabled={isLoading || !currentBusinessId}>
               <PlusCircle className="mr-2 h-4 w-4" /> Añadir/Vincular Promotor
             </Button>
           </div>

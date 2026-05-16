@@ -214,7 +214,7 @@ export default function SignupPage() {
                 <p className="flex items-start"><CheckCircle className="h-4 w-4 mr-2 text-green-500 mt-0.5 shrink-0"/> <span>Acumula puntos con tus visitas y canjéalos.</span></p>
               </CardContent>
               <CardFooter>
-                <Button onClick={() => handleSelectPlan('gratis')} variant="gradient" className="w-full">Registrarse Gratis</Button>
+                <Button onClick={() => handleSelectPlan('gratis')} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">Registrarse Gratis</Button>
               </CardFooter>
             </Card>
             <Card className="flex flex-col border-primary border-2 relative">
@@ -267,7 +267,7 @@ export default function SignupPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
+                <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verificar Documento"}
                 </Button>
                 <Button variant="link" size="sm" className="mt-2 text-muted-foreground w-full" onClick={() => setStep('selection')}>&larr; Volver a elegir plan</Button>
@@ -312,7 +312,7 @@ export default function SignupPage() {
                   </FormItem>
                 )}/>
                 
-                <Button type="button" onClick={handleSignupWithGoogle} variant="gradient" className="w-full flex items-center" disabled={isSubmitting}>
+                <Button type="button" onClick={handleSignupWithGoogle} className="w-full flex items-center bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon className="mr-2 h-5 w-5" />}
                   Continuar y Registrarse con Google
                 </Button>
@@ -328,17 +328,21 @@ export default function SignupPage() {
   
   return (
     <>
-    <div className="relative min-h-screen bg-[#f4eef7] p-4 flex flex-col items-center justify-center">
-        <Link href="/" className="absolute top-4 left-4 z-10 text-sm font-semibold text-purple-800 hover:text-purple-600 transition-colors flex items-center">
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
+    <div className="relative min-h-screen bg-gradient-to-br from-slate-100 via-white to-slate-200 p-4 flex flex-col items-center justify-center">
+        <Link href="/" className="group absolute top-6 left-6 z-50">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary group-hover:opacity-70 transition-opacity">
+            <ArrowLeft className="h-4 w-4" />
             Volver al inicio
+          </span>
         </Link>
       
       <div className="w-full max-w-4xl mx-auto py-12">
         <Card className="w-full shadow-xl bg-white/90 backdrop-blur-sm rounded-xl">
           <CardHeader className="text-center py-6">
-              <div className="w-full flex justify-center mb-4"><SocioVipLogo size={96} /></div>
-              <CardTitle className="text-3xl text-gradient bg-gradient-to-r from-purple-800 to-red-600 text-transparent bg-clip-text">
+              <div className="w-full flex justify-center mb-4">
+                <SocioVipLogo size={180} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto object-fill drop-shadow-lg" />
+              </div>
+              <CardTitle className="text-3xl text-primary">
                   {step === 'selection' ? "Elige tu Membresía" : (step === 'dniEntry' ? "Verifica tu Identidad" : "Completa tu Registro")}
               </CardTitle>
               <CardDescription>

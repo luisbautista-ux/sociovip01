@@ -279,7 +279,7 @@ export default function PilotPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gradient flex items-center gap-3">
+      <h1 className="text-3xl font-bold text-primary flex items-center gap-3">
         <Wand2 className="h-8 w-8 text-primary" />
         Piloto Automático de Marketing
       </h1>

@@ -179,7 +179,7 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       {/* ✅ Título con ícono al lado izquierdo — CORREGIDO */}
-      <h1 className="text-3xl font-bold text-gradient flex items-center gap-2 mb-6">
+      <h1 className="text-3xl font-bold text-primary flex items-center gap-2 mb-6">
         <LayoutDashboard className="h-8 w-8 text-primary !block" />
         Dashboard
       </h1>

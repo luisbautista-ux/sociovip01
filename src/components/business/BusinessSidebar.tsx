@@ -107,7 +107,7 @@ export function BusinessSidebar({ closeSheet }: { closeSheet?: () => void }) {
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const activeStyle = {
-            backgroundImage: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})`,
+            backgroundColor: primaryColor,
           };
           return(
           <Link
@@ -115,8 +115,8 @@ export function BusinessSidebar({ closeSheet }: { closeSheet?: () => void }) {
             href={item.href}
             onClick={closeSheet}
             className={cn(
-              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors sidebar-link",
+              isActive ? "text-white" : "text-muted-foreground"
             )}
             style={isActive ? activeStyle : {}}
           >
@@ -125,6 +125,12 @@ export function BusinessSidebar({ closeSheet }: { closeSheet?: () => void }) {
           </Link>
         )})}
       </nav>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .sidebar-link:hover {
+          background-color: ${secondaryColor} !important;
+          color: white !important;
+        }
+      ` }} />
       <div className="p-4 border-t border-border mt-auto space-y-2">
         <div className="mb-2">
             <p className="text-xs text-muted-foreground">Usuario:</p>
