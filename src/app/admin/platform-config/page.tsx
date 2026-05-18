@@ -12,10 +12,13 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
 import type { Business, PlatformSettings } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 
 export default function PlatformConfigPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [selectedBusinesses, setSelectedBusinesses] = useState<Set<string>>(new Set());
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -34,6 +37,8 @@ export default function PlatformConfigPage() {
       if (configSnap.exists()) {
         const configData = configSnap.data() as PlatformSettings;
         setSelectedBusinesses(new Set(configData.defaultBusinessesForFreeUsers || []));
+        setContactPhone(configData.contactPhone || "");
+        setContactEmail(configData.contactEmail || "");
       }
     } catch (error: any) {
       console.error("Error fetching configuration:", error);
@@ -68,12 +73,14 @@ export default function PlatformConfigPage() {
     try {
       const configDocRef = doc(db, "platformSettings", "membershipConfig");
       const dataToSave: PlatformSettings = {
-        defaultBusinessesForFreeUsers: Array.from(selectedBusinesses)
+        defaultBusinessesForFreeUsers: Array.from(selectedBusinesses),
+        contactPhone: contactPhone.trim(),
+        contactEmail: contactEmail.trim()
       };
       await setDoc(configDocRef, dataToSave, { merge: true });
       toast({
         title: "Configuración Guardada",
-        description: "Se han actualizado los negocios para los usuarios gratuitos."
+        description: "Se han actualizado los negocios y la información de contacto correctamente."
       });
     } catch (error: any) {
       console.error("Error saving configuration:", error);
@@ -143,6 +150,53 @@ export default function PlatformConfigPage() {
             </div>
             <div className="text-sm text-muted-foreground">
               Seleccionados: {selectedBusinesses.size} de {businesses.length} negocios.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Info className="h-5 w-5 text-primary" />
+            Contacto de la Página Principal
+          </CardTitle>
+          <CardDescription>
+            Configura el número de teléfono y el correo electrónico de contacto que se muestran en el encabezado y botón de WhatsApp de la página principal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="contactPhone" className="text-sm font-semibold">Teléfono de Contacto</Label>
+              <Input
+                id="contactPhone"
+                type="text"
+                placeholder="+51 942 401 695"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                disabled={isSaving}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se usará también para el botón flotante de WhatsApp (se extraerán los dígitos automáticamente).
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="contactEmail" className="text-sm font-semibold">Correo de Contacto</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                placeholder="hola@sociovip.pe"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                disabled={isSaving}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Correo oficial que se muestra en el encabezado principal de SocioVIP.
+              </p>
             </div>
           </div>
         </CardContent>

@@ -462,6 +462,8 @@ export interface InitialDataForPromoterLink {
 
 export interface PlatformSettings {
   defaultBusinessesForFreeUsers?: string[];
+  contactPhone?: string;
+  contactEmail?: string;
 }
 
 export interface TicketTypeFormData {

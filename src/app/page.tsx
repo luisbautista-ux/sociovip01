@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, doc, getDoc } from "firebase/firestore";
 import type { BusinessManagedEntity, Business } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -45,8 +45,10 @@ interface EnrichedEntity extends BusinessManagedEntity {
 export default function HomePage() {
   const [promotions, setPromotions] = useState<EnrichedEntity[]>([]);
   const [events, setEvents] = useState<EnrichedEntity[]>([]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [whatsAppPhone, setWhatsAppPhone] = useState("51942401695");
   const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState<'all' | 'promotions' | 'events'>('all');
+  const [view, setView] = useState<'all' | 'promotions' | 'events' | 'experiences'>('all');
   const [isConversationView, setIsConversationView] = useState(false);
   const [isGeneratingItinerary, setIsGeneratingItinerary] = useState(false);
   const [initialChatHistory, setInitialChatHistory] = useState<{role: "user" | "assistant", content: string}[]>([]);
@@ -55,11 +57,29 @@ export default function HomePage() {
   const fetchEntitiesAndBusinesses = useCallback(async () => {
     setIsLoading(true);
     try {
+      const configDocRef = doc(db, "platformSettings", "membershipConfig");
+      const configSnap = await getDoc(configDocRef);
+      if (configSnap.exists()) {
+        const configData = configSnap.data();
+        if (configData.contactPhone) {
+          const cleaned = configData.contactPhone.replace(/\D/g, "");
+          if (cleaned) {
+            setWhatsAppPhone(cleaned);
+          }
+        }
+      }
+
       const businessesSnap = await getDocs(collection(db, "businesses"));
       const businessesMap = new Map<string, Business>();
+      const allBusinesses: Business[] = [];
       businessesSnap.forEach(doc => {
-        businessesMap.set(doc.id, { id: doc.id, ...doc.data() } as Business);
+        const busData = { id: doc.id, ...doc.data() } as Business;
+        businessesMap.set(doc.id, busData);
+        if (busData.name) {
+          allBusinesses.push(busData);
+        }
       });
+      setBusinesses(allBusinesses);
 
       const entitiesQuery = query(
         collection(db, "businessEntities"),
@@ -217,8 +237,69 @@ export default function HomePage() {
     );
   };
 
+  const BusinessCard = ({ business }: { business: Business }) => {
+    const businessUrl = business.customUrlPath ? `/${business.customUrlPath}` : `/`;
+    const coverImage = business.publicCoverImageUrls?.[0] || business.logoUrl || "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=80";
+
+    return (
+      <Card key={business.id} className="shadow-lg hover:shadow-2xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden rounded-lg bg-card group hover:-translate-y-2 border-none">
+        <Link href={businessUrl} passHref>
+          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-lg bg-slate-100">
+            <NextImage
+              src={coverImage}
+              alt={business.name}
+              fill
+              className="object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+            />
+            {business.logoUrl && (
+              <div className="absolute bottom-4 left-4 h-12 w-12 rounded-full border-2 border-white bg-white overflow-hidden shadow-md flex items-center justify-center">
+                <NextImage
+                  src={business.logoUrl}
+                  alt={`${business.name} logo`}
+                  width={48}
+                  height={48}
+                  className="object-contain w-full h-full"
+                />
+              </div>
+            )}
+          </div>
+        </Link>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-xl font-bold">
+            <Link href={businessUrl} className="hover:text-primary transition-colors">
+              {business.name}
+            </Link>
+          </CardTitle>
+          {business.slogan && (
+            <CardDescription className="text-xs pt-1 font-semibold text-slate-400 italic">
+              "{business.slogan}"
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent className="flex-grow space-y-1">
+          <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">
+            {business.description || `${business.name} te ofrece las mejores experiencias exclusivas de la zona.`}
+          </p>
+        </CardContent>
+        <CardFooter className="flex-col items-start p-4 border-t bg-slate-50/50">
+          <p className="text-xs text-muted-foreground w-full mb-3 flex items-center gap-1.5">
+            <Building size={14} className="text-slate-400" />
+            <span>{business.address || `${business.district || ""}, ${business.province || "Perú"}`}</span>
+          </p>
+          <Link href={businessUrl} passHref className="w-full">
+            <Button className="w-full text-white font-bold uppercase tracking-widest text-[10px] bg-[#053264] hover:bg-[#053264]/90 transition-all rounded-md h-10 shadow-md">
+              <Sparkles className="mr-2 h-4 w-4" />
+              Explorar Marca
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
+    );
+  };
+
   const showPromotions = view === 'all' || view === 'promotions';
   const showEvents = view === 'all' || view === 'events';
+  const showExperiences = view === 'all' || view === 'experiences';
   
   if (isLoading) {
     return (
@@ -268,13 +349,14 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#053264] flex flex-col font-sans">
+    <div className="min-h-screen bg-white text-[#053264] flex flex-col font-sans overflow-x-hidden w-full relative">
       <MainHeader />
       
       <main className="flex-grow">
         <CleanHero 
           onGenerateItinerary={handleGenerateItinerary}
           isGenerating={isGeneratingItinerary}
+          businesses={businesses}
         />
         
         {/* Navigation Tabs */}
@@ -307,10 +389,43 @@ export default function HomePage() {
                 >
                   Eventos
                 </button>
+                <button 
+                  onClick={() => setView('experiences')} 
+                  className={cn(
+                    "flex-1 min-w-[120px] py-6 text-[10px] font-black uppercase tracking-[0.3em] transition-all border-b-4", 
+                    view === 'experiences' ? "border-[#053264] text-[#053264]" : "border-transparent text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  Experiencias
+                </button>
             </div>
         </div>
 
         <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8 space-y-20">
+          {showExperiences && (
+            <section id="experiencias" className="scroll-mt-24">
+              <div className="flex flex-col items-center text-center mb-12">
+                <h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Nuestras Experiencias</h2>
+                <div className="w-20 h-1 bg-[#053264] rounded-full" />
+                <p className="mt-4 text-slate-500 font-medium">Descubre las marcas y locales más exclusivos de SocioVIP.</p>
+                <Link href="/landing" className="mt-3 inline-flex items-center text-xs font-black uppercase tracking-widest text-[#053264] hover:text-[#053264]/80 transition-all group border-b border-[#053264]/30 pb-0.5 hover:border-[#053264] w-fit">
+                  <span>¿Quieres afiliar tu negocio?</span>
+                  <Sparkles className="ml-1.5 h-3.5 w-3.5 text-secondary group-hover:rotate-12 transition-transform" />
+                </Link>
+              </div>
+              {businesses.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                  {businesses.map((business) => <BusinessCard key={business.id} business={business} />)}
+                </div>
+              ) : (
+                <div className="bg-slate-50 rounded-2xl p-20 text-center border-2 border-dashed border-slate-200">
+                  <Building className="h-12 w-12 text-slate-300 mx-auto mb-4 animate-pulse" />
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Cargando experiencias...</p>
+                </div>
+              )}
+            </section>
+          )}
+
           {showEvents && (
             <section id="eventos" className="scroll-mt-24">
               <div className="flex flex-col items-center text-center mb-12">
@@ -355,7 +470,7 @@ export default function HomePage() {
 
       {/* WhatsApp Button */}
       <a 
-        href="https://wa.me/51942401695" 
+        href={`https://wa.me/${whatsAppPhone}?text=${encodeURIComponent("¡Hola, SocioVIP! 👋 Acabo de visitar su sitio web y me gustaría hacer una consulta sobre la plataforma.")}`} 
         target="_blank" 
         rel="noopener noreferrer"
         className="fixed bottom-10 left-10 z-[60] w-14 h-14 bg-[#25d366] text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"

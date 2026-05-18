@@ -7,10 +7,35 @@ import { SocioVipLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Phone, Mail, Facebook, Youtube, Instagram, UserCircle, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export function MainHeader() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [contactPhone, setContactPhone] = useState("+51 942 401 695");
+  const [contactEmail, setContactEmail] = useState("hola@sociovip.pe");
+
+  useEffect(() => {
+    const fetchContactInfo = async () => {
+      try {
+        const configDocRef = doc(db, "platformSettings", "membershipConfig");
+        const configSnap = await getDoc(configDocRef);
+        if (configSnap.exists()) {
+          const configData = configSnap.data();
+          if (configData.contactPhone) {
+            setContactPhone(configData.contactPhone);
+          }
+          if (configData.contactEmail) {
+            setContactEmail(configData.contactEmail);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching header contact info:", err);
+      }
+    };
+    fetchContactInfo();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -30,6 +55,7 @@ export function MainHeader() {
     { label: 'Inicio', href: '/' },
     { label: 'Promociones', href: '#promociones' },
     { label: 'Eventos', href: '#eventos' },
+    { label: 'Experiencias', href: '#experiencias' },
   ];
 
   return (
@@ -45,14 +71,14 @@ export function MainHeader() {
         )}>
           <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2 text-[10px] font-medium tracking-widest uppercase">
             <div className="flex items-center gap-6">
-              <a href="tel:+51942401695" className="flex items-center gap-2 hover:text-white/70 transition-colors">
+              <a href={`tel:${contactPhone.replace(/\s+/g, '')}`} className="flex items-center gap-2 hover:text-white/70 transition-colors">
                 <Phone size={10} />
-                <span>+51 942 401 695</span>
+                <span>{contactPhone}</span>
               </a>
               <span className="hidden sm:inline text-white/20">|</span>
-              <a href="mailto:hola@sociovip.pe" className="flex items-center gap-2 hover:text-white/70 transition-colors">
+              <a href={`mailto:${contactEmail}`} className="flex items-center gap-2 hover:text-white/70 transition-colors">
                 <Mail size={10} />
-                <span>hola@sociovip.pe</span>
+                <span>{contactEmail}</span>
               </a>
             </div>
             <div className="flex items-center gap-4 border-l border-white/10 pl-6">

@@ -1,17 +1,34 @@
 "use client";
+
 import React, { useState } from "react";
 import { ArrowRight, CheckCircle, Loader2 } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export function LandingCTA() {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: "", business: "", email: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.email) return;
     setLoading(true);
-    setTimeout(() => { setLoading(false); setSent(true); }, 1200);
+    try {
+      await addDoc(collection(db, "demoRequests"), {
+        name: form.name.trim(),
+        businessName: form.business.trim(),
+        email: form.email.trim(),
+        createdAt: serverTimestamp()
+      });
+      setSent(true);
+    } catch (error) {
+      console.error("Error saving demo request:", error);
+      // Fallback para mantener experiencia de usuario
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

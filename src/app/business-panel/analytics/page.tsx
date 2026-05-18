@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, BarChart, Bar, Cell } from 'recharts';
 import type { BusinessManagedEntity, GeneratedCode } from "@/lib/types";
 import { BarChart3, Users, Loader2, Info, Ticket, Calendar, QrCode, Search, XCircle, Clock } from "lucide-react";
-import { format, subMonths, startOfMonth, es } from "date-fns";
+import { format, subMonths, startOfMonth } from "date-fns";
+import { es } from "date-fns/locale";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";

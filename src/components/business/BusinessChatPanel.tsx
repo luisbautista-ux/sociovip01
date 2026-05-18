@@ -504,7 +504,7 @@ export function BusinessChatPanel({
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-100 via-white to-slate-200 relative overflow-hidden">
       {/* Header Premium Style */}
       <div className="flex-shrink-0 px-6 pt-4 pb-6 border-b border-slate-200 bg-white/60 backdrop-blur-md">
-        <div className="flex items-center justify-between mb-3">
+        <div className="hidden md:flex items-center justify-between mb-3">
           {onBack && (
             <button 
               onClick={onBack}
@@ -517,7 +517,7 @@ export function BusinessChatPanel({
 
           {/* Mobile Panel Switcher - Integrated in header */}
           {onPanelChange && (
-            <div className="md:hidden flex bg-slate-100 rounded-full p-1 border border-slate-200">
+            <div className="flex bg-slate-100 rounded-full p-1 border border-slate-200">
               <button 
                 onClick={() => onPanelChange("chat")} 
                 className={cn("p-1.5 rounded-full transition-all", activePanel === "chat" ? "bg-primary text-white shadow-sm" : "text-slate-400")}

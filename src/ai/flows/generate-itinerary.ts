@@ -9,9 +9,10 @@ export type GenerateItineraryOutput = {
   itineraryText: string;
 };
 
-export async function generateItinerary(input: GenerateItineraryInput): Promise<GenerateItineraryOutput>
+export async function generateItinerary(input: GenerateItineraryInput): Promise<GenerateItineraryOutput> {
+  const GROQ_API_KEY = "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";
 
-const prompt = `
+  const prompt = `
 Contexto de negocios disponibles: ${input.contextData}
 
 Mensaje del usuario: "${input.userPrompt}"
@@ -27,32 +28,33 @@ Instrucciones EXTREMADAMENTE ESTRICTAS para tu respuesta:
 6. Sé empático, entusiasta y usa emojis. Tu respuesta debe ser muy corta (máximo 2 líneas). RESPONDE SIEMPRE EN ESPAÑOL.
   `;
 
-try {
-  method: 'POST',
-    headers: {
-    'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_API_KEY}`
-  },
-  body: JSON.stringify({
-    model: "llama-3.3-70b-versatile",
-    messages: [
-      { role: "system", content: "Eres el conserje VIP de SocioVIP, experto en experiencias exclusivas y atención personalizada paso a paso." },
-      { role: "user", content: prompt }
-    ],
-    temperature: 0.7,
-    max_tokens: 1024
-  })
-});
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: "Eres el conserje VIP de SocioVIP, experto en experiencias exclusivas y atención personalizada paso a paso." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 1024
+      })
+    });
 
-if (!response.ok) {
-  throw new Error("Groq API Error");
-}
+    if (!response.ok) {
+      throw new Error("Groq API Error");
+    }
 
-const data = await response.json();
-return { itineraryText: data.choices?.[0]?.message?.content || "¡Estoy listo para ayudarte!" };
+    const data = await response.json();
+    return { itineraryText: data.choices?.[0]?.message?.content || "¡Estoy listo para ayudarte!" };
 
-} catch (error: any) {
-  console.error("Groq Itinerary Error:", error.message);
-  return { itineraryText: "Dime qué tipo de experiencia buscas y te armaré el mejor plan." };
-}
+  } catch (error: any) {
+    console.error("Groq Itinerary Error:", error.message);
+    return { itineraryText: "Dime qué tipo de experiencia buscas y te armaré el mejor plan." };
+  }
 }

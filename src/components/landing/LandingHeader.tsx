@@ -29,12 +29,19 @@ export function LandingHeader() {
   return (
     <>
       <header className={cn(
-        "fixed top-0 left-0 right-0 z-[100] transition-all duration-500",
-        scrolled ? "bg-white/95 backdrop-blur-lg shadow-sm border-b border-slate-100" : "bg-transparent"
+        "fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ease-in-out",
+        scrolled
+          ? "bg-white/95 backdrop-blur-xl py-3 border-b border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
+          : "bg-transparent py-4"
       )}>
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 flex items-center justify-between h-20">
-          <Link href="/">
-            <SocioVipLogo size={110} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto" />
+        <div className="w-full flex justify-between items-center px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center group z-10">
+            <SocioVipLogo
+              size={scrolled ? 110 : 130}
+              variant="pill"
+              pillPadding="py-0 px-[1.5%]"
+              className="!aspect-[1.6/1] !h-auto object-fill transition-all duration-700 ease-in-out drop-shadow-sm"
+            />
           </Link>
 
           {/* Desktop nav */}
@@ -47,7 +54,7 @@ export function LandingHeader() {
             </a>
           </nav>
 
-          <button className="md:hidden p-2 text-[#053264]" onClick={() => setOpen(true)}>
+          <button className="md:hidden p-2 text-[#053264] z-10" onClick={() => setOpen(true)}>
             <Menu size={24} />
           </button>
         </div>

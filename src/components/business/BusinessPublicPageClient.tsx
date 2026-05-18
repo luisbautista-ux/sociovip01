@@ -58,6 +58,7 @@ import {
   Video,
   MapPin,
   Smartphone,
+  Mail,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -216,7 +217,8 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
   const [allEvents, setAllEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'description' | 'promotions' | 'events'>('description');
+  const [view, setView] = useState<'description' | 'promotions' | 'events' | 'gallery'>('description');
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
   const [showDniModal, setShowDniModal] = useState(false);
@@ -233,6 +235,8 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null); // For custom template rendering
+  const [isScrolled, setIsScrolled] = useState(false);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
 
   const dniForm = useForm<DniFormValues>({
     resolver: zodResolver(DniEntrySchema),
@@ -393,6 +397,30 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
       document.documentElement.style.removeProperty('--ring');
     };
   }, [businessDetails]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPos = window.scrollY || document.documentElement.scrollTop || (mainScrollRef.current ? mainScrollRef.current.scrollTop : 0);
+      setIsScrolled(scrollPos > 30);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    const scrollContainer = mainScrollRef.current;
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    // Ejecutar inmediatamente para capturar posición inicial
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [businessDetails, isLoading]);
 
 
 const handleSpecificCodeSubmit = async (entity: BusinessManagedEntity, codeInputValue: string) => {
@@ -883,9 +911,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   const showDescription = view === 'description';
   const showPromotions = view === 'promotions';
   const showEvents = view === 'events';
+  const showGallery = view === 'gallery';
   const noContentToShow = !isLoading && (
     (view === 'promotions' && promotions.length === 0) ||
-    (view === 'events' && allEvents.length === 0)
+    (view === 'events' && allEvents.length === 0) ||
+    (view === 'gallery' && (!businessDetails?.publicCoverImageUrls?.length && !businessDetails?.publicVideoUrls?.length))
   );
 
 
@@ -893,8 +923,13 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
-          <div className="relative p-[2px] rounded-full shadow-2xl bg-white/95 animate-drop-in animate-float mb-6 max-w-[85vw]">
-            <SocioVipLogo size={180} variant="pill" pillPadding="py-0 px-[1.5%]" className="!aspect-[1.6/1] !h-auto object-fill drop-shadow-lg" />
+          <div className="relative animate-drop-in animate-float mb-6 max-w-[85vw]">
+            <SocioVipLogo 
+              size={180} 
+              variant="pill" 
+              pillPadding="py-0 px-[1.5%]" 
+              className="!aspect-[1.6/1] !h-auto object-fill border-[1px] border-white/95 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.3)] drop-shadow-lg" 
+            />
           </div>
           <p className="mt-4 text-lg font-semibold text-white/90">
             Cargando información del negocio...
@@ -948,46 +983,100 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
   if (!businessDetails) return null;
 
   return (
-    <div className="h-screen flex flex-col bg-muted/40">
-       <header className="sticky top-0 z-50 w-full bg-background shadow-sm shrink-0">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-3">
-                 <Link href="/" className="flex items-center gap-2">
-                    <SocioVipLogo size={32} />
-                    <span className="font-bold text-xl text-black hidden sm:inline">SocioVIP</span>
-                 </Link>
-              </div>
-              <div className="flex items-center gap-2">
-                 <Link href="/" passHref>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="font-semibold text-sm text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
-                    >
-                      <ArrowLeft className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">Volver al Inicio</span>
-                    </Button>
-                 </Link>
+    <div className="h-screen flex flex-col bg-[#0b1319]">
+       <header 
+          className={cn(
+             "fixed top-0 left-0 right-0 z-50 w-full shrink-0 transition-all duration-500",
+             isScrolled 
+                 ? "bg-white/95 backdrop-blur-md shadow-md border-b border-slate-100 py-3" 
+                 : "bg-transparent border-none py-5"
+          )}
+       >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+             <div className="flex items-center justify-between h-14">
+               {/* Brand & Partner Co-Branding */}
+               <div className="flex items-center gap-2 sm:gap-4">
+                  <Link href="/" className="flex items-center group">
+                     {/* SocioVIP logo square animated wrapper */}
+                     <div className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-lg overflow-hidden flex items-center justify-center bg-[#070f14] border border-white/10 shadow-sm transition-all group-hover:scale-105 shrink-0">
+                        <img 
+                           src="https://www.image2url.com/r2/default/gifs/1778861156032-56811580-9ea6-4eab-9dd1-9cec2b902ccb.gif" 
+                           alt="SocioVIP Logo" 
+                           className="w-full h-full object-cover"
+                        />
+                     </div>
+                  </Link>
+                  
+                  {businessDetails.logoUrl && (
+                     <div 
+                        className={cn(
+                           "flex items-center gap-2 sm:gap-3 border-l pl-2 sm:pl-4 transition-colors duration-500",
+                           isScrolled ? "border-slate-200" : "border-white/20"
+                        )}
+                     >
+                        {/* Business logo: square with rounded corners */}
+                        <div className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-lg overflow-hidden border border-white/10 shadow-sm bg-white/5 shrink-0">
+                           <NextImage 
+                              src={businessDetails.logoUrl} 
+                              alt={businessDetails.name} 
+                              fill 
+                              className="object-cover"
+                           />
+                        </div>
+                        <span 
+                           className={cn(
+                              "font-black text-sm sm:text-base uppercase tracking-wider transition-colors duration-500 hidden md:inline-block",
+                              isScrolled ? "text-slate-800" : "text-white"
+                           )}
+                        >
+                           {businessDetails.name}
+                        </span>
+                     </div>
+                  )}
+               </div>
+               
+               {/* Actions */}
+               <div className="flex items-center gap-1.5 sm:gap-3">
+                  <Link href="/" passHref>
+                     <Button
+                         variant="ghost"
+                         size="sm"
+                         className={cn(
+                             "font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all rounded-full px-2 h-9 sm:px-4 sm:h-10 flex items-center gap-1.5 sm:gap-2 bg-transparent border-none",
+                             isScrolled 
+                                 ? "text-slate-600 hover:bg-slate-100" 
+                                 : "text-white hover:bg-white/10"
+                         )}
+                     >
+                       <ArrowLeft className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors", isScrolled ? "text-slate-600" : "text-white")} />
+                       <span className="hidden sm:inline">Volver</span>
+                     </Button>
+                  </Link>
                   <Link href="/login" passHref>
                      <Button
                         variant="outline"
-                        size="icon"
-                        className="font-semibold text-sm border-foreground/20 text-foreground/80 hover:bg-muted hover:text-foreground md:w-auto md:px-4"
+                        size="sm"
+                        className={cn(
+                            "font-black text-[10px] sm:text-xs uppercase tracking-widest rounded-full px-3 h-9 sm:px-5 sm:h-10 flex items-center gap-1.5 sm:gap-2 transition-all shadow-sm bg-transparent",
+                            isScrolled
+                                ? "border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900"
+                                : "border-2 border-white text-white hover:bg-white hover:text-slate-900"
+                        )}
                       >
-                      <UserCircle className="h-5 w-5 md:mr-2" />
-                      <span className="hidden md:inline">Iniciar Sesión</span>
-                    </Button>
+                       <UserCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                       <span className="hidden sm:inline">Iniciar Sesión</span>
+                       <span className="inline sm:hidden">Ingresar</span>
+                     </Button>
                   </Link>
-              </div>
-            </div>
-         </div>
+               </div>
+             </div>
+          </div>
        </header>
 
-       <main className="flex-grow overflow-y-auto">
-            <div className="max-w-7xl mx-auto w-full px-0 sm:px-6 lg:px-8 pt-0">
+       <main ref={mainScrollRef} className="flex-grow overflow-y-auto bg-slate-50">
+            <div className="w-full px-0 pt-0">
                 <ScrollReveal direction="none">
-                    <div className="w-full md:mt-8 mb-4">
+                    <div className="w-full">
                         <ImageCarousel
                         images={businessDetails.publicCoverImageUrls || []}
                         primaryColor={businessDetails.primaryColor}
@@ -998,187 +1087,176 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     </div>
                 </ScrollReveal>
 
-                <ScrollReveal direction="none" delay={200}>
-                    <div className="relative overflow-x-hidden whitespace-nowrap py-2 text-sm font-bold text-white" style={{ backgroundColor: businessDetails.primaryColor }}>
-                        <div className="animate-scroll inline-block">
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                        </div>
-                        <div className="animate-scroll inline-block">
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                            <span className="mx-4">•</span>
-                            <span className="mx-4">Genera tus entradas QR gratis</span>
-                        </div>
-                    </div>
-                </ScrollReveal>
-                <div className="sticky top-0 z-30 bg-white border-b shadow-sm overflow-x-auto no-scrollbar">
+                <div id="entity-views-tabs" className="w-full bg-[#15222C] border-b border-white/5 shadow-2xl overflow-hidden">
                     <div className="max-w-7xl mx-auto">
-                        <div className="grid grid-cols-3 min-w-[300px]">
+                        <div className="grid grid-cols-4 w-full">
                             <button 
                                 onClick={() => setView('description')} 
                                 className={cn(
-                                    "flex flex-col items-center justify-center py-4 px-2 gap-1 transition-all border-r", 
+                                    "flex flex-col sm:flex-row items-center justify-center py-4 sm:py-6 px-1.5 sm:px-4 gap-1 sm:gap-3 transition-all border-r border-white/5", 
                                     view === 'description' 
-                                        ? "text-white" 
-                                        : "text-muted-foreground hover:bg-slate-50 hover:text-foreground"
+                                        ? "bg-slate-900 text-accent font-black" 
+                                        : "text-slate-400 hover:bg-slate-900/40 hover:text-white"
                                 )}
-                                style={view === 'description' ? { backgroundColor: businessDetails.primaryColor } : {}}
                             >
-                                <Info className={cn("h-6 w-6 transition-colors", view === 'description' ? "text-white" : "text-muted-foreground")} />
-                                <span className="font-bold text-[10px] sm:text-xs uppercase tracking-widest">Descripción</span>
+                                <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <span className="font-black text-[9px] xs:text-[10px] sm:text-xs uppercase tracking-wider sm:tracking-widest">Descripción</span>
                             </button>
                             
                             <button 
                                 onClick={() => setView('promotions')} 
                                 className={cn(
-                                    "flex flex-col items-center justify-center py-4 px-2 gap-1 transition-all border-r", 
+                                    "flex flex-col sm:flex-row items-center justify-center py-4 sm:py-6 px-1.5 sm:px-4 gap-1 sm:gap-3 transition-all border-r border-white/5", 
                                     view === 'promotions' 
-                                        ? "text-white" 
-                                        : "text-muted-foreground hover:bg-slate-50 hover:text-foreground"
+                                        ? "bg-slate-900 text-accent font-black" 
+                                        : "text-slate-400 hover:bg-slate-900/40 hover:text-white"
                                 )}
-                                style={view === 'promotions' ? { backgroundColor: businessDetails.primaryColor } : {}}
                             >
-                                <Tag className={cn("h-6 w-6 transition-colors", view === 'promotions' ? "text-white" : "text-muted-foreground")} />
-                                <span className="font-bold text-[10px] sm:text-xs uppercase tracking-widest">Promociones</span>
+                                <Tag className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <span className="font-black text-[9px] xs:text-[10px] sm:text-xs uppercase tracking-wider sm:tracking-widest">Promociones</span>
                             </button>
                             
                             <button 
                                 onClick={() => setView('events')} 
                                 className={cn(
-                                    "flex flex-col items-center justify-center py-4 px-2 gap-1 transition-all", 
+                                    "flex flex-col sm:flex-row items-center justify-center py-4 sm:py-6 px-1.5 sm:px-4 gap-1 sm:gap-3 transition-all border-r border-white/5", 
                                     view === 'events' 
-                                        ? "text-white" 
-                                        : "text-muted-foreground hover:bg-slate-50 hover:text-foreground"
+                                        ? "bg-slate-900 text-accent font-black" 
+                                        : "text-slate-400 hover:bg-slate-900/40 hover:text-white"
                                 )}
-                                style={view === 'events' ? { backgroundColor: businessDetails.primaryColor } : {}}
                             >
-                                <Calendar className={cn("h-6 w-6 transition-colors", view === 'events' ? "text-white" : "text-muted-foreground")} />
-                                <span className="font-bold text-[10px] sm:text-xs uppercase tracking-widest">Eventos</span>
+                                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <span className="font-black text-[9px] xs:text-[10px] sm:text-xs uppercase tracking-wider sm:tracking-widest">Eventos</span>
+                            </button>
+
+                            <button 
+                                onClick={() => setView('gallery')} 
+                                className={cn(
+                                    "flex flex-col sm:flex-row items-center justify-center py-4 sm:py-6 px-1.5 sm:px-4 gap-1 sm:gap-3 transition-all", 
+                                    view === 'gallery' 
+                                        ? "bg-slate-900 text-accent font-black" 
+                                        : "text-slate-400 hover:bg-slate-900/40 hover:text-white"
+                                )}
+                            >
+                                <Video className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <span className="font-black text-[9px] xs:text-[10px] sm:text-xs uppercase tracking-wider sm:tracking-widest">Experiencia</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div className="px-4 sm:px-6 lg:px-8 mt-10 max-w-7xl mx-auto mb-20">
+                <div className="px-4 sm:px-6 lg:px-8 mt-16 max-w-7xl mx-auto mb-20">
                     {showDescription && (
                         <ScrollReveal direction="up">
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                                {/* Main Content Column */}
-                                <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border p-8 sm:p-12">
-                                    <div className="prose prose-slate max-w-none">
-                                        <h2 className="text-4xl font-bold mb-8 tracking-tight" style={{ color: businessDetails.primaryColor }}>
-                                            Descripción
-                                        </h2>
+                            <div className="space-y-12">
+                                {/* Description Card */}
+                                <div className="bg-white rounded-3xl p-8 sm:p-12 shadow-[0_4px_30px_rgba(0,0,0,0.015)] border border-slate-100">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
+                                        {/* Left Column */}
+                                        <div className="space-y-6">
+                                            <h2 className="text-4xl md:text-5xl font-black tracking-tight leading-tight text-slate-800" style={{ color: businessDetails.primaryColor }}>
+                                                {businessDetails.name}
+                                            </h2>
+                                            <p className="text-slate-400 text-xs font-black uppercase tracking-[0.2em] border-l-4 pl-4" style={{ borderColor: businessDetails.primaryColor }}>
+                                                Ficha Oficial • SocioVIP
+                                            </p>
+                                            <div className="text-lg leading-relaxed text-slate-600 font-bold">
+                                                {businessDetails.slogan || "Garantía de calidad excepcional y servicio preferente."}
+                                            </div>
+                                        </div>
                                         
-                                        <div className="text-xl leading-relaxed text-slate-700 whitespace-pre-wrap font-medium">
-                                            {businessDetails.description || "Este negocio aún no ha proporcionado una descripción detallada."}
+                                        {/* Right Column */}
+                                        <div className="space-y-6">
+                                            <div className="text-base leading-relaxed text-slate-600 whitespace-pre-wrap font-medium">
+                                                {businessDetails.description || "Este negocio aún no ha proporcionado una descripción detallada en su ficha de SocioVIP. Por favor, explora las promociones y eventos disponibles o ponte en contacto directo para obtener más detalles de sus exclusivos servicios."}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Sidebar Column */}
-                                <div className="lg:col-span-4 space-y-6">
-                                    <div className="bg-white rounded-2xl shadow-sm border p-8">
-                                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2 border-b pb-4">
-                                            <Info className="h-5 w-5" style={{ color: businessDetails.primaryColor }} />
-                                            Detalles del Negocio
-                                        </h3>
-                                        
-                                        <div className="space-y-8">
-                                            <div className="flex gap-4">
-                                                <div className="mt-1 bg-slate-100 p-2 rounded-lg h-fit">
-                                                    <MapPin className="h-5 w-5 text-slate-600" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-sm text-slate-900 uppercase tracking-wider mb-1">Ubicación</h4>
-                                                    <p className="text-slate-600 text-sm leading-relaxed">
-                                                        {businessDetails.publicAddress || "Dirección no disponible"}
-                                                    </p>
-                                                    {businessDetails.publicAddress && (
-                                                        <a 
-                                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(businessDetails.publicAddress)}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-xs font-bold mt-2 inline-block hover:underline"
-                                                            style={{ color: businessDetails.primaryColor }}
-                                                        >
-                                                            Ver en Google Maps
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex gap-4">
-                                                <div className="mt-1 bg-slate-100 p-2 rounded-lg h-fit">
-                                                    <CalendarDays className="h-5 w-5 text-slate-600" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-sm text-slate-900 uppercase tracking-wider mb-1">Horario</h4>
-                                                    <p className="text-slate-600 text-sm leading-relaxed">
-                                                        Abierto de Lunes a Domingo.<br/>
-                                                        Consulta promociones para horarios especiales.
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {businessDetails.publicPhone && (
-                                                <div className="flex gap-4">
-                                                    <div className="mt-1 bg-slate-100 p-2 rounded-lg h-fit">
-                                                        <Smartphone className="h-5 w-5 text-slate-600" />
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-bold text-sm text-slate-900 uppercase tracking-wider mb-1">Contacto</h4>
-                                                        <p className="text-slate-600 text-sm font-medium">
-                                                            {businessDetails.publicPhone}
-                                                        </p>
-                                                    </div>
-                                                </div>
+                                {/* Details Row */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-start gap-4">
+                                        <div className="mt-1 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+                                            <MapPin className="h-5 w-5 text-slate-500" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-1.5">Ubicación</h4>
+                                            <p className="text-slate-600 text-sm font-semibold leading-relaxed">
+                                                {businessDetails.publicAddress || "Dirección no disponible"}
+                                            </p>
+                                            {businessDetails.publicAddress && (
+                                                <a 
+                                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(businessDetails.publicAddress)}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs font-bold mt-2 inline-block hover:underline"
+                                                    style={{ color: businessDetails.primaryColor }}
+                                                >
+                                                    Ver en Google Maps
+                                                </a>
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* Small branding card */}
-                                    <div className="bg-slate-50 rounded-2xl p-6 border border-dashed flex flex-col items-center text-center">
-                                        <SocioVipLogo size={40} className="mb-3 opacity-50 grayscale" />
-                                        <p className="text-xs text-muted-foreground font-medium">
-                                            Miembro verificado de SocioVIP<br/>
-                                            Garantía de calidad y servicio.
-                                        </p>
+                                    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-start gap-4">
+                                        <div className="mt-1 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+                                            <CalendarDays className="h-5 w-5 text-slate-500" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-1.5">Horarios</h4>
+                                            <p className="text-slate-600 text-sm font-semibold leading-relaxed">
+                                                Lunes a Domingo.<br/>
+                                                <span className="font-medium text-slate-400">Abierto incluso feriados.</span>
+                                            </p>
+                                        </div>
                                     </div>
+                                    <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-start gap-4">
+                                        <div className="mt-1 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+                                            <Smartphone className="h-5 w-5 text-slate-500" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-1.5">Contacto directo</h4>
+                                            <p className="text-slate-600 text-sm font-semibold leading-relaxed">
+                                                {businessDetails.publicPhone || "Teléfono no disponible"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Elite branding card */}
+                                <div className="relative overflow-hidden rounded-3xl p-8 border border-[#eedca5] bg-gradient-to-br from-[#fdfbf7] to-[#f5eed6] flex flex-col items-center text-center shadow-sm">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#ebd28a]/20 rounded-full blur-2xl animate-pulse" />
+                                    <SocioVipLogo size={56} variant="pill" pillPadding="py-0 px-[1%]" className="mb-4 drop-shadow-md animate-float" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-[#8a6d25] bg-[#ebd28a]/35 px-4 py-1.5 rounded-full mb-3">
+                                        Establecimiento Verificado
+                                    </span>
+                                    <p className="text-sm text-[#6e5820] font-bold leading-relaxed max-w-lg">
+                                        Este establecimiento ha sido auditado y cumple con las normas de servicio preferente de SocioVIP.<br/>
+                                        <span className="font-medium text-[#8c7438] text-xs mt-1 block">Recibe un trato preferencial y acumula beneficios en cada visita.</span>
+                                    </p>
                                 </div>
                             </div>
                         </ScrollReveal>
                     )}
 
                     {showPromotions && (
-                      <section>
-                        <h2 className="text-3xl font-bold tracking-tight mb-8 flex items-center" style={{ color: businessDetails.primaryColor }}>
-                          <Tag className="h-8 w-8 mr-3" /> Promociones Vigentes
-                        </h2>
+                      <section className="space-y-8">
+                        <div className="text-center space-y-2 mb-12">
+                          <span className="font-black text-xs uppercase tracking-[0.2em]" style={{ color: businessDetails.primaryColor }}>
+                            Nuestras Ofertas
+                          </span>
+                          <h2 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
+                            PROMOCIONES DISPONIBLES
+                          </h2>
+                          <div className="h-[3px] w-16 mx-auto rounded-full mt-4" style={{ backgroundColor: businessDetails.primaryColor }} />
+                        </div>
+
                         {promotions.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-8">
                                 {promotions.map((promo, index) => (
                                     <ScrollReveal key={promo.id} delay={index * 100}>
-                                        <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-xl bg-card group hover:-translate-y-2 h-full border-2 border-transparent hover:border-primary/20">
-                                        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-xl">
+                                        <Card className="shadow-lg hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden rounded-3xl bg-card border border-slate-100 group hover:-translate-y-2 h-full">
+                                        <div className="relative aspect-[16/9] w-full overflow-hidden">
                                             <NextImage 
                                                 src={promo.imageUrl || "https://placehold.co/600x400.png?text=Promoción"} 
                                                 alt={promo.name} fill 
@@ -1186,23 +1264,26 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                                 style={{ objectPosition: promo.imageObjectPosition || '50% 50%' }} 
                                                 data-ai-hint={promo.aiHint || "discount offer"}
                                             />
+                                            <div className="absolute top-4 right-4 bg-slate-900/90 text-white font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-full backdrop-blur-sm shadow-md">
+                                                Promoción
+                                            </div>
                                         </div>
                                         <CardHeader className="pb-3 px-6 pt-6">
-                                            <CardTitle className="text-xl font-bold">{promo.name}</CardTitle>
+                                            <CardTitle className="text-xl font-black text-slate-800">{promo.name}</CardTitle>
                                         </CardHeader>
-                                        <CardContent className="flex-grow space-y-2 px-6">
-                                            <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{promo.description}</p>
-                                            <p className="text-xs font-semibold text-muted-foreground bg-muted/50 py-1 px-2 rounded inline-block">
-                                                Válido hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
+                                        <CardContent className="flex-grow space-y-4 px-6">
+                                            <p className="text-sm text-slate-500 line-clamp-3 leading-relaxed font-medium">{promo.description}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 bg-slate-50 py-1.5 px-3 rounded-full inline-block border border-slate-100 uppercase tracking-widest">
+                                                Hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
                                             </p>
                                         </CardContent>
-                                        <CardFooter className="flex-col items-start p-6 border-t bg-muted/5"><SpecificCodeEntryForm entity={promo} /></CardFooter>
+                                        <CardFooter className="flex-col items-start p-6 border-t border-slate-100 bg-slate-50/50"><SpecificCodeEntryForm entity={promo} /></CardFooter>
                                         </Card>
                                     </ScrollReveal>
                                 ))}
                             </div>
                         ) : (
-                            <div className="py-12"><Card className="col-span-full border-dashed"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2">No hay Promociones por Ahora</CardTitle></CardHeader><CardContent className="text-center"><CardDescription>Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!</CardDescription></CardContent></Card></div>
+                            <div className="py-12"><Card className="col-span-full border-dashed border-2 rounded-3xl"><CardHeader className="text-center"><PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" /><CardTitle className="mt-2 text-xl font-black text-slate-800">No hay Promociones por Ahora</CardTitle></CardHeader><CardContent className="text-center"><CardDescription className="text-sm font-semibold">Este negocio no tiene promociones activas en este momento. ¡Vuelve pronto!</CardDescription></CardContent></Card></div>
                         )}
                       </section>
                     )}
@@ -1274,24 +1355,178 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                         )}
                       </section>
                     )}
+                    
+                    {showGallery && (
+                      <section className="space-y-12 animate-fade-in">
+                        {(businessDetails.publicVideoUrls?.length > 0 || businessDetails.publicCoverImageUrls?.length > 0) ? (
+                          <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-stretch">
+                            {/* Lado Izquierdo: Galería & Momentos (Imágenes) - Más ancho en desktop */}
+                            {businessDetails.publicCoverImageUrls && businessDetails.publicCoverImageUrls.length > 0 && (
+                              <div className={cn(
+                                "flex flex-col space-y-6 w-full",
+                                businessDetails.publicVideoUrls?.length > 0 ? "lg:w-2/3" : "w-full"
+                              )}>
+                                <h2 className="text-2xl font-black tracking-tight flex items-center gap-3 text-slate-800">
+                                  <span className="p-2 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center justify-center">
+                                    <Smartphone className="h-5 w-5 text-indigo-500" />
+                                  </span>
+                                  Galería & Momentos
+                                </h2>
+                                <div className="flex-1 w-full rounded-3xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.08)] relative border border-slate-100 min-h-[300px]">
+                                  <ImageCarousel 
+                                    images={businessDetails.publicCoverImageUrls} 
+                                    primaryColor={businessDetails.primaryColor} 
+                                    showOverlay={false} 
+                                    aspectClass="h-full aspect-[4/3] lg:aspect-auto"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Lado Derecho: Videos & Ambiente - Más angosto en desktop */}
+                            {businessDetails.publicVideoUrls && businessDetails.publicVideoUrls.length > 0 && (
+                              <div className={cn(
+                                "flex flex-col space-y-6 w-full",
+                                businessDetails.publicCoverImageUrls?.length > 0 ? "lg:w-1/3" : "w-full"
+                              )}>
+                                <h2 className="text-2xl font-black tracking-tight flex items-center gap-3 text-slate-800">
+                                  <span className="p-2 bg-rose-50 rounded-2xl border border-rose-100 flex items-center justify-center">
+                                    <Video className="h-5 w-5 text-rose-500" />
+                                  </span>
+                                  Videos & Ambiente
+                                </h2>
+                                <div className="w-full aspect-[9/16] rounded-3xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.08)] relative border border-slate-100 bg-black">
+                                  <VideoCarousel videos={businessDetails.publicVideoUrls} primaryColor={businessDetails.primaryColor} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="py-12">
+                            <Card className="col-span-full border-dashed rounded-3xl">
+                              <CardHeader className="text-center">
+                                <PackageOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                                <CardTitle className="mt-2">No hay Multimedia disponible</CardTitle>
+                              </CardHeader>
+                              <CardContent className="text-center">
+                                <CardDescription>Este negocio no ha compartido fotos ni videos por el momento.</CardDescription>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )}
+                      </section>
+                    )}
                 </div>
+                
+                {businessDetails.publicAddress && (
+                  <div className="px-4 sm:px-6 lg:px-8 mt-12 mb-8 max-w-7xl mx-auto">
+                    <ScrollReveal direction="up">
+                      <div className="bg-white rounded-3xl p-6 md:p-8 shadow-[0_4px_30px_rgba(0,0,0,0.015)] border border-slate-100 space-y-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div>
+                            <h2 className="text-2xl font-black tracking-tight flex items-center gap-3 text-slate-800">
+                              <span className="p-2 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-center">
+                                <MapPin className="h-5 w-5 text-emerald-500" />
+                              </span>
+                              Ubicación & Mapa
+                            </h2>
+                            <p className="text-slate-500 text-sm mt-1 font-semibold">
+                              {businessDetails.publicAddress}
+                            </p>
+                          </div>
+                          <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(businessDetails.name + ", " + businessDetails.publicAddress)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-full font-bold text-xs uppercase tracking-widest shadow-md transition-all hover:scale-105 justify-center"
+                          >
+                            Abrir en Google Maps
+                          </a>
+                        </div>
+                        <div className="w-full h-[350px] md:h-[450px] rounded-3xl overflow-hidden border border-slate-100 shadow-inner relative group">
+                          <iframe 
+                            width="100%" 
+                            height="100%" 
+                            className="absolute inset-0"
+                            frameBorder="0" 
+                            scrolling="no" 
+                            marginHeight={0} 
+                            marginWidth={0} 
+                            src={`https://maps.google.com/maps?q=${encodeURIComponent(businessDetails.name + ", " + businessDetails.publicAddress)}&t=&z=16&ie=UTF8&iwloc=A&output=embed`}
+                          />
+                        </div>
+                      </div>
+                    </ScrollReveal>
+                  </div>
+                )}
             </div>
             
-            {businessDetails.publicAddress || businessDetails.publicPhone || businessDetails.publicContactEmail ? (
-                <footer className="w-full bg-background border-t mt-12 py-8">
-                    <ScrollReveal direction="down">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-muted-foreground text-sm">
-                            <div className="w-full flex justify-center mb-4 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
-                                <SocioVipLogo size={48} />
-                            </div>
-                            <p className="font-semibold text-foreground mb-2">Información de Contacto</p>
-                            {businessDetails.publicAddress && (<p>{businessDetails.publicAddress}</p>)}
-                            {businessDetails.publicPhone && (<p>Teléfono: {businessDetails.publicPhone}</p>)}
-                            {businessDetails.publicContactEmail && (<p>Email: <a href={`mailto:${businessDetails.publicContactEmail}`} className="text-primary hover:underline">{businessDetails.publicContactEmail}</a></p>)}
-                        </div>
-                    </ScrollReveal>
-                </footer>
-            ) : null}
+             <footer className="w-full bg-[#0b1319] text-slate-400 border-t border-white/5 pt-16 pb-8 shrink-0">
+                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+                         {/* Column 1: Nosotros */}
+                         <div className="space-y-6">
+                             <div className="flex items-center gap-2">
+                                 <SocioVipLogo size={40} />
+                                 <span className="font-black text-lg text-white">SocioVIP</span>
+                             </div>
+                             <p className="text-sm leading-relaxed text-slate-400 font-medium">
+                                 Ofrecemos un servicio personalizado de primer nivel con las mejores opciones y precios que se acomodan a tus necesidades, garantizando experiencias inolvidables.
+                             </p>
+                             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white/5 py-2 px-4 rounded-full w-fit border border-white/5">
+                                 Establecimiento Premium
+                             </div>
+                         </div>
+                         
+                         {/* Column 2: Links */}
+                         <div className="space-y-6">
+                             <h4 className="font-black text-xs uppercase tracking-[0.2em] text-white">Nuestra Plataforma</h4>
+                             <ul className="space-y-3 text-sm font-semibold">
+                                 <li><Link href="/" className="hover:text-white transition-colors">Página Principal</Link></li>
+                                 <li><button onClick={() => setView('description')} className="hover:text-white transition-colors">Descripción del Negocio</button></li>
+                                 <li><button onClick={() => setView('promotions')} className="hover:text-white transition-colors">Promociones Activas</button></li>
+                                 <li><button onClick={() => setView('events')} className="hover:text-white transition-colors">Eventos & Agendas</button></li>
+                                 <li><button onClick={() => setView('gallery')} className="hover:text-white transition-colors flex items-center gap-2">Experiencia & Reels <span className="bg-emerald-500/20 text-emerald-400 text-[8px] px-2 py-0.5 rounded-full uppercase tracking-widest">Nuevo</span></button></li>
+                             </ul>
+                         </div>
+                         
+                         {/* Column 3: Contacto */}
+                         <div className="space-y-6">
+                             <h4 className="font-black text-xs uppercase tracking-[0.2em] text-white">Contactos</h4>
+                             <ul className="space-y-4 text-sm font-semibold">
+                                 {businessDetails.publicPhone && (
+                                     <li className="flex items-center gap-3">
+                                         <Smartphone className="h-4 w-4 text-[#ccffbc]" />
+                                         <span>{businessDetails.publicPhone}</span>
+                                     </li>
+                                 )}
+                                 {businessDetails.publicContactEmail && (
+                                     <li className="flex items-center gap-3">
+                                         <Mail className="h-4 w-4 text-[#ccffbc]" />
+                                         <a href={`mailto:${businessDetails.publicContactEmail}`} className="hover:text-white transition-colors">{businessDetails.publicContactEmail}</a>
+                                     </li>
+                                 )}
+                                 {businessDetails.publicAddress && (
+                                     <li className="flex items-start gap-3">
+                                         <MapPin className="h-4 w-4 text-[#ccffbc] mt-1 shrink-0" />
+                                         <span className="leading-relaxed text-slate-300">{businessDetails.publicAddress}</span>
+                                     </li>
+                                 )}
+                             </ul>
+                         </div>
+                     </div>
+                     
+                     <div className="border-t border-white/5 pt-8 mt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-semibold text-slate-500">
+                         <p>© {new Date().getFullYear()} SocioVIP. Todos los derechos reservados.</p>
+                         <div className="flex items-center gap-4 opacity-50 hover:opacity-80 transition-opacity">
+                             <span className="bg-white/10 px-2.5 py-1 rounded text-[10px] font-bold">VISA</span>
+                             <span className="bg-white/10 px-2.5 py-1 rounded text-[10px] font-bold">MC</span>
+                             <span className="bg-white/10 px-2.5 py-1 rounded text-[10px] font-bold">AMEX</span>
+                             <span className="bg-white/10 px-2.5 py-1 rounded text-[10px] font-bold">PP</span>
+                         </div>
+                     </div>
+                 </div>
+             </footer>
       </main>
 
       <Dialog
@@ -1587,6 +1822,29 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
         </DialogContent>
       </Dialog>
       <LoginModal open={showLoginModal} onOpenChange={setShowLoginModal} />
+      
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center">
+            <NextImage 
+              src={lightboxImage} 
+              alt="Ampliación de Galería" 
+              fill
+              className="object-contain"
+              sizes="100vw"
+            />
+            <button 
+              className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors backdrop-blur-sm shadow-md"
+              onClick={() => setLightboxImage(null)}
+            >
+              Cerrar ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

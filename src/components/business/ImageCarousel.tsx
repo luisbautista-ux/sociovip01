@@ -12,6 +12,8 @@ interface ImageCarouselProps {
   title?: string;
   slogan?: string;
   logoUrl?: string;
+  showOverlay?: boolean;
+  aspectClass?: string;
 }
 
 const SLIDE_DURATION = 5000;
@@ -22,6 +24,8 @@ export function ImageCarousel({
   title = '',
   slogan = '',
   logoUrl,
+  showOverlay = true,
+  aspectClass = 'aspect-[4/3] md:aspect-[16/7]',
 }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animationKey, setAnimationKey] = useState(0);
@@ -54,7 +58,7 @@ export function ImageCarousel({
 
   if (!images || images.length === 0) {
     return (
-      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] md:rounded-xl overflow-hidden bg-muted flex items-center justify-center">
+      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] overflow-hidden bg-muted flex items-center justify-center">
         <Video className="w-12 h-12 text-muted-foreground" />
         <p className="ml-4 text-muted-foreground">No hay imágenes de portada.</p>
       </div>
@@ -63,7 +67,7 @@ export function ImageCarousel({
 
   return (
     <div className="relative w-full h-full px-0">
-      <div className="relative w-full aspect-[4/3] md:aspect-[16/7] md:rounded-2xl overflow-hidden group shadow-2xl">
+      <div className={cn("relative w-full overflow-hidden group shadow-2xl", aspectClass)}>
         {/* Imagen */}
         {images.map((image, index) => (
           <NextImage
@@ -97,33 +101,33 @@ export function ImageCarousel({
           </>
         )}
 
-        {/* Overlay centrado */}
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center bg-black/40 backdrop-blur-[1px] px-4 md:px-8">
-          {logoUrl && (
-            <div className="relative w-20 h-20 md:w-24 md:h-24 mb-6 animate-fade-in-down">
-              <NextImage
-                src={logoUrl}
-                alt="Logo del negocio"
-                fill
-                quality={100}
-                className="object-contain drop-shadow-2xl rounded-lg"
-                sizes="(max-width: 768px) 80px, 96px"
-              />
-            </div>
-          )}
-          <h2 className="text-4xl md:text-6xl font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] tracking-tight animate-fade-in">
-            {title}
-          </h2>
-          {slogan && (
-            <div className="mt-4 flex items-center justify-center">
-                <div className="h-[2px] w-12 bg-white/50 mr-4 rounded-full" />
-                <p className="text-base md:text-xl text-white/90 font-bold uppercase tracking-[0.2em] drop-shadow-md">
-                    {slogan}
-                </p>
-                <div className="h-[2px] w-12 bg-white/50 ml-4 rounded-full" />
-            </div>
-          )}
-        </div>
+        {/* Overlay alineado a la izquierda */}
+        {showOverlay && (
+          <div className="absolute inset-0 z-20 flex flex-col items-start justify-center text-left bg-gradient-to-r from-slate-950/95 via-slate-950/60 to-transparent px-6 sm:px-16 md:px-24 pt-16 sm:pt-0">
+            {slogan && (
+              <span className="font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] text-accent mb-2 sm:mb-3 animate-fade-in-down drop-shadow-md">
+                {slogan}
+              </span>
+            )}
+            <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] tracking-tight animate-fade-in leading-tight max-w-2xl">
+              {title}
+            </h2>
+            <p className="mt-2 sm:mt-4 text-xs sm:text-sm md:text-base text-white/70 max-w-lg font-medium leading-relaxed drop-shadow-sm line-clamp-2 sm:line-clamp-none">
+              Explora las mejores promociones y eventos exclusivos de este prestigioso establecimiento de primer nivel, garantizado por SocioVIP.
+            </p>
+            <button 
+              onClick={() => {
+                const element = document.getElementById("entity-views-tabs");
+                if (element) {
+                  element.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+              className="mt-4 sm:mt-8 border border-white/80 hover:bg-white hover:text-slate-950 text-white rounded-full font-black text-[9px] sm:text-[10px] uppercase tracking-widest px-6 py-2.5 sm:px-8 sm:py-3.5 transition-all duration-300 shadow-lg active:scale-95"
+            >
+              Explorar Experiencias
+            </button>
+          </div>
+        )}
 
         {/* Indicadores de progreso circulares */}
         {images.length > 1 && (

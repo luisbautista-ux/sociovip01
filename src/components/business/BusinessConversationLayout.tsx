@@ -70,7 +70,45 @@ export function BusinessConversationLayout({
   return (
     <div className="flex flex-col h-screen w-full bg-gradient-to-br from-slate-100 via-white to-slate-200 overflow-hidden text-slate-900">
       
-      {/* ── MOBILE HEADER REMOVED (Consolidated into ChatPanel) ── */}
+      {/* ── MOBILE HEADER (Persistent Switcher for Chat, Video, Map) ── */}
+      <div className="md:hidden flex-shrink-0 px-4 py-3 border-b border-slate-200 bg-white/90 backdrop-blur-md flex items-center justify-between z-20">
+        {onBack ? (
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-1 text-slate-500 hover:text-[#053264] transition-colors group"
+          >
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+            <span className="text-xs font-bold uppercase tracking-wider">Volver</span>
+          </button>
+        ) : (
+          <div className="w-10" />
+        )}
+        
+        {/* Mobile Switcher */}
+        <div className="flex bg-slate-100 rounded-full p-1 border border-slate-200">
+          <button 
+            onClick={() => setActivePanel("chat")} 
+            className={cn("p-1.5 rounded-full transition-all", activePanel === "chat" ? "bg-[#053264] text-white shadow-sm" : "text-slate-400")}
+            aria-label="Chat"
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setActivePanel("media")} 
+            className={cn("p-1.5 rounded-full transition-all", activePanel === "media" ? "bg-[#053264] text-white shadow-sm" : "text-slate-400")}
+            aria-label="Exclusive Media"
+          >
+            <Video className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={() => setActivePanel("map")} 
+            className={cn("p-1.5 rounded-full transition-all", activePanel === "map" ? "bg-[#053264] text-white shadow-sm" : "text-slate-400")}
+            aria-label="Location Map"
+          >
+            <Map className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
       {/* ── MAIN 3-COLUMN CONTENT ── */}
       <div className="flex flex-1 min-h-0 relative">

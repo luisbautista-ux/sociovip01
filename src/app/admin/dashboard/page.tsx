@@ -21,6 +21,14 @@ interface MonthlyStat {
   qrCodesUtilized: number; 
 }
 
+interface DemoRequest {
+  id: string;
+  name: string;
+  businessName: string;
+  email: string;
+  createdAt: Date;
+}
+
 type ActivityType = 'new_business' | 'user_login' | 'new_socio_vip' | 'new_qr_client';
 
 interface ActivityItem {
@@ -40,6 +48,7 @@ export default function AdminDashboardPage() {
   });
   const [chartData, setChartData] = useState<MonthlyStat[]>([]);
   const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
+  const [demoRequests, setDemoRequests] = useState<DemoRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -150,6 +159,27 @@ export default function AdminDashboardPage() {
           .slice(0, 5); // Take the most recent 5 across all types
           
       setRecentActivities(sortedActivities);
+      
+      // 4. Fetch recent demo requests
+      try {
+        const demoRequestsSnap = await getDocs(
+          query(collection(db, "demoRequests"), orderBy("createdAt", "desc"), limit(10))
+        );
+        const fetchedDemos: DemoRequest[] = [];
+        demoRequestsSnap.forEach(docSnap => {
+          const data = docSnap.data();
+          fetchedDemos.push({
+            id: docSnap.id,
+            name: data.name || "",
+            businessName: data.businessName || "",
+            email: data.email || "",
+            createdAt: anyToDate(data.createdAt) || new Date()
+          });
+        });
+        setDemoRequests(fetchedDemos);
+      } catch (err) {
+        console.error("Error fetching demo requests in dashboard:", err);
+      }
 
 
     } catch (error: any) {
@@ -244,41 +274,90 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
       
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <History className="h-6 w-6 mr-2 text-primary" />
-            Actividad Reciente del Sistema
-          </CardTitle>
-          <CardDescription>Últimos movimientos en la plataforma.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {recentActivities.length > 0 ? (
-            <div className="space-y-4">
-              {recentActivities.map(activity => (
-                <div key={activity.id} className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                      <activity.icon className="h-5 w-5 text-primary" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <History className="h-6 w-6 mr-2 text-primary" />
+              Actividad Reciente del Sistema
+            </CardTitle>
+            <CardDescription>Últimos movimientos en la plataforma.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentActivities.length > 0 ? (
+              <div className="space-y-4">
+                {recentActivities.map(activity => (
+                  <div key={activity.id} className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                        <activity.icon className="h-5 w-5 text-primary" />
+                      </div>
+                    </div>
+                    <div className="flex-grow">
+                      <p className="text-sm font-medium">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(activity.timestamp, { addSuffix: true, locale: es })}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex-grow">
-                    <p className="text-sm font-medium">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(activity.timestamp, { addSuffix: true, locale: es })}
-                    </p>
+                ))}
+              </div>
+            ) : (
+              <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
+                <Info className="h-12 w-12 text-primary/60 mb-3" />
+                <p className="text-muted-foreground">No hay actividad reciente para mostrar.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <UserPlus className="h-6 w-6 mr-2 text-primary" />
+              Solicitudes de Demos (Leads)
+            </CardTitle>
+            <CardDescription>Negocios interesados en afiliarse desde la Landing.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {demoRequests.length > 0 ? (
+              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                {demoRequests.map(req => (
+                  <div key={req.id} className="flex items-start space-x-4 p-3 rounded-xl hover:bg-muted/50 transition-colors border border-transparent hover:border-slate-100">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Briefcase className="h-5 w-5 text-primary" />
+                      </div>
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-bold text-slate-800 truncate">{req.name}</p>
+                        <span className="text-[10px] text-muted-foreground shrink-0 font-medium">
+                          {formatDistanceToNow(req.createdAt, { addSuffix: true, locale: es })}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-primary truncate mt-0.5">
+                        💼 {req.businessName || "Negocio no especificado"}
+                      </p>
+                      <a 
+                        href={`mailto:${req.email}`}
+                        className="text-xs text-[#0a5cbf] hover:underline flex items-center gap-1 mt-1 font-medium"
+                      >
+                        ✉️ {req.email}
+                      </a>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
-              <Info className="h-12 w-12 text-primary/60 mb-3" />
-              <p className="text-muted-foreground">No hay actividad reciente para mostrar.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="min-h-[150px] flex flex-col items-center justify-center text-center">
+                <Users className="h-12 w-12 text-primary/60 mb-3" />
+                <p className="text-muted-foreground">No hay solicitudes de demos registradas aún.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

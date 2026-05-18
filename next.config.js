@@ -54,10 +54,12 @@ const nextConfig = {
 
   // ✅ Permite que el preview de Firebase Studio se conecte sin bloqueos CORS
   experimental: {
-    allowedDevOrigins: [
-      "https://*.cloudworkstations.dev", // para entornos de Firebase Studio
-      "http://localhost:9002",           // para desarrollo local
-    ],
+    serverActions: {
+      allowedOrigins: [
+        "*.cloudworkstations.dev", // para entornos de Firebase Studio
+        "localhost:9002",           // para desarrollo local
+      ],
+    },
   },
   env: {
     NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
