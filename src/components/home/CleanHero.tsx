@@ -230,7 +230,7 @@ export const CleanHero = ({ onGenerateItinerary, isGenerating, businesses = [] }
                 
                 {/* Traveling glowing worm border in SocioVIP secondary color */}
                 <div 
-                  className="absolute top-1/2 left-1/2 w-[300%] h-[300%] pointer-events-none"
+                  className="absolute top-1/2 left-1/2 w-[200%] aspect-square pointer-events-none"
                   style={{
                     background: "conic-gradient(from 0deg, transparent 0deg, transparent 130deg, #10b981 160deg, #ccffbc 180deg, #10b981 200deg, transparent 230deg, transparent 360deg)",
                     animation: "border-worm-spin 3.5s linear infinite"

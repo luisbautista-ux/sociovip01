@@ -617,7 +617,21 @@ export function BusinessChatPanel({
 
       {/* Input area */}
       <div className="flex-shrink-0 p-3 border-t border-slate-200 bg-white/60 backdrop-blur-md">
-        <div className="flex items-end gap-2 bg-white border border-slate-200 rounded-2xl px-3 py-2 focus-within:border-primary/40 transition-colors shadow-sm">
+        <div className="relative p-[2px] rounded-[18px] overflow-hidden shadow-sm bg-slate-200/50">
+          <style>{`
+            @keyframes border-worm-spin {
+              0% { transform: translate(-50%, -50%) rotate(0deg); }
+              100% { transform: translate(-50%, -50%) rotate(360deg); }
+            }
+          `}</style>
+          <div 
+            className="absolute top-1/2 left-1/2 w-[200%] aspect-square pointer-events-none"
+            style={{
+              background: "conic-gradient(from 0deg, transparent 0deg, transparent 130deg, #10b981 160deg, #ccffbc 180deg, #10b981 200deg, transparent 230deg, transparent 360deg)",
+              animation: "border-worm-spin 3.5s linear infinite"
+            }}
+          />
+          <div className="relative z-10 flex items-end gap-2 bg-white rounded-[16px] px-3 py-2 w-full h-full">
           <button
             onClick={() => toast({
               title: "Próximamente",
@@ -666,6 +680,7 @@ export function BusinessChatPanel({
           >
             <Send className="w-3.5 h-3.5" />
           </button>
+          </div>
         </div>
         <p className="text-center text-slate-400 text-[10px] mt-2">
           Asistente de {business.name} · Powered by SocioVIP
