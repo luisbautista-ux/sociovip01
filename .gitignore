@@ -46,3 +46,4 @@ firestore-debug.logserviceAccountKey.json
 src/lib/firebase/serviceAccountKey.json
 .idx/
 .idx/
+sociovip-backup.tar.gz

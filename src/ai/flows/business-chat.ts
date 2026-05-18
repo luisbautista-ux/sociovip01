@@ -16,7 +16,7 @@ export type BusinessChatInput = {
 };
 
 export async function chatWithBusiness(input: BusinessChatInput) {
-
+  const GROQ_API_KEY = "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";
 
   // Formateamos los datos para que incluyan el teléfono
   const promoList = input.promotions.map(p => `- [UBICACIÓN: ${(p as any).district}, ${(p as any).province}, ${(p as any).department}] | TIPO: ${(p as any).businessType} | NEGOCIO: "${(p as any).businessName}" | TELÉFONO: ${(p as any).businessPhone || 'No disponible'} | PROMOCIÓN: "${p.name}"`).join('\n');
