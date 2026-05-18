@@ -10,8 +10,6 @@ export type GenerateItineraryOutput = {
 };
 
 export async function generateItinerary(input: GenerateItineraryInput): Promise<GenerateItineraryOutput> {
-  const GROQ_API_KEY = "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";
-
   const prompt = `
 Contexto de negocios disponibles: ${input.contextData}
 
@@ -33,7 +31,7 @@ Instrucciones EXTREMADAMENTE ESTRICTAS para tu respuesta:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_API_KEY}`
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",

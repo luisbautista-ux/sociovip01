@@ -159,11 +159,13 @@ export function BusinessMediaPanel({ businesses }: BusinessMediaPanelProps) {
     });
   });
 
-  if (allMedia.length === 0) {
+  const isConciergeMode = businesses.length === 0 || (businesses.length === 1 && businesses[0].name.includes("Concierge"));
+
+  if (allMedia.length === 0 && !isConciergeMode) {
     allMedia.push({ 
       type: 'image', 
       url: "https://images.unsplash.com/photo-1514525253361-bee8a48740ad?auto=format&fit=crop&q=80",
-      businessName: "SocioVIP Concierge",
+      businessName: "SocioVIP",
       businessLogo: null
     });
   }
@@ -178,7 +180,7 @@ export function BusinessMediaPanel({ businesses }: BusinessMediaPanelProps) {
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">Galería Exclusiva</h2>
         </div>
 
-        {businesses.length === 1 && businesses[0].name.includes("Concierge") && allMedia.length === 1 && allMedia[0].businessName.includes("Concierge") && (
+        {isConciergeMode && allMedia.length === 0 && (
           <ConciergeIntroCard />
         )}
 
