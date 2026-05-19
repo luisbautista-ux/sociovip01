@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { SocioVipLogo } from "@/components/icons";
-import { Facebook, Instagram, Youtube } from "lucide-react";
+
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -50,17 +50,7 @@ export function LandingFooter() {
             <p className="text-white/60 text-sm leading-relaxed max-w-xs">
               La plataforma de concierge digital que conecta turistas con las mejores experiencias de Perú.
             </p>
-            <div className="flex items-center gap-4 mt-6">
-              <a href="#" className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Facebook size={16} />
-              </a>
-              <a href="#" className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Instagram size={16} />
-              </a>
-              <a href="#" className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Youtube size={16} />
-              </a>
-            </div>
+
           </div>
 
           {/* Links */}
@@ -94,10 +84,7 @@ export function LandingFooter() {
 
         <div className="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-white/40 text-xs">
           <p>© {new Date().getFullYear()} SOCIO VIP. Todos los derechos reservados.</p>
-          <div className="flex gap-6">
-            <Link href="#" className="hover:text-white transition-colors">Privacidad</Link>
-            <Link href="#" className="hover:text-white transition-colors">Términos</Link>
-          </div>
+
         </div>
       </div>
     </footer>

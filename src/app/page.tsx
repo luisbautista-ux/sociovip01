@@ -408,10 +408,19 @@ export default function HomePage() {
                 <h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Nuestras Experiencias</h2>
                 <div className="w-20 h-1 bg-[#053264] rounded-full" />
                 <p className="mt-4 text-slate-500 font-medium">Descubre las marcas y locales más exclusivos de SocioVIP.</p>
-                <Link href="/landing" className="mt-3 inline-flex items-center text-xs font-black uppercase tracking-widest text-[#053264] hover:text-[#053264]/80 transition-all group border-b border-[#053264]/30 pb-0.5 hover:border-[#053264] w-fit">
-                  <span>¿Quieres afiliar tu negocio?</span>
-                  <Sparkles className="ml-1.5 h-3.5 w-3.5 text-secondary group-hover:rotate-12 transition-transform" />
-                </Link>
+                <div className="mt-10 animate-bounce relative group">
+                  {/* Smoke effect background */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-[#053264] via-[#0a5cbb] to-[#053264] rounded-full blur-lg opacity-40 group-hover:opacity-70 animate-pulse transition-opacity duration-500" />
+                  
+                  <Link href="/landing" className="relative inline-flex items-center justify-center px-8 py-4 rounded-full bg-gradient-to-r from-[#053264] to-[#0a5cbb] text-white font-black text-xs sm:text-sm uppercase tracking-widest shadow-[0_0_20px_rgba(5,50,100,0.5)] transition-all overflow-hidden border border-white/10 hover:scale-105 duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#10b981] to-[#ccffbc] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    <span className="relative z-10 flex items-center gap-2 group-hover:text-[#053264] transition-colors duration-300">
+                      <Building className="h-4 w-4" />
+                      ¿Quieres que tu negocio aparezca aquí?
+                      <Sparkles className="h-4 w-4 text-[#ccffbc] group-hover:text-[#053264] transition-colors duration-300" />
+                    </span>
+                  </Link>
+                </div>
               </div>
               {businesses.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">

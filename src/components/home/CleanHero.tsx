@@ -216,7 +216,7 @@ export const CleanHero = ({ onGenerateItinerary, isGenerating, businesses = [] }
             <h1 className="text-[2.8rem] sm:text-6xl lg:text-5xl xl:text-7xl font-black text-[#053264] tracking-tighter leading-[0.95] mt-8 lg:mt-12">
               Tus experiencias. <br />
               Planeadas en <br />
-              <span className="text-[#053264] italic">minutos.</span>
+              <span className="text-[#053264] italic">segundos.</span>
             </h1>
 
             <div className="w-full">
@@ -244,13 +244,12 @@ export const CleanHero = ({ onGenerateItinerary, isGenerating, businesses = [] }
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
-                      placeholder="Hola, soy tu concierge SocioVIP..."
+                      placeholder="Cuéntame, ¿qué plan tienes en mente?..."
                       rows={2}
                       className="w-full bg-transparent border-none focus:ring-0 text-[#053264] text-base sm:text-lg font-medium placeholder:text-slate-300 resize-none outline-none leading-relaxed"
                     />
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 text-slate-300">
-                        <button type="button" className="hover:text-[#053264] transition-all"><Paperclip size={18} /></button>
                         <button type="button" onClick={toggleListening} className={cn("p-1.5 rounded-full transition-all", isListening ? "text-red-500 bg-red-50" : "hover:text-[#053264]")}>
                           <Mic size={18} className={cn(isListening && "animate-pulse")} />
                         </button>

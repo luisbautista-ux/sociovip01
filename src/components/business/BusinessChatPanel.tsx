@@ -632,22 +632,12 @@ export function BusinessChatPanel({
             }}
           />
           <div className="relative z-10 flex items-end gap-2 bg-white rounded-[16px] px-3 py-2 w-full h-full">
-          <button
-            onClick={() => toast({
-              title: "Próximamente",
-              description: "La funcionalidad de adjuntar archivos estará disponible muy pronto.",
-            })}
-            className="flex-shrink-0 p-1 text-slate-400 hover:text-primary transition-colors"
-            title="Adjuntar"
-          >
-            <Paperclip className="w-4 h-4" />
-          </button>
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Pregunta cualquier cosa..."
+            placeholder="Cuéntame, ¿qué plan tienes en mente?..."
             rows={1}
             className="flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 text-sm resize-none outline-none max-h-28 min-h-[20px] leading-5 py-0"
             style={{ height: "auto" }}
