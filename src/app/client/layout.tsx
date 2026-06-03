@@ -150,8 +150,13 @@ export default function ClientLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-loader">
         <div className="flex flex-col items-center justify-center text-center">
-            <div className="relative p-1 rounded-xl shadow-2xl bg-white/95 animate-drop-in animate-float mb-6">
-                <SocioVipLogo size={300} />
+            <div className="mb-6 max-w-[85vw] animate-drop-in animate-float">
+                <SocioVipLogo 
+                  size={180} 
+                  variant="pill" 
+                  pillPadding="py-0 px-[1.5%]" 
+                  className="!aspect-[1.6/1] !h-auto object-fill border-[1px] border-white/95 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.3)] drop-shadow-lg" 
+                />
             </div>
             <p className="mt-4 text-lg text-white/90">Verificando y cargando...</p>
         </div>

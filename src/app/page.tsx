@@ -341,6 +341,7 @@ export default function HomePage() {
           business={featuredBusiness as any}
           promotions={promotions}
           events={events}
+          businesses={businesses}
           initialMessages={initialChatHistory}
           onBack={() => { setIsConversationView(false); setInitialChatHistory([]); }}
         />

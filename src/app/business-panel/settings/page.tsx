@@ -249,9 +249,11 @@ export default function BusinessSettingsPage() {
         return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     const contactEmailClean = contactEmail.trim().toLowerCase();
-    if (contactEmailClean && !contactEmailClean.endsWith("@gmail.com")) {
-        toast({ title: "Email Inválido", description: "El Email de Contacto del Negocio debe terminar en @gmail.com", variant: "destructive" });
+    if (contactEmailClean && !emailRegex.test(contactEmailClean)) {
+        toast({ title: "Email Inválido", description: "Por favor, ingresa un Email de Contacto válido.", variant: "destructive" });
         return;
     }
 
@@ -262,8 +264,8 @@ export default function BusinessSettingsPage() {
     }
 
     const publicEmailClean = publicContactEmail.trim().toLowerCase();
-    if (publicEmailClean && !publicEmailClean.endsWith("@gmail.com")) {
-        toast({ title: "Email Público Inválido", description: "El Email Público de Contacto debe terminar en @gmail.com", variant: "destructive" });
+    if (publicEmailClean && !emailRegex.test(publicEmailClean)) {
+        toast({ title: "Email Público Inválido", description: "Por favor, ingresa un Email Público de Contacto de formato válido.", variant: "destructive" });
         return;
     }
 

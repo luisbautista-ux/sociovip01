@@ -19,6 +19,7 @@ interface BusinessConversationLayoutProps {
   business: Business; // El negocio inicial (o el Concierge)
   promotions: BusinessManagedEntity[];
   events: BusinessManagedEntity[];
+  businesses?: Business[];
   initialMessages?: { role: "user" | "assistant"; content: string }[];
   onBack?: () => void;
 }
@@ -27,6 +28,7 @@ export function BusinessConversationLayout({
   business: initialBusiness,
   promotions,
   events,
+  businesses = [],
   initialMessages = [],
   onBack,
 }: BusinessConversationLayoutProps) {
@@ -42,6 +44,7 @@ export function BusinessConversationLayout({
     const matchedBusinesses: Business[] = [];
     
     ids.forEach(id => {
+      // Intentamos buscar primero en las entidades activas
       const entity = allEntities.find(e => e.businessId === id);
       if (entity) {
         matchedBusinesses.push({
@@ -57,6 +60,24 @@ export function BusinessConversationLayout({
           publicImageUrls: (entity as any).businessImageUrls || [entity.imageUrl].filter(Boolean),
           customUrlPath: (entity as any).businessCustomUrlPath || null,
         } as any);
+      } else {
+        // Si no hay entidad activa, buscamos en los negocios registrados en general
+        const biz = businesses.find(b => b.id === id);
+        if (biz) {
+          matchedBusinesses.push({
+            id: biz.id,
+            name: biz.name || "Negocio",
+            logoUrl: biz.logoUrl,
+            publicVideoUrls: biz.publicVideoUrls || [],
+            publicAddress: biz.publicAddress || biz.address || "Perú",
+            province: biz.province || "",
+            district: biz.district || "",
+            department: biz.department || "",
+            businessType: biz.businessType || "Local",
+            publicImageUrls: biz.publicCoverImageUrls || [],
+            customUrlPath: biz.customUrlPath || null,
+          } as any);
+        }
       }
     });
 
@@ -123,6 +144,7 @@ export function BusinessConversationLayout({
             business={currentBusiness} 
             promotions={promotions} 
             events={events} 
+            businesses={businesses}
             initialHistory={initialMessages}
             onBusinessDetected={handleBusinessChange}
             onBack={onBack}

@@ -22,6 +22,7 @@ interface BusinessChatPanelProps {
   business: Business;
   promotions: BusinessManagedEntity[];
   events: BusinessManagedEntity[];
+  businesses?: Business[];
   initialHistory?: { role: "user" | "assistant"; content: string }[];
   onBusinessDetected?: (businessId: string) => void;
   onBack?: () => void;
@@ -267,6 +268,7 @@ export function BusinessChatPanel({
   business, 
   promotions, 
   events, 
+  businesses = [],
   initialHistory = [], 
   onBusinessDetected,
   onBack,
@@ -295,15 +297,13 @@ export function BusinessChatPanel({
     // Detectar si el último mensaje menciona negocios, eventos o promociones (soporta múltiples)
     const lastMsg = messages[messages.length - 1];
     if (lastMsg?.role === "assistant" && onBusinessDetected) {
-      const allEntities = [...promotions, ...events];
-      const contentLower = lastMsg.content.toLowerCase();
-      
-      // Buscamos todos los negocios que coincidan de forma flexible respetando el orden de mención
       const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
       const contentNormalized = normalize(lastMsg.content);
       
       const foundBusinesses: { id: string, index: number }[] = [];
       
+      // 1. Buscar en las promociones y eventos activos
+      const allEntities = [...promotions, ...events];
       allEntities.forEach(entity => {
         const bName = (entity as any).businessName;
         const eName = entity.name;
@@ -315,6 +315,16 @@ export function BusinessChatPanel({
         
         if (firstIdx !== -1) {
           foundBusinesses.push({ id: entity.businessId, index: firstIdx });
+        }
+      });
+
+      // 2. Buscar en los negocios registrados en general
+      businesses.forEach(b => {
+        if (b.name && b.id) {
+          const bIdx = contentNormalized.indexOf(normalize(b.name));
+          if (bIdx !== -1) {
+            foundBusinesses.push({ id: b.id, index: bIdx });
+          }
         }
       });
       
@@ -401,13 +411,24 @@ export function BusinessChatPanel({
         district: (e as any).businessDistrict || '',
         department: (e as any).businessDepartment || ''
       }));
+      const cleanBusinesses = (businesses || []).map(b => ({
+        name: b.name,
+        description: b.description || '',
+        businessType: b.businessType || 'Local',
+        businessPhone: b.publicPhone || b.personalPhone || '',
+        province: b.province || '',
+        district: b.district || '',
+        department: b.department || '',
+        publicAddress: b.publicAddress || b.address || ''
+      }));
 
       const response = await chatWithBusiness({
         message: text,
         history: currentHistory.map(m => ({ role: m.role as any, content: m.content })),
         business: { name: business.name, slogan: business.slogan, publicAddress: business.publicAddress },
         promotions: cleanPromotions as any,
-        events: cleanEvents as any
+        events: cleanEvents as any,
+        businesses: cleanBusinesses as any
       });
 
       const assistantMsg: ChatMessage = {

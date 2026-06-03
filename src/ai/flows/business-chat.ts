@@ -13,14 +13,16 @@ export type BusinessChatInput = {
   business: Partial<Business>;
   promotions: BusinessManagedEntity[];
   events: BusinessManagedEntity[];
+  businesses?: Partial<Business>[];
 };
 
 export async function chatWithBusiness(input: BusinessChatInput) {
 
 
-  // Formateamos los datos para que incluyan el teléfono
-  const promoList = input.promotions.map(p => `- [UBICACIÓN: ${(p as any).district}, ${(p as any).province}, ${(p as any).department}] | TIPO: ${(p as any).businessType} | NEGOCIO: "${(p as any).businessName}" | TELÉFONO: ${(p as any).businessPhone || 'No disponible'} | PROMOCIÓN: "${p.name}"`).join('\n');
-  const eventList = input.events.map(e => `- [UBICACIÓN: ${(e as any).district}, ${(e as any).province}, ${(e as any).department}] | TIPO: ${(e as any).businessType} | NEGOCIO: "${(e as any).businessName}" | TELÉFONO: ${(e as any).businessPhone || 'No disponible'} | EVENTO: "${e.name}"`).join('\n');
+  // Formateamos los datos para que incluyan el teléfono y la dirección exacta
+  const promoList = input.promotions.map(p => `- [DIRECCIÓN EXACTA: ${(p as any).locationAddress || 'No especificada'} | UBICACIÓN GENERAL: ${(p as any).district || 'No especificado'}, ${(p as any).province || 'No especificado'}, ${(p as any).department || 'No especificado'}] | TIPO: ${(p as any).businessType} | NEGOCIO: "${(p as any).businessName}" | TELÉFONO: ${(p as any).businessPhone || 'No disponible'} | PROMOCIÓN: "${p.name}"`).join('\n');
+  const eventList = input.events.map(e => `- [DIRECCIÓN EXACTA: ${(e as any).locationAddress || 'No especificada'} | UBICACIÓN GENERAL: ${(e as any).district || 'No especificado'}, ${(e as any).province || 'No especificado'}, ${(e as any).department || 'No especificado'}] | TIPO: ${(e as any).businessType} | NEGOCIO: "${(e as any).businessName}" | TELÉFONO: ${(e as any).businessPhone || 'No disponible'} | EVENTO: "${e.name}"`).join('\n');
+  const businessList = (input.businesses || []).map(b => `- [DIRECCIÓN EXACTA: ${(b as any).publicAddress || 'No especificada'} | UBICACIÓN GENERAL: ${(b as any).district || 'No especificado'}, ${(b as any).province || 'No especificado'}, ${(b as any).department || 'No especificado'}] | TIPO: ${(b as any).businessType || 'Local'} | NEGOCIO: "${b.name}" | TELÉFONO: ${(b as any).businessPhone || 'No disponible'} | DESCRIPCIÓN: "${(b as any).description || ''}"`).join('\n');
 
   const systemPrompt = `
 Eres el AGENTE SOCIOVIP, un concierge de lujo experto en experiencias de alto nivel.
@@ -61,13 +63,25 @@ DEBES RESPONDER ÚNICAMENTE EN FORMATO JSON VÁLIDO:
 REGLAS DE DISEÑO DE RESPUESTA:
 1. SUGERENCIAS: Crea EXACTAMENTE entre 2 y 4 sugerencias cortas que correspondan a las opciones del paso actual.
 2. CERO "LORO": No repitas lo que el usuario acaba de decir.
-3. VENDE LA EXPERIENCIA: Una vez completados los 4 pasos, cuando recomiendes, menciona atractivamente el evento o promoción oficial.
-4. TAXIS Y TRANSPORTE: Solo recomiéndalos según la lógica de ubicación (Chincha vs Otros Departamentos) una vez terminado el perfilamiento.
-5. GEOGRAFÍA: Sunampe, Grocio Prado, Pueblo Nuevo son parte de CHINCHA.
+3. VENDE LA EXPERIENCIA: Una vez completados los 4 pasos:
+   - Identifica la ubicación del usuario (ej. Chincha o sus distritos).
+   - Busca en "DATOS OFICIALES DE NEGOCIOS" y en "NEGOCIOS REGISTRADOS EN SOCIOVIP" los negocios que coincidan con la ubicación del usuario.
+   - Si existen promociones o eventos oficiales activos en la sección "DATOS OFICIALES DE NEGOCIOS" para esa ubicación, recomiéndalos primero de forma atractiva.
+   - Si no hay promociones/eventos activos para esa ubicación, o adicionalmente a ellos, recomienda de forma elegante y atractiva los negocios locales registrados de la sección "NEGOCIOS REGISTRADOS EN SOCIOVIP" que correspondan a dicha ubicación. Menciona siempre el nombre del negocio registrado explícitamente.
+   - Si no hay absolutamente ningún negocio registrado en la ubicación del usuario, debes explicarle de manera muy educada y elegante que en este momento no contamos con socios registrados en esa zona específica, y sugerirle explorar otras zonas cercanas disponibles.
+4. PROHIBICIÓN ABSOLUTA DE NEGOCIOS NO REGISTRADOS (REGLA CRÍTICA):
+   - Está COMPLETAMENTE PROHIBIDO inventar, alucinar, sugerir, mencionar o recomendar cualquier negocio, hotel, resort, restaurante, bar, club, o atractivo turístico que NO esté explícitamente listado en las secciones "DATOS OFICIALES DE NEGOCIOS" o "NEGOCIOS REGISTRADOS EN SOCIOVIP" de este prompt.
+   - No menciones actividades genéricas como "un resort de lujo con spa y golf" o "degustación de vinos" si no están asociadas directamente a un negocio que figure en la lista con su nombre comercial (por ejemplo: recomendar "Casa Hacienda San José" para hospedaje o "Tabernero" / "Viña Vieja" / "Descorchados" / "Amador Ballumbrosio" para experiencias y degustaciones en Chincha). Todo lo recomendado debe estar vinculado a un negocio registrado real de la lista.
+5. TAXIS Y TRANSPORTE: Solo recomiéndalos según la lógica de ubicación (Chincha vs Otros Departamentos) una vez terminado el perfilamiento.
+6. GEOGRAFÍA: Chincha Alta, Chincha Baja, Sunampe, Grocio Prado, Pueblo Nuevo, El Carmen, Tambo de Mora, Alto Larán son distritos de la provincia de CHINCHA, departamento de ICA. Cualquier negocio en estos distritos está en CHINCHA.
+7. DIRECCIÓN EXACTA: Cuando el usuario solicite explícitamente la ubicación o dirección exacta de un negocio (ej: "necesito la ubicación exacta", "dónde queda exactamente"), DEBES proporcionarle obligatoriamente el valor del campo "DIRECCIÓN EXACTA" que figura en su respectivo registro en "NEGOCIOS REGISTRADOS EN SOCIOVIP" o "DATOS OFICIALES DE NEGOCIOS" (por ejemplo: "Cal. Carrizo Nro. Sn Bar. Porvenir..."), en lugar de solo mencionar el distrito, provincia o departamento.
 
 DATOS OFICIALES DE NEGOCIOS:
 ${promoList}
 ${eventList}
+
+NEGOCIOS REGISTRADOS EN SOCIOVIP:
+${businessList}
   `;
 
   const messages = [

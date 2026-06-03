@@ -225,22 +225,22 @@ export default function PilotPage() {
           </div>
           
           {type === 'loyalty' && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor={`threshold-${type}`} className="whitespace-nowrap">Cuando el cliente complete</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor={`threshold-${type}`}>Cuando el cliente complete</Label>
               <Input id={`threshold-${type}`} type="number" value={rule?.threshold || 5} onChange={e => handleRuleChange(type, 'threshold', Number(e.target.value))} className="w-20" min="1"/>
               <Label htmlFor={`threshold-${type}`}>visitas, enviarle:</Label>
             </div>
           )}
           {type === 'retention' && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor={`threshold-${type}`} className="whitespace-nowrap">Si el cliente lleva más de</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor={`threshold-${type}`}>Si el cliente lleva más de</Label>
               <Input id={`threshold-${type}`} type="number" value={rule?.threshold || 60} onChange={e => handleRuleChange(type, 'threshold', Number(e.target.value))} className="w-20" min="1"/>
               <Label htmlFor={`threshold-${type}`}>días sin volver, enviarle:</Label>
             </div>
           )}
           {type === 'birthday' && (
-             <div className="flex items-center gap-2">
-              <Label htmlFor={`threshold-${type}`} className="whitespace-nowrap">A los clientes que cumplen años en</Label>
+             <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor={`threshold-${type}`}>A los clientes que cumplen años en</Label>
               <Select value={String(rule?.threshold || new Date().getMonth() + 1)} onValueChange={(val) => handleRuleChange(type, 'threshold', Number(val))}>
                   <SelectTrigger className="w-[180px]"><SelectValue/></SelectTrigger>
                   <SelectContent>{MESES_DEL_ANO_ES.map((mes, i) => <SelectItem key={i} value={String(i+1)}>{mes}</SelectItem>)}</SelectContent>
@@ -256,14 +256,14 @@ export default function PilotPage() {
             </SelectContent>
           </Select>
         </CardContent>
-        <CardFooter className="flex justify-between items-center">
-            <p className="text-xs text-muted-foreground">Última ejecución: {rule?.lastRun ? anyToDate(rule.lastRun)?.toLocaleString('es-PE') : 'Nunca'}</p>
-            <div>
-              <Button variant="outline" onClick={() => handleSaveRule(type)} disabled={isExecuting !== null || !rule}>
+        <CardFooter className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
+            <p className="text-xs text-muted-foreground text-center sm:text-left">Última ejecución: {rule?.lastRun ? anyToDate(rule.lastRun)?.toLocaleString('es-PE') : 'Nunca'}</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={() => handleSaveRule(type)} disabled={isExecuting !== null || !rule} className="w-full sm:w-auto flex items-center justify-center">
                 {isExecuting === type ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}
                 <span className="ml-2">Guardar Regla</span>
               </Button>
-              <Button onClick={() => executeRule(type)} disabled={isExecuting !== null || !rule?.isEnabled}>
+              <Button onClick={() => executeRule(type)} disabled={isExecuting !== null || !rule?.isEnabled} className="w-full sm:w-auto flex items-center justify-center">
                 {isExecuting === type ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4"/>}
                 <span className="ml-2">Ejecutar Ahora</span>
               </Button>

@@ -274,11 +274,13 @@ export default function MarketingPage() {
           <Card className="bg-muted/30">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Repeat className="h-5 w-5 text-primary"/>Segmentar por Lealtad</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <Label htmlFor="loyalty" className="whitespace-nowrap">Clientes con al menos</Label>
-                    <Input id="loyalty" type="number" value={loyaltyThreshold} onChange={e => setLoyaltyThreshold(Number(e.target.value))} className="w-20" min="1"/>
-                    <Label htmlFor="loyalty">asistencias</Label>
-                    <Button onClick={handleSegmentByLoyalty} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+                    <div className="flex flex-wrap items-center gap-2 flex-grow">
+                      <Label htmlFor="loyalty">Clientes con al menos</Label>
+                      <Input id="loyalty" type="number" value={loyaltyThreshold} onChange={e => setLoyaltyThreshold(Number(e.target.value))} className="w-20" min="1"/>
+                      <Label htmlFor="loyalty">asistencias</Label>
+                    </div>
+                    <Button onClick={handleSegmentByLoyalty} disabled={!!isProcessing || isLoading} className="w-full sm:w-auto">Calcular</Button>
                 </div>
                 {isProcessing === 'loyalty' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
                 {loyalClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{loyalClients.length}</p><p className="text-sm text-muted-foreground">clientes leales encontrados.</p><Button onClick={() => openCampaignModal(loyalClients, `Campaña para ${loyalClients.length} Clientes Leales`, 'loyalty')} className="mt-4"><Send className="mr-2 h-4 w-4"/>Crear Campaña</Button></div>}
@@ -302,11 +304,13 @@ export default function MarketingPage() {
           <Card className="bg-muted/30">
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Moon className="h-5 w-5 text-primary"/>Segmentar por Inactividad</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <Label htmlFor="inactivity" className="whitespace-nowrap">Clientes sin actividad en los últimos</Label>
-                    <Input id="inactivity" type="number" value={inactiveDays} onChange={e => setInactiveDays(Number(e.target.value))} className="w-20" min="30"/>
-                    <Label htmlFor="inactivity">días</Label>
-                    <Button onClick={handleSegmentByInactivity} disabled={!!isProcessing || isLoading} className="ml-auto">Calcular</Button>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+                    <div className="flex flex-wrap items-center gap-2 flex-grow">
+                      <Label htmlFor="inactivity">Clientes sin actividad en los últimos</Label>
+                      <Input id="inactivity" type="number" value={inactiveDays} onChange={e => setInactiveDays(Number(e.target.value))} className="w-20" min="30"/>
+                      <Label htmlFor="inactivity">días</Label>
+                    </div>
+                    <Button onClick={handleSegmentByInactivity} disabled={!!isProcessing || isLoading} className="w-full sm:w-auto">Calcular</Button>
                 </div>
                 {isProcessing === 'inactivity' && <div className="flex items-center text-primary"><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Calculando...</div>}
                 {inactiveClients.length > 0 && <div className="p-4 bg-background rounded-md text-center"><p className="text-3xl font-bold text-primary">{inactiveClients.length}</p><p className="text-sm text-muted-foreground">clientes inactivos encontrados.</p><Button className="mt-4" onClick={() => openCampaignModal(inactiveClients, `Campaña de Reactivación para ${inactiveClients.length} clientes`, 'inactive')}><Send className="mr-2 h-4 w-4"/>Crear Campaña de Reactivación</Button></div>}

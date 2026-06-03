@@ -37,7 +37,7 @@ function Directions({ businesses }: { businesses: Business[] }) {
     if (!routesLibrary || !map) return;
     const renderer = new routesLibrary.DirectionsRenderer({
       map,
-      suppressMarkers: false,
+      suppressMarkers: true,
       polylineOptions: {
         strokeColor: "#8b5cf6",
         strokeWeight: 5,
@@ -78,13 +78,14 @@ function Directions({ businesses }: { businesses: Business[] }) {
   return null;
 }
 
-// Componente para un solo marcador si no hay ruta
-function SingleMarker({ address, name }: { address: string; name: string }) {
+// Componente para un marcador personalizado con logo
+function CustomBusinessMarker({ business, panToMarker = false }: { business: Business; panToMarker?: boolean }) {
   const map = useMap();
   const geocodingLib = useMapsLibrary("geocoding");
   const [coords, setCoords] = useState<google.maps.LatLngLiteral | null>(null);
 
   useEffect(() => {
+    const address = business.publicAddress || business.address;
     if (!geocodingLib || !address) return;
     const geocoder = new geocodingLib.Geocoder();
     geocoder.geocode({ address: address + ", Peru" }, (results, status) => {
@@ -92,17 +93,39 @@ function SingleMarker({ address, name }: { address: string; name: string }) {
         const loc = results[0].geometry.location;
         const newCoords = { lat: loc.lat(), lng: loc.lng() };
         setCoords(newCoords);
-        if (map) {
+        if (panToMarker && map) {
           map.panTo(newCoords);
           map.setZoom(16);
         }
       }
     });
-  }, [geocodingLib, address, map]);
+  }, [geocodingLib, business, map, panToMarker]);
 
   return coords ? (
-    <AdvancedMarker position={coords} title={name}>
-      <Pin background={"#7c3aed"} borderColor={"#ffffff"} glyphColor={"#ffffff"} />
+    <AdvancedMarker position={coords} title={business.name}>
+      <div className="relative group flex flex-col items-center select-none cursor-pointer">
+        {/* Contenedor del Logo */}
+        <div className="w-10 h-10 rounded-full bg-white border-2 border-primary/80 shadow-[0_4px_12px_rgba(5,50,100,0.3)] flex items-center justify-center overflow-hidden transition-all duration-300 group-hover:scale-110 group-hover:border-secondary">
+          {business.logoUrl ? (
+            <img 
+              src={business.logoUrl} 
+              alt={business.name} 
+              className="w-full h-full object-contain p-0.5"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white text-[10px] font-black">
+              {business.name?.substring(0, 2).toUpperCase() || "SV"}
+            </div>
+          )}
+        </div>
+        {/* Puntero */}
+        <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-primary/80 -mt-[1px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.1)] group-hover:border-t-secondary transition-colors" />
+        
+        {/* Etiqueta flotante con nombre */}
+        <div className="absolute top-11 whitespace-nowrap bg-slate-950/90 text-white text-[8px] font-black uppercase tracking-wider py-1 px-2.5 rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-xl pointer-events-none">
+          {business.name}
+        </div>
+      </div>
     </AdvancedMarker>
   ) : null;
 }
@@ -167,9 +190,14 @@ export function BusinessMapGoogle({ businesses, primaryAddress }: { businesses: 
           mapId={"bf50a87347b749ee"}
         >
           {businesses.length > 1 ? (
-            <Directions businesses={businesses} />
+            <>
+              <Directions businesses={businesses} />
+              {businesses.map((b, idx) => (
+                <CustomBusinessMarker key={b.id || idx} business={b} panToMarker={false} />
+              ))}
+            </>
           ) : (
-            <SingleMarker address={primaryAddress || ""} name={businesses[0]?.name || "Destino"} />
+            businesses[0] && <CustomBusinessMarker business={businesses[0]} panToMarker={true} />
           )}
         </Map>
       </APIProvider>

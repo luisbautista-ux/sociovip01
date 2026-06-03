@@ -36,14 +36,14 @@ const businessFormSchemaBase = z.object({
   province: z.string().min(1, "Provincia es requerida."),
   district: z.string().min(1, "Distrito es requerida."),
   address: z.string().min(5, "La dirección debe tener al menos 5 caracteres.").optional().or(z.literal("")),
-  contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }).refine(val => val.toLowerCase().endsWith("@gmail.com"), { message: "El email debe terminar en @gmail.com" }),
+  contactEmail: z.string().email({ message: "Por favor, ingresa un email válido." }),
   managerName: z.string().min(3, "Nombre del gerente es requerido.").optional().or(z.literal("")),
   managerDni: z.string().max(20, "No debe exceder 20 caracteres.").regex(/^\d*$/, "Solo debe contener números.").optional().or(z.literal("")),
   
   logoFile: z.custom<File | null>().optional(),
   publicCoverImageUrls: z.array(z.string().url()).optional(),
   slogan: z.string().max(100, "El slogan no debe exceder 100 caracteres.").optional().or(z.literal("")),
-  publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")).refine(val => !val || val.toLowerCase().endsWith("@gmail.com"), { message: "El email debe terminar en @gmail.com" }),
+  publicContactEmail: z.string().email("Email público de contacto inválido.").optional().or(z.literal("")),
   publicPhone: z.string().regex(/^9\d{8}$/, "El teléfono debe empezar con 9 y tener 9 dígitos.").optional().or(z.literal("")),
   publicAddress: z.string().max(200, "La dirección pública no debe exceder 200 caracteres.").optional().or(z.literal("")),
   customUrlPath: z.string()

@@ -65,6 +65,38 @@ async function getBusinessDetails(businessId: string): Promise<Business | null> 
   }
 }
 
+async function getAllBusinesses(): Promise<Business[]> {
+  try {
+    const snap = await getDocs(collection(db, "businesses"));
+    const list: Business[] = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.name) {
+        list.push({
+          id: docSnap.id,
+          name: data.name,
+          district: data.district || "",
+          province: data.province || "",
+          department: data.department || "",
+          businessType: data.businessType || "Local",
+          publicPhone: data.publicPhone || data.personalPhone || "",
+          description: data.description || "",
+          logoUrl: data.logoUrl || "",
+          publicAddress: data.publicAddress || data.address || "",
+          address: data.address || "",
+          publicCoverImageUrls: data.publicCoverImageUrls || [],
+          publicVideoUrls: data.publicVideoUrls || [],
+          customUrlPath: data.customUrlPath || null,
+        } as Business);
+      }
+    });
+    return list;
+  } catch (error) {
+    console.error("Error fetching all businesses:", error);
+    return [];
+  }
+}
+
 async function getBusinessEntities(
   business: Business
 ): Promise<BusinessManagedEntity[]> {
@@ -133,6 +165,7 @@ export default async function BusinessPublicPage({
 }) {
   const businessDetails = await getBusinessDetails(params.businessId);
   const entities = businessDetails ? await getBusinessEntities(businessDetails) : [];
+  const allBusinesses = await getAllBusinesses();
 
   if (!businessDetails) {
     return (
@@ -159,6 +192,7 @@ export default async function BusinessPublicPage({
       business={businessDetails}
       promotions={promotions}
       events={events}
+      businesses={allBusinesses}
     />
   );
 }
