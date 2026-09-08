@@ -58,6 +58,8 @@ export default function BusinessClientsPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
+  const [birthMonth, setBirthMonth] = useState<string>("all");
+  const [birthYear, setBirthYear] = useState<string>("");
 
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -97,8 +99,23 @@ export default function BusinessClientsPage() {
       
       const searchFilter = nameMatch || dniMatch || phoneMatch;
 
+      let dobMatch = true;
+      if (birthMonth !== "all" || birthYear.trim() !== "") {
+        const dobDate = anyToDate(c.dob);
+        if (!dobDate) {
+          dobMatch = false;
+        } else {
+          if (birthMonth !== "all" && dobDate.getMonth() + 1 !== parseInt(birthMonth)) {
+            dobMatch = false;
+          }
+          if (birthYear.trim() !== "" && dobDate.getFullYear() !== parseInt(birthYear.trim())) {
+            dobMatch = false;
+          }
+        }
+      }
+
       if (!filterDate) {
-        return searchFilter;
+        return searchFilter && dobMatch;
       }
       
       const regDate = anyToDate(c.registrationDate);
@@ -109,9 +126,9 @@ export default function BusinessClientsPage() {
         end: endOfDay(filterDate),
       };
 
-      return searchFilter && isWithinInterval(regDate, interval);
+      return searchFilter && dobMatch && isWithinInterval(regDate, interval);
     });
-  }, [searchTerm, filterDate, qrClients]);
+  }, [searchTerm, filterDate, birthMonth, birthYear, qrClients]);
 
   const totalPages = Math.ceil(filteredClients.length / rowsPerPage);
   
@@ -122,7 +139,7 @@ export default function BusinessClientsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterDate, rowsPerPage]);
+  }, [searchTerm, filterDate, birthMonth, birthYear, rowsPerPage]);
 
 
   const handleExport = async () => {
@@ -219,7 +236,7 @@ export default function BusinessClientsPage() {
           <CardDescription>
             Visualizando todos los clientes que han generado un QR en la plataforma.
           </CardDescription>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -228,6 +245,37 @@ export default function BusinessClientsPage() {
                 className="pl-8 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div>
+              <Select value={birthMonth} onValueChange={setBirthMonth}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Mes de Cumple" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Cualquier mes</SelectItem>
+                  <SelectItem value="1">Enero</SelectItem>
+                  <SelectItem value="2">Febrero</SelectItem>
+                  <SelectItem value="3">Marzo</SelectItem>
+                  <SelectItem value="4">Abril</SelectItem>
+                  <SelectItem value="5">Mayo</SelectItem>
+                  <SelectItem value="6">Junio</SelectItem>
+                  <SelectItem value="7">Julio</SelectItem>
+                  <SelectItem value="8">Agosto</SelectItem>
+                  <SelectItem value="9">Septiembre</SelectItem>
+                  <SelectItem value="10">Octubre</SelectItem>
+                  <SelectItem value="11">Noviembre</SelectItem>
+                  <SelectItem value="12">Diciembre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Input
+                type="number"
+                placeholder="Año Nac. (ej. 1990)"
+                className="w-full"
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
               />
             </div>
              <div>
