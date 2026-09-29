@@ -281,7 +281,7 @@ export default function SignupPage() {
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(handleSignupWithGoogle)} className="space-y-4">
                 <FormField control={signupForm.control} name="dni" render={({ field }) => (
-                  <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} readOnly className="bg-muted cursor-not-allowed font-medium text-foreground opacity-100" /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={signupForm.control} name="name" render={({ field }) => (
@@ -292,7 +292,7 @@ export default function SignupPage() {
                   )}/>
                 </div>
                 <FormField control={signupForm.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="Ingresa tu número celular" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={signupForm.control} name="dob" render={({ field }) => (
                   <FormItem className="flex flex-col">
@@ -321,7 +321,7 @@ export default function SignupPage() {
                 
                 <Button type="button" onClick={handleSignupWithGoogle} className="w-full flex items-center bg-primary text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon className="mr-2 h-5 w-5" />}
-                  Continuar y Registrarse con Google
+                  Continuar y Validar con Google
                 </Button>
               </form>
             </Form>
