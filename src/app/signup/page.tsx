@@ -126,16 +126,22 @@ export default function SignupPage() {
                 const surname = nameParts.length > 2 ? nameParts.slice(-2).join(' ') : nameParts.slice(1).join(' ');
                 const name = nameParts.length > 2 ? nameParts.slice(0, -2).join(' ') : nameParts[0] || '';
 
-                signupForm.setValue('name', name);
-                signupForm.setValue('surname', surname);
-                if (data.phone) signupForm.setValue('phone', data.phone);
-                
+                let dobValue = signupForm.getValues().dob;
                 if (data.fechaNacimiento) {
                     const parsedDate = parse(data.fechaNacimiento, 'dd/MM/yyyy', new Date());
                     if (!isNaN(parsedDate.getTime())) {
-                        signupForm.setValue('dob', parsedDate);
+                        dobValue = parsedDate;
                     }
                 }
+                
+                signupForm.reset({
+                    ...signupForm.getValues(),
+                    dni: docNumber,
+                    name: name,
+                    surname: surname,
+                    phone: data.phone || signupForm.getValues().phone || "",
+                    dob: dobValue
+                });
             } else {
                  signupForm.reset({
                     ...signupForm.getValues(),
@@ -281,7 +287,7 @@ export default function SignupPage() {
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(handleSignupWithGoogle)} className="space-y-4">
                 <FormField control={signupForm.control} name="dni" render={({ field }) => (
-                  <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} readOnly className="bg-muted cursor-not-allowed font-medium text-foreground opacity-100" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} value={field.value || ""} placeholder="Tu número de documento" readOnly className="bg-muted cursor-not-allowed font-medium text-foreground opacity-100" /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={signupForm.control} name="name" render={({ field }) => (
