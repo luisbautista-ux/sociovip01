@@ -4,95 +4,47 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/firebaseAdmin';
 
-// This function is now simplified as we removed the auth check
 async function consultExternalDniApi(
   dni: string
 ): Promise<{ nombreCompleto: string; fechaNacimiento: string | null } | null> {
   try {
-    /* =======================
-       CONSULTA NOMBRES (NO TOCAR)
-    ======================= */
-    const endpointNombres = "https://dniperu.com/wp-admin/admin-ajax.php";
-    const formNombres = new URLSearchParams();
-    formNombres.append('dni4', dni);
-    formNombres.append('action', 'buscar_nombres');
-    formNombres.append('security', 'bb84158dab');
+    const url = `https://api.decolecta.com/v1/reniec/dni?numero=${dni}`;
+    const token = 'sk_19914.4sISqqjJuEH3cwjz15kR0rFEmDI0h2u8'; // Token proporcionado por el usuario
 
-    const responseNombres = await fetch(endpointNombres, {
-      method: 'POST',
+    const response = await fetch(url, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Referer': 'https://dniperu.com/buscar-dni-nombres-apellidos/',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       },
-      body: formNombres.toString(),
     });
 
-    const dataNombres = await responseNombres.json();
-
-    let nombres: string | null = null;
-    let apellidoPaterno: string | null = null;
-    let apellidoMaterno: string | null = null;
-
-    if (dataNombres.success && dataNombres.data?.message) {
-      const lines = dataNombres.data.message.split('\n');
-      lines.forEach((line: string) => {
-        if (line.startsWith("Nombres:"))
-          nombres = line.replace("Nombres:", "").trim();
-        else if (line.startsWith("Apellido Paterno:"))
-          apellidoPaterno = line.replace("Apellido Paterno:", "").trim();
-        else if (line.startsWith("Apellido Materno:"))
-          apellidoMaterno = line.replace("Apellido Materno:", "").trim();
-      });
+    if (!response.ok) {
+      console.error('Error en Decolecta API:', response.status, response.statusText);
+      return null;
     }
 
-    const nombreCompleto = `${nombres || ''} ${apellidoPaterno || ''} ${apellidoMaterno || ''}`
-      .trim()
-      .replace(/\s+/g, ' ');
-      
-    /* =======================
-      CONSULTA FECHA (ACTUALIZADA - nuevo formato JSON directo)
-    ======================= */
-    const endpointFecha = "https://dniperu.com/wp-admin/admin-ajax.php";
-    const formFecha = new URLSearchParams();
-    formFecha.append('dni', dni);
-    formFecha.append('action', 'buscar_fecha');
-    formFecha.append('security', '277566e2f8'); // Este nonce parece seguir funcionando
+    const data = await response.json();
 
-    const responseFecha = await fetch(endpointFecha, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Referer': 'https://dniperu.com/consultas/buscar-fecha-de-nacimiento-con-dni/',
-        // Opcional pero recomendado para simular mejor el navegador
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      body: formFecha.toString(),
-    });
+    if (data && data.first_name) {
+      // El frontend espera el formato "Nombres ApellidoPaterno ApellidoMaterno"
+      // para poder separar correctamente nombre y apellido.
+      const nombreCompleto = `${data.first_name} ${data.first_last_name} ${data.second_last_name}`
+        .trim()
+        .replace(/\s+/g, ' ');
 
-    if (!responseFecha.ok) {
-      console.error('Error en responseFecha:', responseFecha.status);
-      return { nombreCompleto, fechaNacimiento: null };
+      return {
+        nombreCompleto,
+        fechaNacimiento: null // Decolecta no devuelve fecha de nacimiento
+      };
     }
 
-    const dataFecha = await responseFecha.json();
-
-    let fechaNacimiento: string | null = null;
-
-    if (dataFecha.success && dataFecha.data) {
-      // Nuevo formato: campo directo
-      if (dataFecha.data.fechaNacimiento) {
-        fechaNacimiento = dataFecha.data.fechaNacimiento.replace(/\//g, '/'); // limpia los escapes si vienen como 23\/03\/1980
-      }
-      // Opcional: también puedes aprovechar los nombres de aquí si quieres unificar
-      // pero como ya consultas nombres por separado, no es necesario
-    }
-
-        return { nombreCompleto, fechaNacimiento };
-      } catch (e) {
-        console.error("Error fetching from external DNI API in consult-document:", e);
-        return null;
-      }
-    }
+    return null;
+  } catch (e) {
+    console.error("Error fetching from Decolecta DNI API in consult-document:", e);
+    return null;
+  }
+}
 export async function POST(request: Request) {
   try {
     const { dni, docType } = await request.json();
