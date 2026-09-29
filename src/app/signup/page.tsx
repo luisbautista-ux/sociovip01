@@ -295,20 +295,27 @@ export default function SignupPage() {
                   <FormItem><FormLabel>Celular</FormLabel><FormControl><Input type="tel" placeholder="987654321" {...field} disabled={isSubmitting} maxLength={9} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={signupForm.control} name="dob" render={({ field }) => (
-                  <FormItem className="flex flex-col"><FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                            {field.value ? format(field.value, "d 'de' MMMM, yyyy", { locale: es }) : <span>Selecciona tu fecha</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={1920} toYear={new Date().getFullYear() - 18} disabled={(date) => date > new Date(new Date().setFullYear(new Date().getFullYear() - 18))} locale={es} initialFocus />
-                      </PopoverContent>
-                    </Popover><FormMessage />
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Fecha de Nacimiento <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date"
+                        disabled={isSubmitting}
+                        className="w-full bg-white dark:bg-background"
+                        max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]} // Solo mayores de 18
+                        {...field}
+                        value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            // Añadimos T12:00:00 para evitar que la zona horaria reste un día
+                            field.onChange(new Date(e.target.value + 'T12:00:00'));
+                          } else {
+                            field.onChange(undefined);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}/>
                 
