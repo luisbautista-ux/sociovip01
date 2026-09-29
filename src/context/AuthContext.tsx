@@ -263,6 +263,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   const sendPasswordReset = useCallback(async (email: string): Promise<{ success: boolean; error?: AuthError }> => {
     try {
+      auth.languageCode = 'es'; // Forzar el idioma español para el correo
       await sendPasswordResetEmail(auth, email);
       return { success: true };
     } catch (error) {
