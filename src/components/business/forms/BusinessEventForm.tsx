@@ -104,6 +104,71 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     formState: form.formState,
   }));
   
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current || !imgContainerRef.current) return;
+    e.preventDefault();
+    
+    const deltaX = e.clientX - dragStart.current.x;
+    const deltaY = e.clientY - dragStart.current.y;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    
+    setObjectPosition(prev => {
+      const parts = prev.split(' ');
+      let x = parseFloat(parts[0]);
+      let y = parseFloat(parts[1]);
+      if (isNaN(x)) x = 50;
+      if (isNaN(y)) y = 50;
+      
+      const rect = imgContainerRef.current!.getBoundingClientRect();
+      // Sensibilidad del arrastre ajustada (2x) para que se sienta más responsivo
+      const percentX = (deltaX / rect.width) * 200;
+      const percentY = (deltaY / rect.height) * 200;
+      
+      x = Math.max(0, Math.min(100, x - percentX));
+      y = Math.max(0, Math.min(100, y - percentY));
+      
+      return `${Math.round(x)}% ${Math.round(y)}%`;
+    });
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    isDragging.current = true;
+    dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current || !imgContainerRef.current) return;
+    
+    const deltaX = e.touches[0].clientX - dragStart.current.x;
+    const deltaY = e.touches[0].clientY - dragStart.current.y;
+    dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    
+    setObjectPosition(prev => {
+      const parts = prev.split(' ');
+      let x = parseFloat(parts[0]) || 50;
+      let y = parseFloat(parts[1]) || 50;
+      
+      const rect = imgContainerRef.current!.getBoundingClientRect();
+      const percentX = (deltaX / rect.width) * 200;
+      const percentY = (deltaY / rect.height) * 200;
+      
+      x = Math.max(0, Math.min(100, x - percentX));
+      y = Math.max(0, Math.min(100, y - percentY));
+      
+      return `${Math.round(x)}% ${Math.round(y)}%`;
+    });
+  };
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -120,9 +185,19 @@ export const BusinessEventForm = React.forwardRef<EventDetailsFormRef, BusinessE
     <Form {...form}>
       <form className="space-y-6 overflow-y-auto px-1 py-1">
         <div className="space-y-4">
-          <div ref={imgContainerRef} className="relative aspect-video rounded-md border bg-muted overflow-hidden cursor-move">
+          <div 
+            ref={imgContainerRef} 
+            className="relative aspect-video rounded-md border bg-muted overflow-hidden cursor-move select-none"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleMouseUp}
+          >
             {imagePreviewUrl ? (
-              <img src={imagePreviewUrl} className="object-cover w-full h-full" style={{ objectPosition }} />
+              <img draggable={false} src={imagePreviewUrl} className="object-cover w-full h-full pointer-events-none" style={{ objectPosition }} />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground"><ImageIcon size={40} /><span className="text-xs">Sin imagen</span></div>
             )}
