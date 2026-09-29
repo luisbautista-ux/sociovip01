@@ -4,6 +4,34 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
 
+export const metadata: Metadata = {
+  metadataBase: new URL('https://sociovip.pe'),
+  title: "SocioVIP - Experiencias Exclusivas",
+  description: "Descubre las mejores promociones y eventos exclusivos en tu ciudad con SocioVIP.",
+  openGraph: {
+    title: "SocioVIP - Experiencias Exclusivas",
+    description: "Descubre las mejores promociones y eventos exclusivos en tu ciudad con SocioVIP.",
+    url: "https://sociovip.pe",
+    siteName: "SocioVIP",
+    images: [
+      {
+        url: "/og-image.png", // Next.js automatically resolves this against metadataBase
+        width: 1200,
+        height: 630,
+        alt: "SocioVIP Preview",
+      },
+    ],
+    locale: "es_PE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SocioVIP - Experiencias Exclusivas",
+    description: "Descubre las mejores promociones y eventos exclusivos en tu ciudad con SocioVIP.",
+    images: ["/og-image.png"],
+  },
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
