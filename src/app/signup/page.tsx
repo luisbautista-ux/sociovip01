@@ -286,8 +286,14 @@ export default function SignupPage() {
           <div className="w-full max-w-md mx-auto">
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(handleSignupWithGoogle)} className="space-y-4">
-                <FormField control={signupForm.control} name="dni" render={({ field }) => (
-                  <FormItem><FormLabel>DNI/CE</FormLabel><FormControl><Input {...field} value={field.value || ""} placeholder="Tu número de documento" readOnly className="bg-muted cursor-not-allowed font-medium text-foreground opacity-100" /></FormControl><FormMessage /></FormItem>
+                <FormField control={signupForm.control} name="dni" render={() => (
+                  <FormItem>
+                    <FormLabel>DNI/CE</FormLabel>
+                    <FormControl>
+                      <Input value={signupForm.watch('dni')} placeholder="Cargando documento..." readOnly className="bg-muted cursor-not-allowed font-medium text-foreground opacity-100" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}/>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={signupForm.control} name="name" render={({ field }) => (
