@@ -217,7 +217,7 @@ export default function BusinessPublicPageClient({ customUrlPath }: { customUrlP
   const [allEvents, setAllEvents] = useState<BusinessManagedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<'description' | 'promotions' | 'events' | 'gallery'>('description');
+  const [view, setView] = useState<'description' | 'promotions' | 'events' | 'gallery'>('events');
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const [pageViewState, setPageViewState] = useState<"entityList" | "qrDisplay">("entityList");
