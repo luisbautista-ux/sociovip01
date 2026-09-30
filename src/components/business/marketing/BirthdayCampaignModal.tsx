@@ -107,8 +107,8 @@ export function CampaignCreationModal({
         setTimeout(() => {
             const giftName = getGiftName();
             const businessLink = businessDetails?.customUrlPath
-              ? `https://sociovip.app/${businessDetails.customUrlPath}`
-              : `https://sociovip.app`;
+              ? `https://sociovip.pe/${businessDetails.customUrlPath}`
+              : `https://sociovip.pe`;
 
             let messages: string[];
 

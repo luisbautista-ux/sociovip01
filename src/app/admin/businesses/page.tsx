@@ -109,7 +109,7 @@ export default function AdminBusinessesPage() {
       biz.joinDate ? format(parseISO(biz.joinDate as string), "dd/MM/yyyy", { locale: es }) : 'N/A',
       biz.businessType || "N/A", biz.department || "N/A", biz.province || "N/A", biz.district || "N/A", biz.address || "N/A",
       biz.managerName || "N/A", `'${biz.managerDni || "N/A"}`, 
-      biz.customUrlPath ? `sociovip.app/${biz.customUrlPath}` : `sociovip.app/business/${biz.id}`,
+      biz.customUrlPath ? `sociovip.pe/${biz.customUrlPath}` : `sociovip.pe/business/${biz.id}`,
       biz.logoUrl || "N/A", (biz.publicCoverImageUrls || []).join(', '), biz.slogan || "N/A",
       biz.publicContactEmail || "N/A", `'${biz.publicPhone || "N/A"}`, biz.publicAddress || "N/A",
     ].map(cell => `"${String(cell || '').replace(/"/g, '""')}"`));
@@ -320,7 +320,7 @@ export default function AdminBusinessesPage() {
                         <div className="flex justify-between items-start">
                           <span className="text-muted-foreground">URL Pública</span>
                           <Link href={publicLink} target="_blank" className="font-semibold text-primary hover:underline text-xs flex items-center text-right break-all">
-                              {`sociovip.app${publicLink}`} <ExternalLink className="ml-1 h-3 w-3 flex-shrink-0" />
+                              {`sociovip.pe${publicLink}`} <ExternalLink className="ml-1 h-3 w-3 flex-shrink-0" />
                           </Link>
                         </div>
                       </CardContent>
@@ -375,7 +375,7 @@ export default function AdminBusinessesPage() {
                           ? `/${biz.customUrlPath.trim()}`
                           : `/business/${biz.id}`;
                         const displayUrl = biz.customUrlPath && biz.customUrlPath.trim() !== ""
-                          ? `sociovip.app/${biz.customUrlPath.trim()}`
+                          ? `sociovip.pe/${biz.customUrlPath.trim()}`
                           : `.../${biz.id.substring(0, 10)}...`;
 
                         return (

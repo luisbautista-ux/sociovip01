@@ -7,7 +7,7 @@ export async function generateMetadata({ params }: { params: { customUrlPath: st
   const customUrlPath = params.customUrlPath.toLowerCase().trim();
   let businessName = "SocioVIP - Negocio";
   let businessDescription = "Descubre las mejores promociones y eventos de este negocio.";
-  let logoUrl = "https://sociovip.pe/og-image.jpg"; // Default fallback
+  let logoUrl = "https://sociovip.pe/og-imagen.jpg"; // Default fallback
 
   try {
     const adminDb = admin.firestore();

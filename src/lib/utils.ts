@@ -141,8 +141,8 @@ export const generateCodesPDF = async (
       doc.text(`Entrada #${page * codesPerPage + i + 1}`, x + cellWidth / 2, y + 12, { align: "center" });
 
       const businessUrl = businessDetails.customUrlPath
-        ? `https://sociovip.app/${businessDetails.customUrlPath}`
-        : `https://sociovip.app/business/${entity.businessId}`;
+        ? `https://sociovip.pe/${businessDetails.customUrlPath}`
+        : `https://sociovip.pe/business/${entity.businessId}`;
         
       const qrSize = cellWidth * 0.7;
       const qrCodeDataUrl = await QRCode.toDataURL(businessUrl, { errorCorrectionLevel: "H", width: qrSize, margin: 1 });

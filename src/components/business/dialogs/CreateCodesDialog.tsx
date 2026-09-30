@@ -191,8 +191,8 @@ export function CreateCodesDialog({
     if (justCreatedCodes.length === 0 || !businessDetails || !entity) return;
     
     const businessUrl = businessDetails.customUrlPath
-      ? `https://sociovip.app/${businessDetails.customUrlPath}`
-      : `https://sociovip.app/business/${entity?.businessId}`;
+      ? `https://sociovip.pe/${businessDetails.customUrlPath}`
+      : `https://sociovip.pe/business/${entity?.businessId}`;
 
     generateCodesPDF(justCreatedCodes, businessDetails, entity);
   };

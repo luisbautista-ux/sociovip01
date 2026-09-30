@@ -588,7 +588,7 @@ export default function BusinessSettingsPage() {
             <div className="space-y-2">
               <Label htmlFor="customUrlPath" className="flex items-center gap-2"><LinkIcon className="h-4 w-4 text-muted-foreground"/> Ruta URL Personalizada (Slug)</Label>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground hidden sm:inline">sociovip.app/</span>
+                <span className="text-sm text-muted-foreground hidden sm:inline">sociovip.pe/</span>
                 <Input id="customUrlPath" value={customUrlPath} onChange={(e) => setCustomUrlPath(e.target.value)} disabled={isSaving} placeholder="mi-negocio" />
               </div>
             </div>

@@ -27,7 +27,7 @@ function createHtmlBody(
     businessLogoUrl?: string, 
     primaryColor: string = '#8E5EA2', 
     secondaryColor: string = '#B080D0',
-    businessUrl: string = 'https://sociovip.app'
+    businessUrl: string = 'https://sociovip.pe'
 ): string {
     const finalBody = messageBody.replace(/\n/g, '<br>');
     const gifUrl = "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjlnanA4cGhidjNocDBlOGRyZXJzN2NnbmRtNzUzaXZiM2Y3dWI2ciZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5piDYylE9mTtri4E2E/giphy.gif";
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
             const personalizedBody = body.replace(/\[Nombre\]/g, clientName);
             const personalizedSubject = subject.replace(/\[Nombre\]/g, clientName);
             
-            const businessUrl = businessData.customUrlPath ? `https://sociovip.app/${businessData.customUrlPath}` : 'https://sociovip.app';
+            const businessUrl = businessData.customUrlPath ? `https://sociovip.pe/${businessData.customUrlPath}` : 'https://sociovip.pe';
             const htmlBody = createHtmlBody(personalizedBody, businessData.name, businessData.logoUrl, businessData.primaryColor, businessData.secondaryColor, businessUrl);
 
             const fromHeader = `"${businessData.name}" <${senderEmail}>`;

@@ -919,7 +919,7 @@ const checkDniExists = async (dniToVerify: string): Promise<CheckDniResult> => {
                     <p>Para asignarle un rol de plataforma (admin, staff, etc.), el usuario primero debe tener una cuenta personal en SocioVIP.</p>
                     <div className="bg-muted p-3 rounded-md text-center">
                         <p className="text-sm font-semibold">Indícale al usuario que se registre en:</p>
-                        <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.app/signup</a>
+                        <a href="/signup" target="_blank" className="text-primary font-bold underline">sociovip.pe/signup</a>
                         <p className="text-xs text-muted-foreground mt-1">Una vez registrado, podrás buscar su DNI aquí para asignarle un rol.</p>
                     </div>
                 </ShadcnAlertDialogDescription>
