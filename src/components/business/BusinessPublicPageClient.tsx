@@ -853,8 +853,8 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             control={form.control}
             name="specificCode"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel htmlFor={`specificCode-${entity.id}`} className="text-xs text-muted-foreground">
+              <FormItem className="text-center">
+                <FormLabel htmlFor={`specificCode-${entity.id}`} className="text-xs text-muted-foreground text-center w-full block">
                   Código Alfanumérico (9 dígitos) <span className="text-destructive">*</span>
                 </FormLabel>
                 <FormControl>
@@ -864,11 +864,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                     {...field}
                     onChange={(e) => field.onChange(normalizeCode(e.target.value))}
                     maxLength={9}
-                    className="text-sm h-9 w-full focus-visible:ring-offset-0 transition-all border-2"
+                    className="text-sm h-9 w-full text-center focus-visible:ring-offset-0 transition-all border-2 mx-auto"
                     disabled={isLoadingQrFlow}
                   />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-center" />
               </FormItem>
             )}
           />
@@ -877,7 +877,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             size="sm"
             className="w-full h-9 text-white font-bold transition-all hover:scale-105 active:scale-95"
             style={{
-                backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#053264'}, ${businessDetails?.secondaryColor || '#ccffbc'})`
+                backgroundColor: businessDetails?.primaryColor || '#053264'
             }}
             disabled={isLoadingQrFlow}
           >
