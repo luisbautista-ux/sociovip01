@@ -847,7 +847,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit((data) => handleSpecificCodeSubmit(entity, data.specificCode))}
-          className="space-y-2 mt-2"
+          className="space-y-2 mt-2 w-full max-w-xs mx-auto flex flex-col items-center"
         >
           <FormField
             control={form.control}
@@ -872,6 +872,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
               </FormItem>
             )}
           />
+          <div className="w-full pt-1">
           <Button
             type="submit"
             size="sm"
@@ -884,6 +885,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
             {isLoadingQrFlow ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : (isEvent ? <Calendar className="h-4 w-4 mr-2" /> : <QrCodeIcon className="h-4 w-4 mr-2" />)}
             {isEvent ? "Obtener Entrada" : "Generar QR"}
           </Button>
+          </div>
         </form>
       </Form>
     );
@@ -1277,7 +1279,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                                 Hasta el {format(parseISO(promo.endDate), "dd MMMM, yyyy", { locale: es })}
                                             </p>
                                         </CardContent>
-                                        <CardFooter className="flex-col items-start p-6 border-t border-slate-100 bg-slate-50/50"><SpecificCodeEntryForm entity={promo} /></CardFooter>
+                                        <CardFooter className="flex-col items-center p-6 border-t border-slate-100 bg-slate-50/50 w-full"><SpecificCodeEntryForm entity={promo} /></CardFooter>
                                         </Card>
                                     </ScrollReveal>
                                 ))}
@@ -1334,7 +1336,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                                             </div>
                                         </CardContent>
                                         {isEntityCurrentlyActivatable(event) ? (
-                                            <CardFooter className="flex-col items-start p-6 border-t bg-muted/5">
+                                            <CardFooter className="flex-col items-center p-6 border-t bg-muted/5 w-full">
                                                 {event.isPublicAccess ? (
                                                     <Button onClick={() => handlePublicAccessSubmit(event)} className="w-full h-10 text-white font-bold shadow-lg transition-all hover:scale-105" style={{backgroundImage: `linear-gradient(to right, ${businessDetails?.primaryColor || '#053264'}, ${businessDetails?.secondaryColor || '#ccffbc'})`}}>
                                                         <QrCodeIcon className="mr-2 h-4 w-4"/> Generar Entrada QR
