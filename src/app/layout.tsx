@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     siteName: "SocioVIP",
     images: [
       {
-        url: "/og-image.jpg", // Next.js automatically resolves this against metadataBase
+        url: "/og-imagen.jpg", // Next.js automatically resolves this against metadataBase
         width: 1200,
         height: 630,
         alt: "SocioVIP Preview",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SocioVIP - Experiencias Exclusivas",
     description: "Descubre las mejores promociones y eventos exclusivos en tu ciudad con SocioVIP.",
-    images: ["/og-image.jpg"],
+    images: ["/og-imagen.jpg"],
   },
 };
 
