@@ -110,7 +110,7 @@ export function VideoCarousel({ videos, primaryColor = '#B080D0' }: VideoCarouse
 
       <button
         onClick={() => setIsMuted(prev => !prev)}
-        className="absolute top-3 right-3 z-30 p-2 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        className="absolute top-3 right-3 z-30 p-2 bg-black/40 text-white rounded-full transition-opacity duration-300"
       >
         {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
       </button>

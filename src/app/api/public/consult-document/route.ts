@@ -9,7 +9,7 @@ async function consultExternalDniApi(
 ): Promise<{ nombreCompleto: string; fechaNacimiento: string | null } | null> {
   try {
     const url = `https://api.decolecta.com/v1/reniec/dni?numero=${dni}`;
-    const token = 'sk_19914.4sISqqjJuEH3cwjz15kR0rFEmDI0h2u8'; // Token proporcionado por el usuario
+    const token = '123456'; // Token proporcionado por el usuario
 
     const response = await fetch(url, {
       method: 'GET',
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     // *** CAMBIO MÍNIMO: Primero verificar si ya es un usuario de plataforma ***
     const platformUserQuery = await adminDb.collection('platformUsers').where('dni', '==', dni).limit(1).get();
     if (!platformUserQuery.empty) {
-        return NextResponse.json({ isPlatformUser: true });
+      return NextResponse.json({ isPlatformUser: true });
     }
 
     // Search in other internal DBs first
@@ -86,11 +86,11 @@ export async function POST(request: Request) {
 
         const fechaNacimiento = dobDate
           ? dobDate.toLocaleDateString('es-PE', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              timeZone: 'America/Lima',
-            })
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            timeZone: 'America/Lima',
+          })
           : null;
 
         return NextResponse.json({
