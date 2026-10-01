@@ -25,7 +25,7 @@ export function ImageCarousel({
   slogan = '',
   logoUrl,
   showOverlay = true,
-  aspectClass = 'aspect-[4/3] md:aspect-[16/7]',
+  aspectClass = 'min-h-[75vh] md:min-h-0 md:aspect-[16/7]',
 }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [animationKey, setAnimationKey] = useState(0);
@@ -88,44 +88,33 @@ export function ImageCarousel({
           <>
             <button
               onClick={goToPrevious}
-              className="absolute top-1/2 left-3 z-30 -translate-y-1/2 p-2 bg-black/30 text-white rounded-full transition-colors duration-300 hover:bg-black/50"
+              className="absolute left-3 p-2 bg-black/30 text-white rounded-full transition-colors duration-300 hover:bg-black/50 z-30 top-auto bottom-4 md:top-1/2 md:bottom-auto md:-translate-y-1/2"
             >
-              <ChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
             </button>
             <button
               onClick={goToNext}
-              className="absolute top-1/2 right-3 z-30 -translate-y-1/2 p-2 bg-black/30 text-white rounded-full transition-colors duration-300 hover:bg-black/50"
+              className="absolute right-3 p-2 bg-black/30 text-white rounded-full transition-colors duration-300 hover:bg-black/50 z-30 top-auto bottom-4 md:top-1/2 md:bottom-auto md:-translate-y-1/2"
             >
-              <ChevronRight className="h-6 w-6" />
+              <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
             </button>
           </>
         )}
 
-        {/* Overlay alineado a la izquierda */}
+        {/* Overlay alineado a la izquierda en desktop y mobile */}
         {showOverlay && (
-          <div className="absolute inset-0 z-20 flex flex-col items-start justify-center text-left bg-gradient-to-r from-slate-950/95 via-slate-950/60 to-transparent px-6 sm:px-16 md:px-24 pt-16 sm:pt-0">
+          <div className="absolute inset-0 z-20 flex flex-col items-start justify-center text-left bg-gradient-to-t from-black/90 via-black/60 to-black/30 md:bg-none md:bg-gradient-to-r md:from-slate-950/95 md:via-slate-950/60 md:to-transparent px-6 sm:px-16 md:px-24 pt-16 sm:pt-0">
             {slogan && (
-              <span className="font-black text-[9px] sm:text-[10px] md:text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] text-accent mb-2 sm:mb-3 animate-fade-in-down drop-shadow-md">
+              <span className="font-black text-[10px] md:text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] text-accent mb-3 animate-fade-in-down drop-shadow-md">
                 {slogan}
               </span>
             )}
-            <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] tracking-tight animate-fade-in leading-tight max-w-2xl">
+            <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] tracking-tight animate-fade-in leading-tight max-w-2xl">
               {title}
             </h2>
-            <p className="mt-2 sm:mt-4 text-xs sm:text-sm md:text-base text-white/70 max-w-lg font-medium leading-relaxed drop-shadow-sm line-clamp-2 sm:line-clamp-none">
+            <p className="mt-3 sm:mt-4 text-sm md:text-base text-white/90 md:text-white/70 max-w-lg font-medium leading-relaxed drop-shadow-sm line-clamp-3 sm:line-clamp-none">
               Explora las mejores promociones y eventos exclusivos de este prestigioso establecimiento de primer nivel, garantizado por SocioVIP.
             </p>
-            <button 
-              onClick={() => {
-                const element = document.getElementById("entity-views-tabs");
-                if (element) {
-                  element.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className="mt-4 sm:mt-8 border border-white/80 hover:bg-white hover:text-slate-950 text-white rounded-full font-black text-[9px] sm:text-[10px] uppercase tracking-widest px-6 py-2.5 sm:px-8 sm:py-3.5 transition-all duration-300 shadow-lg active:scale-95"
-            >
-              Explorar Experiencias
-            </button>
           </div>
         )}
 

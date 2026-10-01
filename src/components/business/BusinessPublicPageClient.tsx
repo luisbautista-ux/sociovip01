@@ -1000,11 +1000,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                <div className="flex items-center gap-2 sm:gap-4">
                   <Link href="/" className="flex items-center group">
                      {/* SocioVIP logo square animated wrapper */}
-                     <div className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-lg overflow-hidden flex items-center justify-center bg-[#070f14] border border-white/10 shadow-sm transition-all group-hover:scale-105 shrink-0">
+                     <div className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-lg overflow-hidden flex items-center justify-center bg-[#0c2f55] border border-white/10 shadow-sm transition-all group-hover:scale-105 shrink-0">
                         <img 
                            src="https://www.image2url.com/r2/default/gifs/1778861156032-56811580-9ea6-4eab-9dd1-9cec2b902ccb.gif" 
                            alt="SocioVIP Logo" 
-                           className="w-full h-full object-cover"
+                           className="w-full h-full object-cover scale-[0.75]"
                         />
                      </div>
                   </Link>
