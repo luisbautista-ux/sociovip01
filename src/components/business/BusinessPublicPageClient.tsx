@@ -1741,7 +1741,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                       <FormControl>
                         <Input 
                             type="tel" 
-                            placeholder="987654321" 
+                            placeholder="Ingrese su celular" 
                             {...field} 
                             maxLength={9}
                             onChange={(e) => {
@@ -1789,6 +1789,12 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                               date > new Date(new Date().setFullYear(new Date().getFullYear() - 10)) || date < new Date("1920-01-01")
                             }
                             initialFocus
+                            style={{
+                              "--rdp-accent-color": businessDetails.secondaryColor || "#ccffbc",
+                              "--rdp-background-color": `${businessDetails.secondaryColor || "#ccffbc"}40`,
+                              "--rdp-outline": `2px solid ${businessDetails.secondaryColor || "#ccffbc"}`,
+                              "--rdp-outline-focus": `2px solid ${businessDetails.secondaryColor || "#ccffbc"}`
+                            } as React.CSSProperties}
                           />
                         </PopoverContent>
                       </Popover>
@@ -1800,7 +1806,11 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 bg-transparent hover:bg-black/5 text-slate-800"
+                    style={{
+                      borderColor: businessDetails.secondaryColor || '#ccffbc',
+                      borderWidth: '2px'
+                    }}
                     onClick={() => {
                       setCurrentStepInModal("enterDni");
                       newQrClientForm.reset({ dni: enteredDni });
@@ -1812,7 +1822,7 @@ const handleNewUserSubmitInModal: SubmitHandler<NewQrClientFormData> = async (fo
                   </Button>
                   <Button type="submit" className="flex-1 text-white font-bold shadow-lg transition-all hover:scale-105" 
                     style={{
-                        backgroundImage: `linear-gradient(to right, ${businessDetails.primaryColor || '#053264'}, ${businessDetails.secondaryColor || '#ccffbc'})`
+                        backgroundColor: businessDetails.primaryColor || '#053264'
                     }}
                     disabled={isLoadingQrFlow || isConsultingDni}>
                     {isLoadingQrFlow ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Registrar y Generar QR"}
